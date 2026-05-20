@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "FinViet",
+    "slug": "finviet-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/to-do-list.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/to-do-list.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A6B3C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.finviet.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "FinViet needs camera access to scan receipts and bank screenshots.",
+        "NSPhotoLibraryUsageDescription": "FinViet needs photo library access to upload receipt images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/to-do-list.png",
+        "backgroundColor": "#1A6B3C"
+      },
+      "package": "com.finviet.mobile",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1A6B3C",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "FinViet"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FinViet needs photo library access to upload receipt images.",
+          "cameraPermission": "FinViet needs camera access to scan receipts."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
