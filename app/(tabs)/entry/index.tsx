@@ -4,9 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   COLORS,
@@ -33,20 +34,40 @@ const MOCK_ENTRY_METHODS = [
     description: 'Chụp ảnh hóa đơn hoặc tải ảnh lên để nhận diện tự động.',
     route: '/(tabs)/entry/photo',
   },
+  {
+    id: 'sms',
+    icon: '💬',
+    title: 'Dán SMS',
+    description: 'Dán tin nhắn ngân hàng để AI tự động trích xuất giao dịch.',
+    route: '/(tabs)/entry/sms',
+  },
 ] as const;
 
 export default function EntryChooserScreen() {
   const router = useRouter();
+  const { date } = useLocalSearchParams<{ date?: string }>();
+
+  const buildHref = (route: string) =>
+    date ? `${route}?date=${date}` : route;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thêm Giao Dịch</Text>
+        {date ? (
+          <Text style={styles.headerSubtitle}>
+            Ngày: {formatDate(date)}
+          </Text>
+        ) : null}
       </View>
 
       {/* Body */}
-      <View style={styles.body}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.prompt}>Chọn phương thức nhập</Text>
 
         <View style={styles.cardsContainer}>
@@ -55,7 +76,7 @@ export default function EntryChooserScreen() {
               key={method.id}
               style={styles.card}
               activeOpacity={0.75}
-              onPress={() => router.push(method.route)}
+              onPress={() => router.push(buildHref(method.route) as never)}
             >
               {/* Icon column */}
               <View style={styles.iconWrapper}>
@@ -73,9 +94,15 @@ export default function EntryChooserScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
+}
+
+function formatDate(iso: string): string {
+  const parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 const styles = StyleSheet.create({
@@ -98,12 +125,21 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.gray[900],
   },
+  headerSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.brand[500],
+    fontWeight: FONT_WEIGHT.medium,
+    marginTop: SPACING[1],
+  },
 
   // ─── Body ────────────────────────────────────────────────────────────────────
   body: {
     flex: 1,
+  },
+  bodyContent: {
     paddingHorizontal: SPACING[5],
     paddingTop: SPACING[6],
+    paddingBottom: SPACING[8],
   },
   prompt: {
     fontSize: FONT_SIZE.sm,

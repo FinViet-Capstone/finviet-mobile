@@ -63,7 +63,10 @@ function isValidUri(uri: string | undefined): boolean {
 
 export default function PhotoConfirmScreen() {
   const router = useRouter();
-  const { uri: rawUri } = useLocalSearchParams<{ uri?: string }>();
+  const { uri: rawUri, date: dateParam } = useLocalSearchParams<{
+    uri?: string;
+    date?: string;
+  }>();
   const extract = useExtractFromPhoto();
 
   const imageUri: string | null =
@@ -77,7 +80,9 @@ export default function PhotoConfirmScreen() {
   );
   const [amountRaw, setAmountRaw] = useState<string>('');
   const [merchant, setMerchant] = useState<string>('');
-  const [dateDisplay, setDateDisplay] = useState<string>(isoToDisplay(todayISO()));
+  const [dateDisplay, setDateDisplay] = useState<string>(
+    isoToDisplay(dateParam ?? todayISO()),
+  );
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryUncertain, setCategoryUncertain] = useState<boolean>(false);
   const [amountUncertain, setAmountUncertain] = useState<boolean>(false);
@@ -93,6 +98,7 @@ export default function PhotoConfirmScreen() {
       onSuccess: (result) => {
         if (result.amount !== null) setAmountRaw(String(result.amount));
         if (result.merchant !== null) setMerchant(result.merchant);
+        // Prefer extraction date; fall back to forwarded calendar date if extraction returns today
         setDateDisplay(isoToDisplay(result.transactionDate));
         setCategoryId(result.categoryId);
         setAmountUncertain(

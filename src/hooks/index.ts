@@ -10,3 +10,4 @@ export { useGoals, useGoalById } from './useGoals';
 export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
 export { useNotifications, useUnreadNotifications } from './useNotifications';
 export { useExtractFromPhoto } from './useExtractFromPhoto';
+export { useExtractFromSMS } from './useExtractFromSMS';

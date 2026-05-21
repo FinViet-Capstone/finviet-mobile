@@ -161,12 +161,10 @@ export default function CalendarScreen() {
   const handleDayTap = (cell: DayCell) => {
     const now = Date.now();
     if (lastTap && lastTap.iso === cell.iso && now - lastTap.at < DOUBLE_TAP_MS) {
-      // Double tap on empty day → manual entry pre-filled with that date
-      if (!cell.hasActivity) {
-        router.push(
-          `/(tabs)/entry/manual?date=${cell.iso}` as never,
-        );
-      }
+      // Double tap on any day → entry chooser pre-filled with that date
+      router.push(
+        `/(tabs)/entry?date=${cell.iso}` as never,
+      );
       setLastTap(null);
       return;
     }
@@ -174,7 +172,7 @@ export default function CalendarScreen() {
     setLastTap({ iso: cell.iso, at: now });
   };
 
-  const handleEntryDoubleTap = (txId: string) => {
+  const handleEntryTap = (txId: string) => {
     router.push(`/(tabs)/calendar/edit-entry?id=${txId}` as never);
   };
 
@@ -298,24 +296,13 @@ export default function CalendarScreen() {
               <View key={tx.id} style={styles.entryWrapper}>
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onPress={() => {
-                    const now = Date.now();
-                    if (
-                      lastTap?.iso === tx.id &&
-                      now - lastTap.at < DOUBLE_TAP_MS
-                    ) {
-                      handleEntryDoubleTap(tx.id);
-                      setLastTap(null);
-                    } else {
-                      setLastTap({ iso: tx.id, at: now });
-                    }
-                  }}
+                  onPress={() => handleEntryTap(tx.id)}
                 >
-                  <TransactionCard transaction={tx} />
+                  <TransactionCard transaction={tx} showChevron />
                   {tx.categoryId === null ? (
                     <View style={styles.entryUncategorized}>
                       <Text style={styles.entryUncategorizedText}>
-                        ? Chưa phân loại — chạm 2 lần để sửa
+                        ? Chưa phân loại — chạm để sửa
                       </Text>
                     </View>
                   ) : null}

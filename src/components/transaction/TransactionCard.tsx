@@ -8,16 +8,18 @@ import { Transaction } from '@/types/transaction';
 export interface TransactionCardProps {
   transaction: Transaction;
   onPress?: () => void;
+  /** Renders a small `›` chevron at the right edge to signal "tap for detail". */
+  showChevron?: boolean;
 }
 
 /**
  * Single transaction row displaying:
- *   [Category circle] | description + merchant | amount + date
+ *   [Category circle] | description + merchant | amount + date | (chevron)
  *
  * The category icon is rendered as a colored circle with the category's initial
  * letter because the icon set has not yet been decided (see categories.ts).
  */
-export function TransactionCard({ transaction, onPress }: TransactionCardProps) {
+export function TransactionCard({ transaction, onPress, showChevron = false }: TransactionCardProps) {
   const category = transaction.categoryId
     ? getCategoryById(transaction.categoryId)
     : undefined;
@@ -59,6 +61,8 @@ export function TransactionCard({ transaction, onPress }: TransactionCardProps) 
         />
         <Text style={styles.date}>{formattedDate}</Text>
       </View>
+
+      {showChevron ? <Text style={styles.cardChevron}>›</Text> : null}
     </View>
   );
 
@@ -123,5 +127,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.gray[400],
     marginTop: 2,
+  },
+  cardChevron: {
+    fontSize: FONT_SIZE.xl,
+    color: COLORS.gray[300],
+    marginLeft: SPACING[2],
+    lineHeight: 22,
   },
 });

@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import {
@@ -41,6 +41,12 @@ type PhotoOptionId = 'camera' | 'gallery';
 
 export default function PhotoEntryScreen() {
   const router = useRouter();
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+
+  const buildConfirmHref = (uri: string) => {
+    const base = `/(tabs)/entry/photo-confirm?uri=${encodeURIComponent(uri)}`;
+    return dateParam ? `${base}&date=${dateParam}` : base;
+  };
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -64,9 +70,7 @@ export default function PhotoEntryScreen() {
       });
       if (result.canceled) return;
       const uri = result.assets[0].uri;
-      router.push(
-        ('/(tabs)/entry/photo-confirm?uri=' + encodeURIComponent(uri)) as never,
-      );
+      router.push(buildConfirmHref(uri) as never);
     } finally {
       setIsLoading(false);
     }
@@ -90,9 +94,7 @@ export default function PhotoEntryScreen() {
       });
       if (result.canceled) return;
       const uri = result.assets[0].uri;
-      router.push(
-        ('/(tabs)/entry/photo-confirm?uri=' + encodeURIComponent(uri)) as never,
-      );
+      router.push(buildConfirmHref(uri) as never);
     } finally {
       setIsLoading(false);
     }
