@@ -1,22 +1,75 @@
+/**
+ * user.ts - FinViet type definitions for the User domain
+ *
+ * Monetary amounts: number = whole Vietnamese Dong (VND).
+ *
+ * Date fields:
+ *   DATE columns   : ISO 8601 string "YYYY-MM-DD"
+ *   TIMESTAMPTZ    : ISO 8601 string "YYYY-MM-DDTHH:mm:ssZ"
+ */
+
+// -------------------------------------------------------------------------
+// Notification preferences (maps to notif_budget / notif_report / notif_goals)
+// -------------------------------------------------------------------------
+
+export interface NotificationSettings {
+  /** Push notification when a budget category reaches 80% */
+  budget: boolean;
+  /** Push notification when the weekly AI report is ready */
+  report: boolean;
+  /** Push notification when a savings goal milestone is reached */
+  goals: boolean;
+}
+
+// -------------------------------------------------------------------------
+// User preferences (surfaced on the More -> Preferences screen)
+// -------------------------------------------------------------------------
+
+export type AppLanguage = 'vi' | 'en';
+export type AppTheme = 'light' | 'dark' | 'system';
+
+export interface UserPreferences {
+  language: AppLanguage;
+  /** UUID of the wallet pre-selected when logging a transaction */
+  defaultWalletId: string | null;
+  /** ISO 4217 currency code -- default "VND" */
+  defaultCurrency: string;
+  theme: AppTheme;
+}
+
+// -------------------------------------------------------------------------
+// User
+// -------------------------------------------------------------------------
+
 export interface User {
   id: string;
   email: string;
+  /** Null when the account was created via Google OAuth only */
+  passwordHash: string | null;
+  /** Google OAuth subject identifier; null for email-only accounts */
+  googleId: string | null;
   displayName: string;
-  avatarUrl?: string;
-  monthlyIncome?: number;
-  defaultWalletId?: string;
+  avatarUrl: string | null;
+  /** Estimated monthly income in whole VND; null until set during onboarding */
+  monthlyIncome: number | null;
+  defaultWalletId: string | null;
   defaultCurrency: string;
-  language: 'vi' | 'en';
-  theme: 'light' | 'dark' | 'system';
+  language: AppLanguage;
+  theme: AppTheme;
   isActive: boolean;
-  notifBudget: boolean;
-  notifReport: boolean;
-  notifGoals: boolean;
-  fcmToken?: string;
+  notifications: NotificationSettings;
+  /** Firebase Cloud Messaging device token for push notifications */
+  fcmToken: string | null;
   onboardingDone: boolean;
+  /** ISO 8601 timestamp */
   createdAt: string;
+  /** ISO 8601 timestamp */
   updatedAt: string;
 }
+
+// -------------------------------------------------------------------------
+// Auth payloads
+// -------------------------------------------------------------------------
 
 export interface AuthTokens {
   accessToken: string;
@@ -49,6 +102,10 @@ export interface ChangePasswordPayload {
   newPassword: string;
 }
 
+// -------------------------------------------------------------------------
+// Onboarding & profile update payloads
+// -------------------------------------------------------------------------
+
 export interface OnboardingPayload {
   monthlyIncome: number;
   defaultCurrency: string;
@@ -64,11 +121,9 @@ export interface UpdateProfilePayload {
 }
 
 export interface UpdatePreferencesPayload {
-  language?: 'vi' | 'en';
-  theme?: 'light' | 'dark' | 'system';
-  defaultWalletId?: string;
+  language?: AppLanguage;
+  theme?: AppTheme;
+  defaultWalletId?: string | null;
   defaultCurrency?: string;
-  notifBudget?: boolean;
-  notifReport?: boolean;
-  notifGoals?: boolean;
+  notifications?: Partial<NotificationSettings>;
 }

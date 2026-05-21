@@ -52,13 +52,15 @@ export interface DeepLinkDestination {
 export function parseDeepLink(deepLink: string): DeepLinkDestination | null {
   if (!deepLink) return null;
 
-  const budgetMatch = deepLink.match(/^\/budget\/([a-f0-9-]+)$/i);
+  // Budget detail lives at /more/budget/{id} in Expo Router
+  const budgetMatch = deepLink.match(/^\/more\/budget\/([a-zA-Z0-9_-]+)$/);
   if (budgetMatch) return { screen: 'BudgetDetail', params: { id: budgetMatch[1] } };
 
   if (deepLink === '/report/weekly') return { screen: 'WeeklyReport' };
   if (deepLink === '/report/score')  return { screen: 'SpendingScoreDetail' };
 
-  const goalMatch = deepLink.match(/^\/goal\/([a-f0-9-]+)$/i);
+  // Goal detail lives at /wallet/goals/{id} in Expo Router
+  const goalMatch = deepLink.match(/^\/wallet\/goals\/([a-zA-Z0-9_-]+)$/);
   if (goalMatch) return { screen: 'GoalDetail', params: { id: goalMatch[1] } };
 
   if (deepLink === '/notifications') return { screen: 'Notifications' };
