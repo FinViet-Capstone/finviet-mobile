@@ -7,6 +7,6 @@ export const useBudgets = () =>
 export const useBudgetById = (id: string | undefined) =>
   useQuery({
     queryKey: ['budgets', id],
-    queryFn: () => (id ? getBudgetById(id) : undefined),
+    queryFn: () => (id ? getBudgetById(id) ?? null : null),
     enabled: !!id,
   });

@@ -15,7 +15,7 @@ export const useTransactions = (filters?: TransactionFilters) =>
 export const useTransactionById = (id: string | undefined) =>
   useQuery({
     queryKey: ['transactions', id],
-    queryFn: () => (id ? getTransactionById(id) : undefined),
+    queryFn: () => (id ? getTransactionById(id) ?? null : null),
     enabled: !!id,
   });
 

@@ -7,6 +7,6 @@ export const useGoals = () =>
 export const useGoalById = (id: string | undefined) =>
   useQuery({
     queryKey: ['goals', id],
-    queryFn: () => (id ? getGoalById(id) : undefined),
+    queryFn: () => (id ? getGoalById(id) ?? null : null),
     enabled: !!id,
   });

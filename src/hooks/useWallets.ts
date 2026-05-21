@@ -7,6 +7,6 @@ export const useWallets = () =>
 export const useWalletById = (id: string | undefined) =>
   useQuery({
     queryKey: ['wallets', id],
-    queryFn: () => (id ? getWalletById(id) : undefined),
+    queryFn: () => (id ? getWalletById(id) ?? null : null),
     enabled: !!id,
   });
