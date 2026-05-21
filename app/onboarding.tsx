@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { WalletType } from '@/types/wallet';
+import { useAuthStore } from '@/stores/authStore';
 import {
   COLORS,
   SPACING,
@@ -97,6 +98,7 @@ const indicatorStyles = StyleSheet.create({
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const markOnboardingDone = useAuthStore((s) => s.markOnboardingDone);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [monthlyIncome, setMonthlyIncome] = useState('');
@@ -120,6 +122,7 @@ export default function OnboardingScreen() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      markOnboardingDone();
       router.replace('/(tabs)/report');
     }, 500);
   };

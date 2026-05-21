@@ -37,3 +37,6 @@ export {
 
 // Notifications
 export { getNotifications, getUnreadNotifications } from './mock/notifications';
+
+// Photo Extraction (mock — frozen contract; see types/extraction.ts and constants/extraction.ts)
+export { extractFromPhoto } from './mock/extraction';

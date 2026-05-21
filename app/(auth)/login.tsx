@@ -17,6 +17,8 @@ import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { useAuthStore } from '@/stores/authStore';
+import { getUser } from '@/services';
 import {
   COLORS,
   SPACING,
@@ -49,6 +51,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -67,6 +70,8 @@ export default function LoginScreen() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      const user = { ...getUser(), onboardingDone: true };
+      setSession(user);
       router.replace('/(tabs)/report');
     }, 1000);
   };

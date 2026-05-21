@@ -12,3 +12,4 @@ export * from './budget';
 export * from './goal';
 export * from './ai';
 export * from './notification';
+export * from './extraction';
