@@ -11,6 +11,9 @@ expo-env.d.ts
 android/
 ios/
 
+# Agents files
+agents/
+
 # Environment files
 .env
 .env.local

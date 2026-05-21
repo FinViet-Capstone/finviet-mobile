@@ -2,11 +2,12 @@
   "expo": {
     "name": "FinViet",
     "slug": "finviet-mobile",
+    "scheme": "finviet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/to-do-list.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/to-do-list.png",
       "resizeMode": "contain",
@@ -55,7 +56,8 @@
           "photosPermission": "FinViet needs photo library access to upload receipt images.",
           "cameraPermission": "FinViet needs camera access to scan receipts."
         }
-      ]
+      ],
+      "expo-router"
     ],
     "extra": {
       "eas": {

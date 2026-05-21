@@ -1,33 +1,30 @@
 {
   "compilerOptions": {
-    // Language & output
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
-
-    // JSX
     "jsx": "react-native",
-
-    // Strictness
     "strict": true,
     "moduleDetection": "force",
-
-    // Interop
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-
-    // Path aliases — resolved relative to this tsconfig file
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
     "App.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
     "*.ts",
@@ -35,5 +32,6 @@
   ],
   "exclude": [
     "node_modules"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

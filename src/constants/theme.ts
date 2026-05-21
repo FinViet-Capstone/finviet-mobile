@@ -1,5 +1,5 @@
-// Design token map for NativeWind v2 + Victory Native
-// Any Tailwind class not supported by NativeWind v2 should use these as StyleSheet fallbacks.
+// Design tokens — shared across all screens via StyleSheet.
+// Import COLORS, SPACING, FONT_SIZE, etc. instead of hardcoding values.
 
 export const COLORS = {
   // Brand

@@ -1,7 +1,7 @@
 {
   "name": "finviet-mobile",
   "version": "1.0.0",
-  "main": "App.tsx",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -10,36 +10,33 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
-    "expo": "~54.0.0",
-    "react": "18.3.1",
-    "react-native": "~0.76.0",
-    "@react-navigation/native": "^6.1.18",
-    "@react-navigation/native-stack": "^6.11.0",
-    "@react-navigation/bottom-tabs": "^6.6.1",
-    "zustand": "^5.0.2",
-    "react-hook-form": "^7.54.2",
-    "zod": "^3.24.1",
     "@hookform/resolvers": "^3.9.1",
-    "nativewind": "^2.0.11",
+    "expo": "~54.0.0",
+    "expo-constants": "~18.0.13",
+    "expo-image-picker": "~17.0.11",
+    "expo-linking": "~8.0.12",
+    "expo-notifications": "~0.32.17",
+    "expo-router": "~6.0.23",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-hook-form": "^7.54.2",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-worklets": "0.5.1",
     "victory-native": "36.9.2",
-    "expo-notifications": "~0.29.0",
-    "expo-image-picker": "~16.0.6",
-    "expo-constants": "~17.0.3",
-    "expo-linking": "~7.0.3",
-    "expo-status-bar": "~2.0.0",
-    "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "~4.4.0",
-    "react-native-gesture-handler": "~2.20.2",
-    "react-native-reanimated": "~3.16.1",
-    "react-native-svg": "15.9.0"
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "@types/react": "~18.3.12",
-    "typescript": "^5.3.0",
-    "tailwindcss": "^3.4.0",
+    "@types/react": "~19.1.10",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.0.0"
+    "eslint": "^9.0.0",
+    "typescript": "^5.3.0"
   }
 }
