@@ -1,46 +1,36 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
 import { getCategoryById } from '@/constants/categories';
+import { getCategoryIcon } from '@/constants/categoryIcons';
 import { AmountText } from '@/components/common/AmountText';
 import { Transaction } from '@/types/transaction';
 
 export interface TransactionCardProps {
   transaction: Transaction;
   onPress?: () => void;
-  /** Renders a small `›` chevron at the right edge to signal "tap for detail". */
+  /** Renders a small chevron at the right edge to signal "tap for detail". */
   showChevron?: boolean;
 }
 
-/**
- * Single transaction row displaying:
- *   [Category circle] | description + merchant | amount + date | (chevron)
- *
- * The category icon is rendered as a colored circle with the category's initial
- * letter because the icon set has not yet been decided (see categories.ts).
- */
 export function TransactionCard({ transaction, onPress, showChevron = false }: TransactionCardProps) {
   const category = transaction.categoryId
     ? getCategoryById(transaction.categoryId)
     : undefined;
 
   const categoryColor = category?.color ?? COLORS.gray[400];
-  const categoryInitial = category?.nameVi?.charAt(0).toUpperCase() ?? '?';
+  const Icon = getCategoryIcon(category?.icon);
 
-  // Format transaction_date (YYYY-MM-DD) as DD/MM/YYYY for display
   const [year, month, day] = transaction.transactionDate.split('-');
   const formattedDate = `${day}/${month}/${year}`;
 
   const content = (
     <View style={styles.row}>
-      {/* Category circle */}
       <View style={[styles.categoryCircle, { backgroundColor: categoryColor + '26' }]}>
-        <Text style={[styles.categoryInitial, { color: categoryColor }]}>
-          {categoryInitial}
-        </Text>
+        <Icon size={20} color={categoryColor} />
       </View>
 
-      {/* Middle: description + merchant */}
       <View style={styles.middle}>
         <Text style={styles.description} numberOfLines={1}>
           {transaction.description ?? category?.nameVi ?? 'Giao dịch'}
@@ -52,7 +42,6 @@ export function TransactionCard({ transaction, onPress, showChevron = false }: T
         ) : null}
       </View>
 
-      {/* Right: amount + date */}
       <View style={styles.right}>
         <AmountText
           amount={transaction.amount}
@@ -62,7 +51,9 @@ export function TransactionCard({ transaction, onPress, showChevron = false }: T
         <Text style={styles.date}>{formattedDate}</Text>
       </View>
 
-      {showChevron ? <Text style={styles.cardChevron}>›</Text> : null}
+      {showChevron ? (
+        <ChevronRight size={18} color={COLORS.gray[300]} style={styles.cardChevron} />
+      ) : null}
     </View>
   );
 
@@ -102,10 +93,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: SPACING[3],
   },
-  categoryInitial: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-  },
   middle: {
     flex: 1,
     marginRight: SPACING[2],
@@ -129,9 +116,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cardChevron: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.gray[300],
     marginLeft: SPACING[2],
-    lineHeight: 22,
   },
 });

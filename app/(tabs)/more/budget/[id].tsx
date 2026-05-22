@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Wallet, Receipt } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -61,7 +62,7 @@ export default function BudgetDetailScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Không tìm thấy" />
         <EmptyState
-          iconName="cash-outline"
+          icon={Wallet}
           title="Không tìm thấy ngân sách"
           subtitle="Ngân sách này có thể đã bị xóa."
         />
@@ -164,7 +165,7 @@ export default function BudgetDetailScreen() {
           </Text>
           {expenseTxs.length === 0 ? (
             <EmptyState
-              iconName="receipt-outline"
+              icon={Receipt}
               title="Chưa có giao dịch"
               subtitle="Giao dịch trong tháng sẽ xuất hiện ở đây."
             />

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { AlertCircle, CheckCircle2, Receipt } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -53,7 +54,7 @@ export default function EditEntryScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Sửa giao dịch" />
         <EmptyState
-          iconName="alert-circle-outline"
+          icon={AlertCircle}
           title="Thiếu mã giao dịch"
           subtitle="Không thể tải giao dịch này. Quay lại và thử lại."
         />
@@ -90,7 +91,7 @@ function UncategorizedListMode() {
 
         {list.length === 0 ? (
           <EmptyState
-            iconName="checkmark-circle-outline"
+            icon={CheckCircle2}
             title="Tất cả đã phân loại"
             subtitle="Tất cả giao dịch của bạn đều đã có danh mục."
           />
@@ -149,7 +150,7 @@ function EditMode({ txId }: { txId: string }) {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Không tìm thấy" />
         <EmptyState
-          iconName="receipt-outline"
+          icon={Receipt}
           title="Không tìm thấy giao dịch"
           subtitle="Giao dịch này có thể đã bị xóa."
         />

@@ -1,6 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { BarChart3, Calendar as CalendarIcon, Wallet, Menu, Plus } from 'lucide-react-native';
 import TabBarIcon from '@/components/common/TabBarIcon';
 import { COLORS } from '@/constants/theme';
 
@@ -12,7 +13,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       style={styles.entryWrapper}
     >
       <View style={styles.entryButton}>
-        <TabBarIcon glyph="+" color={COLORS.white} size={28} />
+        <Plus color={COLORS.white} size={28} />
       </View>
     </TouchableOpacity>
   );
@@ -36,14 +37,14 @@ export default function TabLayout() {
         name="report"
         options={{
           title: 'Báo cáo',
-          tabBarIcon: ({ color, size }) => <TabBarIcon glyph="📊" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon={BarChart3} color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="calendar"
         options={{
           title: 'Lịch',
-          tabBarIcon: ({ color, size }) => <TabBarIcon glyph="📅" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon={CalendarIcon} color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -57,14 +58,14 @@ export default function TabLayout() {
         name="wallet"
         options={{
           title: 'Ví',
-          tabBarIcon: ({ color, size }) => <TabBarIcon glyph="💳" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon={Wallet} color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: 'Khác',
-          tabBarIcon: ({ color, size }) => <TabBarIcon glyph="☰" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon={Menu} color={color} size={size} />,
         }}
       />
     </Tabs>

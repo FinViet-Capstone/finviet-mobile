@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronLeft } from 'lucide-react-native';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
 
 export interface ScreenHeaderProps {
@@ -29,7 +29,7 @@ export function ScreenHeader({
             style={styles.backButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="chevron-back" size={24} color={COLORS.gray[800]} />
+            <ChevronLeft size={24} color={COLORS.gray[800]} />
           </TouchableOpacity>
         ) : null}
       </View>

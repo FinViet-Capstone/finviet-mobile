@@ -1,27 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Inbox, type LucideIcon } from 'lucide-react-native';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 
 export interface EmptyStateProps {
-  /**
-   * Ionicons icon name (see https://icons.expo.fyi).
-   * Defaults to 'file-tray-outline'.
-   */
-  iconName?: React.ComponentProps<typeof Ionicons>['name'];
+  /** Lucide icon component. Defaults to `Inbox`. */
+  icon?: LucideIcon;
   title: string;
   subtitle?: string;
 }
 
 export function EmptyState({
-  iconName = 'file-tray-outline',
+  icon: Icon = Inbox,
   title,
   subtitle,
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrapper}>
-        <Ionicons name={iconName} size={48} color={COLORS.gray[400]} />
+        <Icon size={48} color={COLORS.gray[400]} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

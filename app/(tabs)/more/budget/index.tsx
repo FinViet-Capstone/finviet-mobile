@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Wallet } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -68,7 +69,7 @@ export default function BudgetListScreen() {
         {/* Budget cards */}
         {budgets.length === 0 ? (
           <EmptyState
-            iconName="cash-outline"
+            icon={Wallet}
             title="Chưa có ngân sách"
             subtitle="Đặt giới hạn chi tiêu cho từng danh mục để theo dõi tốt hơn."
           />

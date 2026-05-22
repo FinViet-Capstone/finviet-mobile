@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { FileText } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -31,7 +32,7 @@ export default function WeeklyReportScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} />
         <EmptyState
-          iconName="document-text-outline"
+          icon={FileText}
           title="Chưa có báo cáo tuần"
           subtitle="Báo cáo sẽ được tạo vào sáng thứ Hai mỗi tuần."
         />

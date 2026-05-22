@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Bell } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -132,7 +133,7 @@ export default function NotificationsScreen() {
       >
         {list.length === 0 ? (
           <EmptyState
-            iconName="notifications-outline"
+            icon={Bell}
             title="Không có thông báo"
             subtitle="Cảnh báo ngân sách và báo cáo tuần sẽ xuất hiện tại đây."
           />

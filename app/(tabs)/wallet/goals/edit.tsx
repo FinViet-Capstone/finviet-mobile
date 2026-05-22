@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Trophy } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -63,7 +64,7 @@ export default function EditGoalScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Không tìm thấy" />
         <EmptyState
-          iconName="trophy-outline"
+          icon={Trophy}
           title="Không tìm thấy mục tiêu"
           subtitle="Mục tiêu này có thể đã bị xóa."
         />
