@@ -25,13 +25,10 @@ import {
 } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Donut } from '@/components/charts/Donut';
-import { WeeklySpendingSwiper } from '@/components/charts/WeeklySpendingSwiper';
 import { RingBadge } from '@/components/charts/RingBadge';
 import { CATEGORIES } from '@/constants/categories';
 import { formatVND } from '@/utils/formatters';
 import type { Transaction } from '@/types';
-
-const MONDAY_FIRST_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -55,9 +52,6 @@ export default function ReportScreen() {
     startDate: ymd(monthStart),
     endDate: ymd(monthEnd),
   });
-
-  // Week range no longer used here — the WeeklySpendingSwiper owns its own
-  // per-week queries so the user can page back through history.
 
   // Last month for WoW comparison
   const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -90,9 +84,6 @@ export default function ReportScreen() {
   }, [monthTx]);
 
   const monthExpenseTotal = donutData.reduce((sum, d) => sum + d.y, 0);
-
-  // Week bars are rendered by WeeklySpendingSwiper below; this screen no longer
-  // pre-aggregates a single week.
 
   // Top 5 merchants this month
   const topMerchants = useMemo(() => {
@@ -220,20 +211,6 @@ export default function ReportScreen() {
                 })}
               </View>
             ) : null}
-          </View>
-        </View>
-
-        {/* Week bars */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Chi tiêu theo ngày</Text>
-          <Text style={styles.sectionSubtitle}>
-            Vuốt sang trái để xem các tuần trước. Phần xám là chi tiêu chưa phân loại.
-          </Text>
-          <View style={styles.chartCard}>
-            <WeeklySpendingSwiper
-              dayLabels={MONDAY_FIRST_LABELS}
-              formatValue={formatVND}
-            />
           </View>
         </View>
 

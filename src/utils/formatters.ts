@@ -29,3 +29,28 @@ export function formatVND(amount: number): string {
   }
   return parts.join('.') + ' ₫';
 }
+
+/**
+ * Compact VND formatter for chart axes — keeps labels short.
+ * Uses Vietnamese suffixes: k (nghìn), m (triệu), t (tỷ).
+ * Rounds to 1 decimal place and strips trailing ".0".
+ *
+ * @example formatVNDCompact(1_234)         → "1.2k"
+ * @example formatVNDCompact(1_000_000)     → "1m"
+ * @example formatVNDCompact(2_500_000)     → "2.5m"
+ * @example formatVNDCompact(1_000_000_000) → "1t"
+ * @example formatVNDCompact(450)           → "450"
+ */
+export function formatVNDCompact(amount: number): string {
+  const abs = Math.abs(Math.round(amount));
+  if (abs >= 1_000_000_000) return _compact(abs / 1_000_000_000, 't');
+  if (abs >= 1_000_000)     return _compact(abs / 1_000_000, 'm');
+  if (abs >= 1_000)         return _compact(abs / 1_000, 'k');
+  return String(abs);
+}
+
+function _compact(val: number, suffix: string): string {
+  const rounded = Math.round(val * 10) / 10;
+  const str = rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
+  return str + suffix;
+}

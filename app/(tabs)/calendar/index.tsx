@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { CalendarDays, BarChart3 } from 'lucide-react-native';
 
 import {
   COLORS,
@@ -20,26 +21,34 @@ import {
 import { useTransactions, useBudgets, useUser } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
-import { formatVND } from '@/utils/formatters';
+import { WeeklySpendingSwiper } from '@/components/charts/WeeklySpendingSwiper';
+import { formatVND, formatVNDCompact } from '@/utils/formatters';
 import type { Transaction } from '@/types';
 
-const VI_DAYS_OF_WEEK = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const VI_DAYS_OF_WEEK = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
 const VI_MONTHS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
   'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
 ];
 
 const DOUBLE_TAP_MS = 300;
+type CalendarView = 'calendar' | 'bar';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DayCell {
-  iso: string;            // "YYYY-MM-DD"
-  dayOfMonth: number;     // 1-31
+  iso: string;
+  dayOfMonth: number;
   total: number;
   hasUncategorized: boolean;
   isOverBudget: boolean;
   hasActivity: boolean;
   isToday: boolean;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -54,56 +63,62 @@ function todayISO(): string {
   return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+function formatVietnameseDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `Ngày ${parseInt(d, 10)} tháng ${parseInt(m, 10)}, ${y}`;
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function CalendarScreen() {
   const router = useRouter();
-  const today = new Date();
+  const today  = new Date();
 
-  // Calendar viewport state
-  const [year, setYear] = useState(today.getFullYear());
+  // View toggle: calendar grid or weekly bar chart
+  const [activeView, setActiveView] = useState<CalendarView>('calendar');
+
+  // Calendar viewport
+  const [year, setYear]         = useState(today.getFullYear());
   const [monthIdx, setMonthIdx] = useState(today.getMonth());
+
+  // Shared: the selected ISO date drives the day detail panel in both views
   const [selectedISO, setSelectedISO] = useState<string>(todayISO());
-  const [lastTap, setLastTap] = useState<{ iso: string; at: number } | null>(null);
+  const [lastTap, setLastTap]         = useState<{ iso: string; at: number } | null>(null);
 
   const monthStartISO = isoDate(year, monthIdx, 1);
-  const monthEndISO = isoDate(
-    year,
-    monthIdx,
-    new Date(year, monthIdx + 1, 0).getDate(),
-  );
+  const monthEndISO   = isoDate(year, monthIdx, new Date(year, monthIdx + 1, 0).getDate());
 
   const { data: transactions, isLoading } = useTransactions({
     startDate: monthStartISO,
     endDate: monthEndISO,
   });
+  // Dedicated single-day query for the detail panel — always scoped to the
+  // selected date so it stays accurate even when the calendar month viewport
+  // has been scrolled to a different month (which would otherwise empty out
+  // the month-level `transactions` and make the panel appear blank).
+  const { data: selectedDayTxs } = useTransactions({
+    startDate: selectedISO,
+    endDate: selectedISO,
+  });
   const { data: budgets } = useBudgets();
-  const { data: user } = useUser();
+  const { data: user }    = useUser();
 
-  const monthlyLimit = useMemo(() => {
-    if (!budgets) return 0;
-    return budgets.reduce((sum, b) => sum + b.monthlyLimit, 0);
-  }, [budgets]);
+  const monthlyLimit = useMemo(
+    () => (budgets ?? []).reduce((sum, b) => sum + b.monthlyLimit, 0),
+    [budgets],
+  );
 
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  // Per-day threshold fallback chain (resolved OQ #9):
-  //   1. monthly category budgets ÷ days-in-month
-  //   2. user.dailySpendLimit (advanced preference)
-  //   3. neutral (no coloring)
+  const daysInMonth   = new Date(year, monthIdx + 1, 0).getDate();
   const dailyAvgLimit =
-    monthlyLimit > 0
-      ? monthlyLimit / daysInMonth
-      : user?.dailySpendLimit ?? 0;
+    monthlyLimit > 0 ? monthlyLimit / daysInMonth : user?.dailySpendLimit ?? 0;
 
-  // Aggregate expenses per day (exclude transfers — ARCHITECTURE §5)
+  // Per-day aggregations (expenses only, transfers excluded)
   const dayMap = useMemo(() => {
     const map = new Map<string, { total: number; hasUncategorized: boolean }>();
     if (!transactions) return map;
     for (const tx of transactions) {
-      if (tx.type === 'transfer_in' || tx.type === 'transfer_out') continue;
       if (tx.type !== 'expense') continue;
-      const cur = map.get(tx.transactionDate) ?? {
-        total: 0,
-        hasUncategorized: false,
-      };
+      const cur = map.get(tx.transactionDate) ?? { total: 0, hasUncategorized: false };
       cur.total += tx.amount;
       if (tx.categoryId === null) cur.hasUncategorized = true;
       map.set(tx.transactionDate, cur);
@@ -114,67 +129,44 @@ export default function CalendarScreen() {
   const dayCells: DayCell[] = useMemo(() => {
     const cells: DayCell[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      const iso = isoDate(year, monthIdx, day);
-      const agg = dayMap.get(iso);
-      const total = agg?.total ?? 0;
+      const iso              = isoDate(year, monthIdx, day);
+      const agg              = dayMap.get(iso);
+      const total            = agg?.total ?? 0;
       const hasUncategorized = agg?.hasUncategorized ?? false;
-      const hasActivity = total > 0;
-      const isOverBudget =
-        dailyAvgLimit > 0 && hasActivity && total > dailyAvgLimit;
-      cells.push({
-        iso,
-        dayOfMonth: day,
-        total,
-        hasUncategorized,
-        isOverBudget,
-        hasActivity,
-        isToday: iso === todayISO(),
-      });
+      const hasActivity      = total > 0;
+      const isOverBudget     = dailyAvgLimit > 0 && hasActivity && total > dailyAvgLimit;
+      cells.push({ iso, dayOfMonth: day, total, hasUncategorized, isOverBudget, hasActivity, isToday: iso === todayISO() });
     }
     return cells;
   }, [dayMap, daysInMonth, dailyAvgLimit, year, monthIdx]);
 
-  // Monday is the first day of the week. JS getDay() returns Sun=0..Sat=6;
-  // we shift so Mon=0..Sun=6 to match VI_DAYS_OF_WEEK ordering.
-  const sundayOffset = new Date(year, monthIdx, 1).getDay();
-  const firstDOW = (sundayOffset + 6) % 7;
-  const leadingBlanks: null[] = Array.from({ length: firstDOW }, () => null);
+  const sundayOffset  = new Date(year, monthIdx, 1).getDay();
+  const firstDOW      = (sundayOffset + 6) % 7;
+  const leadingBlanks = Array.from({ length: firstDOW }, () => null);
 
-  const monthExpenses = (transactions ?? []).filter(
-    (t) => t.type === 'expense',
-  );
-  const monthTotal = monthExpenses.reduce((sum, t) => sum + t.amount, 0);
-  const uncategorizedCount = monthExpenses.filter(
-    (t) => t.categoryId === null,
-  ).length;
+  const monthExpenses      = (transactions ?? []).filter((t) => t.type === 'expense');
+  const monthTotal         = monthExpenses.reduce((sum, t) => sum + t.amount, 0);
+  const uncategorizedCount = monthExpenses.filter((t) => t.categoryId === null).length;
 
-  const dayTransactions = useMemo(
-    () =>
-      (transactions ?? []).filter((t) => t.transactionDate === selectedISO),
-    [transactions, selectedISO],
-  );
+  // The day panel uses its own query result — not a filter of the month slice —
+  // so it is always correct regardless of which month the calendar is browsing.
+  const dayTransactions = selectedDayTxs ?? [];
+
+  // ── Event handlers ──────────────────────────────────────────────────────────
 
   const handlePrevMonth = () => {
-    if (monthIdx === 0) {
-      setYear(year - 1);
-      setMonthIdx(11);
-    } else setMonthIdx(monthIdx - 1);
+    if (monthIdx === 0) { setYear(year - 1); setMonthIdx(11); }
+    else setMonthIdx(monthIdx - 1);
   };
-
   const handleNextMonth = () => {
-    if (monthIdx === 11) {
-      setYear(year + 1);
-      setMonthIdx(0);
-    } else setMonthIdx(monthIdx + 1);
+    if (monthIdx === 11) { setYear(year + 1); setMonthIdx(0); }
+    else setMonthIdx(monthIdx + 1);
   };
 
   const handleDayTap = (cell: DayCell) => {
     const now = Date.now();
     if (lastTap && lastTap.iso === cell.iso && now - lastTap.at < DOUBLE_TAP_MS) {
-      // Double tap on any day → entry chooser pre-filled with that date
-      router.push(
-        `/(tabs)/entry?date=${cell.iso}` as never,
-      );
+      router.push(`/(tabs)/entry?date=${cell.iso}` as never);
       setLastTap(null);
       return;
     }
@@ -182,117 +174,145 @@ export default function CalendarScreen() {
     setLastTap({ iso: cell.iso, at: now });
   };
 
-  const handleEntryTap = (txId: string) => {
-    router.push(`/(tabs)/calendar/edit-entry?id=${txId}` as never);
-  };
+  // Single tap on a bar in bar view → update selectedISO → show day panel
+  const handleBarDayPress = (iso: string) => setSelectedISO(iso);
 
-  const handleFixUncategorized = () => {
-    router.push(
-      `/(tabs)/calendar/edit-entry?uncategorized=1` as never,
-    );
-  };
+  const handleEntryTap         = (txId: string) => router.push(`/(tabs)/calendar/edit-entry?id=${txId}` as never);
+  const handleFixUncategorized = ()              => router.push(`/(tabs)/calendar/edit-entry?uncategorized=1` as never);
 
   if (isLoading) return <LoadingSpinner />;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch chi tiêu</Text>
+
+        {/* Circular icon-only segmented control */}
+        <View style={styles.segmentRow}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeView === 'calendar' && styles.segmentBtnActive]}
+            onPress={() => setActiveView('calendar')}
+            activeOpacity={0.8}
+          >
+            <CalendarDays
+              size={18}
+              color={activeView === 'calendar' ? COLORS.white : COLORS.gray[500]}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeView === 'bar' && styles.segmentBtnActive]}
+            onPress={() => setActiveView('bar')}
+            activeOpacity={0.8}
+          >
+            <BarChart3
+              size={18}
+              color={activeView === 'bar' ? COLORS.white : COLORS.gray[500]}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Month nav */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity
-            style={styles.navBtn}
-            onPress={handlePrevMonth}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.navIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.monthLabel}>
-            {VI_MONTHS[monthIdx]} {year}
-          </Text>
-          <TouchableOpacity
-            style={styles.navBtn}
-            onPress={handleNextMonth}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.navIcon}>›</Text>
-          </TouchableOpacity>
-        </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Day-of-week header */}
-        <View style={styles.dowRow}>
-          {VI_DAYS_OF_WEEK.map((d) => (
-            <Text key={d} style={styles.dowLabel}>
-              {d}
-            </Text>
-          ))}
-        </View>
-
-        {/* Grid */}
-        <View style={styles.grid}>
-          {leadingBlanks.map((_, idx) => (
-            <View key={`b-${idx}`} style={styles.cell} />
-          ))}
-          {dayCells.map((cell) => {
-            const isSelected = cell.iso === selectedISO;
-            const dayBgColor = !cell.hasActivity
-              ? 'transparent'
-              : cell.isOverBudget
-              ? COLORS.calendar.overBudget
-              : COLORS.calendar.withinBudget;
-            const dayTextColor =
-              cell.hasActivity || isSelected ? COLORS.white : COLORS.gray[800];
-
-            return (
-              <TouchableOpacity
-                key={cell.iso}
-                style={styles.cell}
-                onPress={() => handleDayTap(cell)}
-                activeOpacity={0.75}
-              >
-                <View
-                  style={[
-                    styles.dayCircle,
-                    cell.hasActivity && { backgroundColor: dayBgColor },
-                    isSelected && styles.dayCircleSelected,
-                    cell.isToday && styles.dayCircleToday,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      { color: dayTextColor },
-                      isSelected && styles.dayNumberSelected,
-                    ]}
-                  >
-                    {cell.dayOfMonth}
-                  </Text>
-                  {cell.hasUncategorized ? (
-                    <View style={styles.uncategorizedBadge}>
-                      <Text style={styles.uncategorizedBadgeText}>?</Text>
-                    </View>
-                  ) : null}
-                </View>
+        {activeView === 'calendar' ? (
+          /* ── CALENDAR VIEW ─────────────────────────────────────────────── */
+          <>
+            {/* Month nav */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity style={styles.navBtn} onPress={handlePrevMonth} activeOpacity={0.75}>
+                <Text style={styles.navIcon}>‹</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
+              <Text style={styles.monthLabel}>{VI_MONTHS[monthIdx]} {year}</Text>
+              <TouchableOpacity style={styles.navBtn} onPress={handleNextMonth} activeOpacity={0.75}>
+                <Text style={styles.navIcon}>›</Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* Legend */}
-        <View style={styles.legend}>
-          <Legend color={COLORS.calendar.withinBudget} label="Trong ngân sách" />
-          <Legend color={COLORS.calendar.overBudget} label="Vượt ngân sách" />
-          <Legend color={COLORS.calendar.uncategorized} label="Chưa phân loại" />
-        </View>
+            {/* Day-of-week labels */}
+            <View style={styles.dowRow}>
+              {VI_DAYS_OF_WEEK.map((d) => (
+                <Text key={d} style={styles.dowLabel}>{d}</Text>
+              ))}
+            </View>
 
-        {/* Day detail panel */}
+            {/* Day grid */}
+            <View style={styles.grid}>
+              {leadingBlanks.map((_, idx) => (
+                <View key={`b-${idx}`} style={styles.cell} />
+              ))}
+              {dayCells.map((cell) => {
+                const isSelected  = cell.iso === selectedISO;
+                const dayBgColor  = !cell.hasActivity
+                  ? 'transparent'
+                  : cell.isOverBudget
+                  ? COLORS.calendar.overBudget
+                  : COLORS.calendar.withinBudget;
+                const dayTextColor =
+                  cell.hasActivity || isSelected ? COLORS.white : COLORS.gray[800];
+                return (
+                  <TouchableOpacity
+                    key={cell.iso}
+                    style={styles.cell}
+                    onPress={() => handleDayTap(cell)}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.dayCircle,
+                        cell.hasActivity && { backgroundColor: dayBgColor },
+                        isSelected && styles.dayCircleSelected,
+                        cell.isToday  && styles.dayCircleToday,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayNumber,
+                          { color: dayTextColor },
+                          isSelected && styles.dayNumberSelected,
+                        ]}
+                      >
+                        {cell.dayOfMonth}
+                      </Text>
+                      {cell.hasUncategorized ? (
+                        <View style={styles.uncategorizedBadge}>
+                          <Text style={styles.uncategorizedBadgeText}>?</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Legend */}
+            <View style={styles.legend}>
+              <Legend color={COLORS.calendar.withinBudget}  label="Trong ngân sách" />
+              <Legend color={COLORS.calendar.overBudget}    label="Vượt ngân sách" />
+              <Legend color={COLORS.calendar.uncategorized} label="Chưa phân loại" />
+            </View>
+          </>
+        ) : (
+          /* ── BAR VIEW ──────────────────────────────────────────────────── */
+          <View style={styles.barSection}>
+            <Text style={styles.barHint}>
+              Chạm vào cột để xem giao dịch • Vuốt để xem tuần trước
+            </Text>
+            <View style={styles.barCard}>
+              <WeeklySpendingSwiper
+                dayLabels={VI_DAYS_OF_WEEK}
+                formatValue={formatVNDCompact}
+                chartHeight={260}
+                onDayPress={handleBarDayPress}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* ── Day detail panel — visible in both views ────────────────────── */}
         <View style={styles.dayPanel}>
           <Text style={styles.dayPanelTitle}>
             {formatVietnameseDate(selectedISO)}
@@ -304,10 +324,7 @@ export default function CalendarScreen() {
           ) : (
             dayTransactions.map((tx: Transaction) => (
               <View key={tx.id} style={styles.entryWrapper}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleEntryTap(tx.id)}
-                >
+                <TouchableOpacity activeOpacity={0.85} onPress={() => handleEntryTap(tx.id)}>
                   <TransactionCard transaction={tx} showChevron />
                   {tx.categoryId === null ? (
                     <View style={styles.entryUncategorized}>
@@ -323,17 +340,14 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer summary */}
+      {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <Text style={styles.footerLabel}>Tổng chi tháng</Text>
           <Text style={styles.footerTotal}>{formatVND(monthTotal)}</Text>
         </View>
         <TouchableOpacity
-          style={[
-            styles.footerCta,
-            uncategorizedCount === 0 && styles.footerCtaDisabled,
-          ]}
+          style={[styles.footerCta, uncategorizedCount === 0 && styles.footerCtaDisabled]}
           onPress={handleFixUncategorized}
           disabled={uncategorizedCount === 0}
           activeOpacity={0.75}
@@ -346,6 +360,8 @@ export default function CalendarScreen() {
   );
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <View style={styles.legendItem}>
@@ -355,16 +371,17 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function formatVietnameseDate(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `Ngày ${parseInt(d, 10)} tháng ${parseInt(m, 10)}, ${y}`;
-}
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.gray[100] },
-  scroll: { paddingBottom: SPACING[16] },
+  scroll:    { paddingBottom: SPACING[16] },
 
+  // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: COLORS.white,
     paddingHorizontal: SPACING[5],
     paddingVertical: SPACING[4],
@@ -377,6 +394,27 @@ const styles = StyleSheet.create({
     color: COLORS.gray[900],
   },
 
+  // Segmented control (circular pill container)
+  segmentRow: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+    backgroundColor: COLORS.gray[100],
+    borderRadius: BORDER_RADIUS.full,
+    padding: 3,
+  },
+  segmentBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: COLORS.brand[500],
+    ...SHADOW.sm,
+  },
+
+  // Month nav
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -404,6 +442,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray[900],
   },
 
+  // Weekday header row
   dowRow: {
     flexDirection: 'row',
     paddingHorizontal: SPACING[2],
@@ -419,6 +458,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
+  // Grid
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -449,13 +489,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.brand[300],
   },
-  dayNumber: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-  dayNumberSelected: {
-    fontWeight: FONT_WEIGHT.bold,
-  },
+  dayNumber:         { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
+  dayNumberSelected: { fontWeight: FONT_WEIGHT.bold },
   uncategorizedBadge: {
     position: 'absolute',
     top: -2,
@@ -473,6 +508,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.bold,
   },
 
+  // Legend
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -484,9 +520,28 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[4],
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendDot:  { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { fontSize: FONT_SIZE.xs, color: COLORS.gray[600] },
 
+  // Bar view
+  barSection: {
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[4],
+    paddingBottom: SPACING[4],
+  },
+  barHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.gray[500],
+    marginBottom: SPACING[3],
+  },
+  barCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[3],
+    ...SHADOW.sm,
+  },
+
+  // Day panel (shared)
   dayPanel: {
     backgroundColor: COLORS.white,
     marginHorizontal: SPACING[5],
@@ -506,7 +561,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: SPACING[6],
   },
-
   entryWrapper: { marginBottom: SPACING[2] },
   entryUncategorized: {
     marginTop: -SPACING[1],
@@ -521,6 +575,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.medium,
   },
 
+  // Footer
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -530,7 +585,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[200],
   },
-  footerLeft: { flex: 1 },
+  footerLeft:  { flex: 1 },
   footerLabel: { fontSize: FONT_SIZE.xs, color: COLORS.gray[500] },
   footerTotal: {
     fontSize: FONT_SIZE.lg,
