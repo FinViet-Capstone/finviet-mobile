@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { VictoryPie } from 'victory-native';
-import { PieChart } from 'lucide-react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
+import { PieChart as PieChartIcon } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
-import { ChartTooltip } from '@/components/charts/ChartTooltip';
-import { COLORS } from '@/constants/theme';
+import { COLORS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 
 export interface DonutDatum {
-  /** Label shown on the legend / tooltip */
+  /** Label shown when the slice is focused */
   x: string;
   /** Numeric value (must be > 0 to appear as a slice) */
   y: number;
@@ -15,109 +14,102 @@ export interface DonutDatum {
   color: string;
 }
 
-export interface VictoryDonutProps {
+export interface DonutProps {
   data: DonutDatum[];
-  /** Inner radius for the donut hole — defaults to 70 */
+  /** Inner radius for the donut hole — defaults to 60 */
   innerRadius?: number;
-  /** Chart height in pixels — defaults to 220 */
-  height?: number;
-  /**
-   * Optional value formatter for the tooltip subline. Receives the slice value.
-   * Defaults to `String(value)`.
-   */
+  /** Outer radius — defaults to 100 */
+  radius?: number;
+  /** Optional value formatter for the center label. Defaults to `String(value)`. */
   formatValue?: (value: number) => string;
+  /** Heading shown above the value when no slice is focused. Defaults to "Tổng". */
+  totalLabel?: string;
 }
 
 /**
- * Donut chart wrapping VictoryPie (Victory Native v36 API).
- * Renders EmptyState when data is empty or all values are zero.
+ * Donut chart with sectionAutoFocus — pressing a slice pulls it outward and
+ * surfaces its label + value in the center hole. Releasing reverts the focus.
  *
- * Tooltip behavior: hold-to-peek. Pressing a slice surfaces a label + value
- * tooltip in the donut hole; releasing clears it. The tooltip is positioned at
- * the chart's geometric center (independent of touch coords), which gives a
- * stable read point regardless of which slice is held.
+ * Slices are pre-sorted by value descending so the largest sits at 12 o'clock.
  *
- * Victory Native v36 notes:
- *  - Press is wired via the `events` prop. Event coords are unreliable across
- *    SVG/RN boundaries, so we don't use them — the datum alone drives the UI.
- *  - Do NOT use CartesianChart or useChartPressState (those are v37+ XL API)
+ * Built on `react-native-gifted-charts` (SVG-based, Expo Go compatible).
  */
-export function VictoryDonut({
+export function Donut({
   data,
-  innerRadius = 70,
-  height = 220,
+  innerRadius = 60,
+  radius = 100,
   formatValue = String,
-}: VictoryDonutProps) {
-  const hasData = data.length > 0 && data.some((d) => d.y > 0);
-  const [active, setActive] = useState<DonutDatum | null>(null);
-  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: height });
+  totalLabel = 'Tổng',
+}: DonutProps) {
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
-  if (!hasData) {
+  const sorted = [...data]
+    .filter((d) => d.y > 0)
+    .sort((a, b) => b.y - a.y);
+
+  if (sorted.length === 0) {
     return (
       <EmptyState
-        icon={PieChart}
+        icon={PieChartIcon}
         title="Chưa có dữ liệu"
         subtitle="Thêm giao dịch để xem biểu đồ"
       />
     );
   }
 
-  const events = [
-    {
-      target: 'data' as const,
-      eventHandlers: {
-        onPressIn: () => [
-          {
-            target: 'data' as const,
-            mutation: (props: { datum?: DonutDatum }) => {
-              if (props.datum) setActive(props.datum);
-              return null;
-            },
-          },
-        ],
-        onPressOut: () => {
-          setActive(null);
-          return [];
-        },
-      },
-    },
-  ];
+  const total = sorted.reduce((s, d) => s + d.y, 0);
+
+  const pieData = sorted.map((d, i) => ({
+    value: d.y,
+    color: d.color,
+    focused: focusedIndex === i,
+  }));
+
+  const focused = focusedIndex !== null ? sorted[focusedIndex] : null;
 
   return (
-    <View
-      style={[styles.container, { height }]}
-      onLayout={(e) =>
-        setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
-      }
-    >
-      <VictoryPie
-        data={data}
+    <View style={styles.container}>
+      <PieChart
+        data={pieData}
+        donut
+        radius={radius}
         innerRadius={innerRadius}
-        height={height}
-        padding={{ top: 16, bottom: 16, left: 16, right: 16 }}
-        events={events}
-        style={{
-          data: {
-            fill: ({ datum }: { datum?: DonutDatum }) => datum?.color ?? COLORS.gray[300],
-            stroke: COLORS.white,
-            strokeWidth: 2,
-          },
-          labels: { display: 'none' },
-        }}
-        labels={() => ''}
+        sectionAutoFocus
+        focusOnPress
+        innerCircleColor={COLORS.white}
+        onPress={(_item: unknown, index: number) =>
+          setFocusedIndex((cur) => (cur === index ? null : index))
+        }
+        centerLabelComponent={() => (
+          <View style={styles.centerLabel}>
+            {focused ? (
+              <>
+                <Text
+                  style={[styles.centerHeading, { color: focused.color }]}
+                  numberOfLines={1}
+                >
+                  {focused.x}
+                </Text>
+                <Text style={styles.centerValue} numberOfLines={1}>
+                  {formatValue(focused.y)}
+                </Text>
+                <Text style={styles.centerSub} numberOfLines={1}>
+                  {((focused.y / total) * 100).toFixed(0)}%
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.centerHeading} numberOfLines={1}>
+                  {totalLabel}
+                </Text>
+                <Text style={styles.centerValue} numberOfLines={1}>
+                  {formatValue(total)}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
       />
-
-      {active ? (
-        <ChartTooltip
-          x={size.w / 2}
-          y={size.h / 2}
-          offsetY={0}
-          width={140}
-          label={active.x}
-          value={formatValue(active.y)}
-          accent={active.color}
-        />
-      ) : null}
     </View>
   );
 }
@@ -127,5 +119,25 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  centerLabel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerHeading: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.medium,
+    color: COLORS.gray[500],
+    marginBottom: 2,
+  },
+  centerValue: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.gray[900],
+  },
+  centerSub: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.gray[500],
+    marginTop: 2,
   },
 });

@@ -24,14 +24,14 @@ import {
   useWeeklyReport,
 } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { VictoryDonut } from '@/components/charts/VictoryDonut';
-import { VictoryBarWeek } from '@/components/charts/VictoryBarWeek';
+import { Donut } from '@/components/charts/Donut';
+import { WeeklySpendingSwiper } from '@/components/charts/WeeklySpendingSwiper';
 import { RingBadge } from '@/components/charts/RingBadge';
 import { CATEGORIES } from '@/constants/categories';
 import { formatVND } from '@/utils/formatters';
 import type { Transaction } from '@/types';
 
-const VI_DAYS_OF_WEEK = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const MONDAY_FIRST_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -56,13 +56,8 @@ export default function ReportScreen() {
     endDate: ymd(monthEnd),
   });
 
-  // Week range (last 7 days ending today)
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - 6);
-  const { data: weekTx } = useTransactions({
-    startDate: ymd(weekStart),
-    endDate: ymd(today),
-  });
+  // Week range no longer used here — the WeeklySpendingSwiper owns its own
+  // per-week queries so the user can page back through history.
 
   // Last month for WoW comparison
   const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -96,30 +91,8 @@ export default function ReportScreen() {
 
   const monthExpenseTotal = donutData.reduce((sum, d) => sum + d.y, 0);
 
-  // Week bars
-  const weekBars = useMemo(() => {
-    const dayTotals = new Array(7).fill(0);
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(weekStart.getDate() + i);
-      const iso = ymd(d);
-      const total = (weekTx ?? [])
-        .filter((t) => t.transactionDate === iso && t.type === 'expense')
-        .reduce((s, t) => s + t.amount, 0);
-      dayTotals[i] = total;
-    }
-    const avg = dayTotals.reduce((a, b) => a + b, 0) / 7;
-    return dayTotals.map((amount, i) => {
-      const d = new Date(weekStart);
-      d.setDate(weekStart.getDate() + i);
-      return {
-        day: VI_DAYS_OF_WEEK[d.getDay()],
-        amount,
-        overAverage: amount > avg && avg > 0,
-      };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekTx]);
+  // Week bars are rendered by WeeklySpendingSwiper below; this screen no longer
+  // pre-aggregates a single week.
 
   // Top 5 merchants this month
   const topMerchants = useMemo(() => {
@@ -226,7 +199,7 @@ export default function ReportScreen() {
           <Text style={styles.sectionTitle}>Chi tiêu theo danh mục</Text>
           <Text style={styles.sectionSubtitle}>Tháng này</Text>
           <View style={styles.chartCard}>
-            <VictoryDonut data={donutData} formatValue={formatVND} />
+            <Donut data={donutData} formatValue={formatVND} />
             {donutData.length > 0 ? (
               <View style={styles.legend}>
                 {donutData.slice(0, 5).map((d) => {
@@ -252,12 +225,15 @@ export default function ReportScreen() {
 
         {/* Week bars */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Chi tiêu 7 ngày qua</Text>
+          <Text style={styles.sectionTitle}>Chi tiêu theo ngày</Text>
           <Text style={styles.sectionSubtitle}>
-            Đỏ: vượt mức trung bình ngày
+            Vuốt sang trái để xem các tuần trước. Phần xám là chi tiêu chưa phân loại.
           </Text>
           <View style={styles.chartCard}>
-            <VictoryBarWeek data={weekBars} formatValue={formatVND} />
+            <WeeklySpendingSwiper
+              dayLabels={MONDAY_FIRST_LABELS}
+              formatValue={formatVND}
+            />
           </View>
         </View>
 
