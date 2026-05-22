@@ -22,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { CATEGORIES } from '@/constants/categories';
+import { useCreateTransaction, useWallets } from '@/hooks';
 import { formatVND } from '@/utils/formatters';
 
 interface ParsedRow {
@@ -49,12 +50,20 @@ const MOCK_PARSED_ROWS: ParsedRow[] = [
 
 const UNCERTAIN_THRESHOLD = 0.7;
 
+/** Convert "DD/MM/YYYY" → "YYYY-MM-DD". */
+function displayToIso(display: string): string {
+  const [d, m, y] = display.split('/');
+  return `${y}-${m}-${d}`;
+}
+
 export default function CSVPreviewScreen() {
   const router = useRouter();
   const { bank, fileName } = useLocalSearchParams<{
     bank?: string;
     fileName?: string;
   }>();
+  const createMutation = useCreateTransaction();
+  const { data: walletData } = useWallets();
 
   const [rows, setRows] = useState<ParsedRow[]>(MOCK_PARSED_ROWS);
   const [pickerForId, setPickerForId] = useState<string | null>(null);
@@ -82,20 +91,47 @@ export default function CSVPreviewScreen() {
     setPickerForId(null);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (selectedCount === 0) {
       Alert.alert('Chưa chọn giao dịch', 'Vui lòng chọn ít nhất một giao dịch.');
       return;
     }
+    const wallets = walletData?.wallets ?? [];
+    const targetWallet = wallets.find((w) => w.isPrimary) ?? wallets[0];
+    if (!targetWallet) {
+      Alert.alert('Chưa có ví', 'Hãy tạo ít nhất một ví trước khi nhập CSV.');
+      return;
+    }
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      const selected = rows.filter((r) => r.selected);
+      // Sequential to avoid race conditions on the in-memory store; fast enough for the row counts we expect.
+      let inserted = 0;
+      for (const r of selected) {
+        await createMutation.mutateAsync({
+          walletId: targetWallet.id,
+          categoryId: r.aiCategoryId,
+          amount: r.amount,
+          type: r.type,
+          description: r.description,
+          merchant: r.merchant,
+          transactionDate: displayToIso(r.date),
+          aiSuggestedCategoryId: r.aiCategoryId,
+          aiOverridden: r.aiConfidence === 1,
+          entryMethod: 'csv_import',
+        });
+        inserted += 1;
+      }
       Alert.alert(
         'Nhập thành công',
-        `${selectedCount} giao dịch đã được thêm vào lịch sử.`,
+        `${inserted} giao dịch đã được thêm vào ví "${targetWallet.name}".`,
         [{ text: 'OK', onPress: () => router.replace('/(tabs)/more') }],
       );
-    }, 800);
+    } catch {
+      Alert.alert('Lỗi', 'Không nhập được tất cả giao dịch. Hãy thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

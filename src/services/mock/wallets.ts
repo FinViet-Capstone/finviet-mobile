@@ -109,6 +109,7 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
 
 export interface UpdateWalletInput {
   name?: string;
+  type?: WalletType;
   isPrimary?: boolean;
 }
 
@@ -130,6 +131,7 @@ export async function updateWallet(
   const updated: Wallet = {
     ...target,
     ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+    ...(patch.type !== undefined ? { type: patch.type } : {}),
     ...(patch.isPrimary !== undefined ? { isPrimary: patch.isPrimary } : {}),
     updatedAt: nowIso(),
   };

@@ -59,6 +59,7 @@ export interface UpdatePreferencesInput {
   theme?: 'light' | 'dark' | 'system';
   defaultWalletId?: string | null;
   defaultCurrency?: string;
+  dailySpendLimit?: number | null;
   notifications?: Partial<{ budget: boolean; report: boolean; goals: boolean }>;
 }
 
@@ -77,6 +78,9 @@ export const useUpdatePreferences = () => {
           : {}),
         ...(patch.defaultCurrency !== undefined
           ? { defaultCurrency: patch.defaultCurrency }
+          : {}),
+        ...(patch.dailySpendLimit !== undefined
+          ? { dailySpendLimit: patch.dailySpendLimit }
           : {}),
         ...(patch.notifications !== undefined && currentUser
           ? {

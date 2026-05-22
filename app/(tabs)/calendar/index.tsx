@@ -17,13 +17,13 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-import { useTransactions, useBudgets } from '@/hooks';
+import { useTransactions, useBudgets, useUser } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import { formatVND } from '@/utils/formatters';
 import type { Transaction } from '@/types';
 
-const VI_DAYS_OF_WEEK = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const VI_DAYS_OF_WEEK = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const VI_MONTHS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
   'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
@@ -76,6 +76,7 @@ export default function CalendarScreen() {
     endDate: monthEndISO,
   });
   const { data: budgets } = useBudgets();
+  const { data: user } = useUser();
 
   const monthlyLimit = useMemo(() => {
     if (!budgets) return 0;
@@ -83,7 +84,14 @@ export default function CalendarScreen() {
   }, [budgets]);
 
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  const dailyAvgLimit = monthlyLimit > 0 ? monthlyLimit / daysInMonth : 0;
+  // Per-day threshold fallback chain (resolved OQ #9):
+  //   1. monthly category budgets ÷ days-in-month
+  //   2. user.dailySpendLimit (advanced preference)
+  //   3. neutral (no coloring)
+  const dailyAvgLimit =
+    monthlyLimit > 0
+      ? monthlyLimit / daysInMonth
+      : user?.dailySpendLimit ?? 0;
 
   // Aggregate expenses per day (exclude transfers — ARCHITECTURE §5)
   const dayMap = useMemo(() => {
@@ -126,8 +134,10 @@ export default function CalendarScreen() {
     return cells;
   }, [dayMap, daysInMonth, dailyAvgLimit, year, monthIdx]);
 
-  // Pad leading blanks (Sunday = 0)
-  const firstDOW = new Date(year, monthIdx, 1).getDay();
+  // Monday is the first day of the week. JS getDay() returns Sun=0..Sat=6;
+  // we shift so Mon=0..Sun=6 to match VI_DAYS_OF_WEEK ordering.
+  const sundayOffset = new Date(year, monthIdx, 1).getDay();
+  const firstDOW = (sundayOffset + 6) % 7;
   const leadingBlanks: null[] = Array.from({ length: firstDOW }, () => null);
 
   const monthExpenses = (transactions ?? []).filter(

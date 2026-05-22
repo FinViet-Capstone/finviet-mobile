@@ -35,6 +35,8 @@ export interface UserPreferences {
   /** ISO 4217 currency code -- default "VND" */
   defaultCurrency: string;
   theme: AppTheme;
+  /** Optional per-day spend ceiling (whole VND); null = not set. Calendar's red-day fallback when no monthly category budget is configured. */
+  dailySpendLimit: number | null;
 }
 
 // -------------------------------------------------------------------------
@@ -56,6 +58,8 @@ export interface User {
   defaultCurrency: string;
   language: AppLanguage;
   theme: AppTheme;
+  /** Optional per-day spend ceiling (whole VND); null = not set. Calendar's red-day fallback when no monthly category budget is configured. */
+  dailySpendLimit: number | null;
   isActive: boolean;
   /** False until the user clicks the verification link in their inbox. Soft gate -- onboarding still runs. */
   emailVerified: boolean;
@@ -127,5 +131,6 @@ export interface UpdatePreferencesPayload {
   theme?: AppTheme;
   defaultWalletId?: string | null;
   defaultCurrency?: string;
+  dailySpendLimit?: number | null;
   notifications?: Partial<NotificationSettings>;
 }

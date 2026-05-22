@@ -108,7 +108,8 @@ export default function BudgetDetailScreen() {
   };
 
   const handleEdit = () => {
-    Alert.alert('Chỉnh sửa', 'Tính năng chỉnh sửa giới hạn sẽ sớm ra mắt.');
+    if (!budget) return;
+    router.push(`/(tabs)/more/budget/edit?id=${budget.id}` as never);
   };
 
   return (

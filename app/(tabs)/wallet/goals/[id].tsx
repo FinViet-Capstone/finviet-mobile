@@ -96,7 +96,7 @@ export default function GoalDetailScreen() {
   };
 
   const handleEdit = () => {
-    Alert.alert('Chỉnh sửa', 'Tính năng chỉnh sửa mục tiêu sẽ sớm ra mắt.');
+    router.push(`/(tabs)/wallet/goals/edit?id=${goal.id}` as never);
   };
 
   const handleDelete = () => {

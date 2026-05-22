@@ -50,6 +50,8 @@ export default function WalletDetailScreen() {
 
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState<WalletType>('cash');
+  const [editPrimary, setEditPrimary] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
   if (!wallet) {
@@ -69,6 +71,8 @@ export default function WalletDetailScreen() {
 
   const handleEdit = () => {
     setEditName(wallet.name);
+    setEditType(wallet.type);
+    setEditPrimary(wallet.isPrimary);
     setEditVisible(true);
   };
 
@@ -78,12 +82,18 @@ export default function WalletDetailScreen() {
       return;
     }
     if (!wallet) return;
+    const patch = {
+      name: editName.trim(),
+      type: editType,
+      // Locked-primary: a primary wallet stays primary unless another wallet is promoted.
+      ...(wallet.isPrimary ? {} : { isPrimary: editPrimary }),
+    };
     updateMutation.mutate(
-      { id: wallet.id, patch: { name: editName.trim() } },
+      { id: wallet.id, patch },
       {
         onSuccess: () => {
           setEditVisible(false);
-          Alert.alert('Đã cập nhật', 'Tên ví đã được lưu.');
+          Alert.alert('Đã cập nhật', 'Ví đã được lưu.');
         },
         onError: () => Alert.alert('Lỗi', 'Không cập nhật được ví.'),
       },
@@ -196,7 +206,9 @@ export default function WalletDetailScreen() {
         >
           <TouchableOpacity activeOpacity={1} style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Sửa tên ví</Text>
+            <Text style={styles.sheetTitle}>Sửa ví</Text>
+
+            <Text style={styles.editFieldLabel}>Tên ví</Text>
             <RNTextInput
               value={editName}
               onChangeText={setEditName}
@@ -204,6 +216,54 @@ export default function WalletDetailScreen() {
               placeholder="Tên ví"
               autoFocus
             />
+
+            <Text style={styles.editFieldLabel}>Loại ví</Text>
+            <View style={styles.typeRow}>
+              {(['cash', 'momo', 'bank_account'] as const).map((t) => {
+                const selected = editType === t;
+                return (
+                  <TouchableOpacity
+                    key={t}
+                    style={[
+                      styles.typeChip,
+                      selected ? styles.typeChipSelected : styles.typeChipDefault,
+                    ]}
+                    onPress={() => setEditType(t)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.typeIcon}>{WALLET_ICON[t]}</Text>
+                    <Text
+                      style={[
+                        styles.typeLabel,
+                        selected ? styles.typeLabelSelected : styles.typeLabelDefault,
+                      ]}
+                    >
+                      {WALLET_LABEL[t]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={styles.primaryRow}
+              onPress={() => setEditPrimary((p) => !p)}
+              activeOpacity={0.75}
+              disabled={wallet.isPrimary}
+            >
+              <View style={[styles.checkbox, editPrimary && styles.checkboxOn]}>
+                {editPrimary ? <Text style={styles.checkboxMark}>✓</Text> : null}
+              </View>
+              <View style={styles.primaryText}>
+                <Text style={styles.primaryLabel}>Đặt làm ví chính</Text>
+                {wallet.isPrimary ? (
+                  <Text style={styles.primaryHint}>
+                    Đây đã là ví chính. Đổi ví chính bằng cách sửa ví khác.
+                  </Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+
             <Button title="Lưu" onPress={handleSaveEdit} loading={updateMutation.isPending} />
           </TouchableOpacity>
         </TouchableOpacity>
@@ -366,7 +426,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     fontSize: FONT_SIZE.base,
     color: COLORS.gray[900],
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
     backgroundColor: COLORS.white,
+  },
+
+  // Edit-modal extras
+  editFieldLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.gray[500],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SPACING[2],
+  },
+  typeRow: { flexDirection: 'row', gap: SPACING[2], marginBottom: SPACING[3] },
+  typeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: SPACING[3],
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1.5,
+    gap: SPACING[1],
+  },
+  typeChipDefault: { borderColor: COLORS.gray[200], backgroundColor: COLORS.gray[50] },
+  typeChipSelected: { borderColor: COLORS.brand[500], backgroundColor: COLORS.brand[50] },
+  typeIcon: { fontSize: FONT_SIZE.xl },
+  typeLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold },
+  typeLabelDefault: { color: COLORS.gray[600] },
+  typeLabelSelected: { color: COLORS.brand[600] },
+
+  primaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    marginBottom: SPACING[4],
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1.5,
+    borderColor: COLORS.gray[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+  },
+  checkboxOn: { backgroundColor: COLORS.brand[500], borderColor: COLORS.brand[500] },
+  checkboxMark: { color: COLORS.white, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold },
+  primaryText: { flex: 1 },
+  primaryLabel: { fontSize: FONT_SIZE.base, color: COLORS.gray[800] },
+  primaryHint: {
+    marginTop: 2,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.gray[500],
+    lineHeight: 16,
   },
 });

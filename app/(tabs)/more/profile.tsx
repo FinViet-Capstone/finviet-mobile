@@ -8,9 +8,11 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import {
   COLORS,
@@ -61,8 +63,29 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleAvatarUpload = () => {
-    Alert.alert('Tải ảnh đại diện', 'Tính năng tải ảnh sẽ sớm ra mắt.');
+  const handleAvatarUpload = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Cần cấp quyền',
+        'Hãy cấp quyền truy cập thư viện ảnh trong Cài đặt để đổi ảnh đại diện.',
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+    updateMutation.mutate(
+      { avatarUrl: uri },
+      {
+        onError: () => Alert.alert('Lỗi', 'Không lưu được ảnh đại diện.'),
+      },
+    );
   };
 
   const handleChangePassword = () => {
@@ -95,9 +118,13 @@ export default function ProfileScreen() {
               onPress={handleAvatarUpload}
               activeOpacity={0.85}
             >
-              <Text style={styles.avatarLetter}>
-                {user.displayName.charAt(0).toUpperCase()}
-              </Text>
+              {user.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarLetter}>
+                  {user.displayName.charAt(0).toUpperCase()}
+                </Text>
+              )}
               <View style={styles.avatarBadge}>
                 <Text style={styles.avatarBadgeIcon}>📷</Text>
               </View>
@@ -212,6 +239,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE['3xl'],
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.white,
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
   },
   avatarBadge: {
     position: 'absolute',

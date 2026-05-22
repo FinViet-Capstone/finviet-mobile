@@ -19,6 +19,7 @@ const MOCK_USER: User = {
   defaultCurrency: 'VND',
   language: 'vi',
   theme: 'system',
+  dailySpendLimit: null,
   isActive: true,
   emailVerified: true,   // existing demo user is fully verified
   /** Nested NotificationSettings object — mirrors the DB columns notif_budget/notif_report/notif_goals */

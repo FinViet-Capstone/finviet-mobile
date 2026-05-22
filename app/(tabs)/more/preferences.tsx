@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useUser, useWallets } from '@/hooks';
+import { useUser, useWallets, useUpdatePreferences } from '@/hooks';
 import type { AppLanguage, AppTheme, NotificationSettings } from '@/types';
 import type { Wallet } from '@/types/wallet';
 
@@ -41,6 +41,7 @@ export default function PreferencesScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useUser();
   const { data: walletData } = useWallets();
+  const updateMutation = useUpdatePreferences();
 
   const [language, setLanguage] = useState<AppLanguage>('vi');
   const [theme, setTheme] = useState<AppTheme>('system');
@@ -52,7 +53,6 @@ export default function PreferencesScreen() {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dailyLimit, setDailyLimit] = useState('');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -60,6 +60,7 @@ export default function PreferencesScreen() {
     setTheme(user.theme);
     setDefaultWalletId(user.defaultWalletId);
     setNotifications(user.notifications);
+    setDailyLimit(user.dailySpendLimit ? String(user.dailySpendLimit) : '');
   }, [user]);
 
   if (isLoading || !user) return <LoadingSpinner />;
@@ -68,11 +69,20 @@ export default function PreferencesScreen() {
   const defaultWallet = wallets.find((w) => w.id === defaultWalletId);
 
   const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      Alert.alert('Đã lưu', 'Tùy chọn của bạn đã được cập nhật.');
-    }, 500);
+    const dailyNum = dailyLimit ? parseInt(dailyLimit, 10) : 0;
+    updateMutation.mutate(
+      {
+        language,
+        theme,
+        defaultWalletId,
+        notifications,
+        dailySpendLimit: dailyNum > 0 ? dailyNum : null,
+      },
+      {
+        onSuccess: () => Alert.alert('Đã lưu', 'Tùy chọn của bạn đã được cập nhật.'),
+        onError: () => Alert.alert('Lỗi', 'Không lưu được tùy chọn.'),
+      },
+    );
   };
 
   const handleNotifToggle = (key: keyof NotificationSettings) => {
@@ -202,7 +212,7 @@ export default function PreferencesScreen() {
         <Button
           title="Lưu thay đổi"
           onPress={handleSave}
-          loading={saving}
+          loading={updateMutation.isPending}
           style={styles.saveBtn}
         />
       </ScrollView>
