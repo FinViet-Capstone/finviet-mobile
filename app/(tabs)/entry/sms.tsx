@@ -28,7 +28,7 @@ import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { CATEGORIES } from '@/constants/categories';
 import type { Category } from '@/constants/categories';
-import { useExtractFromSMS, useWallets } from '@/hooks';
+import { useExtractFromSMS, useWallets, useCreateTransaction } from '@/hooks';
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from '@/constants/extraction';
 import { formatVND } from '@/utils/formatters';
 import type { Wallet } from '@/types/wallet';
@@ -48,12 +48,19 @@ function isoToDisplay(iso: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+function displayToIso(display: string): string {
+  const parts = display.split('/');
+  if (parts.length !== 3) return todayISO();
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
 export default function SMSEntryScreen() {
   const router = useRouter();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const initialISO = dateParam ?? todayISO();
 
   const extract = useExtractFromSMS();
+  const createMutation = useCreateTransaction();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
 
   // Phase state
@@ -75,7 +82,6 @@ export default function SMSEntryScreen() {
   // UI state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
 
   useEffect(() => {
@@ -148,13 +154,31 @@ export default function SMSEntryScreen() {
       setAmountError('Số tiền phải lớn hơn 0');
       return;
     }
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      Alert.alert('Đã lưu', 'Giao dịch đã được ghi lại.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    }, 500);
+    if (!walletId) {
+      Alert.alert('Chưa chọn ví', 'Hãy chọn ví trước khi xác nhận.');
+      return;
+    }
+    createMutation.mutate(
+      {
+        walletId,
+        categoryId,
+        amount,
+        type: 'expense',
+        description: merchant.trim() || null,
+        merchant: merchant.trim() || null,
+        transactionDate: displayToIso(dateDisplay),
+        aiSuggestedCategoryId: categoryId,
+        aiOverridden: false,
+        entryMethod: 'manual',
+      },
+      {
+        onSuccess: () =>
+          Alert.alert('Đã lưu', 'Giao dịch đã được ghi lại.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: () => Alert.alert('Không lưu được', 'Hãy thử lại sau.'),
+      },
+    );
   };
 
   const handleUseSample = () => setSmsText(SAMPLE_SMS);
@@ -347,7 +371,7 @@ export default function SMSEntryScreen() {
             <Button
               title="Xác nhận"
               onPress={handleConfirm}
-              loading={submitting}
+              loading={createMutation.isPending}
               style={styles.halfBtn}
             />
           </View>

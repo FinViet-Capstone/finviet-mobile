@@ -23,17 +23,17 @@ import {
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { ChangePasswordSheet } from '@/components/auth/ChangePasswordSheet';
-import { useUser } from '@/hooks';
+import { useUser, useUpdateProfile } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/utils/formatters';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useUser();
+  const updateMutation = useUpdateProfile();
 
   const [displayName, setDisplayName] = useState('');
   const [income, setIncome] = useState('');
-  const [saving, setSaving] = useState(false);
   const [showPasswordSheet, setShowPasswordSheet] = useState(false);
 
   useEffect(() => {
@@ -49,11 +49,16 @@ export default function ProfileScreen() {
       Alert.alert('Tên không hợp lệ', 'Vui lòng nhập tên hiển thị.');
       return;
     }
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      Alert.alert('Đã lưu', 'Hồ sơ của bạn đã được cập nhật.');
-    }, 500);
+    updateMutation.mutate(
+      {
+        displayName: displayName.trim(),
+        monthlyIncome: income ? parseInt(income, 10) : null,
+      },
+      {
+        onSuccess: () => Alert.alert('Đã lưu', 'Hồ sơ của bạn đã được cập nhật.'),
+        onError: () => Alert.alert('Lỗi', 'Không lưu được hồ sơ.'),
+      },
+    );
   };
 
   const handleAvatarUpload = () => {
@@ -137,7 +142,7 @@ export default function ProfileScreen() {
           <Button
             title="Lưu thay đổi"
             onPress={handleSave}
-            loading={saving}
+            loading={updateMutation.isPending}
             style={styles.saveBtn}
           />
 

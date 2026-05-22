@@ -8,7 +8,9 @@ import { USER_ID } from './wallets';
 // Notifications without an actionable destination set deepLink: null explicitly
 // (AppNotification.deepLink is `string | null`, not optional).
 
-const MOCK_NOTIFICATIONS: AppNotification[] = [
+// ─── Mock Data (mutable) ──────────────────────────────────────────────────────
+
+let NOTIFICATIONS: AppNotification[] = [
   // ── 1 · Budget alert — Mua sắm overspent ─────────────────────────────────────
   {
     id: 'notif_01',
@@ -132,9 +134,11 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
 
 // ─── Service Functions ─────────────────────────────────────────────────────────
 
+const delay = (ms = 200) => new Promise<void>((r) => setTimeout(r, ms));
+
 /** Returns all notifications sorted newest-first. */
 export function getNotifications(): AppNotification[] {
-  return [...MOCK_NOTIFICATIONS].sort((a, b) =>
+  return [...NOTIFICATIONS].sort((a, b) =>
     b.sentAt.localeCompare(a.sentAt),
   );
 }
@@ -142,4 +146,20 @@ export function getNotifications(): AppNotification[] {
 /** Returns only unread notifications. */
 export function getUnreadNotifications(): AppNotification[] {
   return getNotifications().filter((n) => !n.isRead);
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await delay();
+  NOTIFICATIONS = NOTIFICATIONS.map((n) =>
+    n.id === id ? { ...n, isRead: true } : n,
+  );
+}
+
+export async function markAllNotificationsRead(): Promise<{ count: number }> {
+  await delay();
+  const count = NOTIFICATIONS.filter((n) => !n.isRead).length;
+  NOTIFICATIONS = NOTIFICATIONS.map((n) =>
+    n.isRead ? n : { ...n, isRead: true },
+  );
+  return { count };
 }

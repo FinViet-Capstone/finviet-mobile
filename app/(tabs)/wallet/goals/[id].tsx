@@ -21,7 +21,7 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-import { useGoalById } from '@/hooks';
+import { useGoalById, useDeleteGoal, useAddContribution } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/common/Button';
@@ -33,12 +33,13 @@ export default function GoalDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: goal, isLoading } = useGoalById(id);
+  const deleteMutation = useDeleteGoal();
+  const contribMutation = useAddContribution();
 
   const [contribVisible, setContribVisible] = useState(false);
   const [contribAmount, setContribAmount] = useState('');
   const [contribNote, setContribNote] = useState('');
   const [contribError, setContribError] = useState<string | undefined>();
-  const [contribLoading, setContribLoading] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
   if (!goal) {
@@ -78,15 +79,20 @@ export default function GoalDetailScreen() {
       setContribError('Số tiền phải lớn hơn 0.');
       return;
     }
-    setContribLoading(true);
-    setTimeout(() => {
-      setContribLoading(false);
-      setContribVisible(false);
-      Alert.alert(
-        'Đã đóng góp',
-        `${formatVND(amount)} đã được thêm vào mục tiêu "${goal.name}".`,
-      );
-    }, 500);
+    if (!goal) return;
+    contribMutation.mutate(
+      { goalId: goal.id, input: { amount, note: contribNote.trim() || undefined } },
+      {
+        onSuccess: () => {
+          setContribVisible(false);
+          Alert.alert(
+            'Đã đóng góp',
+            `${formatVND(amount)} đã được thêm vào mục tiêu "${goal.name}".`,
+          );
+        },
+        onError: () => setContribError('Không lưu được đóng góp.'),
+      },
+    );
   };
 
   const handleEdit = () => {
@@ -94,6 +100,7 @@ export default function GoalDetailScreen() {
   };
 
   const handleDelete = () => {
+    if (!goal) return;
     Alert.alert(
       'Xóa mục tiêu?',
       `Bạn có chắc muốn xóa "${goal.name}"?`,
@@ -102,11 +109,14 @@ export default function GoalDetailScreen() {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Đã xóa', 'Mục tiêu đã được xóa.', [
-              { text: 'OK', onPress: () => router.back() },
-            ]);
-          },
+          onPress: () =>
+            deleteMutation.mutate(goal.id, {
+              onSuccess: () =>
+                Alert.alert('Đã xóa', 'Mục tiêu đã được xóa.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]),
+              onError: () => Alert.alert('Lỗi', 'Không xóa được mục tiêu.'),
+            }),
         },
       ],
     );
@@ -166,6 +176,7 @@ export default function GoalDetailScreen() {
             title="Xóa mục tiêu"
             variant="ghost"
             onPress={handleDelete}
+            loading={deleteMutation.isPending}
             style={styles.deleteBtn}
           />
         </View>
@@ -213,7 +224,7 @@ export default function GoalDetailScreen() {
             <Button
               title="Lưu"
               onPress={handleSaveContribution}
-              loading={contribLoading}
+              loading={contribMutation.isPending}
               style={styles.modalSubmit}
             />
           </TouchableOpacity>

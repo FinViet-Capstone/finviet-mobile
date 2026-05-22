@@ -1,14 +1,42 @@
-export { useUser } from './useUser';
-export { useWallets, useWalletById } from './useWallets';
+export { useUser, useUpdateProfile, useUpdatePreferences } from './useUser';
+export {
+  useWallets,
+  useWalletById,
+  useCreateWallet,
+  useUpdateWallet,
+  useDeleteWallet,
+  useCreateTransfer,
+} from './useWallets';
 export {
   useTransactions,
   useTransactionById,
   useRecentTransactions,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
 } from './useTransactions';
-export { useBudgets, useBudgetById } from './useBudgets';
-export { useGoals, useGoalById } from './useGoals';
+export {
+  useBudgets,
+  useBudgetById,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+} from './useBudgets';
+export {
+  useGoals,
+  useGoalById,
+  useCreateGoal,
+  useUpdateGoal,
+  useDeleteGoal,
+  useAddContribution,
+} from './useGoals';
 export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
-export { useNotifications, useUnreadNotifications } from './useNotifications';
+export {
+  useNotifications,
+  useUnreadNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from './useNotifications';
 export { useExtractFromPhoto } from './useExtractFromPhoto';
 export { useExtractFromSMS } from './useExtractFromSMS';
 export {

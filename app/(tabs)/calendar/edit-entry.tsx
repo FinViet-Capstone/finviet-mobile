@@ -31,6 +31,8 @@ import {
   useTransactionById,
   useTransactions,
   useWallets,
+  useUpdateTransaction,
+  useDeleteTransaction,
 } from '@/hooks';
 import { CATEGORIES } from '@/constants/categories';
 import type { Category } from '@/constants/categories';
@@ -117,6 +119,8 @@ function EditMode({ txId }: { txId: string }) {
   const router = useRouter();
   const { data: tx, isLoading } = useTransactionById(txId);
   const { data: walletData } = useWallets();
+  const updateMutation = useUpdateTransaction();
+  const deleteMutation = useDeleteTransaction();
 
   const [amountRaw, setAmountRaw] = useState('');
   const [description, setDescription] = useState('');
@@ -125,7 +129,6 @@ function EditMode({ txId }: { txId: string }) {
   const [walletId, setWalletId] = useState<string | null>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
 
   useEffect(() => {
@@ -170,29 +173,50 @@ function EditMode({ txId }: { txId: string }) {
       setAmountError('Số tiền phải lớn hơn 0');
       return;
     }
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      Alert.alert('Đã lưu', 'Giao dịch đã được cập nhật.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    }, 500);
+    if (!walletId) {
+      Alert.alert('Chưa chọn ví', 'Hãy chọn ví trước khi lưu.');
+      return;
+    }
+    updateMutation.mutate(
+      {
+        id: txId,
+        patch: {
+          amount,
+          description: description.trim() || null,
+          merchant: isTransfer ? null : (merchant.trim() || null),
+          categoryId: isTransfer ? null : categoryId,
+          walletId: isTransfer ? undefined : walletId,
+        },
+      },
+      {
+        onSuccess: () =>
+          Alert.alert('Đã lưu', 'Giao dịch đã được cập nhật.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: () => Alert.alert('Lỗi', 'Không cập nhật được giao dịch.'),
+      },
+    );
   };
 
   const handleDelete = () => {
     Alert.alert(
       'Xóa giao dịch?',
-      'Hành động này không thể hoàn tác.',
+      isTransfer
+        ? 'Đây là giao dịch chuyển khoản. Cả hai chiều (nhận + chuyển) sẽ bị xóa.'
+        : 'Hành động này không thể hoàn tác.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Đã xóa', 'Giao dịch đã được xóa.', [
-              { text: 'OK', onPress: () => router.back() },
-            ]);
-          },
+          onPress: () =>
+            deleteMutation.mutate(txId, {
+              onSuccess: () =>
+                Alert.alert('Đã xóa', 'Giao dịch đã được xóa.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]),
+              onError: () => Alert.alert('Lỗi', 'Không xóa được giao dịch.'),
+            }),
         },
       ],
     );
@@ -323,7 +347,7 @@ function EditMode({ txId }: { txId: string }) {
           <Button
             title="Lưu thay đổi"
             onPress={handleSave}
-            loading={submitting}
+            loading={updateMutation.isPending}
             style={styles.submit}
           />
 
@@ -331,6 +355,7 @@ function EditMode({ txId }: { txId: string }) {
             title="Xóa giao dịch"
             variant="ghost"
             onPress={handleDelete}
+            loading={deleteMutation.isPending}
           />
         </ScrollView>
       </KeyboardAvoidingView>

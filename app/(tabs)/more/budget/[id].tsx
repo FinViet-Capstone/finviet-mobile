@@ -18,7 +18,7 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-import { useBudgetById, useTransactions } from '@/hooks';
+import { useBudgetById, useTransactions, useDeleteBudget } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/common/Button';
@@ -38,6 +38,7 @@ export default function BudgetDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: budget, isLoading } = useBudgetById(id);
+  const deleteMutation = useDeleteBudget();
 
   // Pull current month transactions filtered by category
   const today = new Date();
@@ -84,6 +85,7 @@ export default function BudgetDetailScreen() {
       : 'Trong ngân sách';
 
   const handleDelete = () => {
+    if (!budget) return;
     Alert.alert(
       'Xóa ngân sách?',
       `Xóa ngân sách "${budget.categoryName}"?`,
@@ -92,11 +94,14 @@ export default function BudgetDetailScreen() {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Đã xóa', 'Ngân sách đã được xóa.', [
-              { text: 'OK', onPress: () => router.back() },
-            ]);
-          },
+          onPress: () =>
+            deleteMutation.mutate(budget.id, {
+              onSuccess: () =>
+                Alert.alert('Đã xóa', 'Ngân sách đã được xóa.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]),
+              onError: () => Alert.alert('Lỗi', 'Không xóa được ngân sách.'),
+            }),
         },
       ],
     );
@@ -182,6 +187,7 @@ export default function BudgetDetailScreen() {
             title="Xóa ngân sách"
             variant="ghost"
             onPress={handleDelete}
+            loading={deleteMutation.isPending}
           />
         </View>
       </ScrollView>

@@ -1,18 +1,22 @@
 /**
- * useUser -- reads the current session user.
+ * useUser -- reads & mutates the current session user.
  *
- * Source of truth in mock-land is the Zustand auth store. Wrapping it in a
- * useQuery means screens get the standard `{ data, isLoading, error }` shape
- * they're already coded against, and TanStack auto-refetches whenever the
- * session changes (login / logout / OAuth all rotate the queryKey).
+ * The mock source of truth is the Zustand auth store. Wrapping it in useQuery
+ * preserves the standard `{ data, isLoading, error }` shape and makes any
+ * session change (login / logout / updateUser / OAuth) auto-rotate the cache
+ * via the queryKey.
  *
- * On real-API day, swap queryFn to `api.get('/users/me')` and the screens
- * stay untouched.
+ * On real-API day, queryFn becomes `api.get('/users/me')` and the mutations
+ * call `PATCH /users/me` -- screens stay untouched.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import type { User } from '@/types';
+
+const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useUser = () => {
   const sessionUser = useAuthStore((s) => s.user);
@@ -20,5 +24,71 @@ export const useUser = () => {
     queryKey: ['user', sessionUser?.id ?? null, sessionUser?.email ?? null],
     queryFn: async () => sessionUser ?? null,
     staleTime: Infinity,
+  });
+};
+
+// ─── Mutations ────────────────────────────────────────────────────────────────
+
+export interface UpdateProfileInput {
+  displayName?: string;
+  avatarUrl?: string | null;
+  monthlyIncome?: number | null;
+}
+
+export const useUpdateProfile = () => {
+  const qc = useQueryClient();
+  const updateUser = useAuthStore((s) => s.updateUser);
+  return useMutation({
+    mutationFn: async (patch: UpdateProfileInput) => {
+      await delay();
+      updateUser({
+        ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
+        ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),
+        ...(patch.monthlyIncome !== undefined
+          ? { monthlyIncome: patch.monthlyIncome }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['user'] }),
+  });
+};
+
+export interface UpdatePreferencesInput {
+  language?: 'vi' | 'en';
+  theme?: 'light' | 'dark' | 'system';
+  defaultWalletId?: string | null;
+  defaultCurrency?: string;
+  notifications?: Partial<{ budget: boolean; report: boolean; goals: boolean }>;
+}
+
+export const useUpdatePreferences = () => {
+  const qc = useQueryClient();
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const currentUser = useAuthStore((s) => s.user);
+  return useMutation({
+    mutationFn: async (patch: UpdatePreferencesInput) => {
+      await delay();
+      updateUser({
+        ...(patch.language !== undefined ? { language: patch.language } : {}),
+        ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
+        ...(patch.defaultWalletId !== undefined
+          ? { defaultWalletId: patch.defaultWalletId }
+          : {}),
+        ...(patch.defaultCurrency !== undefined
+          ? { defaultCurrency: patch.defaultCurrency }
+          : {}),
+        ...(patch.notifications !== undefined && currentUser
+          ? {
+              notifications: {
+                ...currentUser.notifications,
+                ...patch.notifications,
+              },
+            }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['user'] }),
   });
 };

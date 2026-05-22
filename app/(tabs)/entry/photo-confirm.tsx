@@ -29,7 +29,7 @@ import type { Category } from '@/constants/categories';
 import { TextInput } from '@/components/common/TextInput';
 import { Button } from '@/components/common/Button';
 import { formatVND } from '@/utils/formatters';
-import { useExtractFromPhoto } from '@/hooks';
+import { useExtractFromPhoto, useCreateTransaction, useWallets } from '@/hooks';
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from '@/constants/extraction';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +52,12 @@ function isoToDisplay(iso: string): string {
   return parts[2] + '/' + parts[1] + '/' + parts[0];
 }
 
+function displayToIso(display: string): string {
+  const parts = display.split('/');
+  if (parts.length !== 3) return todayISO();
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
 /** Returns true when the string looks like a valid image URI. */
 function isValidUri(uri: string | undefined): boolean {
   return typeof uri === 'string' && uri.trim().length > 0 && uri.includes('://');
@@ -68,6 +74,8 @@ export default function PhotoConfirmScreen() {
     date?: string;
   }>();
   const extract = useExtractFromPhoto();
+  const createMutation = useCreateTransaction();
+  const { data: walletsData } = useWallets();
 
   const imageUri: string | null =
     typeof rawUri === 'string' ? rawUri : null;
@@ -88,7 +96,6 @@ export default function PhotoConfirmScreen() {
   const [amountUncertain, setAmountUncertain] = useState<boolean>(false);
   const [merchantUncertain, setMerchantUncertain] = useState<boolean>(false);
   const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [amountError, setAmountError] = useState<string | undefined>(undefined);
 
   // Run extraction when we have a valid URI
@@ -146,16 +153,34 @@ export default function PhotoConfirmScreen() {
       setAmountError('Số tiền phải lớn hơn 0');
       return;
     }
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại.', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
-    }, 500);
+    const wallets = walletsData?.wallets ?? [];
+    const primary = wallets.find((w) => w.isPrimary) ?? wallets[0];
+    if (!primary) {
+      Alert.alert('Chưa có ví', 'Hãy tạo ít nhất một ví trước khi lưu giao dịch.');
+      return;
+    }
+    createMutation.mutate(
+      {
+        walletId: primary.id,
+        categoryId,
+        amount,
+        type: 'expense',
+        description: merchant.trim() || null,
+        merchant: merchant.trim() || null,
+        transactionDate: displayToIso(dateDisplay),
+        aiSuggestedCategoryId: categoryId,
+        aiOverridden: false,
+        entryMethod: 'photo',
+        imageUrl: imageUri ?? null,
+      },
+      {
+        onSuccess: () =>
+          Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: () => Alert.alert('Không lưu được', 'Hãy thử lại sau.'),
+      },
+    );
   };
 
   // ── Processing state ──────────────────────────────────────────────────────
@@ -299,7 +324,7 @@ export default function PhotoConfirmScreen() {
             <Button
               title="Xác nhận"
               onPress={handleConfirm}
-              loading={isSubmitting}
+              loading={createMutation.isPending}
               style={styles.halfBtn}
             />
           </View>

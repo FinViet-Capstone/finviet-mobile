@@ -1,5 +1,5 @@
 import type { Transaction, TransactionType } from '../../types';
-import { USER_ID, WALLET_IDS } from './wallets';
+import { USER_ID, WALLET_IDS, adjustWalletBalance } from './wallets';
 
 // ─── Filter Type ───────────────────────────────────────────────────────────────
 
@@ -17,17 +17,9 @@ export interface TransactionFilters {
 }
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
-// 34 transactions spanning May 2026.
-// Includes:
-//   • 3 uncategorized entries   (tx_14, tx_15, tx_26)  — categoryId: null, orange "?" badge
-//   • 2 transfer pairs          (pair_01, pair_02)      — for transfer filter tests
-//   • Vietnamese merchant names throughout
-//
-// Every field declared by the Transaction interface is present on every object
-// — nullable fields are set to null explicitly (not omitted) so TypeScript strict
-// mode does not complain about missing required properties.
+// `let` not `const` -- mutation services rewrite this in place.
 
-const MOCK_TRANSACTIONS: Transaction[] = [
+let TRANSACTIONS: Transaction[] = [
   // ── 01 · Income ──────────────────────────────────────────────────────────────
   {
     id: 'tx_01',
@@ -47,8 +39,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-01T09:00:00.000Z',
     updatedAt: '2026-05-01T09:00:00.000Z',
   },
-
-  // ── 02 · Housing ─────────────────────────────────────────────────────────────
   {
     id: 'tx_02',
     userId: USER_ID,
@@ -67,8 +57,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-01T10:00:00.000Z',
     updatedAt: '2026-05-01T10:00:00.000Z',
   },
-
-  // ── 03 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_03',
     userId: USER_ID,
@@ -87,8 +75,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-02T12:30:00.000Z',
     updatedAt: '2026-05-02T12:30:00.000Z',
   },
-
-  // ── 04 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_04',
     userId: USER_ID,
@@ -107,8 +93,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-03T10:00:00.000Z',
     updatedAt: '2026-05-03T10:00:00.000Z',
   },
-
-  // ── 05 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_05',
     userId: USER_ID,
@@ -127,8 +111,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-03T08:00:00.000Z',
     updatedAt: '2026-05-03T08:00:00.000Z',
   },
-
-  // ── 06 · Transport ───────────────────────────────────────────────────────────
   {
     id: 'tx_06',
     userId: USER_ID,
@@ -147,8 +129,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-04T07:30:00.000Z',
     updatedAt: '2026-05-04T07:30:00.000Z',
   },
-
-  // ── 07 · Shopping ────────────────────────────────────────────────────────────
   {
     id: 'tx_07',
     userId: USER_ID,
@@ -167,8 +147,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-05T14:00:00.000Z',
     updatedAt: '2026-05-05T14:00:00.000Z',
   },
-
-  // ── 08 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_08',
     userId: USER_ID,
@@ -187,17 +165,15 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-05T17:00:00.000Z',
     updatedAt: '2026-05-05T17:00:00.000Z',
   },
-
-  // ── 09 · Transfer out — pair_01 (Bank → MoMo) ────────────────────────────────
   {
     id: 'tx_09',
     userId: USER_ID,
     walletId: WALLET_IDS.BANK,
-    categoryId: null,         // transfers are never categorized
+    categoryId: null,
     amount: 500_000,
     type: 'transfer_out',
     description: 'Chuyển tiền sang Ví MoMo',
-    merchant: null,           // internal transfer — no merchant
+    merchant: null,
     transactionDate: '2026-05-06',
     aiSuggestedCategoryId: null,
     aiOverridden: false,
@@ -207,17 +183,15 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-06T10:00:00.000Z',
     updatedAt: '2026-05-06T10:00:00.000Z',
   },
-
-  // ── 10 · Transfer in — pair_01 ───────────────────────────────────────────────
   {
     id: 'tx_10',
     userId: USER_ID,
     walletId: WALLET_IDS.MOMO,
-    categoryId: null,         // transfers are never categorized
+    categoryId: null,
     amount: 500_000,
     type: 'transfer_in',
     description: 'Nhận tiền từ Vietcombank',
-    merchant: null,           // internal transfer — no merchant
+    merchant: null,
     transactionDate: '2026-05-06',
     aiSuggestedCategoryId: null,
     aiOverridden: false,
@@ -227,8 +201,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-06T10:00:00.000Z',
     updatedAt: '2026-05-06T10:00:00.000Z',
   },
-
-  // ── 11 · Health ──────────────────────────────────────────────────────────────
   {
     id: 'tx_11',
     userId: USER_ID,
@@ -247,8 +219,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-07T09:00:00.000Z',
     updatedAt: '2026-05-07T09:00:00.000Z',
   },
-
-  // ── 12 · Entertainment ───────────────────────────────────────────────────────
   {
     id: 'tx_12',
     userId: USER_ID,
@@ -267,8 +237,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-08T00:00:00.000Z',
     updatedAt: '2026-05-08T00:00:00.000Z',
   },
-
-  // ── 13 · Shopping ────────────────────────────────────────────────────────────
   {
     id: 'tx_13',
     userId: USER_ID,
@@ -287,13 +255,11 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-09T16:00:00.000Z',
     updatedAt: '2026-05-09T16:00:00.000Z',
   },
-
-  // ── 14 · UNCATEGORIZED — photo entry, orange "?" badge ───────────────────────
   {
     id: 'tx_14',
     userId: USER_ID,
     walletId: WALLET_IDS.CASH,
-    categoryId: null,         // uncategorized — triggers orange "?" badge in Calendar/Budget
+    categoryId: null,
     amount: 100_000,
     type: 'expense',
     description: 'Đổ xăng xe máy',
@@ -307,13 +273,11 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-10T07:00:00.000Z',
     updatedAt: '2026-05-10T07:00:00.000Z',
   },
-
-  // ── 15 · UNCATEGORIZED — manual entry, orange "?" badge ──────────────────────
   {
     id: 'tx_15',
     userId: USER_ID,
     walletId: WALLET_IDS.CASH,
-    categoryId: null,         // uncategorized — triggers orange "?" badge in Calendar/Budget
+    categoryId: null,
     amount: 230_000,
     type: 'expense',
     description: 'Mua sắm tạp hóa',
@@ -327,8 +291,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-10T11:00:00.000Z',
     updatedAt: '2026-05-10T11:00:00.000Z',
   },
-
-  // ── 16 · Education ───────────────────────────────────────────────────────────
   {
     id: 'tx_16',
     userId: USER_ID,
@@ -347,8 +309,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-11T20:00:00.000Z',
     updatedAt: '2026-05-11T20:00:00.000Z',
   },
-
-  // ── 17 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_17',
     userId: USER_ID,
@@ -367,8 +327,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-12T12:00:00.000Z',
     updatedAt: '2026-05-12T12:00:00.000Z',
   },
-
-  // ── 18 · Transport ───────────────────────────────────────────────────────────
   {
     id: 'tx_18',
     userId: USER_ID,
@@ -387,8 +345,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-13T14:00:00.000Z',
     updatedAt: '2026-05-13T14:00:00.000Z',
   },
-
-  // ── 19 · Beauty ──────────────────────────────────────────────────────────────
   {
     id: 'tx_19',
     userId: USER_ID,
@@ -407,8 +363,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-13T16:30:00.000Z',
     updatedAt: '2026-05-13T16:30:00.000Z',
   },
-
-  // ── 20 · Bills ───────────────────────────────────────────────────────────────
   {
     id: 'tx_20',
     userId: USER_ID,
@@ -427,8 +381,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-14T09:00:00.000Z',
     updatedAt: '2026-05-14T09:00:00.000Z',
   },
-
-  // ── 21 · Family ──────────────────────────────────────────────────────────────
   {
     id: 'tx_21',
     userId: USER_ID,
@@ -447,17 +399,15 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-15T10:00:00.000Z',
     updatedAt: '2026-05-15T10:00:00.000Z',
   },
-
-  // ── 22 · Transfer out — pair_02 (Cash → MoMo) ────────────────────────────────
   {
     id: 'tx_22',
     userId: USER_ID,
     walletId: WALLET_IDS.CASH,
-    categoryId: null,         // transfers are never categorized
+    categoryId: null,
     amount: 200_000,
     type: 'transfer_out',
     description: 'Chuyển tiền mặt sang MoMo',
-    merchant: null,           // internal transfer — no merchant
+    merchant: null,
     transactionDate: '2026-05-15',
     aiSuggestedCategoryId: null,
     aiOverridden: false,
@@ -467,17 +417,15 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-15T11:00:00.000Z',
     updatedAt: '2026-05-15T11:00:00.000Z',
   },
-
-  // ── 23 · Transfer in — pair_02 ───────────────────────────────────────────────
   {
     id: 'tx_23',
     userId: USER_ID,
     walletId: WALLET_IDS.MOMO,
-    categoryId: null,         // transfers are never categorized
+    categoryId: null,
     amount: 200_000,
     type: 'transfer_in',
     description: 'Nhận từ tiền mặt',
-    merchant: null,           // internal transfer — no merchant
+    merchant: null,
     transactionDate: '2026-05-15',
     aiSuggestedCategoryId: null,
     aiOverridden: false,
@@ -487,8 +435,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-15T11:00:00.000Z',
     updatedAt: '2026-05-15T11:00:00.000Z',
   },
-
-  // ── 24 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_24',
     userId: USER_ID,
@@ -507,8 +453,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-16T15:00:00.000Z',
     updatedAt: '2026-05-16T15:00:00.000Z',
   },
-
-  // ── 25 · Shopping ────────────────────────────────────────────────────────────
   {
     id: 'tx_25',
     userId: USER_ID,
@@ -527,13 +471,11 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-17T10:00:00.000Z',
     updatedAt: '2026-05-17T10:00:00.000Z',
   },
-
-  // ── 26 · UNCATEGORIZED — photo entry, AI uncertain, orange "?" badge ──────────
   {
     id: 'tx_26',
     userId: USER_ID,
     walletId: WALLET_IDS.CASH,
-    categoryId: null,         // uncategorized — triggers orange "?" badge in Calendar/Budget
+    categoryId: null,
     amount: 45_000,
     type: 'expense',
     description: 'Mua sữa tươi',
@@ -547,8 +489,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-17T19:00:00.000Z',
     updatedAt: '2026-05-17T19:00:00.000Z',
   },
-
-  // ── 27 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_27',
     userId: USER_ID,
@@ -567,8 +507,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-18T19:30:00.000Z',
     updatedAt: '2026-05-18T19:30:00.000Z',
   },
-
-  // ── 28 · Savings ─────────────────────────────────────────────────────────────
   {
     id: 'tx_28',
     userId: USER_ID,
@@ -587,8 +525,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-18T09:00:00.000Z',
     updatedAt: '2026-05-18T09:00:00.000Z',
   },
-
-  // ── 29 · Health ──────────────────────────────────────────────────────────────
   {
     id: 'tx_29',
     userId: USER_ID,
@@ -607,8 +543,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-19T10:00:00.000Z',
     updatedAt: '2026-05-19T10:00:00.000Z',
   },
-
-  // ── 30 · Transport ───────────────────────────────────────────────────────────
   {
     id: 'tx_30',
     userId: USER_ID,
@@ -627,8 +561,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-19T22:00:00.000Z',
     updatedAt: '2026-05-19T22:00:00.000Z',
   },
-
-  // ── 31 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_31',
     userId: USER_ID,
@@ -647,8 +579,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-20T07:30:00.000Z',
     updatedAt: '2026-05-20T07:30:00.000Z',
   },
-
-  // ── 32 · Bills ───────────────────────────────────────────────────────────────
   {
     id: 'tx_32',
     userId: USER_ID,
@@ -667,8 +597,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-20T11:00:00.000Z',
     updatedAt: '2026-05-20T11:00:00.000Z',
   },
-
-  // ── 33 · Food ────────────────────────────────────────────────────────────────
   {
     id: 'tx_33',
     userId: USER_ID,
@@ -687,8 +615,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-05-21T12:00:00.000Z',
     updatedAt: '2026-05-21T12:00:00.000Z',
   },
-
-  // ── 34 · Shopping (AI override example) ──────────────────────────────────────
   {
     id: 'tx_34',
     userId: USER_ID,
@@ -699,7 +625,6 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     description: 'Mua quần áo mùa hè',
     merchant: 'Shopee',
     transactionDate: '2026-05-21',
-    // AI suggested 'cat_other'; user manually overrode to 'cat_shopping'
     aiSuggestedCategoryId: 'cat_other',
     aiOverridden: true,
     entryMethod: 'manual',
@@ -710,36 +635,60 @@ const MOCK_TRANSACTIONS: Transaction[] = [
   },
 ];
 
-// ─── Service Functions ─────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Returns all transactions, optionally filtered. Results are sorted newest-first. */
+const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
+
+function genTxId(): string {
+  return `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+}
+
+function genPairId(): string {
+  return `pair_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * Wallet balance delta produced by a single transaction.
+ * Positive = credit the wallet, negative = debit.
+ */
+function balanceDelta(t: Pick<Transaction, 'amount' | 'type'>): number {
+  switch (t.type) {
+    case 'income':
+    case 'transfer_in':
+      return t.amount;
+    case 'expense':
+    case 'transfer_out':
+      return -t.amount;
+  }
+}
+
+// ─── Reads ─────────────────────────────────────────────────────────────────────
+
 export function getTransactions(filters?: TransactionFilters): Transaction[] {
-  let result = [...MOCK_TRANSACTIONS];
+  let result = [...TRANSACTIONS];
 
   if (filters?.walletId !== undefined) {
     result = result.filter((t) => t.walletId === filters.walletId);
   }
-
   if (filters?.type !== undefined) {
     result = result.filter((t) => t.type === filters.type);
   }
-
   if (filters?.uncategorizedOnly === true) {
-    // categoryId is string | null — null means uncategorized; check === null, not === undefined
     result = result.filter((t) => t.categoryId === null);
   } else if (filters?.categoryId !== undefined) {
     result = result.filter((t) => t.categoryId === filters.categoryId);
   }
-
   if (filters?.startDate !== undefined) {
     result = result.filter((t) => t.transactionDate >= filters.startDate!);
   }
-
   if (filters?.endDate !== undefined) {
     result = result.filter((t) => t.transactionDate <= filters.endDate!);
   }
 
-  // Sort newest first; break ties by createdAt
   return result.sort((a, b) => {
     const dateDiff = b.transactionDate.localeCompare(a.transactionDate);
     if (dateDiff !== 0) return dateDiff;
@@ -747,15 +696,192 @@ export function getTransactions(filters?: TransactionFilters): Transaction[] {
   });
 }
 
-/** Returns a single transaction by ID, or undefined if not found. */
 export function getTransactionById(id: string): Transaction | undefined {
-  return MOCK_TRANSACTIONS.find((t) => t.id === id);
+  return TRANSACTIONS.find((t) => t.id === id);
 }
 
-/**
- * Returns the N most recent transactions (all types, newest-first).
- * Defaults to 10 if n is not specified.
- */
 export function getRecentTransactions(n: number = 10): Transaction[] {
   return getTransactions().slice(0, n);
+}
+
+// ─── Writes ────────────────────────────────────────────────────────────────────
+
+export interface CreateTransactionInput {
+  walletId: string;
+  categoryId: string | null;
+  amount: number;
+  type: 'expense' | 'income';
+  description: string | null;
+  merchant: string | null;
+  transactionDate: string;
+  aiSuggestedCategoryId?: string | null;
+  aiOverridden?: boolean;
+  entryMethod: 'manual' | 'photo' | 'csv_import';
+  imageUrl?: string | null;
+}
+
+export async function createTransaction(
+  input: CreateTransactionInput,
+): Promise<Transaction> {
+  await delay();
+  const tx: Transaction = {
+    id: genTxId(),
+    userId: USER_ID,
+    walletId: input.walletId,
+    categoryId: input.categoryId,
+    amount: input.amount,
+    type: input.type,
+    description: input.description,
+    merchant: input.merchant,
+    transactionDate: input.transactionDate,
+    aiSuggestedCategoryId: input.aiSuggestedCategoryId ?? null,
+    aiOverridden: input.aiOverridden ?? false,
+    entryMethod: input.entryMethod,
+    transferPairId: null,
+    imageUrl: input.imageUrl ?? null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  TRANSACTIONS = [...TRANSACTIONS, tx];
+  adjustWalletBalance(tx.walletId, balanceDelta(tx));
+  return tx;
+}
+
+export interface UpdateTransactionInput {
+  amount?: number;
+  description?: string | null;
+  merchant?: string | null;
+  categoryId?: string | null;
+  walletId?: string;
+  transactionDate?: string;
+}
+
+export async function updateTransaction(
+  id: string,
+  patch: UpdateTransactionInput,
+): Promise<Transaction> {
+  await delay();
+  const before = TRANSACTIONS.find((t) => t.id === id);
+  if (!before) throw new Error('Transaction not found');
+
+  // Transfer legs are immutable on amount/category/wallet (per ARCHITECTURE §5).
+  // Higher layers (edit-entry screen) prevent the user from changing those, but
+  // belt-and-braces: scrub them out of the patch so a stray call can't corrupt
+  // the transfer_pair invariant.
+  if (before.type === 'transfer_in' || before.type === 'transfer_out') {
+    patch = {
+      description: patch.description,
+    };
+  }
+
+  const after: Transaction = {
+    ...before,
+    ...(patch.amount !== undefined ? { amount: patch.amount } : {}),
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.merchant !== undefined ? { merchant: patch.merchant } : {}),
+    ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
+    ...(patch.walletId !== undefined ? { walletId: patch.walletId } : {}),
+    ...(patch.transactionDate !== undefined
+      ? { transactionDate: patch.transactionDate }
+      : {}),
+    aiOverridden:
+      patch.categoryId !== undefined && patch.categoryId !== before.aiSuggestedCategoryId
+        ? true
+        : before.aiOverridden,
+    updatedAt: nowIso(),
+  };
+
+  // Reverse the old wallet-side delta, apply the new one.
+  // If wallet changed, both wallets are touched.
+  adjustWalletBalance(before.walletId, -balanceDelta(before));
+  adjustWalletBalance(after.walletId, balanceDelta(after));
+
+  TRANSACTIONS = TRANSACTIONS.map((t) => (t.id === id ? after : t));
+  return after;
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  await delay();
+  const target = TRANSACTIONS.find((t) => t.id === id);
+  if (!target) return;
+
+  // Transfer pair: deleting one leg deletes the other atomically.
+  if (target.transferPairId) {
+    const both = TRANSACTIONS.filter(
+      (t) => t.transferPairId === target.transferPairId,
+    );
+    both.forEach((t) => adjustWalletBalance(t.walletId, -balanceDelta(t)));
+    TRANSACTIONS = TRANSACTIONS.filter(
+      (t) => t.transferPairId !== target.transferPairId,
+    );
+    return;
+  }
+
+  adjustWalletBalance(target.walletId, -balanceDelta(target));
+  TRANSACTIONS = TRANSACTIONS.filter((t) => t.id !== id);
+}
+
+export interface CreateTransferInput {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  note?: string | null;
+  transactionDate?: string;
+}
+
+export interface CreateTransferResult {
+  outTx: Transaction;
+  inTx: Transaction;
+}
+
+export async function createTransfer(
+  input: CreateTransferInput,
+): Promise<CreateTransferResult> {
+  await delay();
+  const pairId = genPairId();
+  const date = input.transactionDate ?? nowIso().split('T')[0];
+
+  const outTx: Transaction = {
+    id: genTxId(),
+    userId: USER_ID,
+    walletId: input.fromWalletId,
+    categoryId: null,
+    amount: input.amount,
+    type: 'transfer_out',
+    description: input.note ?? 'Chuyển tiền nội bộ',
+    merchant: null,
+    transactionDate: date,
+    aiSuggestedCategoryId: null,
+    aiOverridden: false,
+    entryMethod: 'manual',
+    transferPairId: pairId,
+    imageUrl: null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  // Microsecond gap so the createdAt sort is stable: out leg comes first.
+  await new Promise((r) => setTimeout(r, 1));
+  const inTx: Transaction = {
+    id: genTxId(),
+    userId: USER_ID,
+    walletId: input.toWalletId,
+    categoryId: null,
+    amount: input.amount,
+    type: 'transfer_in',
+    description: input.note ?? 'Nhận tiền nội bộ',
+    merchant: null,
+    transactionDate: date,
+    aiSuggestedCategoryId: null,
+    aiOverridden: false,
+    entryMethod: 'manual',
+    transferPairId: pairId,
+    imageUrl: null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+
+  TRANSACTIONS = [...TRANSACTIONS, outTx, inTx];
+  adjustWalletBalance(outTx.walletId, balanceDelta(outTx));
+  adjustWalletBalance(inTx.walletId, balanceDelta(inTx));
+  return { outTx, inTx };
 }

@@ -12,21 +12,57 @@
 export { getUser } from './mock/user';
 
 // Wallets
-export { getWallets, getWalletById } from './mock/wallets';
+export {
+  getWallets,
+  getWalletById,
+  createWallet,
+  updateWallet,
+  deleteWallet,
+} from './mock/wallets';
+export type { CreateWalletInput, UpdateWalletInput } from './mock/wallets';
 
 // Transactions
 export {
   getTransactions,
   getTransactionById,
   getRecentTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  createTransfer,
 } from './mock/transactions';
-export type { TransactionFilters } from './mock/transactions';
+export type {
+  TransactionFilters,
+  CreateTransactionInput,
+  UpdateTransactionInput,
+  CreateTransferInput,
+  CreateTransferResult,
+} from './mock/transactions';
 
 // Budgets
-export { getBudgets, getBudgetById } from './mock/budgets';
+export {
+  getBudgets,
+  getBudgetById,
+  createBudget,
+  updateBudget,
+  deleteBudget,
+} from './mock/budgets';
+export type { CreateBudgetInput, UpdateBudgetInput } from './mock/budgets';
 
 // Goals
-export { getGoals, getGoalById } from './mock/goals';
+export {
+  getGoals,
+  getGoalById,
+  createGoal,
+  updateGoal,
+  deleteGoal,
+  addGoalContribution,
+} from './mock/goals';
+export type {
+  CreateGoalInput,
+  UpdateGoalInput,
+  AddContributionInput,
+} from './mock/goals';
 
 // Reports & AI
 export {
@@ -36,7 +72,12 @@ export {
 } from './mock/reports';
 
 // Notifications
-export { getNotifications, getUnreadNotifications } from './mock/notifications';
+export {
+  getNotifications,
+  getUnreadNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from './mock/notifications';
 
 // Photo / SMS Extraction (mock — frozen contract; see types/extraction.ts and constants/extraction.ts)
 export { extractFromPhoto, extractFromSMS } from './mock/extraction';

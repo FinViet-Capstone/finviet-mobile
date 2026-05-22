@@ -1,122 +1,194 @@
 import type { BudgetWithSpend } from '../../types';
+import { getCategoryById } from '@/constants/categories';
 import { USER_ID } from './wallets';
+import { getTransactions } from './transactions';
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-// 5 budgets across different categories with deliberately varied statuses:
-//
-//   cat_food      → safe   (40.6% spent)  — GREEN  <60%
-//   cat_shopping  → danger (150.8% spent) — RED    >80%  (overspent; triggers 80% notification)
-//   cat_transport → warning (61.4% spent) — YELLOW 60–80%
-//   cat_health    → warning (77.5% spent) — YELLOW 60–80%
-//   cat_bills     → safe   (45.0% spent)  — GREEN  <60%
-//
-// Spent values are derived from the May 2026 MOCK_TRANSACTIONS in transactions.ts
-// and are held as static numbers here — screens do not recompute from raw transactions.
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
-const MOCK_BUDGETS: BudgetWithSpend[] = [
-  // ── Ăn uống — GREEN ──────────────────────────────────────────────────────────
+const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
+
+function genId(): string {
+  return `budget_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/** Returns "YYYY-MM-01" / "YYYY-MM-<lastDay>" for the current calendar month. */
+function currentMonthRange(): { startDate: string; endDate: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const first = new Date(y, m, 1);
+  const last = new Date(y, m + 1, 0);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { startDate: fmt(first), endDate: fmt(last) };
+}
+
+/** Recompute spent/remaining/percentage/status from live transactions. */
+function withSpend(budget: {
+  id: string;
+  userId: string;
+  categoryId: string;
+  monthlyLimit: number;
+  resetDay: number;
+  createdAt: string;
+  updatedAt: string;
+}): BudgetWithSpend {
+  const { startDate, endDate } = currentMonthRange();
+  const cat = getCategoryById(budget.categoryId);
+  const txs = getTransactions({
+    categoryId: budget.categoryId,
+    type: 'expense',
+    startDate,
+    endDate,
+  });
+  const spent = txs.reduce((s, t) => s + t.amount, 0);
+  const remaining = budget.monthlyLimit - spent;
+  const percentage =
+    budget.monthlyLimit > 0
+      ? Math.round(((spent / budget.monthlyLimit) * 100) * 10) / 10
+      : 0;
+  const status: BudgetWithSpend['status'] =
+    percentage > 80 ? 'danger' : percentage >= 60 ? 'warning' : 'safe';
+
+  return {
+    ...budget,
+    categoryName: cat?.nameVi ?? 'Khác',
+    categoryColor: cat?.color ?? '#94A3B8',
+    categoryIcon: cat?.icon ?? 'ellipsis',
+    spent,
+    remaining,
+    percentage,
+    status,
+  };
+}
+
+// ─── Mock Data (mutable) ───────────────────────────────────────────────────────
+// Stored without the derived spend fields -- those are computed on read so
+// transaction mutations show up in the UI without re-running a setter.
+
+interface BaseBudget {
+  id: string;
+  userId: string;
+  categoryId: string;
+  monthlyLimit: number;
+  resetDay: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+let BUDGETS: BaseBudget[] = [
   {
     id: 'budget_food_01',
     userId: USER_ID,
     categoryId: 'cat_food',
     monthlyLimit: 2_000_000,
     resetDay: 1,
-    categoryName: 'Ăn uống',
-    categoryColor: '#F97316',
-    categoryIcon: 'utensils',
-    // Transactions: tx_03(85k) tx_04(45k) tx_05(65k) tx_08(185k) tx_17(125k)
-    //               tx_24(55k) tx_27(95k) tx_31(68k) tx_33(89k)
-    spent: 812_000,
-    remaining: 1_188_000,
-    percentage: 40.6,
-    status: 'safe',
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
-
-  // ── Mua sắm — RED (danger / overspent) ───────────────────────────────────────
   {
     id: 'budget_shopping_01',
     userId: USER_ID,
     categoryId: 'cat_shopping',
     monthlyLimit: 1_000_000,
     resetDay: 1,
-    categoryName: 'Mua sắm',
-    categoryColor: '#EC4899',
-    categoryIcon: 'shopping-bag',
-    // Transactions: tx_07(320k) tx_13(450k) tx_25(178k) tx_34(560k) = 1,508,000
-    spent: 1_508_000,
-    remaining: -508_000,
-    percentage: 150.8,
-    status: 'danger',
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
-
-  // ── Di chuyển — YELLOW (warning) ─────────────────────────────────────────────
   {
     id: 'budget_transport_01',
     userId: USER_ID,
     categoryId: 'cat_transport',
     monthlyLimit: 350_000,
     resetDay: 1,
-    categoryName: 'Di chuyển',
-    categoryColor: '#3B82F6',
-    categoryIcon: 'car',
-    // Transactions: tx_06(35k) tx_18(42k) tx_30(38k) + earlier 100k = 215,000
-    spent: 215_000,
-    remaining: 135_000,
-    percentage: 61.4,
-    status: 'warning',
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
-
-  // ── Sức khỏe — YELLOW (warning, close to red) ────────────────────────────────
   {
     id: 'budget_health_01',
     userId: USER_ID,
     categoryId: 'cat_health',
     monthlyLimit: 800_000,
     resetDay: 1,
-    categoryName: 'Sức khỏe',
-    categoryColor: '#EF4444',
-    categoryIcon: 'heart-pulse',
-    // Transactions: tx_11(120k) tx_29(500k) = 620,000
-    spent: 620_000,
-    remaining: 180_000,
-    percentage: 77.5,
-    status: 'warning',
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
-
-  // ── Hóa đơn & Tiện ích — GREEN ───────────────────────────────────────────────
   {
     id: 'budget_bills_01',
     userId: USER_ID,
     categoryId: 'cat_bills',
     monthlyLimit: 1_000_000,
     resetDay: 1,
-    categoryName: 'Hóa đơn & Tiện ích',
-    categoryColor: '#6366F1',
-    categoryIcon: 'receipt',
-    // Transactions: tx_20(350k) tx_32(100k) = 450,000
-    spent: 450_000,
-    remaining: 550_000,
-    percentage: 45.0,
-    status: 'safe',
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
 ];
 
-// ─── Service Functions ─────────────────────────────────────────────────────────
+// ─── Reads ─────────────────────────────────────────────────────────────────────
 
 export function getBudgets(): BudgetWithSpend[] {
-  return MOCK_BUDGETS;
+  return BUDGETS.map(withSpend);
 }
 
 export function getBudgetById(id: string): BudgetWithSpend | undefined {
-  return MOCK_BUDGETS.find((b) => b.id === id);
+  const base = BUDGETS.find((b) => b.id === id);
+  return base ? withSpend(base) : undefined;
+}
+
+// ─── Writes ────────────────────────────────────────────────────────────────────
+
+export interface CreateBudgetInput {
+  categoryId: string;
+  monthlyLimit: number;
+}
+
+export async function createBudget(
+  input: CreateBudgetInput,
+): Promise<BudgetWithSpend> {
+  await delay();
+  // One budget per (user, category) -- upsert on conflict.
+  const existing = BUDGETS.find((b) => b.categoryId === input.categoryId);
+  if (existing) {
+    return updateBudget(existing.id, { monthlyLimit: input.monthlyLimit });
+  }
+  const base: BaseBudget = {
+    id: genId(),
+    userId: USER_ID,
+    categoryId: input.categoryId,
+    monthlyLimit: input.monthlyLimit,
+    resetDay: 1,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  BUDGETS = [...BUDGETS, base];
+  return withSpend(base);
+}
+
+export interface UpdateBudgetInput {
+  monthlyLimit?: number;
+}
+
+export async function updateBudget(
+  id: string,
+  patch: UpdateBudgetInput,
+): Promise<BudgetWithSpend> {
+  await delay();
+  const before = BUDGETS.find((b) => b.id === id);
+  if (!before) throw new Error('Budget not found');
+  const after: BaseBudget = {
+    ...before,
+    ...(patch.monthlyLimit !== undefined ? { monthlyLimit: patch.monthlyLimit } : {}),
+    updatedAt: nowIso(),
+  };
+  BUDGETS = BUDGETS.map((b) => (b.id === id ? after : b));
+  return withSpend(after);
+}
+
+export async function deleteBudget(id: string): Promise<void> {
+  await delay();
+  BUDGETS = BUDGETS.filter((b) => b.id !== id);
 }

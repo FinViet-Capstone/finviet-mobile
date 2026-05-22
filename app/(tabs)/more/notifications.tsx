@@ -18,7 +18,7 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-import { useNotifications } from '@/hooks';
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import type { AppNotification, NotificationType } from '@/types/notification';
@@ -64,6 +64,8 @@ function formatRelative(iso: string): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { data: notifications, isLoading } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -71,6 +73,7 @@ export default function NotificationsScreen() {
   const unreadCount = list.filter((n) => !n.isRead).length;
 
   const handleTap = (n: AppNotification) => {
+    if (!n.isRead) markRead.mutate(n.id);
     if (n.deepLink) {
       router.push(n.deepLink as never);
     } else {
@@ -84,7 +87,14 @@ export default function NotificationsScreen() {
       'Đánh dấu tất cả thông báo là đã đọc?',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Xác nhận', onPress: () => Alert.alert('Đã cập nhật') },
+        {
+          text: 'Xác nhận',
+          onPress: () =>
+            markAllRead.mutate(undefined, {
+              onSuccess: ({ count }) =>
+                Alert.alert('Đã cập nhật', `${count} thông báo đã được đánh dấu là đã đọc.`),
+            }),
+        },
       ],
     );
   };

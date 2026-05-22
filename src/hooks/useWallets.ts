@@ -1,5 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { getWallets, getWalletById } from '@/services';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  getWallets,
+  getWalletById,
+  createWallet,
+  updateWallet,
+  deleteWallet,
+  createTransfer,
+  type CreateWalletInput,
+  type UpdateWalletInput,
+  type CreateTransferInput,
+} from '@/services';
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useWallets = () =>
   useQuery({ queryKey: ['wallets'], queryFn: () => getWallets() });
@@ -10,3 +22,48 @@ export const useWalletById = (id: string | undefined) =>
     queryFn: () => (id ? getWalletById(id) ?? null : null),
     enabled: !!id,
   });
+
+// ─── Mutations ────────────────────────────────────────────────────────────────
+
+function invalidateWalletDependents(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['wallets'] });
+  qc.invalidateQueries({ queryKey: ['transactions'] });
+  qc.invalidateQueries({ queryKey: ['user'] });
+}
+
+export const useCreateWallet = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateWalletInput) => createWallet(input),
+    onSuccess: () => invalidateWalletDependents(qc),
+  });
+};
+
+export const useUpdateWallet = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateWalletInput }) =>
+      updateWallet(id, patch),
+    onSuccess: () => invalidateWalletDependents(qc),
+  });
+};
+
+export const useDeleteWallet = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteWallet(id),
+    onSuccess: () => invalidateWalletDependents(qc),
+  });
+};
+
+export const useCreateTransfer = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTransferInput) => createTransfer(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wallets'] });
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['budgets'] });
+    },
+  });
+};

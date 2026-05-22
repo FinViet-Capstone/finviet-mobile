@@ -35,7 +35,7 @@ import type { Category } from '@/constants/categories';
 import { TextInput } from '@/components/common/TextInput';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useWallets } from '@/hooks';
+import { useWallets, useCreateTransaction } from '@/hooks';
 import type { Wallet } from '@/types/wallet';
 import { formatVND } from '@/utils/formatters';
 
@@ -71,12 +71,20 @@ function isoToDisplay(iso: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+/** Converts "DD/MM/YYYY" → "YYYY-MM-DD". */
+function displayToIso(display: string): string {
+  const parts = display.split('/');
+  if (parts.length !== 3) return todayISO();
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ManualEntryScreen() {
   const router = useRouter();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const { data: walletData, isLoading } = useWallets();
+  const createMutation = useCreateTransaction();
 
   const initialISO = dateParam ?? todayISO();
 
@@ -92,7 +100,6 @@ export default function ManualEntryScreen() {
   const [aiSuggestion, setAiSuggestion] = useState<Category | null>(null);
   const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
   const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
   if (isLoading || !walletData) return <LoadingSpinner />;
@@ -171,13 +178,31 @@ export default function ManualEntryScreen() {
     }
 
     setErrors({});
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại thành công.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    }, 500);
+    createMutation.mutate(
+      {
+        walletId: effectiveWalletId,
+        categoryId: selectedCategoryId,
+        amount: amountNum,
+        type: entryType,
+        description: description.trim(),
+        merchant: null,
+        transactionDate: displayToIso(dateDisplay),
+        aiSuggestedCategoryId: aiSuggestion?.id ?? null,
+        aiOverridden:
+          selectedCategoryId !== null &&
+          aiSuggestion !== null &&
+          selectedCategoryId !== aiSuggestion.id,
+        entryMethod: 'manual',
+      },
+      {
+        onSuccess: () =>
+          Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại thành công.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: () =>
+          Alert.alert('Không lưu được', 'Hãy thử lại sau.'),
+      },
+    );
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -346,7 +371,7 @@ export default function ManualEntryScreen() {
           <Button
             title="Lưu giao dịch"
             onPress={handleSubmit}
-            loading={isSubmitting}
+            loading={createMutation.isPending}
             style={styles.submitBtn}
           />
         </ScrollView>

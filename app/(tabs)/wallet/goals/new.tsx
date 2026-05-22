@@ -22,7 +22,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
-import { useWallets } from '@/hooks';
+import { useWallets, useCreateGoal } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/utils/formatters';
 
@@ -75,6 +75,7 @@ function monthsBetween(fromIso: string, toIso: string): number {
 export default function CreateGoalScreen() {
   const router = useRouter();
   const { data: walletsData, isLoading: walletsLoading } = useWallets();
+  const createMutation = useCreateGoal();
 
   const today = useMemo(() => new Date(), []);
   const todayIso = useMemo(() => toIsoDate(today), [today]);
@@ -86,7 +87,6 @@ export default function CreateGoalScreen() {
   const [activePreset, setActivePreset] = useState<string | null>('6m');
   const [fundingWalletId, setFundingWalletId] = useState<string | null>(null);
   const [initialContribution, setInitialContribution] = useState('');
-  const [loading, setLoading] = useState(false);
 
   if (walletsLoading || !walletsData) return <LoadingSpinner />;
 
@@ -143,16 +143,25 @@ export default function CreateGoalScreen() {
   };
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert(
-        'Đã tạo mục tiêu',
-        `Mục tiêu "${name.trim()}" đã sẵn sàng. Hãy đóng góp đều đặn nhé!`,
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    }, 500);
+    if (!canSubmit || !fundingWalletId) return;
+    createMutation.mutate(
+      {
+        name: name.trim(),
+        targetAmount: targetNum,
+        deadline: deadlineIso,
+        fundingWalletId,
+        initialAmount: initialNum > 0 ? initialNum : undefined,
+      },
+      {
+        onSuccess: (goal) =>
+          Alert.alert(
+            'Đã tạo mục tiêu',
+            `Mục tiêu "${goal.name}" đã sẵn sàng. Hãy đóng góp đều đặn nhé!`,
+            [{ text: 'OK', onPress: () => router.back() }],
+          ),
+        onError: () => Alert.alert('Lỗi', 'Không tạo được mục tiêu.'),
+      },
+    );
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -311,7 +320,7 @@ export default function CreateGoalScreen() {
           <Button
             title="Tạo mục tiêu"
             onPress={handleSubmit}
-            loading={loading}
+            loading={createMutation.isPending}
             disabled={!canSubmit}
             style={styles.submit}
           />

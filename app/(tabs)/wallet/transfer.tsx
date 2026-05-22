@@ -25,7 +25,7 @@ import {
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useWallets } from '@/hooks';
+import { useWallets, useCreateTransfer } from '@/hooks';
 import { formatVND } from '@/utils/formatters';
 import type { Wallet, WalletType } from '@/types/wallet';
 
@@ -38,6 +38,7 @@ const WALLET_ICON: Record<WalletType, string> = {
 export default function TransferScreen() {
   const router = useRouter();
   const { data, isLoading } = useWallets();
+  const transferMutation = useCreateTransfer();
 
   const [fromId, setFromId] = useState<string | null>(null);
   const [toId, setToId] = useState<string | null>(null);
@@ -45,7 +46,6 @@ export default function TransferScreen() {
   const [description, setDescription] = useState('');
   const [showFrom, setShowFrom] = useState(false);
   const [showTo, setShowTo] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const wallets: Wallet[] = useMemo(() => data?.wallets ?? [], [data]);
@@ -80,15 +80,23 @@ export default function TransferScreen() {
       setError(`Số dư ${fromWallet.name} không đủ.`);
       return;
     }
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      Alert.alert(
-        'Chuyển khoản thành công',
-        `${formatVND(amount)} từ ${fromWallet.name} → ${toWallet.name}`,
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    }, 600);
+    transferMutation.mutate(
+      {
+        fromWalletId: fromWallet.id,
+        toWalletId: toWallet.id,
+        amount,
+        note: description.trim() || null,
+      },
+      {
+        onSuccess: () =>
+          Alert.alert(
+            'Chuyển khoản thành công',
+            `${formatVND(amount)} từ ${fromWallet.name} → ${toWallet.name}`,
+            [{ text: 'OK', onPress: () => router.back() }],
+          ),
+        onError: () => setError('Không thực hiện được giao dịch. Hãy thử lại.'),
+      },
+    );
   };
 
   return (
@@ -194,7 +202,7 @@ export default function TransferScreen() {
           <Button
             title="Xác nhận chuyển"
             onPress={handleSubmit}
-            loading={submitting}
+            loading={transferMutation.isPending}
             style={styles.submit}
           />
         </ScrollView>

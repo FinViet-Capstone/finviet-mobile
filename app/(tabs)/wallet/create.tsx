@@ -22,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { useCreateWallet } from '@/hooks';
 import type { WalletType } from '@/types/wallet';
 
 const WALLET_TYPE_OPTIONS: { type: WalletType; icon: string; label: string }[] = [
@@ -32,24 +33,33 @@ const WALLET_TYPE_OPTIONS: { type: WalletType; icon: string; label: string }[] =
 
 export default function CreateWalletScreen() {
   const router = useRouter();
+  const createMutation = useCreateWallet();
   const [name, setName] = useState('');
   const [type, setType] = useState<WalletType>('cash');
   const [balance, setBalance] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const handleCreate = () => {
     if (name.trim().length === 0) {
       Alert.alert('Tên ví không hợp lệ', 'Vui lòng nhập tên ví.');
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert('Đã tạo ví', `Ví "${name.trim()}" đã được tạo.`, [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    }, 500);
+    createMutation.mutate(
+      {
+        name: name.trim(),
+        type,
+        balance: parseInt(balance, 10) || 0,
+        isPrimary,
+      },
+      {
+        onSuccess: (wallet) =>
+          Alert.alert('Đã tạo ví', `Ví "${wallet.name}" đã được tạo.`, [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: () =>
+          Alert.alert('Không tạo được ví', 'Hãy thử lại sau.'),
+      },
+    );
   };
 
   return (
@@ -133,7 +143,7 @@ export default function CreateWalletScreen() {
           <Button
             title="Tạo ví"
             onPress={handleCreate}
-            loading={loading}
+            loading={createMutation.isPending}
             style={styles.submit}
           />
         </ScrollView>

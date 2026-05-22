@@ -20,7 +20,7 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-import { useWalletById, useTransactions } from '@/hooks';
+import { useWalletById, useTransactions, useUpdateWallet, useDeleteWallet } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/common/Button';
@@ -45,6 +45,8 @@ export default function WalletDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: wallet, isLoading } = useWalletById(id);
   const { data: transactions } = useTransactions(id ? { walletId: id } : undefined);
+  const updateMutation = useUpdateWallet();
+  const deleteMutation = useDeleteWallet();
 
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -75,11 +77,21 @@ export default function WalletDetailScreen() {
       Alert.alert('Tên ví không hợp lệ', 'Vui lòng nhập tên ví.');
       return;
     }
-    setEditVisible(false);
-    Alert.alert('Đã cập nhật', 'Tên ví đã được lưu.');
+    if (!wallet) return;
+    updateMutation.mutate(
+      { id: wallet.id, patch: { name: editName.trim() } },
+      {
+        onSuccess: () => {
+          setEditVisible(false);
+          Alert.alert('Đã cập nhật', 'Tên ví đã được lưu.');
+        },
+        onError: () => Alert.alert('Lỗi', 'Không cập nhật được ví.'),
+      },
+    );
   };
 
   const handleDelete = () => {
+    if (!wallet) return;
     if (wallet.isPrimary) {
       Alert.alert('Không thể xóa', 'Ví chính không thể xóa. Hãy đặt ví khác làm ví chính trước.');
       return;
@@ -92,11 +104,14 @@ export default function WalletDetailScreen() {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Đã xóa', 'Ví đã được xóa.', [
-              { text: 'OK', onPress: () => router.back() },
-            ]);
-          },
+          onPress: () =>
+            deleteMutation.mutate(wallet.id, {
+              onSuccess: () =>
+                Alert.alert('Đã xóa', 'Ví đã được xóa.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]),
+              onError: () => Alert.alert('Lỗi', 'Không xóa được ví.'),
+            }),
         },
       ],
     );
@@ -164,7 +179,7 @@ export default function WalletDetailScreen() {
         </View>
 
         <View style={styles.dangerSection}>
-          <Button title="Xóa ví" variant="ghost" onPress={handleDelete} />
+          <Button title="Xóa ví" variant="ghost" onPress={handleDelete} loading={deleteMutation.isPending} />
         </View>
       </ScrollView>
 
@@ -189,7 +204,7 @@ export default function WalletDetailScreen() {
               placeholder="Tên ví"
               autoFocus
             />
-            <Button title="Lưu" onPress={handleSaveEdit} />
+            <Button title="Lưu" onPress={handleSaveEdit} loading={updateMutation.isPending} />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>

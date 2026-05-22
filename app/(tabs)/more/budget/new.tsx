@@ -23,7 +23,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
-import { useBudgets } from '@/hooks';
+import { useBudgets, useCreateBudget } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EXPENSE_CATEGORIES, getCategoryById } from '@/constants/categories';
 import { formatVND } from '@/utils/formatters';
@@ -35,11 +35,11 @@ import { formatVND } from '@/utils/formatters';
 export default function CreateBudgetScreen() {
   const router = useRouter();
   const { data: budgets, isLoading } = useBudgets();
+  const createMutation = useCreateBudget();
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [limit, setLimit] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   if (isLoading || !budgets) return <LoadingSpinner />;
 
@@ -63,16 +63,19 @@ export default function CreateBudgetScreen() {
   };
 
   const handleSubmit = () => {
-    if (!canSubmit || !selectedCategory) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert(
-        'Đã tạo ngân sách',
-        `Ngân sách ${formatVND(limitNum)} cho "${selectedCategory.nameVi}" đã được áp dụng cho tháng này.`,
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    }, 500);
+    if (!canSubmit || !selectedCategory || !categoryId) return;
+    createMutation.mutate(
+      { categoryId, monthlyLimit: limitNum },
+      {
+        onSuccess: () =>
+          Alert.alert(
+            'Đã tạo ngân sách',
+            `Ngân sách ${formatVND(limitNum)} cho "${selectedCategory.nameVi}" đã được áp dụng cho tháng này.`,
+            [{ text: 'OK', onPress: () => router.back() }],
+          ),
+        onError: () => Alert.alert('Lỗi', 'Không tạo được ngân sách.'),
+      },
+    );
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -192,7 +195,7 @@ export default function CreateBudgetScreen() {
               <Button
                 title="Tạo ngân sách"
                 onPress={handleSubmit}
-                loading={loading}
+                loading={createMutation.isPending}
                 disabled={!canSubmit}
                 style={styles.submit}
               />
