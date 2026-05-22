@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VictoryChart, VictoryBar, VictoryAxis } from 'victory-native';
 import { BarChart3 } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
+import { ChartTooltip } from '@/components/charts/ChartTooltip';
 import { COLORS, FONT_SIZE } from '@/constants/theme';
 
 export interface WeekBarDatum {
@@ -18,6 +19,11 @@ export interface VictoryBarWeekProps {
   data: WeekBarDatum[];
   /** Chart height in pixels — defaults to 220 */
   height?: number;
+  /**
+   * Optional value formatter for the tooltip subline. Receives the bar value.
+   * Defaults to `String(value)`.
+   */
+  formatValue?: (value: number) => string;
 }
 
 /**
@@ -25,13 +31,25 @@ export interface VictoryBarWeekProps {
  * Bars are colored red when `overAverage` is true, green otherwise.
  * Renders EmptyState when data is empty or all amounts are zero.
  *
+ * Tooltip behavior: hold-to-peek. Pressing a bar surfaces a label + value
+ * tooltip directly above the bar; releasing clears it. The tooltip's x is
+ * computed from the bar's index in the data array (not the touch coords),
+ * which keeps the tooltip aligned with the bar even on bumpy presses.
+ *
  * Victory Native v36 notes:
  *  - Use VictoryChart + VictoryBar (not CartesianChart — that's v37+ XL)
- *  - `style.data.fill` accepts a function receiving `{ datum }` for conditional color
- *  - `VictoryAxis` is used for x-axis labels; y-axis left implicit for a clean look
+ *  - Press is wired via the `events` prop. Event coords are unreliable across
+ *    SVG/RN boundaries, so we don't use them — the datum index drives layout.
+ *  - VictoryAxis is used for x-axis labels; y-axis left implicit for a clean look
  */
-export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
+export function VictoryBarWeek({
+  data,
+  height = 220,
+  formatValue = String,
+}: VictoryBarWeekProps) {
   const hasData = data.length > 0 && data.some((d) => d.amount > 0);
+  const [active, setActive] = useState<{ index: number; datum: WeekBarDatum } | null>(null);
+  const [width, setWidth] = useState(0);
 
   if (!hasData) {
     return (
@@ -43,16 +61,58 @@ export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
     );
   }
 
-  // Victory Native expects `x` and `y` field names by default.
-  // We map our domain data into those fields while preserving the extra flag.
-  const chartData = data.map((d) => ({
+  // Carry the original domain datum + index through to the events callback.
+  const chartData = data.map((d, i) => ({
     x: d.day,
     y: d.amount,
     overAverage: d.overAverage,
+    original: d,
+    index: i,
   }));
 
+  type ChartDatum = (typeof chartData)[number];
+
+  const events = [
+    {
+      target: 'data' as const,
+      eventHandlers: {
+        onPressIn: () => [
+          {
+            target: 'data' as const,
+            mutation: (props: { datum?: ChartDatum }) => {
+              if (props.datum?.original) {
+                setActive({ index: props.datum.index, datum: props.datum.original });
+              }
+              return null;
+            },
+          },
+        ],
+        onPressOut: () => {
+          setActive(null);
+          return [];
+        },
+      },
+    },
+  ];
+
+  // Position the tooltip above the touched bar.
+  // VictoryChart pads x: 8px on left & right; domainPadding spreads bars across the
+  // remaining width. Each bar's center sits at: leftPad + (i + 0.5) * slotWidth.
+  let tipX = 0;
+  let tipY = 24; // sits near the top of the chart area
+  if (active && width > 0) {
+    const leftPad = 8;
+    const rightPad = 8;
+    const innerW = width - leftPad - rightPad;
+    const slot = innerW / data.length;
+    tipX = leftPad + slot * (active.index + 0.5);
+  }
+
   return (
-    <View style={[styles.container, { height }]}>
+    <View
+      style={[styles.container, { height }]}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
       <VictoryChart
         height={height}
         domainPadding={{ x: 16 }}
@@ -72,6 +132,7 @@ export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
         <VictoryBar
           data={chartData}
           cornerRadius={{ top: 4 }}
+          events={events}
           style={{
             data: {
               fill: ({ datum }: { datum?: { overAverage: boolean } }) =>
@@ -80,6 +141,18 @@ export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
           }}
         />
       </VictoryChart>
+
+      {active ? (
+        <ChartTooltip
+          x={tipX}
+          y={tipY}
+          offsetY={0}
+          width={120}
+          label={active.datum.day}
+          value={formatValue(active.datum.amount)}
+          accent={active.datum.overAverage ? COLORS.danger : COLORS.success}
+        />
+      ) : null}
     </View>
   );
 }

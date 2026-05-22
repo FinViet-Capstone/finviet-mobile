@@ -226,7 +226,7 @@ export default function ReportScreen() {
           <Text style={styles.sectionTitle}>Chi tiêu theo danh mục</Text>
           <Text style={styles.sectionSubtitle}>Tháng này</Text>
           <View style={styles.chartCard}>
-            <VictoryDonut data={donutData} />
+            <VictoryDonut data={donutData} formatValue={formatVND} />
             {donutData.length > 0 ? (
               <View style={styles.legend}>
                 {donutData.slice(0, 5).map((d) => {
@@ -257,7 +257,7 @@ export default function ReportScreen() {
             Đỏ: vượt mức trung bình ngày
           </Text>
           <View style={styles.chartCard}>
-            <VictoryBarWeek data={weekBars} />
+            <VictoryBarWeek data={weekBars} formatValue={formatVND} />
           </View>
         </View>
 
