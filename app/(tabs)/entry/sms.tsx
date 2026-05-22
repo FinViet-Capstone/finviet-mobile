@@ -26,6 +26,7 @@ import {
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { CATEGORIES } from '@/constants/categories';
 import type { Category } from '@/constants/categories';
 import { useExtractFromSMS, useWallets, useCreateTransaction } from '@/hooks';
@@ -40,18 +41,6 @@ const SAMPLE_SMS =
 
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
-}
-
-function isoToDisplay(iso: string): string {
-  const parts = iso.split('-');
-  if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-function displayToIso(display: string): string {
-  const parts = display.split('/');
-  if (parts.length !== 3) return todayISO();
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 
 export default function SMSEntryScreen() {
@@ -70,7 +59,7 @@ export default function SMSEntryScreen() {
   // Form state (filled after extraction)
   const [amountRaw, setAmountRaw] = useState('');
   const [merchant, setMerchant] = useState('');
-  const [dateDisplay, setDateDisplay] = useState(isoToDisplay(initialISO));
+  const [dateIso, setDateIso] = useState(initialISO);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
 
@@ -113,7 +102,7 @@ export default function SMSEntryScreen() {
       onSuccess: (result) => {
         if (result.amount !== null) setAmountRaw(String(result.amount));
         if (result.merchant !== null) setMerchant(result.merchant);
-        setDateDisplay(isoToDisplay(result.transactionDate));
+        setDateIso(result.transactionDate);
         setCategoryId(result.categoryId);
 
         setAmountUncertain(
@@ -166,7 +155,7 @@ export default function SMSEntryScreen() {
         type: 'expense',
         description: merchant.trim() || null,
         merchant: merchant.trim() || null,
-        transactionDate: displayToIso(dateDisplay),
+        transactionDate: dateIso,
         aiSuggestedCategoryId: categoryId,
         aiOverridden: false,
         entryMethod: 'manual',
@@ -348,17 +337,11 @@ export default function SMSEntryScreen() {
 
           {/* Date */}
           <View style={styles.card}>
-            <Text style={styles.fieldLabel}>Ngày</Text>
-            <TouchableOpacity
-              style={styles.selectRow}
-              onPress={() =>
-                Alert.alert('Chọn ngày', 'Tính năng chọn ngày sẽ sớm ra mắt.')
-              }
-              activeOpacity={0.75}
-            >
-              <Text style={styles.selectValue}>{dateDisplay}</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+            <DatePickerField
+              label="Ngày"
+              value={dateIso}
+              onChange={setDateIso}
+            />
           </View>
 
           <View style={styles.actionsRow}>

@@ -22,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { useWallets, useCreateGoal } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/utils/formatters';
@@ -52,11 +53,6 @@ function toIsoDate(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
-}
-
-function formatDeadlineDisplay(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
 }
 
 function monthsBetween(fromIso: string, toIso: string): number {
@@ -116,12 +112,9 @@ export default function CreateGoalScreen() {
     setDeadlineIso(toIsoDate(addMonths(today, preset.addMonths)));
   };
 
-  const handleDeadlinePicker = () => {
-    // Native datepicker requires a dev build (matches calendar/edit-entry pattern).
-    Alert.alert(
-      'Chọn ngày tùy chỉnh',
-      'Bộ chọn ngày sẽ khả dụng sau khi nâng cấp Dev Build. Tạm thời hãy dùng các mốc nhanh phía trên.',
-    );
+  const handleDateChange = (iso: string) => {
+    setDeadlineIso(iso);
+    setActivePreset(null);
   };
 
   const handleFundingWalletPicker = () => {
@@ -241,16 +234,12 @@ export default function CreateGoalScreen() {
               })}
             </View>
 
-            <TouchableOpacity
-              style={styles.dateRow}
-              onPress={handleDeadlinePicker}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.dateLabel}>Ngày kết thúc</Text>
-              <Text style={styles.dateValue}>
-                {formatDeadlineDisplay(deadlineIso)} ›
-              </Text>
-            </TouchableOpacity>
+            <DatePickerField
+              label="Ngày kết thúc tùy chỉnh"
+              value={deadlineIso}
+              onChange={handleDateChange}
+              minDate={todayIso}
+            />
           </View>
 
           {/* Funding wallet */}
@@ -421,6 +410,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     backgroundColor: COLORS.gray[50],
     borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING[3],
   },
   dateLabel: { fontSize: FONT_SIZE.sm, color: COLORS.gray[600] },
   dateValue: {

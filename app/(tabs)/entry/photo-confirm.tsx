@@ -28,6 +28,7 @@ import { CATEGORIES } from '@/constants/categories';
 import type { Category } from '@/constants/categories';
 import { TextInput } from '@/components/common/TextInput';
 import { Button } from '@/components/common/Button';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { formatVND } from '@/utils/formatters';
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from '@/hooks';
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from '@/constants/extraction';
@@ -50,12 +51,6 @@ function isoToDisplay(iso: string): string {
   const parts = iso.split('-');
   if (parts.length !== 3) return iso;
   return parts[2] + '/' + parts[1] + '/' + parts[0];
-}
-
-function displayToIso(display: string): string {
-  const parts = display.split('/');
-  if (parts.length !== 3) return todayISO();
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 
 /** Returns true when the string looks like a valid image URI. */
@@ -88,9 +83,7 @@ export default function PhotoConfirmScreen() {
   );
   const [amountRaw, setAmountRaw] = useState<string>('');
   const [merchant, setMerchant] = useState<string>('');
-  const [dateDisplay, setDateDisplay] = useState<string>(
-    isoToDisplay(dateParam ?? todayISO()),
-  );
+  const [dateIso, setDateIso] = useState<string>(dateParam ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryUncertain, setCategoryUncertain] = useState<boolean>(false);
   const [amountUncertain, setAmountUncertain] = useState<boolean>(false);
@@ -106,7 +99,7 @@ export default function PhotoConfirmScreen() {
         if (result.amount !== null) setAmountRaw(String(result.amount));
         if (result.merchant !== null) setMerchant(result.merchant);
         // Prefer extraction date; fall back to forwarded calendar date if extraction returns today
-        setDateDisplay(isoToDisplay(result.transactionDate));
+        setDateIso(result.transactionDate);
         setCategoryId(result.categoryId);
         setAmountUncertain(
           result.confidence.amount < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
@@ -167,7 +160,7 @@ export default function PhotoConfirmScreen() {
         type: 'expense',
         description: merchant.trim() || null,
         merchant: merchant.trim() || null,
-        transactionDate: displayToIso(dateDisplay),
+        transactionDate: dateIso,
         aiSuggestedCategoryId: categoryId,
         aiOverridden: false,
         entryMethod: 'photo',
@@ -300,17 +293,11 @@ export default function PhotoConfirmScreen() {
 
           {/* Date */}
           <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Ngày'}</Text>
-            <TouchableOpacity
-              style={styles.selectRow}
-              onPress={() =>
-                Alert.alert('Chọn ngày', 'Tính năng chọn ngày sẽ sớm ra mắt.')
-              }
-              activeOpacity={0.75}
-            >
-              <Text style={styles.selectValue}>{dateDisplay}</Text>
-              <Text style={styles.chevron}>{String.fromCharCode(8250)}</Text>
-            </TouchableOpacity>
+            <DatePickerField
+              label="Ngày"
+              value={dateIso}
+              onChange={setDateIso}
+            />
           </View>
 
           {/* Action buttons */}

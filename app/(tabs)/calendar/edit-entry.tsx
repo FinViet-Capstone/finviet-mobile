@@ -26,6 +26,7 @@ import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import {
   useTransactionById,
@@ -127,6 +128,7 @@ function EditMode({ txId }: { txId: string }) {
   const [merchant, setMerchant] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
+  const [dateIso, setDateIso] = useState<string>('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
@@ -138,6 +140,7 @@ function EditMode({ txId }: { txId: string }) {
     setMerchant(tx.merchant ?? '');
     setCategoryId(tx.categoryId);
     setWalletId(tx.walletId);
+    setDateIso(tx.transactionDate);
   }, [tx]);
 
   if (isLoading) return <LoadingSpinner />;
@@ -163,9 +166,6 @@ function EditMode({ txId }: { txId: string }) {
 
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
 
-  const [yyyy, mm, dd] = tx.transactionDate.split('-');
-  const dateDisplay = `${dd}/${mm}/${yyyy}`;
-
   const handleSave = () => {
     setAmountError(undefined);
     const amount = parseInt(amountRaw, 10) || 0;
@@ -186,6 +186,7 @@ function EditMode({ txId }: { txId: string }) {
           merchant: isTransfer ? null : (merchant.trim() || null),
           categoryId: isTransfer ? null : categoryId,
           walletId: isTransfer ? undefined : walletId,
+          transactionDate: dateIso,
         },
       },
       {
@@ -329,19 +330,14 @@ function EditMode({ txId }: { txId: string }) {
             </TouchableOpacity>
           </View>
 
-          {/* Date (read-only for now — date picker is a future iteration) */}
+          {/* Date */}
           <View style={styles.card}>
-            <Text style={styles.fieldLabel}>Ngày</Text>
-            <TouchableOpacity
-              style={styles.selectRow}
-              onPress={() =>
-                Alert.alert('Chọn ngày', 'Tính năng chọn ngày sẽ sớm ra mắt.')
-              }
-              activeOpacity={0.75}
-            >
-              <Text style={styles.selectValue}>{dateDisplay}</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+            <DatePickerField
+              label="Ngày"
+              value={dateIso || tx.transactionDate}
+              onChange={setDateIso}
+              disabled={isTransfer}
+            />
           </View>
 
           <Button

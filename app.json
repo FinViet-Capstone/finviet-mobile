@@ -57,7 +57,8 @@
           "cameraPermission": "FinViet needs camera access to scan receipts."
         }
       ],
-      "expo-router"
+      "expo-router",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

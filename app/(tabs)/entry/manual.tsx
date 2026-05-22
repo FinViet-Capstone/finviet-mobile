@@ -35,6 +35,7 @@ import type { Category } from '@/constants/categories';
 import { TextInput } from '@/components/common/TextInput';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { useWallets, useCreateTransaction } from '@/hooks';
 import type { Wallet } from '@/types/wallet';
 import { formatVND } from '@/utils/formatters';
@@ -64,20 +65,6 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-/** Converts "YYYY-MM-DD" → "DD/MM/YYYY" for display. */
-function isoToDisplay(iso: string): string {
-  const parts = iso.split('-');
-  if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-/** Converts "DD/MM/YYYY" → "YYYY-MM-DD". */
-function displayToIso(display: string): string {
-  const parts = display.split('/');
-  if (parts.length !== 3) return todayISO();
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ManualEntryScreen() {
@@ -93,7 +80,7 @@ export default function ManualEntryScreen() {
   const [description, setDescription] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [dateDisplay] = useState<string>(isoToDisplay(initialISO));
+  const [dateIso, setDateIso] = useState<string>(initialISO);
   const [entryType, setEntryType] = useState<EntryType>('expense');
 
   // ── UI state ────────────────────────────────────────────────────────────────
@@ -155,10 +142,6 @@ export default function ManualEntryScreen() {
 
   const handleDismissSuggestion = () => setAiSuggestion(null);
 
-  const handleDatePress = () => {
-    Alert.alert('Chọn ngày', 'Tính năng chọn ngày sẽ sớm ra mắt.');
-  };
-
   const handleSubmit = () => {
     const digits = amountRaw.replace(/\D/g, '');
     const amountNum = digits ? parseInt(digits, 10) : 0;
@@ -186,7 +169,7 @@ export default function ManualEntryScreen() {
         type: entryType,
         description: description.trim(),
         merchant: null,
-        transactionDate: displayToIso(dateDisplay),
+        transactionDate: dateIso,
         aiSuggestedCategoryId: aiSuggestion?.id ?? null,
         aiOverridden:
           selectedCategoryId !== null &&
@@ -315,15 +298,11 @@ export default function ManualEntryScreen() {
 
           {/* ─ Date ─ */}
           <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Ngày'}</Text>
-            <TouchableOpacity
-              style={styles.selectRow}
-              onPress={handleDatePress}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.selectValue}>{dateDisplay}</Text>
-              <Text style={styles.chevron}>{'›'}</Text>
-            </TouchableOpacity>
+            <DatePickerField
+              label="Ngày"
+              value={dateIso}
+              onChange={setDateIso}
+            />
           </View>
 
           {/* ─ Type toggle ─ */}
