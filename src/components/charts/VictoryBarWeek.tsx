@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VictoryChart, VictoryBar, VictoryAxis } from 'victory-native';
+import { BarChart3 } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
 import { COLORS, FONT_SIZE } from '@/constants/theme';
 
@@ -35,7 +36,7 @@ export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
   if (!hasData) {
     return (
       <EmptyState
-        iconName="bar-chart-outline"
+        icon={BarChart3}
         title="Chưa có dữ liệu"
         subtitle="Thêm giao dịch để xem biểu đồ"
       />
@@ -73,8 +74,8 @@ export function VictoryBarWeek({ data, height = 220 }: VictoryBarWeekProps) {
           cornerRadius={{ top: 4 }}
           style={{
             data: {
-              fill: ({ datum }: { datum: { overAverage: boolean } }) =>
-                datum.overAverage ? COLORS.danger : COLORS.success,
+              fill: ({ datum }: { datum?: { overAverage: boolean } }) =>
+                datum?.overAverage ? COLORS.danger : COLORS.success,
             },
           }}
         />

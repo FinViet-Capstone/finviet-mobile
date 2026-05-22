@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VictoryPie } from 'victory-native';
+import { PieChart } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
 import { COLORS } from '@/constants/theme';
 
@@ -40,7 +41,7 @@ export function VictoryDonut({
   if (!hasData) {
     return (
       <EmptyState
-        iconName="pie-chart-outline"
+        icon={PieChart}
         title="Chưa có dữ liệu"
         subtitle="Thêm giao dịch để xem biểu đồ"
       />
@@ -56,7 +57,7 @@ export function VictoryDonut({
         padding={{ top: 16, bottom: 16, left: 16, right: 16 }}
         style={{
           data: {
-            fill: ({ datum }: { datum: DonutDatum }) => datum.color,
+            fill: ({ datum }: { datum?: DonutDatum }) => datum?.color ?? COLORS.gray[300],
             stroke: COLORS.white,
             strokeWidth: 2,
           },
