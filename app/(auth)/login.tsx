@@ -6,7 +6,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +16,8 @@ import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
-import { useAuthStore } from '@/stores/authStore';
-import { getUser } from '@/services';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { useLogin, useGoogleOAuth } from '@/hooks';
 import {
   COLORS,
   SPACING,
@@ -51,9 +50,9 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
+  const loginMutation = useLogin();
+  const googleMutation = useGoogleOAuth('login');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const {
     control,
@@ -66,18 +65,17 @@ export default function LoginScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const onSubmit = (_data: LoginFormValues) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const user = { ...getUser(), onboardingDone: true };
-      setSession(user);
-      router.replace('/(tabs)/report');
-    }, 1000);
+  const onSubmit = (data: LoginFormValues) => {
+    loginMutation.mutate(data, {
+      onSuccess: () => router.replace('/(tabs)/report'),
+    });
   };
 
   const handleGoogleLogin = () => {
-    Alert.alert('Coming soon');
+    googleMutation.mutate(undefined, {
+      onSuccess: (user) =>
+        router.replace(user.onboardingDone ? '/(tabs)/report' : '/onboarding'),
+    });
   };
 
   const handleForgotPassword = () => {
@@ -87,6 +85,9 @@ export default function LoginScreen() {
   const handleCreateAccount = () => {
     router.push('/(auth)/register');
   };
+
+  const isBusy = loginMutation.isPending || googleMutation.isPending;
+  const surfacedError = loginMutation.error ?? googleMutation.error;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,8 @@ export default function LoginScreen() {
               Chào mừng bạn quay trở lại!
             </Text>
 
+            <AuthErrorBanner error={surfacedError} />
+
             {/* Email field */}
             <Controller
               control={control}
@@ -135,6 +138,7 @@ export default function LoginScreen() {
                   error={errors.email?.message}
                   leftIcon={<Text style={styles.fieldIcon}>✉</Text>}
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -167,6 +171,7 @@ export default function LoginScreen() {
                     </TouchableOpacity>
                   }
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -176,6 +181,7 @@ export default function LoginScreen() {
               onPress={handleForgotPassword}
               style={styles.forgotRow}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={isBusy}
             >
               <Text style={styles.forgotLabel}>Quên mật khẩu?</Text>
             </TouchableOpacity>
@@ -184,7 +190,8 @@ export default function LoginScreen() {
             <Button
               title="Đăng nhập"
               onPress={handleSubmit(onSubmit)}
-              loading={loading}
+              loading={loginMutation.isPending}
+              disabled={isBusy}
               style={styles.loginButton}
             />
 
@@ -197,19 +204,24 @@ export default function LoginScreen() {
 
             {/* Google OAuth button */}
             <TouchableOpacity
-              style={styles.googleButton}
+              style={[styles.googleButton, isBusy && styles.googleButtonBusy]}
               onPress={handleGoogleLogin}
               activeOpacity={0.75}
+              disabled={isBusy}
             >
               <Text style={styles.googleIcon}>G</Text>
-              <Text style={styles.googleLabel}>Tiếp tục với Google</Text>
+              <Text style={styles.googleLabel}>
+                {googleMutation.isPending
+                  ? 'Đang kết nối Google...'
+                  : 'Tiếp tục với Google'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* ── Footer link ─────────────────────────────────────────────── */}
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Chưa có tài khoản? </Text>
-            <TouchableOpacity onPress={handleCreateAccount}>
+            <TouchableOpacity onPress={handleCreateAccount} disabled={isBusy}>
               <Text style={styles.footerLink}>Tạo tài khoản</Text>
             </TouchableOpacity>
           </View>
@@ -351,6 +363,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     gap: SPACING[3],
     ...SHADOW.sm,
+  },
+  googleButtonBusy: {
+    opacity: 0.6,
   },
   googleIcon: {
     fontSize: FONT_SIZE.lg,

@@ -20,6 +20,7 @@ const MOCK_USER: User = {
   language: 'vi',
   theme: 'system',
   isActive: true,
+  emailVerified: true,   // existing demo user is fully verified
   /** Nested NotificationSettings object — mirrors the DB columns notif_budget/notif_report/notif_goals */
   notifications: {
     budget: true,

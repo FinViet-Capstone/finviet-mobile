@@ -22,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { ChangePasswordSheet } from '@/components/auth/ChangePasswordSheet';
 import { useUser } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/utils/formatters';
@@ -159,19 +160,10 @@ export default function ProfileScreen() {
       </KeyboardAvoidingView>
 
       {showPasswordSheet ? (
-        <View style={styles.passwordSheet}>
-          <View style={styles.passwordCard}>
-            <Text style={styles.passwordTitle}>Đổi mật khẩu</Text>
-            <Text style={styles.passwordSub}>
-              Tính năng đổi mật khẩu sẽ sớm ra mắt khi backend được tích hợp.
-            </Text>
-            <Button
-              title="Đã hiểu"
-              variant="secondary"
-              onPress={() => setShowPasswordSheet(false)}
-            />
-          </View>
-        </View>
+        <ChangePasswordSheet
+          visible={showPasswordSheet}
+          onClose={() => setShowPasswordSheet(false)}
+        />
       ) : null}
     </SafeAreaView>
   );
@@ -288,31 +280,4 @@ const styles = StyleSheet.create({
   },
   linkSub: { fontSize: FONT_SIZE.xs, color: COLORS.gray[500], marginTop: 2 },
   linkChevron: { fontSize: FONT_SIZE.xl, color: COLORS.gray[300] },
-
-  passwordSheet: {
-    position: 'absolute',
-    inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING[5],
-  },
-  passwordCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[5],
-    width: '100%',
-  },
-  passwordTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-    marginBottom: SPACING[2],
-  },
-  passwordSub: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[600],
-    marginBottom: SPACING[4],
-    lineHeight: 22,
-  },
 });

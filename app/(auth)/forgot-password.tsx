@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { useForgotPassword } from '@/hooks';
 import {
   COLORS,
   SPACING,
@@ -38,32 +40,52 @@ const forgotPasswordSchema = z.object({
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const forgotMutation = useForgotPassword();
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
 
   const {
     control,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
   });
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const onSubmit = (_data: ForgotPasswordFormValues) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-    }, 1000);
+  const onSubmit = (data: ForgotPasswordFormValues) => {
+    forgotMutation.mutate(data.email, {
+      onSuccess: () => {
+        setSubmittedEmail(data.email);
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+      },
+    });
+  };
+
+  const handleResend = () => {
+    if (cooldown > 0) return;
+    const email = submittedEmail ?? getValues('email');
+    if (!email) return;
+    forgotMutation.mutate(email, {
+      onSuccess: () => setCooldown(RESEND_COOLDOWN_SECONDS),
+    });
   };
 
   const handleBackToLogin = () => {
@@ -71,6 +93,8 @@ export default function ForgotPasswordScreen() {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  const submitted = submittedEmail !== null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -122,19 +146,42 @@ export default function ForgotPasswordScreen() {
                 </View>
                 <Text style={styles.successTitle}>Email đã được gửi!</Text>
                 <Text style={styles.successMessage}>
-                  Vui lòng kiểm tra hộp thư đến (và thư mục spam) để tìm
-                  link đặt lại mật khẩu. Link sẽ hết hạn sau{' '}
+                  Vui lòng kiểm tra hộp thư đến (và thư mục spam) tới{' '}
+                  <Text style={styles.successHighlight}>{submittedEmail}</Text>
+                  . Link sẽ hết hạn sau{' '}
                   <Text style={styles.successHighlight}>30 phút</Text>.
                 </Text>
+
+                <AuthErrorBanner error={forgotMutation.error} />
+
                 <Button
                   title="Quay lại Đăng nhập"
                   onPress={handleBackToLogin}
                   style={styles.backLoginButton}
                 />
-                <Text style={styles.resendNote}>
-                  Không nhận được email?{' '}
-                  <Text style={styles.resendLink}>Gửi lại</Text>
-                </Text>
+
+                <TouchableOpacity
+                  onPress={handleResend}
+                  disabled={cooldown > 0 || forgotMutation.isPending}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.resendNote}>
+                    Không nhận được email?{' '}
+                    <Text
+                      style={[
+                        styles.resendLink,
+                        (cooldown > 0 || forgotMutation.isPending) &&
+                          styles.disabledLink,
+                      ]}
+                    >
+                      {cooldown > 0
+                        ? `Gửi lại sau ${cooldown}s`
+                        : forgotMutation.isPending
+                          ? 'Đang gửi...'
+                          : 'Gửi lại'}
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               /* ── Form state ── */
@@ -142,6 +189,8 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.cardLabel}>
                   Nhập địa chỉ email của bạn
                 </Text>
+
+                <AuthErrorBanner error={forgotMutation.error} />
 
                 <Controller
                   control={control}
@@ -160,6 +209,7 @@ export default function ForgotPasswordScreen() {
                       error={errors.email?.message}
                       leftIcon={<Text style={styles.fieldIcon}>✉</Text>}
                       containerStyle={styles.fieldSpacing}
+                      editable={!forgotMutation.isPending}
                     />
                   )}
                 />
@@ -167,7 +217,7 @@ export default function ForgotPasswordScreen() {
                 <Button
                   title="Gửi link đặt lại"
                   onPress={handleSubmit(onSubmit)}
-                  loading={loading}
+                  loading={forgotMutation.isPending}
                   style={styles.submitButton}
                 />
 
@@ -358,5 +408,8 @@ const styles = StyleSheet.create({
   resendLink: {
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.brand[500],
+  },
+  disabledLink: {
+    color: COLORS.gray[400],
   },
 });

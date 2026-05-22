@@ -11,3 +11,11 @@ export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports'
 export { useNotifications, useUnreadNotifications } from './useNotifications';
 export { useExtractFromPhoto } from './useExtractFromPhoto';
 export { useExtractFromSMS } from './useExtractFromSMS';
+export {
+  useLogin,
+  useRegister,
+  useGoogleOAuth,
+  useForgotPassword,
+  useResendVerification,
+  useChangePassword,
+} from './useAuth';

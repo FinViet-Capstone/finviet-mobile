@@ -13,3 +13,4 @@ export * from './goal';
 export * from './ai';
 export * from './notification';
 export * from './extraction';
+export * from './auth';

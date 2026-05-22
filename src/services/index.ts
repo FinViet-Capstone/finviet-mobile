@@ -40,3 +40,18 @@ export { getNotifications, getUnreadNotifications } from './mock/notifications';
 
 // Photo / SMS Extraction (mock — frozen contract; see types/extraction.ts and constants/extraction.ts)
 export { extractFromPhoto, extractFromSMS } from './mock/extraction';
+
+// Auth
+export {
+  login,
+  register,
+  googleOAuth,
+  forgotPassword,
+  resendVerification,
+  changePassword,
+} from './mock/auth';
+export type {
+  MockLoginInput,
+  MockRegisterInput,
+  MockChangePasswordInput,
+} from './mock/auth';

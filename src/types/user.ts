@@ -57,6 +57,8 @@ export interface User {
   language: AppLanguage;
   theme: AppTheme;
   isActive: boolean;
+  /** False until the user clicks the verification link in their inbox. Soft gate -- onboarding still runs. */
+  emailVerified: boolean;
   notifications: NotificationSettings;
   /** Firebase Cloud Messaging device token for push notifications */
   fcmToken: string | null;

@@ -6,7 +6,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +16,8 @@ import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
-import { useAuthStore } from '@/stores/authStore';
-import { getUser } from '@/services';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { useRegister, useGoogleOAuth } from '@/hooks';
 import {
   COLORS,
   SPACING,
@@ -61,10 +60,10 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
+  const registerMutation = useRegister();
+  const googleMutation = useGoogleOAuth('register');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const {
     control,
@@ -82,23 +81,36 @@ export default function RegisterScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const onSubmit = (_data: RegisterFormValues) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const user = { ...getUser(), onboardingDone: false };
-      setSession(user);
-      router.replace('/onboarding');
-    }, 1000);
+  const onSubmit = (data: RegisterFormValues) => {
+    registerMutation.mutate(
+      {
+        displayName: data.displayName,
+        email: data.email,
+        password: data.password,
+      },
+      {
+        onSuccess: (user) =>
+          router.replace({
+            pathname: '/(auth)/verify-email',
+            params: { email: user.email },
+          }),
+      },
+    );
   };
 
   const handleGoogleSignUp = () => {
-    Alert.alert('Coming soon');
+    googleMutation.mutate(undefined, {
+      onSuccess: (user) =>
+        router.replace(user.onboardingDone ? '/(tabs)/report' : '/onboarding'),
+    });
   };
 
   const handleLogin = () => {
     router.push('/(auth)/login');
   };
+
+  const isBusy = registerMutation.isPending || googleMutation.isPending;
+  const surfacedError = registerMutation.error ?? googleMutation.error;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -129,6 +141,8 @@ export default function RegisterScreen() {
               Điền thông tin để bắt đầu hành trình tài chính
             </Text>
 
+            <AuthErrorBanner error={surfacedError} />
+
             {/* Display Name field */}
             <Controller
               control={control}
@@ -146,6 +160,7 @@ export default function RegisterScreen() {
                   error={errors.displayName?.message}
                   leftIcon={<Text style={styles.fieldIcon}>👤</Text>}
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -168,6 +183,7 @@ export default function RegisterScreen() {
                   error={errors.email?.message}
                   leftIcon={<Text style={styles.fieldIcon}>✉</Text>}
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -200,6 +216,7 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
                   }
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -232,6 +249,7 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
                   }
                   containerStyle={styles.fieldSpacing}
+                  editable={!isBusy}
                 />
               )}
             />
@@ -249,7 +267,8 @@ export default function RegisterScreen() {
             <Button
               title="Tạo tài khoản"
               onPress={handleSubmit(onSubmit)}
-              loading={loading}
+              loading={registerMutation.isPending}
+              disabled={isBusy}
               style={styles.registerButton}
             />
 
@@ -262,19 +281,24 @@ export default function RegisterScreen() {
 
             {/* Google OAuth button */}
             <TouchableOpacity
-              style={styles.googleButton}
+              style={[styles.googleButton, isBusy && styles.googleButtonBusy]}
               onPress={handleGoogleSignUp}
               activeOpacity={0.75}
+              disabled={isBusy}
             >
               <Text style={styles.googleIcon}>G</Text>
-              <Text style={styles.googleLabel}>Đăng ký với Google</Text>
+              <Text style={styles.googleLabel}>
+                {googleMutation.isPending
+                  ? 'Đang kết nối Google...'
+                  : 'Đăng ký với Google'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* ── Footer link ─────────────────────────────────────────────── */}
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Đã có tài khoản? </Text>
-            <TouchableOpacity onPress={handleLogin}>
+            <TouchableOpacity onPress={handleLogin} disabled={isBusy}>
               <Text style={styles.footerLink}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
@@ -417,6 +441,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     gap: SPACING[3],
     ...SHADOW.sm,
+  },
+  googleButtonBusy: {
+    opacity: 0.6,
   },
   googleIcon: {
     fontSize: FONT_SIZE.lg,

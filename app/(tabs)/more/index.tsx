@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
   SHADOW,
 } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
-import { useUser } from '@/hooks';
+import { useUser, useResendVerification } from '@/hooks';
 
 interface MenuItem {
   icon: string;
@@ -48,6 +48,15 @@ export default function MoreMenuScreen() {
   const router = useRouter();
   const { data: user } = useUser();
   const clearSession = useAuthStore((s) => s.clearSession);
+  const resendMutation = useResendVerification();
+  const [cooldown, setCooldown] = useState(0);
+  const [resentOnce, setResentOnce] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất?', 'Bạn có chắc muốn đăng xuất khỏi tài khoản?', [
@@ -61,6 +70,21 @@ export default function MoreMenuScreen() {
         },
       },
     ]);
+  };
+
+  const handleResendVerification = () => {
+    if (!user?.email || cooldown > 0) return;
+    resendMutation.mutate(user.email, {
+      onSuccess: () => {
+        setResentOnce(true);
+        setCooldown(60);
+      },
+      onError: () =>
+        Alert.alert(
+          'Không gửi được email',
+          'Hãy kiểm tra kết nối mạng và thử lại sau.',
+        ),
+    });
   };
 
   return (
@@ -88,6 +112,41 @@ export default function MoreMenuScreen() {
             <Text style={styles.editIcon}>✏️</Text>
           </TouchableOpacity>
         </View>
+
+        {user && !user.emailVerified ? (
+          <View style={styles.verifyAlert}>
+            <View style={styles.verifyIconWrap}>
+              <Text style={styles.verifyIcon}>!</Text>
+            </View>
+            <View style={styles.verifyText}>
+              <Text style={styles.verifyTitle}>Email chưa xác minh</Text>
+              <Text style={styles.verifyBody}>
+                {resentOnce && cooldown > 0
+                  ? `Đã gửi lại liên kết tới ${user.email}. Hãy kiểm tra hộp thư.`
+                  : 'Hãy kiểm tra hộp thư để hoàn tất xác minh email.'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleResendVerification}
+              disabled={cooldown > 0 || resendMutation.isPending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text
+                style={[
+                  styles.verifyAction,
+                  (cooldown > 0 || resendMutation.isPending) &&
+                    styles.verifyActionDisabled,
+                ]}
+              >
+                {cooldown > 0
+                  ? `${cooldown}s`
+                  : resendMutation.isPending
+                    ? '...'
+                    : 'Gửi lại'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <Section title="Tài khoản & Cài đặt" items={SETTINGS_ITEMS} />
         <Section title="Công cụ" items={TOOL_ITEMS} />
@@ -180,6 +239,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editIcon: { fontSize: 18 },
+
+  // Email-not-verified alert
+  verifyAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING[5],
+    marginTop: SPACING[3],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[3],
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING[3],
+  },
+  verifyIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: '#F97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyIcon: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.white,
+  },
+  verifyText: { flex: 1 },
+  verifyTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: '#9A3412',
+  },
+  verifyBody: {
+    fontSize: FONT_SIZE.xs,
+    color: '#9A3412',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  verifyAction: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: '#C2410C',
+  },
+  verifyActionDisabled: {
+    color: '#FDBA74',
+  },
 
   section: { marginTop: SPACING[5], paddingHorizontal: SPACING[5] },
   sectionTitle: {
