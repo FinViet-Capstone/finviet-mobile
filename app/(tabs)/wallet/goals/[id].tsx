@@ -190,6 +190,10 @@ export default function GoalDetailScreen() {
         animationType="slide"
         onRequestClose={() => setContribVisible(false)}
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
         <TouchableOpacity
           style={styles.overlay}
           activeOpacity={1}
@@ -230,6 +234,7 @@ export default function GoalDetailScreen() {
             />
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
