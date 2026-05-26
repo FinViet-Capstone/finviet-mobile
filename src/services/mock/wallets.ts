@@ -82,6 +82,15 @@ export interface CreateWalletInput {
   type: WalletType;
   balance: number;
   isPrimary?: boolean;
+  linkedMetadata?: {
+    institutionId: string;
+    institutionName: string;
+    accountId: string;
+    accountNumber?: string;
+    lastSyncAt?: string;
+    syncStatus: 'active' | 'error' | 'pending';
+    syncError?: string;
+  };
 }
 
 export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
@@ -102,6 +111,7 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
     isDeleted: false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
+    linkedMetadata: input.linkedMetadata,
   };
   WALLETS = [...WALLETS, wallet];
   return wallet;

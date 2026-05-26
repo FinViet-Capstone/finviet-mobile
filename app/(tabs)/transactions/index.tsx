@@ -88,6 +88,7 @@ export default function TransactionsScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [monthIdx, setMonthIdx] = useState(today.getMonth());
   const [selectedISO, setSelectedISO] = useState<string>(todayISO());
+  const [lastTap, setLastTap] = useState<{ iso: string; at: number } | null>(null);
 
   const { data: walletsData } = useWallets();
   const wallets = walletsData?.wallets ?? [];
@@ -120,11 +121,21 @@ export default function TransactionsScreen() {
     }
   }, [selectedPeriod]);
 
+  const monthStartISO = isoDate(year, monthIdx, 1);
+  const monthEndISO = isoDate(year, monthIdx, new Date(year, monthIdx + 1, 0).getDate());
+
   const { data: transactions, isLoading } = useTransactions({
-    startDate: viewMode === 'list' ? startDate : isoDate(year, monthIdx, 1),
-    endDate: viewMode === 'list' ? endDate : isoDate(year, monthIdx, new Date(year, monthIdx + 1, 0).getDate()),
+    startDate: viewMode === 'list' ? startDate : monthStartISO,
+    endDate: viewMode === 'list' ? endDate : monthEndISO,
     walletId: selectedWalletId ?? undefined,
   });
+
+  // Dedicated single-day query for calendar day detail panel
+  const { data: selectedDayTxs } = useTransactions({
+    startDate: selectedISO,
+    endDate: selectedISO,
+  });
+
   const { data: budgets } = useBudgets();
   const { data: user } = useUser();
 
@@ -178,6 +189,54 @@ export default function TransactionsScreen() {
     return transactions.filter(tx => !tx.categoryId).length;
   }, [transactions]);
 
+  // Calendar-specific calculations
+  const monthlyLimit = useMemo(
+    () => (budgets ?? []).reduce((sum, b) => sum + b.monthlyLimit, 0),
+    [budgets],
+  );
+
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const dailyAvgLimit =
+    monthlyLimit > 0 ? monthlyLimit / daysInMonth : user?.dailySpendLimit ?? 0;
+
+  // Per-day aggregations (expenses only, transfers excluded)
+  const dayMap = useMemo(() => {
+    const map = new Map<string, { total: number; hasUncategorized: boolean }>();
+    if (!transactions) return map;
+    for (const tx of transactions) {
+      if (tx.type !== 'expense') continue;
+      const cur = map.get(tx.transactionDate) ?? { total: 0, hasUncategorized: false };
+      cur.total += tx.amount;
+      if (tx.categoryId === null) cur.hasUncategorized = true;
+      map.set(tx.transactionDate, cur);
+    }
+    return map;
+  }, [transactions]);
+
+  const dayCells: DayCell[] = useMemo(() => {
+    const cells: DayCell[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = isoDate(year, monthIdx, day);
+      const agg = dayMap.get(iso);
+      const total = agg?.total ?? 0;
+      const hasUncategorized = agg?.hasUncategorized ?? false;
+      const hasActivity = total > 0;
+      const isOverBudget = dailyAvgLimit > 0 && hasActivity && total > dailyAvgLimit;
+      cells.push({ iso, dayOfMonth: day, total, hasUncategorized, isOverBudget, hasActivity, isToday: iso === todayISO() });
+    }
+    return cells;
+  }, [dayMap, daysInMonth, dailyAvgLimit, year, monthIdx]);
+
+  const sundayOffset = new Date(year, monthIdx, 1).getDay();
+  const firstDOW = (sundayOffset + 6) % 7;
+  const leadingBlanks = Array.from({ length: firstDOW }, () => null);
+
+  const monthExpenses = (transactions ?? []).filter((t) => t.type === 'expense');
+  const monthTotal = monthExpenses.reduce((sum, t) => sum + t.amount, 0);
+
+  // The day panel uses its own query result for calendar view
+  const dayTransactions = viewMode === 'calendar' ? (selectedDayTxs ?? []) : [];
+
   const selectedWallet = selectedWalletId
     ? wallets.find(w => w.id === selectedWalletId)
     : null;
@@ -194,6 +253,31 @@ export default function TransactionsScreen() {
       router.push(`/(tabs)/transactions/edit-entry?id=${firstUncategorized.id}` as never);
     }
   };
+
+  // Calendar event handlers
+  const handlePrevMonth = () => {
+    if (monthIdx === 0) { setYear(year - 1); setMonthIdx(11); }
+    else setMonthIdx(monthIdx - 1);
+  };
+
+  const handleNextMonth = () => {
+    if (monthIdx === 11) { setYear(year + 1); setMonthIdx(0); }
+    else setMonthIdx(monthIdx + 1);
+  };
+
+  const handleDayTap = (cell: DayCell) => {
+    const now = Date.now();
+    const DOUBLE_TAP_MS = 300;
+    if (lastTap && lastTap.iso === cell.iso && now - lastTap.at < DOUBLE_TAP_MS) {
+      router.push(`/(tabs)/entry?date=${cell.iso}` as never);
+      setLastTap(null);
+      return;
+    }
+    setSelectedISO(cell.iso);
+    setLastTap({ iso: cell.iso, at: now });
+  };
+
+  const handleEntryTap = (txId: string) => router.push(`/(tabs)/transactions/edit-entry?id=${txId}` as never);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -253,83 +337,85 @@ export default function TransactionsScreen() {
 
       {viewMode === 'list' ? (
         /* ── LIST VIEW ──────────────────────────────────────────────────── */
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Balance Summary */}
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Balance</Text>
-            <Text style={styles.balanceAmount}>
-              {formatVND(selectedWallet?.balance ?? totalBalance)}
-            </Text>
-          </View>
-
-          {/* Period Tabs */}
-          <View style={styles.periodTabs}>
-            <TouchableOpacity
-              style={[styles.periodTab, selectedPeriod === 'last_month' && styles.periodTabActive]}
-              onPress={() => setSelectedPeriod('last_month')}
-            >
-              <Text style={[styles.periodTabText, selectedPeriod === 'last_month' && styles.periodTabTextActive]}>
-                LAST MONTH
+        <>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Balance Summary */}
+            <View style={styles.balanceCard}>
+              <Text style={styles.balanceLabel}>Balance</Text>
+              <Text style={styles.balanceAmount}>
+                {formatVND(selectedWallet?.balance ?? totalBalance)}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.periodTab, selectedPeriod === 'this_month' && styles.periodTabActive]}
-              onPress={() => setSelectedPeriod('this_month')}
-            >
-              <Text style={[styles.periodTabText, selectedPeriod === 'this_month' && styles.periodTabTextActive]}>
-                THIS MONTH
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.periodTab, selectedPeriod === 'future' && styles.periodTabActive]}
-              onPress={() => setSelectedPeriod('future')}
-            >
-              <Text style={[styles.periodTabText, selectedPeriod === 'future' && styles.periodTabTextActive]}>
-                FUTURE
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Opening/Ending Balance */}
-          <View style={styles.balanceSummary}>
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceSummaryLabel}>Opening balance</Text>
-              <Text style={styles.balanceSummaryValue}>{formatVND(openingBalance)}</Text>
             </View>
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceSummaryLabel}>Ending balance</Text>
-              <Text style={styles.balanceSummaryValue}>{formatVND(endingBalance)}</Text>
-            </View>
-            <View style={styles.balanceDivider} />
-            <Text style={[styles.balanceSummaryValue, styles.balanceNet]}>
-              {netChange >= 0 ? '+' : ''}{formatVND(netChange)}
-            </Text>
-          </View>
 
-          {/* Grouped Transactions */}
-          {groupedTransactions.map(group => (
-            <View key={group.date} style={styles.transactionGroup}>
-              <View style={styles.transactionGroupHeader}>
-                <Text style={styles.transactionGroupDate}>
-                  {formatVietnameseDate(group.date)}
+            {/* Period Tabs */}
+            <View style={styles.periodTabs}>
+              <TouchableOpacity
+                style={[styles.periodTab, selectedPeriod === 'last_month' && styles.periodTabActive]}
+                onPress={() => setSelectedPeriod('last_month')}
+              >
+                <Text style={[styles.periodTabText, selectedPeriod === 'last_month' && styles.periodTabTextActive]}>
+                  LAST MONTH
                 </Text>
-                <Text style={[styles.transactionGroupTotal, group.total >= 0 ? styles.incomeText : styles.expenseText]}>
-                  {group.total >= 0 ? '+' : ''}{formatVND(Math.abs(group.total))}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.periodTab, selectedPeriod === 'this_month' && styles.periodTabActive]}
+                onPress={() => setSelectedPeriod('this_month')}
+              >
+                <Text style={[styles.periodTabText, selectedPeriod === 'this_month' && styles.periodTabTextActive]}>
+                  THIS MONTH
                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.periodTab, selectedPeriod === 'future' && styles.periodTabActive]}
+                onPress={() => setSelectedPeriod('future')}
+              >
+                <Text style={[styles.periodTabText, selectedPeriod === 'future' && styles.periodTabTextActive]}>
+                  FUTURE
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Opening/Ending Balance */}
+            <View style={styles.balanceSummary}>
+              <View style={styles.balanceRow}>
+                <Text style={styles.balanceSummaryLabel}>Opening balance</Text>
+                <Text style={styles.balanceSummaryValue}>{formatVND(openingBalance)}</Text>
               </View>
-              {group.transactions.map(tx => (
-                <TouchableOpacity
-                  key={tx.id}
-                  onPress={() => router.push(`/(tabs)/transactions/edit-entry?id=${tx.id}` as never)}
-                  activeOpacity={0.7}
-                >
-                  <TransactionCard transaction={tx} />
-                </TouchableOpacity>
-              ))}
+              <View style={styles.balanceRow}>
+                <Text style={styles.balanceSummaryLabel}>Ending balance</Text>
+                <Text style={styles.balanceSummaryValue}>{formatVND(endingBalance)}</Text>
+              </View>
+              <View style={styles.balanceDivider} />
+              <Text style={[styles.balanceSummaryValue, styles.balanceNet]}>
+                {netChange >= 0 ? '+' : ''}{formatVND(netChange)}
+              </Text>
             </View>
-          ))}
 
-          {/* Footer with uncategorized count */}
+            {/* Grouped Transactions */}
+            {groupedTransactions.map(group => (
+              <View key={group.date} style={styles.transactionGroup}>
+                <View style={styles.transactionGroupHeader}>
+                  <Text style={styles.transactionGroupDate}>
+                    {formatVietnameseDate(group.date)}
+                  </Text>
+                  <Text style={[styles.transactionGroupTotal, group.total >= 0 ? styles.incomeText : styles.expenseText]}>
+                    {group.total >= 0 ? '+' : ''}{formatVND(Math.abs(group.total))}
+                  </Text>
+                </View>
+                {group.transactions.map(tx => (
+                  <TouchableOpacity
+                    key={tx.id}
+                    onPress={() => router.push(`/(tabs)/transactions/edit-entry?id=${tx.id}` as never)}
+                    activeOpacity={0.7}
+                  >
+                    <TransactionCard transaction={tx} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Fixed Footer with uncategorized count */}
           <View style={styles.footer}>
             <View style={styles.footerLeft}>
               <Text style={styles.footerLabel}>Tổng giao dịch</Text>
@@ -345,13 +431,141 @@ export default function TransactionsScreen() {
               <Text style={styles.footerCtaLabel}>Cần phân loại</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </>
       ) : (
         /* ── CALENDAR VIEW ──────────────────────────────────────────────── */
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Calendar implementation - keeping existing calendar code */}
-          <Text style={styles.placeholderText}>Calendar view (existing implementation)</Text>
-        </ScrollView>
+        <>
+          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+            {/* Month nav */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity style={styles.navBtn} onPress={handlePrevMonth} activeOpacity={0.75}>
+                <Text style={styles.navIcon}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.monthLabel}>{VI_MONTHS[monthIdx]} {year}</Text>
+              <TouchableOpacity style={styles.navBtn} onPress={handleNextMonth} activeOpacity={0.75}>
+                <Text style={styles.navIcon}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Day-of-week labels */}
+            <View style={styles.dowRow}>
+              {VI_DAYS_OF_WEEK.map((d) => (
+                <View key={d} style={styles.dowCell}>
+                  <Text style={styles.dowLabel}>{d}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Day grid */}
+            <View style={styles.grid}>
+              {leadingBlanks.map((_, idx) => (
+                <View key={`blank-${idx}`} style={styles.cell} />
+              ))}
+              {dayCells.map((cell) => {
+                const isSelected = cell.iso === selectedISO;
+                const dayBgColor = !cell.hasActivity
+                  ? 'transparent'
+                  : cell.isOverBudget
+                  ? COLORS.calendar.overBudget
+                  : COLORS.calendar.withinBudget;
+                const dayTextColor =
+                  cell.hasActivity || isSelected ? COLORS.white : COLORS.gray[800];
+                return (
+                  <TouchableOpacity
+                    key={cell.iso}
+                    style={styles.cell}
+                    onPress={() => handleDayTap(cell)}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.dayCircle,
+                        cell.hasActivity && { backgroundColor: dayBgColor },
+                        isSelected && styles.dayCircleSelected,
+                        cell.isToday && styles.dayCircleToday,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayNumber,
+                          { color: dayTextColor },
+                          isSelected && styles.dayNumberSelected,
+                        ]}
+                      >
+                        {cell.dayOfMonth}
+                      </Text>
+                      {cell.hasUncategorized ? (
+                        <View style={styles.uncategorizedBadge}>
+                          <Text style={styles.uncategorizedBadgeText}>?</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Legend */}
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: COLORS.calendar.withinBudget }]} />
+                <Text style={styles.legendLabel}>Trong ngân sách</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: COLORS.calendar.overBudget }]} />
+                <Text style={styles.legendLabel}>Vượt ngân sách</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: COLORS.calendar.uncategorized }]} />
+                <Text style={styles.legendLabel}>Chưa phân loại</Text>
+              </View>
+            </View>
+
+            {/* Day detail panel */}
+            <View style={styles.dayPanel}>
+              <Text style={styles.dayPanelTitle}>
+                {formatVietnameseDate(selectedISO)}
+              </Text>
+              {dayTransactions.length === 0 ? (
+                <Text style={styles.dayPanelEmpty}>
+                  Không có giao dịch nào trong ngày này.
+                </Text>
+              ) : (
+                dayTransactions.map((tx: Transaction) => (
+                  <View key={tx.id} style={styles.entryWrapper}>
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => handleEntryTap(tx.id)}>
+                      <TransactionCard transaction={tx} showChevron />
+                      {tx.categoryId === null ? (
+                        <View style={styles.entryUncategorized}>
+                          <Text style={styles.entryUncategorizedText}>
+                            ? Chưa phân loại — chạm để sửa
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Footer for calendar view */}
+          <View style={styles.footer}>
+            <View style={styles.footerLeft}>
+              <Text style={styles.footerLabel}>Tổng chi tháng</Text>
+              <Text style={styles.footerTotal}>{formatVND(monthTotal)}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.footerCta, uncategorizedCount === 0 && styles.footerCtaDisabled]}
+              onPress={handleFixUncategorized}
+              disabled={uncategorizedCount === 0}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerCtaCount}>{uncategorizedCount}</Text>
+              <Text style={styles.footerCtaLabel}>Cần phân loại</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
       {/* ── Wallet Selector Modal ──────────────────────────────────────────── */}
@@ -596,11 +810,38 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
   },
 
-  placeholderText: {
-    textAlign: 'center',
-    padding: SPACING[12],
+  // Day panel (shared)
+  dayPanel: {
+    backgroundColor: COLORS.white,
+    marginHorizontal: SPACING[5],
+    padding: SPACING[4],
+    borderRadius: BORDER_RADIUS.xl,
+    ...SHADOW.sm,
+  },
+  dayPanelTitle: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.gray[500],
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.gray[900],
+    marginBottom: SPACING[3],
+  },
+  dayPanelEmpty: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray[400],
+    textAlign: 'center',
+    paddingVertical: SPACING[6],
+  },
+  entryWrapper: { marginBottom: SPACING[2] },
+  entryUncategorized: {
+    marginTop: -SPACING[1],
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1],
+    backgroundColor: '#FFF7ED',
+    borderRadius: BORDER_RADIUS.md,
+  },
+  entryUncategorizedText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.calendar.uncategorized,
+    fontWeight: FONT_WEIGHT.medium,
   },
 
   // Modal
@@ -761,8 +1002,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[2],
     backgroundColor: COLORS.white,
   },
+  dowCell: {
+    width: '14.285714%',
+    alignItems: 'center',
+  },
   dowLabel: {
-    flex: 1,
     textAlign: 'center',
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
@@ -778,7 +1022,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   cell: {
-    width: `${100 / 7}%`,
+    width: '14.285714%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -832,24 +1076,6 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
   legendDot:  { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { fontSize: FONT_SIZE.xs, color: COLORS.gray[600] },
-
-  // Bar view
-  barSection: {
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[4],
-    paddingBottom: SPACING[4],
-  },
-  barHint: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
-    marginBottom: SPACING[3],
-  },
-  barCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[3],
-    ...SHADOW.sm,
-  },
 
   // Day panel (shared)
   dayPanel: {

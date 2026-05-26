@@ -41,7 +41,7 @@ export default function CreateWalletScreen() {
 
   const handleCreate = () => {
     if (type === 'linked') {
-      router.push('/wallet/link-institution');
+      router.push('/(tabs)/wallet/link-flow');
       return;
     }
 
