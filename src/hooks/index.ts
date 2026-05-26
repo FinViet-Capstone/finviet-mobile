@@ -47,3 +47,8 @@ export {
   useResendVerification,
   useChangePassword,
 } from './useAuth';
+export {
+  useInstitutions,
+  useLinkedAccounts,
+  useSyncLinkedWallet,
+} from './useLinkedWallet';

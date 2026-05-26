@@ -441,11 +441,11 @@ export default function ManualEntryScreen() {
                   activeOpacity={0.75}
                 >
                   <Text style={styles.walletEmoji}>
-                    {item.type === 'cash'
+                    {item.type === 'basic'
                       ? '💵'
-                      : item.type === 'momo'
-                      ? '📱'
-                      : '🏦'}
+                      : item.type === 'linked'
+                      ? '🔗'
+                      : '🎯'}
                   </Text>
                   <Text style={styles.listRowText}>{item.name}</Text>
                   {selectedWalletId === item.id ? (

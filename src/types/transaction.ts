@@ -13,7 +13,7 @@
  */
 
 export type TransactionType = 'expense' | 'income' | 'transfer_out' | 'transfer_in';
-export type EntryMethod = 'manual' | 'photo' | 'csv_import';
+export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked';
 
 export interface Transaction {
   id: string;
@@ -43,6 +43,8 @@ export interface Transaction {
   transferPairId: string | null;
   /** Source image URL for Photo Entry; null for manual / CSV transactions */
   imageUrl: string | null;
+  /** External transaction ID from linked wallet provider (FinVerse, etc.) */
+  externalId: string | null;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */

@@ -102,7 +102,7 @@ function UncategorizedListMode() {
               transaction={tx}
               onPress={() =>
                 router.push(
-                  `/(tabs)/calendar/edit-entry?id=${tx.id}` as never,
+                  `/(tabs)/transactions/edit-entry?id=${tx.id}` as never,
                 )
               }
             />
@@ -432,7 +432,7 @@ function EditMode({ txId }: { txId: string }) {
                   activeOpacity={0.75}
                 >
                   <Text style={styles.walletEmoji}>
-                    {item.type === 'cash' ? '💵' : item.type === 'momo' ? '📱' : '🏦'}
+                    {item.type === 'basic' ? '💵' : item.type === 'linked' ? '🔗' : '🎯'}
                   </Text>
                   <Text style={styles.listRowText}>{item.name}</Text>
                   {walletId === item.id ? (

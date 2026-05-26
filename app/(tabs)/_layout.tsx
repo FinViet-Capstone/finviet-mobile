@@ -41,9 +41,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="transactions"
         options={{
-          title: 'Lịch',
+          title: 'Giao dịch',
           tabBarIcon: ({ color, size }) => <TabBarIcon icon={CalendarIcon} color={color} size={size} />,
         }}
       />
