@@ -30,15 +30,15 @@ import { formatVND } from '@/utils/formatters';
 import type { WalletType } from '@/types/wallet';
 
 const WALLET_ICON: Record<WalletType, string> = {
-  cash: '💵',
-  momo: '📱',
-  bank_account: '🏦',
+  basic: '💵',
+  linked: '🔗',
+  goal: '🎯',
 };
 
 const WALLET_LABEL: Record<WalletType, string> = {
-  cash: 'Tiền mặt',
-  momo: 'Ví điện tử MoMo',
-  bank_account: 'Tài khoản ngân hàng',
+  basic: 'Ví cơ bản',
+  linked: 'Ví liên kết',
+  goal: 'Ví mục tiêu',
 };
 
 export default function WalletDetailScreen() {
@@ -51,7 +51,7 @@ export default function WalletDetailScreen() {
 
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editType, setEditType] = useState<WalletType>('cash');
+  const [editType, setEditType] = useState<WalletType>('basic');
   const [editPrimary, setEditPrimary] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
@@ -181,7 +181,7 @@ export default function WalletDetailScreen() {
                 transaction={tx}
                 onPress={() =>
                   router.push(
-                    `/(tabs)/calendar/edit-entry?id=${tx.id}` as never,
+                    `/(tabs)/transactions/edit-entry?id=${tx.id}` as never,
                   )
                 }
               />
@@ -220,7 +220,7 @@ export default function WalletDetailScreen() {
 
             <Text style={styles.editFieldLabel}>Loại ví</Text>
             <View style={styles.typeRow}>
-              {(['cash', 'momo', 'bank_account'] as const).map((t) => {
+              {(['basic', 'linked', 'goal'] as const).map((t) => {
                 const selected = editType === t;
                 return (
                   <TouchableOpacity

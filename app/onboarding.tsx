@@ -36,9 +36,9 @@ const MOCK_FEATURES = [
 
 const WALLET_TYPE_OPTIONS: { type: WalletType; icon: string; label: string }[] =
   [
-    { type: 'cash', icon: '💵', label: 'Tiền mặt' },
-    { type: 'momo', icon: '📱', label: 'MoMo' },
-    { type: 'bank_account', icon: '🏦', label: 'Ngân hàng' },
+    { type: 'basic', icon: '💵', label: 'Ví cơ bản' },
+    { type: 'linked', icon: '🔗', label: 'Ví liên kết' },
+    { type: 'goal', icon: '🎯', label: 'Ví mục tiêu' },
   ];
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [monthlyIncome, setMonthlyIncome] = useState('');
   const [walletName, setWalletName] = useState('');
-  const [walletType, setWalletType] = useState<WalletType>('cash');
+  const [walletType, setWalletType] = useState<WalletType>('basic');
   const [initialBalance, setInitialBalance] = useState('');
   const [loading, setLoading] = useState(false);
 

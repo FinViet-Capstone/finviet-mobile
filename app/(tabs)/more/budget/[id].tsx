@@ -176,7 +176,7 @@ export default function BudgetDetailScreen() {
                 transaction={tx}
                 onPress={() =>
                   router.push(
-                    `/(tabs)/calendar/edit-entry?id=${tx.id}` as never,
+                    `/(tabs)/transactions/edit-entry?id=${tx.id}` as never,
                   )
                 }
               />

@@ -24,15 +24,15 @@ import { formatVND } from '@/utils/formatters';
 import type { Wallet, WalletType } from '@/types/wallet';
 
 const WALLET_ICON: Record<WalletType, string> = {
-  cash: '💵',
-  momo: '📱',
-  bank_account: '🏦',
+  basic: '💵',
+  linked: '🔗',
+  goal: '🎯',
 };
 
 const WALLET_LABEL: Record<WalletType, string> = {
-  cash: 'Tiền mặt',
-  momo: 'Ví điện tử MoMo',
-  bank_account: 'Tài khoản ngân hàng',
+  basic: 'Ví cơ bản',
+  linked: 'Ví liên kết',
+  goal: 'Ví mục tiêu',
 };
 
 export default function WalletListScreen() {

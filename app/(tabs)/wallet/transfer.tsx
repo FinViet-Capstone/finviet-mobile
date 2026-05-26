@@ -30,9 +30,9 @@ import { formatVND } from '@/utils/formatters';
 import type { Wallet, WalletType } from '@/types/wallet';
 
 const WALLET_ICON: Record<WalletType, string> = {
-  cash: '💵',
-  momo: '📱',
-  bank_account: '🏦',
+  basic: '💵',
+  linked: '🔗',
+  goal: '🎯',
 };
 
 export default function TransferScreen() {

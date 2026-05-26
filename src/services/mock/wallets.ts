@@ -20,7 +20,7 @@ let WALLETS: Wallet[] = [
     id: WALLET_IDS.CASH,
     userId: USER_ID,
     name: 'Tiền mặt',
-    type: 'cash',
+    type: 'basic',
     balance: 2_350_000,
     isPrimary: true,
     isDeleted: false,
@@ -31,7 +31,7 @@ let WALLETS: Wallet[] = [
     id: WALLET_IDS.MOMO,
     userId: USER_ID,
     name: 'Ví MoMo',
-    type: 'momo',
+    type: 'basic',
     balance: 890_000,
     isPrimary: false,
     isDeleted: false,
@@ -42,7 +42,7 @@ let WALLETS: Wallet[] = [
     id: WALLET_IDS.BANK,
     userId: USER_ID,
     name: 'Vietcombank',
-    type: 'bank_account',
+    type: 'basic',
     balance: 15_200_000,
     isPrimary: false,
     isDeleted: false,
@@ -82,6 +82,15 @@ export interface CreateWalletInput {
   type: WalletType;
   balance: number;
   isPrimary?: boolean;
+  linkedMetadata?: {
+    institutionId: string;
+    institutionName: string;
+    accountId: string;
+    accountNumber?: string;
+    lastSyncAt?: string;
+    syncStatus: 'active' | 'error' | 'pending';
+    syncError?: string;
+  };
 }
 
 export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
@@ -102,6 +111,7 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
     isDeleted: false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
+    linkedMetadata: input.linkedMetadata,
   };
   WALLETS = [...WALLETS, wallet];
   return wallet;

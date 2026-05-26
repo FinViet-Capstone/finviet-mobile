@@ -1,4 +1,14 @@
-export type WalletType = 'cash' | 'momo' | 'bank_account';
+export type WalletType = 'basic' | 'linked' | 'goal';
+
+export interface LinkedWalletMetadata {
+  institutionId: string;
+  institutionName: string;
+  accountId: string;
+  accountNumber?: string;
+  lastSyncAt?: string;
+  syncStatus: 'active' | 'error' | 'pending';
+  syncError?: string;
+}
 
 export interface Wallet {
   id: string;
@@ -10,6 +20,7 @@ export interface Wallet {
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+  linkedMetadata?: LinkedWalletMetadata;
 }
 
 export interface WalletSummary {

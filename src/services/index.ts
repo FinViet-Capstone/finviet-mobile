@@ -96,3 +96,13 @@ export type {
   MockRegisterInput,
   MockChangePasswordInput,
 } from './mock/auth';
+
+// Linked Wallet Sync
+export {
+  syncLinkedWalletTransactions,
+  getLinkedAccounts,
+  getInstitutions,
+  createLinkToken,
+  exchangePublicToken,
+} from './linkedWalletSync';
+export type { SyncResult } from './linkedWalletSync';

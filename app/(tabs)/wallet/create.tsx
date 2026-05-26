@@ -25,21 +25,26 @@ import { TextInput } from '@/components/common/TextInput';
 import { useCreateWallet } from '@/hooks';
 import type { WalletType } from '@/types/wallet';
 
-const WALLET_TYPE_OPTIONS: { type: WalletType; icon: string; label: string }[] = [
-  { type: 'cash', icon: '💵', label: 'Tiền mặt' },
-  { type: 'momo', icon: '📱', label: 'MoMo' },
-  { type: 'bank_account', icon: '🏦', label: 'Ngân hàng' },
+const WALLET_TYPE_OPTIONS: { type: WalletType; icon: string; label: string; description: string }[] = [
+  { type: 'basic', icon: '💵', label: 'Ví cơ bản', description: 'Nhập giao dịch thủ công' },
+  { type: 'linked', icon: '🔗', label: 'Ví liên kết', description: 'Đồng bộ tự động từ ngân hàng' },
+  { type: 'goal', icon: '🎯', label: 'Ví mục tiêu', description: 'Theo dõi tiết kiệm' },
 ];
 
 export default function CreateWalletScreen() {
   const router = useRouter();
   const createMutation = useCreateWallet();
   const [name, setName] = useState('');
-  const [type, setType] = useState<WalletType>('cash');
+  const [type, setType] = useState<WalletType>('basic');
   const [balance, setBalance] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
 
   const handleCreate = () => {
+    if (type === 'linked') {
+      router.push('/(tabs)/wallet/link-flow');
+      return;
+    }
+
     if (name.trim().length === 0) {
       Alert.alert('Tên ví không hợp lệ', 'Vui lòng nhập tên ví.');
       return;
@@ -114,34 +119,39 @@ export default function CreateWalletScreen() {
                     >
                       {opt.label}
                     </Text>
+                    <Text style={styles.typeDescription}>{opt.description}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <TextInput
-              label="Số dư ban đầu (VND)"
-              value={balance}
-              onChangeText={(t) => setBalance(t.replace(/\D/g, ''))}
-              keyboardType="numeric"
-              placeholder="0"
-              containerStyle={styles.field}
-            />
+            {type !== 'linked' && (
+              <>
+                <TextInput
+                  label="Số dư ban đầu (VND)"
+                  value={balance}
+                  onChangeText={(t) => setBalance(t.replace(/\D/g, ''))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  containerStyle={styles.field}
+                />
 
-            <TouchableOpacity
-              style={styles.primaryRow}
-              onPress={() => setIsPrimary((p) => !p)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.checkbox, isPrimary && styles.checkboxOn]}>
-                {isPrimary ? <Text style={styles.checkboxMark}>✓</Text> : null}
-              </View>
-              <Text style={styles.primaryLabel}>Đặt làm ví chính</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.primaryRow}
+                  onPress={() => setIsPrimary((p) => !p)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.checkbox, isPrimary && styles.checkboxOn]}>
+                    {isPrimary ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                  </View>
+                  <Text style={styles.primaryLabel}>Đặt làm ví chính</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           <Button
-            title="Tạo ví"
+            title={type === 'linked' ? 'Tiếp tục liên kết' : 'Tạo ví'}
             onPress={handleCreate}
             loading={createMutation.isPending}
             style={styles.submit}
@@ -193,11 +203,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  typeRow: { flexDirection: 'row', gap: SPACING[2], marginBottom: SPACING[5] },
+  typeRow: { flexDirection: 'column', gap: SPACING[2], marginBottom: SPACING[5] },
   typeChip: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: SPACING[3],
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[3],
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1.5,
     gap: SPACING[1],
@@ -205,9 +215,10 @@ const styles = StyleSheet.create({
   typeChipDefault: { borderColor: COLORS.gray[200], backgroundColor: COLORS.gray[50] },
   typeChipSelected: { borderColor: COLORS.brand[500], backgroundColor: COLORS.brand[50] },
   typeIcon: { fontSize: FONT_SIZE.xl },
-  typeLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold },
+  typeLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
   typeLabelDefault: { color: COLORS.gray[600] },
   typeLabelSelected: { color: COLORS.brand[600] },
+  typeDescription: { fontSize: FONT_SIZE.xs, color: COLORS.gray[500], textAlign: 'center' },
 
   primaryRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3] },
   checkbox: {

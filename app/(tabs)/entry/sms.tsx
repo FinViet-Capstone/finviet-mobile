@@ -437,7 +437,7 @@ export default function SMSEntryScreen() {
                   activeOpacity={0.75}
                 >
                   <Text style={styles.walletEmoji}>
-                    {item.type === 'cash' ? '💵' : item.type === 'momo' ? '📱' : '🏦'}
+                    {item.type === 'basic' ? '💵' : item.type === 'linked' ? '🔗' : '🎯'}
                   </Text>
                   <Text style={styles.listRowText}>{item.name}</Text>
                   {walletId === item.id ? (
