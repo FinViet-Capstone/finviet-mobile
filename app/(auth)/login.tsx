@@ -67,7 +67,8 @@ export default function LoginScreen() {
 
   const onSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data, {
-      onSuccess: () => router.replace('/(tabs)/report'),
+      onSuccess: (user) =>
+        router.replace(user.onboardingDone ? '/(tabs)/report' : '/onboarding'),
     });
   };
 
