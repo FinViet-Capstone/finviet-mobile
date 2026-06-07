@@ -29,10 +29,10 @@ export function TextInput({
   const [isFocused, setIsFocused] = useState(false);
 
   const borderColor = error
-    ? COLORS.danger
+    ? COLORS.error
     : isFocused
-    ? COLORS.brand[500]
-    : COLORS.gray[300];
+    ? COLORS.primary
+    : COLORS.outlineVariant;
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
@@ -47,7 +47,7 @@ export function TextInput({
             leftIcon ? styles.inputWithLeft : undefined,
             rightIcon ? styles.inputWithRight : undefined,
           ]}
-          placeholderTextColor={COLORS.gray[400]}
+          placeholderTextColor={COLORS.outline}
           secureTextEntry={secureTextEntry}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -69,15 +69,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[700],
+    color: COLORS.onSurfaceVariant,
     marginBottom: SPACING[1],
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceVariant + '80', // 50% opacity
     minHeight: 48,
   },
   iconLeft: {
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
     fontSize: FONT_SIZE.base,
-    color: COLORS.gray[900],
+    color: COLORS.onSurface,
   },
   inputWithLeft: {
     paddingLeft: SPACING[2],
@@ -106,6 +106,6 @@ const styles = StyleSheet.create({
   error: {
     marginTop: SPACING[1],
     fontSize: FONT_SIZE.xs,
-    color: COLORS.danger,
+    color: COLORS.error,
   },
 });

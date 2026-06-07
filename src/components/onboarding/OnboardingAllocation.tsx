@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, ALLOCATION_PRESETS } from '@/data/onboardingData';
 
@@ -33,6 +34,36 @@ export function OnboardingAllocation({
   const calculateAmount = (percentage: number): string => {
     const amount = (income * percentage) / 100;
     return amount.toLocaleString('vi-VN').replace(/,/g, '.') + 'đ';
+  };
+
+  const handleSliderChange = (key: 'essential' | 'wants' | 'savings', newValue: number) => {
+    const rounded = Math.round(newValue);
+    const currentTotal = allocations.essential + allocations.wants + allocations.savings;
+    const otherKeys = (['essential', 'wants', 'savings'] as const).filter(k => k !== key);
+
+    // Calculate how much needs to be redistributed
+    const delta = rounded - allocations[key];
+    const remaining = currentTotal - rounded;
+
+    // Distribute the remaining percentage to the other two buckets proportionally
+    const [key1, key2] = otherKeys;
+    const total1and2 = allocations[key1] + allocations[key2];
+
+    if (total1and2 === 0) {
+      // If both are 0, split evenly
+      onChangeAllocation(key1, Math.floor(remaining / 2));
+      onChangeAllocation(key2, remaining - Math.floor(remaining / 2));
+    } else {
+      // Distribute proportionally
+      const ratio1 = allocations[key1] / total1and2;
+      const new1 = Math.round(remaining * ratio1);
+      const new2 = remaining - new1;
+
+      onChangeAllocation(key1, new1);
+      onChangeAllocation(key2, new2);
+    }
+
+    onChangeAllocation(key, rounded);
   };
 
   const isValid = allocations.essential + allocations.wants + allocations.savings === 100;
@@ -95,17 +126,18 @@ export function OnboardingAllocation({
                     <Text style={styles.amount}>{calculateAmount(percentage)}</Text>
                   </View>
 
-                  {/* Slider - Note: React Native doesn't have native range input, using TouchableOpacity as placeholder */}
-                  <View style={styles.sliderContainer}>
-                    <View style={styles.sliderTrack}>
-                      <View
-                        style={[
-                          styles.sliderFill,
-                          { width: `${percentage}%`, backgroundColor: color },
-                        ]}
-                      />
-                    </View>
-                  </View>
+                  {/* Interactive Slider */}
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={0}
+                    maximumValue={100}
+                    step={1}
+                    value={percentage}
+                    onValueChange={(value) => handleSliderChange(key, value)}
+                    minimumTrackTintColor={color}
+                    maximumTrackTintColor={`${COLORS.outline}33`}
+                    thumbTintColor={color}
+                  />
                 </View>
               </View>
             </View>
@@ -250,18 +282,9 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onBackground,
   },
-  sliderContainer: {
-    marginTop: SPACING[1],
-  },
-  sliderTrack: {
-    height: 4,
-    backgroundColor: `${COLORS.outline}33`,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  sliderFill: {
-    height: '100%',
-    borderRadius: 2,
+  slider: {
+    width: '100%',
+    height: 40,
   },
   validationSuccess: {
     flexDirection: 'row',

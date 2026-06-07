@@ -100,6 +100,16 @@ export const useOnboardingFlow = () => {
     }));
   };
 
+  const reorderCategories = (group: keyof OnboardingState['categories'], newOrder: string[]) => {
+    setState(prev => ({
+      ...prev,
+      categories: {
+        ...prev.categories,
+        [group]: newOrder,
+      },
+    }));
+  };
+
   const updateWalletType = (type: 'basic' | 'linked') => {
     setState(prev => ({ ...prev, walletType: type }));
   };
@@ -135,6 +145,7 @@ export const useOnboardingFlow = () => {
     resetToDefaultAllocation,
     addCategory,
     removeCategory,
+    reorderCategories,
     updateWalletType,
     updateWalletName,
     updateWalletBalance,

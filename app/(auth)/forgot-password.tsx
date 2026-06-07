@@ -89,7 +89,7 @@ export default function ForgotPasswordScreen() {
   };
 
   const handleBackToLogin = () => {
-    router.replace('/(auth)/login');
+    router.replace('/(auth)');
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   // Layout
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: COLORS.background,
   },
   keyboardView: {
     flex: 1,
@@ -271,11 +271,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.brand[400],
+    backgroundColor: COLORS.surfaceContainer,
   },
   backArrow: {
     fontSize: FONT_SIZE.xl,
-    color: COLORS.white,
+    color: COLORS.primary,
     fontWeight: FONT_WEIGHT.bold,
   },
   navTitle: {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.white,
+    color: COLORS.onBackground,
   },
   navSpacer: {
     width: 40,
@@ -295,17 +295,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[6],
     paddingTop: SPACING[6],
     paddingBottom: SPACING[8],
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: COLORS.background,
   },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.brand[400],
+    backgroundColor: COLORS.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING[4],
-    ...SHADOW.md,
   },
   iconEmoji: {
     fontSize: 36,
@@ -313,13 +312,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: FONT_SIZE['2xl'],
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.white,
+    color: COLORS.onBackground,
     marginBottom: SPACING[2],
     textAlign: 'center',
   },
   heroSubtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.brand[100],
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -328,14 +327,15 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: SPACING[4],
     marginTop: -SPACING[2],
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS['2xl'],
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[6],
-    ...SHADOW.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   cardLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[600],
+    color: COLORS.onSurfaceVariant,
     marginBottom: SPACING[4],
   },
 
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   fieldIcon: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.gray[400],
+    color: COLORS.onSurfaceVariant,
   },
 
   // Submit / cancel
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   cancelLabel: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.brand[500],
+    color: COLORS.primary,
   },
 
   // Success state
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.brand[50],
+    backgroundColor: COLORS.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING[4],
@@ -381,20 +381,20 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: COLORS.onBackground,
     marginBottom: SPACING[3],
     textAlign: 'center',
   },
   successMessage: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: SPACING[6],
   },
   successHighlight: {
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[700],
+    color: COLORS.onBackground,
   },
   backLoginButton: {
     alignSelf: 'stretch',
@@ -402,14 +402,14 @@ const styles = StyleSheet.create({
   },
   resendNote: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
   },
   resendLink: {
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.brand[500],
+    color: COLORS.primary,
   },
   disabledLink: {
-    color: COLORS.gray[400],
+    color: COLORS.outline,
   },
 });

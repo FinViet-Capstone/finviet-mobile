@@ -6,9 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
-import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency, CURRENCIES } from '@/data/onboardingData';
+import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency } from '@/data/onboardingData';
 
 export interface OnboardingWalletProps {
   readonly walletType: 'basic' | 'linked';
@@ -31,142 +35,161 @@ export function OnboardingWallet({
   onChangeWalletBalance,
   onFinish,
 }: OnboardingWalletProps) {
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [isBalanceFocused, setIsBalanceFocused] = useState(false);
 
-  const handleBalanceChange = (text: string) => {
-    const formatted = formatVietnameseCurrency(text);
+  const handleNumberPress = (num: string) => {
+    const currentValue = walletBalance.replace(/\./g, '');
+    const newValue = currentValue + num;
+    const formatted = formatVietnameseCurrency(newValue);
     onChangeWalletBalance(formatted);
+  };
+
+  const handleBackspace = () => {
+    const currentValue = walletBalance.replace(/\./g, '');
+    if (currentValue.length > 0) {
+      const newValue = currentValue.slice(0, -1);
+      const formatted = formatVietnameseCurrency(newValue);
+      onChangeWalletBalance(formatted);
+    }
+  };
+
+  const handleClear = () => {
+    onChangeWalletBalance('');
+  };
+
+  const handleDismissKeypad = () => {
+    setIsBalanceFocused(false);
   };
 
   const canFinish = walletName.trim().length > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>{ONBOARDING_STRINGS.wallet.title}</Text>
-        <Text style={styles.subtitle}>{ONBOARDING_STRINGS.wallet.subtitle}</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={handleDismissKeypad}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{ONBOARDING_STRINGS.wallet.title}</Text>
+            <Text style={styles.subtitle}>{ONBOARDING_STRINGS.wallet.subtitle}</Text>
+          </View>
 
-      {/* Wallet Type Selection */}
-      <View style={styles.typeSelection}>
-        {WALLET_TYPES.map((type) => {
-          const isSelected = walletType === type.id;
-          return (
-            <TouchableOpacity
-              key={type.id}
-              style={[
-                styles.typeCard,
-                isSelected && styles.typeCardSelected,
-              ]}
-              onPress={() => onChangeWalletType(type.id as 'basic' | 'linked')}
-              activeOpacity={0.7}
-            >
-              {isSelected && (
-                <View style={styles.checkBadge}>
-                  <Text style={styles.checkIcon}>✓</Text>
+          {/* Wallet Type Selection */}
+          <View style={styles.typeSelection}>
+            {WALLET_TYPES.map((type) => {
+              const isSelected = walletType === type.id;
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.typeCard,
+                    isSelected && styles.typeCardSelected,
+                  ]}
+                  onPress={() => onChangeWalletType(type.id as 'basic' | 'linked')}
+                  activeOpacity={0.7}
+                >
+                  {isSelected && (
+                    <View style={styles.checkBadge}>
+                      <Text style={styles.checkIcon}>✓</Text>
+                    </View>
+                  )}
+
+                  {'hasAIBadge' in type && type.hasAIBadge && (
+                    <View style={styles.aiBadgeTop}>
+                      <Text style={styles.aiBadgeIcon}>✨</Text>
+                      <Text style={styles.aiBadgeLabel}>AI</Text>
+                    </View>
+                  )}
+
+                  <View style={[
+                    styles.typeIcon,
+                    isSelected
+                      ? { backgroundColor: COLORS.primaryContainer }
+                      : { backgroundColor: COLORS.surfaceVariant }
+                  ]}>
+                    <Text style={styles.typeIconText}>{getIconForType(type.icon)}</Text>
+                  </View>
+
+                  <Text style={[
+                    styles.typeLabel,
+                    isSelected ? { color: COLORS.onBackground } : { color: COLORS.onSurfaceVariant }
+                  ]}>
+                    {type.label}
+                  </Text>
+                  <Text style={styles.typeDescription}>{type.description}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Expanded Form for Basic Wallet */}
+          {walletType === 'basic' && (
+            <View style={styles.formCard}>
+              {/* Wallet Name */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.nameLabel}</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputIcon}>✏️</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={ONBOARDING_STRINGS.wallet.namePlaceholder}
+                    placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
+                    value={walletName}
+                    onChangeText={onChangeWalletName}
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                  />
                 </View>
-              )}
-
-              {'hasAIBadge' in type && type.hasAIBadge && (
-                <View style={styles.aiBadgeTop}>
-                  <Text style={styles.aiBadgeIcon}>✨</Text>
-                  <Text style={styles.aiBadgeLabel}>AI</Text>
-                </View>
-              )}
-
-              <View style={[
-                styles.typeIcon,
-                isSelected
-                  ? { backgroundColor: COLORS.primaryContainer }
-                  : { backgroundColor: COLORS.surfaceVariant }
-              ]}>
-                <Text style={styles.typeIconText}>{getIconForType(type.icon)}</Text>
               </View>
 
-              <Text style={[
-                styles.typeLabel,
-                isSelected ? { color: COLORS.onBackground } : { color: COLORS.onSurfaceVariant }
-              ]}>
-                {type.label}
-              </Text>
-              <Text style={styles.typeDescription}>{type.description}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Expanded Form for Basic Wallet */}
-      {walletType === 'basic' && (
-        <View style={styles.formCard}>
-          {/* Wallet Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.nameLabel}</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>✏️</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={ONBOARDING_STRINGS.wallet.namePlaceholder}
-                placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-                value={walletName}
-                onChangeText={onChangeWalletName}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
-            </View>
-          </View>
-
-          {/* Current Balance */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.balanceLabel}</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.currencySymbol}>₫</Text>
-              <TextInput
-                style={[styles.input, styles.balanceInput]}
-                placeholder="0"
-                placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-                value={walletBalance}
-                onChangeText={handleBalanceChange}
-                keyboardType="numeric"
-                returnKeyType="done"
-              />
-            </View>
-            <Text style={styles.inputHint}>{ONBOARDING_STRINGS.wallet.balanceHint}</Text>
-          </View>
-
-          {/* Currency Selector */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.currencyLabel}</Text>
-            <TouchableOpacity
-              style={styles.currencyButton}
-              onPress={() => setShowCurrencyPicker(!showCurrencyPicker)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.currencyContent}>
-                <View style={styles.flagCircle}>
-                  <Text style={styles.flagText}>VN</Text>
-                </View>
-                <Text style={styles.currencyText}>VND - Việt Nam Đồng</Text>
+              {/* Current Balance */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.balanceLabel}</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.inputContainer,
+                    isBalanceFocused && styles.inputContainerFocused,
+                  ]}
+                  onPress={() => setIsBalanceFocused(true)}
+                  activeOpacity={1}
+                >
+                  <Text style={styles.currencySymbol}>₫</Text>
+                  <Text style={[styles.balanceDisplay, !walletBalance && styles.balancePlaceholder]}>
+                    {walletBalance || '0'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.inputHint}>{ONBOARDING_STRINGS.wallet.balanceHint}</Text>
               </View>
-              <Text style={styles.expandIcon}>▼</Text>
+            </View>
+          )}
+
+          {/* Finish Button */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, !canFinish && styles.buttonDisabled]}
+              onPress={onFinish}
+              disabled={!canFinish}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.buttonText}>{ONBOARDING_STRINGS.wallet.button}</Text>
+              <Text style={styles.checkIconButton}>✓</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+
+      {/* Show numeric keypad when balance is focused */}
+      {isBalanceFocused && walletType === 'basic' && (
+        <NumericKeypad
+          onNumberPress={handleNumberPress}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onDone={handleDismissKeypad}
+        />
       )}
-
-      {/* Finish Button */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, !canFinish && styles.buttonDisabled]}
-          onPress={onFinish}
-          disabled={!canFinish}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.buttonText}>{ONBOARDING_STRINGS.wallet.button}</Text>
-          <Text style={styles.checkIconButton}>✓</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -316,6 +339,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[3],
     gap: SPACING[2],
   },
+  inputContainerFocused: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
   inputIcon: {
     fontSize: 20,
   },
@@ -330,51 +357,21 @@ const styles = StyleSheet.create({
     color: COLORS.onBackground,
     padding: 0,
   },
-  balanceInput: {
+  balanceDisplay: {
+    flex: 1,
+    fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.onBackground,
     textAlign: 'right',
+  },
+  balancePlaceholder: {
+    color: `${COLORS.onSurfaceVariant}80`,
+    fontWeight: FONT_WEIGHT.normal,
   },
   inputHint: {
     fontSize: FONT_SIZE.xs,
     color: `${COLORS.onSurfaceVariant}B3`,
     marginTop: 4,
-  },
-  currencyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[3],
-  },
-  currencyContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  flagCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flagText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-  },
-  currencyText: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onBackground,
-  },
-  expandIcon: {
-    fontSize: 12,
-    color: COLORS.onSurfaceVariant,
   },
   buttonContainer: {
     marginTop: SPACING[8],

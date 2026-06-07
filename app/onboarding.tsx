@@ -31,6 +31,7 @@ export default function OnboardingScreen() {
     resetToDefaultAllocation,
     addCategory,
     removeCategory,
+    reorderCategories,
     updateWalletType,
     updateWalletName,
     updateWalletBalance,
@@ -76,6 +77,7 @@ export default function OnboardingScreen() {
             categories={state.categories}
             onAddCategory={addCategory}
             onRemoveCategory={removeCategory}
+            onReorderCategories={reorderCategories}
             onSkip={goToNextStep}
             onNext={goToNextStep}
           />

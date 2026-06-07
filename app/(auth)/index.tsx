@@ -83,16 +83,19 @@ export default function AuthScreen() {
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: {
+      email: 'test@finviet.com',
+      password: 'password123'
+    },
   });
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      displayName: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
+      displayName: 'Nguyễn Văn A',
+      email: 'newuser@finviet.com',
+      password: 'password123',
+      confirmPassword: 'password123',
     },
   });
 

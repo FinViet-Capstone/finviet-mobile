@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
-  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, formatVietnameseCurrency } from '@/data/onboardingData';
 
@@ -17,15 +18,31 @@ export interface OnboardingIncomeProps {
 }
 
 export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingIncomeProps) {
-  const [isFocused, setIsFocused] = useState(false);
-
-  const handleTextChange = (text: string) => {
-    const formatted = formatVietnameseCurrency(text);
+  const handleNumberPress = (num: string) => {
+    const currentValue = value.replace(/\./g, '');
+    const newValue = currentValue + num;
+    const formatted = formatVietnameseCurrency(newValue);
     onChangeValue(formatted);
   };
 
+  const handleBackspace = () => {
+    const currentValue = value.replace(/\./g, '');
+    if (currentValue.length > 0) {
+      const newValue = currentValue.slice(0, -1);
+      const formatted = formatVietnameseCurrency(newValue);
+      onChangeValue(formatted);
+    }
+  };
+
+  const handleClear = () => {
+    onChangeValue('');
+  };
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header Text */}
       <View style={styles.header}>
         <Text style={styles.title}>{ONBOARDING_STRINGS.income.title}</Text>
@@ -35,28 +52,15 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
       {/* Input Area with Glassmorphism */}
       <View style={styles.inputWrapper}>
         <View style={styles.glowBackground} />
-        <View style={[styles.glassCard, isFocused && styles.glassCardFocused]}>
+        <View style={styles.glassCard}>
           <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              value={value}
-              onChangeText={handleTextChange}
-              placeholder={ONBOARDING_STRINGS.income.placeholder}
-              placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-              keyboardType="numeric"
-              returnKeyType="done"
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              autoFocus
-            />
-            <Text style={[styles.currency, isFocused && styles.currencyFocused]}>VND</Text>
+            <Text style={styles.displayText}>
+              {value || ONBOARDING_STRINGS.income.placeholder}
+            </Text>
+            <Text style={styles.currency}>VND</Text>
           </View>
 
-          {/* AI Badge */}
-          <View style={styles.aiBadge}>
-            <Text style={styles.aiIcon}>✨</Text>
-            <Text style={styles.aiLabel}>AI INSIGHT</Text>
-          </View>
+          {/* Removed AI Badge */}
         </View>
       </View>
 
@@ -70,7 +74,14 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
           <Text style={styles.buttonText}>{ONBOARDING_STRINGS.income.button}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      {/* Custom Numeric Keypad */}
+      <NumericKeypad
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+      />
+    </KeyboardAvoidingView>
   );
 }
 
@@ -122,14 +133,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING[2],
   },
-  glassCardFocused: {
-    borderColor: `${COLORS.primary}80`,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -137,50 +140,17 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: SPACING[2],
   },
-  input: {
+  displayText: {
     fontSize: 28,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.primary,
     textAlign: 'center',
-    maxWidth: 200,
-    padding: 0,
-    margin: 0,
     minWidth: 80,
   },
   currency: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onSurfaceVariant,
-  },
-  currencyFocused: {
-    color: COLORS.primary,
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.surfaceContainer,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}33`,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
-    marginTop: SPACING[2],
-  },
-  aiIcon: {
-    fontSize: 14,
-    color: COLORS.tertiary,
-  },
-  aiLabel: {
-    fontSize: 12,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.tertiary,
-    letterSpacing: 1.5,
   },
   buttonContainer: {
     paddingBottom: SPACING[8],

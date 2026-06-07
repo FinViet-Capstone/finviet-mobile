@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,26 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import DraggableFlatList, {
+  ScaleDecorator,
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
+import { getCategoryIcon } from '@/constants/categoryIcons';
+import { getCategoryById } from '@/constants/categories';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
-import { ONBOARDING_STRINGS, CATEGORY_GROUPS } from '@/data/onboardingData';
+import { ONBOARDING_STRINGS } from '@/data/onboardingData';
+import { CategoryLibrarySheet } from './CategoryLibrarySheet';
+
+type BucketType = 'essential' | 'wants' | 'savings';
+type BucketKey = 'needs' | 'wants' | 'savings';
+
+interface BucketConfig {
+  id: BucketType;
+  key: BucketKey;
+  name: string;
+  color: string;
+}
 
 export interface OnboardingCategoriesProps {
   readonly categories: {
@@ -15,39 +33,101 @@ export interface OnboardingCategoriesProps {
     wants: string[];
     savings: string[];
   };
-  readonly onAddCategory: (group: 'essential' | 'wants' | 'savings', category: string) => void;
-  readonly onRemoveCategory: (group: 'essential' | 'wants' | 'savings', category: string) => void;
+  readonly onAddCategory: (group: BucketType, categoryId: string) => void;
+  readonly onRemoveCategory: (group: BucketType, categoryId: string) => void;
+  readonly onReorderCategories?: (group: BucketType, newOrder: string[]) => void;
   readonly onSkip: () => void;
   readonly onNext: () => void;
 }
+
+const BUCKETS: BucketConfig[] = [
+  { id: 'essential', key: 'needs', name: 'Thiết yếu', color: COLORS.primary },
+  { id: 'wants', key: 'wants', name: 'Mong muốn', color: COLORS.secondary },
+  { id: 'savings', key: 'savings', name: 'Tiết kiệm', color: COLORS.tertiary },
+];
 
 export function OnboardingCategories({
   categories,
   onAddCategory,
   onRemoveCategory,
+  onReorderCategories,
   onSkip,
   onNext,
 }: OnboardingCategoriesProps) {
-  const getColorForGroup = (color: string) => {
-    const colorMap: Record<string, string> = {
-      primary: COLORS.primary,
-      secondary: COLORS.secondary,
-      tertiary: COLORS.tertiary,
-    };
-    return colorMap[color] || COLORS.primary;
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [selectedBucket, setSelectedBucket] = useState<BucketKey>('needs');
+
+  // Convert Material Symbols naming (underscore) to MaterialIcons naming (hyphen)
+  const convertIconName = (symbolsName: string): string => {
+    return symbolsName.replace(/_/g, '-');
   };
 
-  const getIconForCategory = (icon: string): string => {
-    const iconMap: Record<string, string> = {
-      restaurant: '🍽️',
-      home: '🏠',
-      directions_car: '🚗',
-      movie: '🎬',
-      shopping_bag: '🛍️',
-      trending_up: '📈',
-      savings: '💰',
-    };
-    return iconMap[icon] || '📊';
+  const handleOpenSheet = (bucketKey: BucketKey) => {
+    setSelectedBucket(bucketKey);
+    setSheetVisible(true);
+  };
+
+  const handleSelectCategory = (categoryId: string) => {
+    const bucket = BUCKETS.find((b) => b.key === selectedBucket);
+    if (bucket) {
+      onAddCategory(bucket.id, categoryId);
+    }
+  };
+
+  const handleRemoveCategory = (bucketId: BucketType, categoryId: string) => {
+    onRemoveCategory(bucketId, categoryId);
+  };
+
+  const handleDragEnd = (bucketId: BucketType, newOrder: string[]) => {
+    if (onReorderCategories) {
+      onReorderCategories(bucketId, newOrder);
+    }
+  };
+
+  // Get all already added category IDs across all buckets
+  const alreadyAddedIds = [
+    ...categories.essential,
+    ...categories.wants,
+    ...categories.savings,
+  ];
+
+  const renderCategoryItem = (
+    { item: categoryId, drag, isActive }: RenderItemParams<string>,
+    bucketId: BucketType,
+    color: string
+  ) => {
+    const category = getCategoryById(categoryId);
+    if (!category) return null;
+
+    const iconName = convertIconName(getCategoryIcon(category.icon));
+
+    return (
+      <ScaleDecorator>
+        <View style={styles.categoryItemWrapper}>
+          <TouchableOpacity
+            onLongPress={drag}
+            disabled={isActive}
+            style={[
+              styles.categoryItem,
+              { borderColor: `${color}40` },
+              isActive && styles.categoryItemDragging,
+            ]}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="drag-indicator" size={20} color={COLORS.onSurfaceVariant} />
+            <MaterialIcons name={iconName as any} size={20} color={COLORS.onSurface} />
+            <Text style={styles.categoryLabel}>{category.nameVi}</Text>
+            <TouchableOpacity
+              onPress={() => handleRemoveCategory(bucketId, categoryId)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.removeButton}
+            >
+              <MaterialIcons name="close" size={18} color={COLORS.onSurfaceVariant} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+      </ScaleDecorator>
+    );
   };
 
   return (
@@ -70,37 +150,32 @@ export function OnboardingCategories({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.groupsContainer}>
-          {CATEGORY_GROUPS.map((group) => {
-            const color = getColorForGroup(group.color);
+          {BUCKETS.map((bucket) => {
+            const categoryIds = categories[bucket.id];
             return (
-              <View key={group.id} style={styles.groupCard}>
+              <View key={bucket.id} style={styles.groupCard}>
                 <View style={styles.groupHeader}>
-                  <View style={[styles.colorDot, { backgroundColor: color }]} />
-                  <Text style={[styles.groupTitle, { color }]}>{group.name}</Text>
+                  <View style={[styles.colorDot, { backgroundColor: bucket.color }]} />
+                  <Text style={[styles.groupTitle, { color: bucket.color }]}>{bucket.name}</Text>
                 </View>
 
-                <View style={styles.chipsContainer}>
-                  {group.categories.map((category, index) => (
-                    <View
-                      key={`${category.icon}-${index}`}
-                      style={[styles.chip, { borderColor: `${color}80` }]}
+                <DraggableFlatList
+                  data={categoryIds}
+                  renderItem={(params) => renderCategoryItem(params, bucket.id, bucket.color)}
+                  keyExtractor={(item) => item}
+                  onDragEnd={({ data }) => handleDragEnd(bucket.id, data)}
+                  scrollEnabled={false}
+                  ListFooterComponent={
+                    <TouchableOpacity
+                      style={[styles.addButton, { borderColor: COLORS.outline }]}
+                      activeOpacity={0.7}
+                      onPress={() => handleOpenSheet(bucket.key)}
                     >
-                      <Text style={styles.chipIcon}>{getIconForCategory(category.icon)}</Text>
-                      <Text style={styles.chipLabel}>{category.label}</Text>
-                    </View>
-                  ))}
-
-                  {/* Add Button */}
-                  <TouchableOpacity
-                    style={[styles.addChip, { borderColor: COLORS.outline }]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.addIcon}>+</Text>
-                    <Text style={styles.addLabel}>
-                      {ONBOARDING_STRINGS.categories.addCategory}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                      <MaterialIcons name="add" size={20} color={COLORS.onSurfaceVariant} />
+                      <Text style={styles.addLabel}>Thêm từ thư viện</Text>
+                    </TouchableOpacity>
+                  }
+                />
               </View>
             );
           })}
@@ -115,9 +190,18 @@ export function OnboardingCategories({
           activeOpacity={0.9}
         >
           <Text style={styles.buttonText}>{ONBOARDING_STRINGS.categories.button}</Text>
-          <Text style={styles.arrowIcon}>→</Text>
+          <MaterialIcons name="arrow-forward" size={24} color={COLORS.onPrimary} />
         </TouchableOpacity>
       </View>
+
+      {/* Category Library Sheet */}
+      <CategoryLibrarySheet
+        visible={sheetVisible}
+        targetBucket={selectedBucket}
+        alreadyAddedIds={alreadyAddedIds}
+        onSelect={handleSelectCategory}
+        onClose={() => setSheetVisible(false)}
+      />
     </View>
   );
 }
@@ -189,46 +273,46 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
   },
-  chipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING[2],
+  categoryItemWrapper: {
+    marginBottom: SPACING[2],
   },
-  chip: {
+  categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
     backgroundColor: COLORS.surfaceBright,
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[2],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[3],
+    minHeight: 48,
   },
-  chipIcon: {
-    fontSize: 20,
+  categoryItemDragging: {
+    opacity: 0.8,
+    transform: [{ scale: 1.02 }],
+    backgroundColor: COLORS.surfaceContainerHighest,
   },
-  chipLabel: {
-    fontSize: FONT_SIZE.sm,
+  categoryLabel: {
+    fontSize: FONT_SIZE.base,
     color: COLORS.onSurface,
+    fontWeight: FONT_WEIGHT.medium,
+    flex: 1,
   },
-  addChip: {
+  removeButton: {
+    padding: SPACING[1],
+  },
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACING[2],
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[2],
-  },
-  addIcon: {
-    fontSize: 20,
-    color: COLORS.onSurfaceVariant,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[3],
+    marginTop: SPACING[2],
+    minHeight: 48,
   },
   addLabel: {
     fontSize: FONT_SIZE.sm,
@@ -259,10 +343,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
-  },
-  arrowIcon: {
-    fontSize: FONT_SIZE.xl,
     color: COLORS.onPrimary,
   },
 });
