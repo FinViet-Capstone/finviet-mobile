@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Wallet as WalletIcon, Receipt } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import {
   COLORS,
@@ -60,7 +60,7 @@ export default function WalletDetailScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Không tìm thấy" />
         <EmptyState
-          icon={WalletIcon}
+          icon="account_balance_wallet"
           title="Không tìm thấy ví"
           subtitle="Ví này có thể đã bị xóa."
         />
@@ -170,7 +170,7 @@ export default function WalletDetailScreen() {
           </Text>
           {txList.length === 0 ? (
             <EmptyState
-              icon={Receipt}
+              icon="receipt"
               title="Chưa có giao dịch"
               subtitle="Các giao dịch của ví này sẽ xuất hiện ở đây."
             />

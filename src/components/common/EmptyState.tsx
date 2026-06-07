@@ -1,24 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Inbox, type LucideIcon } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 
 export interface EmptyStateProps {
-  /** Lucide icon component. Defaults to `Inbox`. */
-  icon?: LucideIcon;
+  /** Material Symbols icon name. Defaults to 'inbox'. */
+  icon?: string;
   title: string;
   subtitle?: string;
 }
 
 export function EmptyState({
-  icon: Icon = Inbox,
+  icon = 'inbox',
   title,
   subtitle,
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrapper}>
-        <Icon size={48} color={COLORS.gray[400]} />
+        <MaterialIcon name={icon} size={48} color={COLORS.gray[400]} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

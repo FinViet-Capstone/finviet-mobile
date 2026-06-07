@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
@@ -20,7 +20,7 @@ export function TransactionCard({ transaction, onPress, showChevron = false }: T
     : undefined;
 
   const categoryColor = category?.color ?? COLORS.gray[400];
-  const Icon = getCategoryIcon(category?.icon);
+  const iconName = getCategoryIcon(category?.icon);
 
   const [year, month, day] = transaction.transactionDate.split('-');
   const formattedDate = `${day}/${month}/${year}`;
@@ -28,7 +28,7 @@ export function TransactionCard({ transaction, onPress, showChevron = false }: T
   const content = (
     <View style={styles.row}>
       <View style={[styles.categoryCircle, { backgroundColor: categoryColor + '26' }]}>
-        <Icon size={20} color={categoryColor} />
+        <MaterialIcon name={iconName} size={20} color={categoryColor} />
       </View>
 
       <View style={styles.middle}>
@@ -52,7 +52,7 @@ export function TransactionCard({ transaction, onPress, showChevron = false }: T
       </View>
 
       {showChevron ? (
-        <ChevronRight size={18} color={COLORS.gray[300]} style={styles.cardChevron} />
+        <MaterialIcon name="chevron_right" size={18} color={COLORS.gray[300]} style={styles.cardChevron} />
       ) : null}
     </View>
   );

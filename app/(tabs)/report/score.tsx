@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { BarChart3 } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import {
   COLORS,
@@ -33,7 +33,7 @@ export default function SpendingScoreDetail() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} />
         <EmptyState
-          icon={BarChart3}
+          icon="bar_chart"
           title="Chưa có điểm số"
           subtitle="Cần thêm dữ liệu chi tiêu để tính điểm."
         />

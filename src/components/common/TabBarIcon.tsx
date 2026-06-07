@@ -1,17 +1,17 @@
 import React from 'react';
-import { type LucideIcon } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS } from '@/constants/theme';
 
 interface TabBarIconProps {
-  icon: LucideIcon;
+  icon: string;
   color?: string;
   size?: number;
 }
 
 export default function TabBarIcon({
-  icon: Icon,
+  icon,
   color = COLORS.gray[500],
   size = 22,
 }: TabBarIconProps) {
-  return <Icon color={color} size={size} />;
+  return <MaterialIcon name={icon} color={color} size={size} />;
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
@@ -20,12 +21,12 @@ export function CategoryBadge({ categoryId }: CategoryBadgeProps) {
     );
   }
 
-  const Icon = getCategoryIcon(category.icon);
+  const iconName = getCategoryIcon(category.icon);
   const backgroundColor = category.color + '26'; // ~15% opacity tint
 
   return (
     <View style={[styles.pill, { backgroundColor }]}>
-      <Icon size={12} color={category.color} />
+      <MaterialIcon name={iconName} size={12} color={category.color} />
       <Text style={[styles.label, { color: category.color }]} numberOfLines={1}>
         {category.nameVi}
       </Text>

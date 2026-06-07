@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { CalendarDays, List, ChevronDown } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import {
   COLORS,
@@ -312,7 +312,8 @@ export default function TransactionsScreen() {
             onPress={() => setViewMode('calendar')}
             activeOpacity={0.8}
           >
-            <CalendarDays
+            <MaterialIcon
+              name="calendar_month"
               size={18}
               color={viewMode === 'calendar' ? COLORS.white : COLORS.gray[500]}
             />
@@ -331,7 +332,7 @@ export default function TransactionsScreen() {
           <Text style={styles.walletSelectorText}>
             {selectedWallet ? selectedWallet.name : 'Total'}
           </Text>
-          <ChevronDown size={16} color={COLORS.gray[400]} />
+          <MaterialIcon name="expand_more" size={16} color={COLORS.gray[400]} />
         </View>
       </TouchableOpacity>
 

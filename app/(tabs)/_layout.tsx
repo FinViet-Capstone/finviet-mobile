@@ -1,7 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { BarChart3, Calendar as CalendarIcon, Wallet, Menu, Plus } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import TabBarIcon from '@/components/common/TabBarIcon';
 import { COLORS } from '@/constants/theme';
 
@@ -13,7 +13,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       style={styles.entryWrapper}
     >
       <View style={styles.entryButton}>
-        <Plus color={COLORS.white} size={28} />
+        <MaterialIcon name="add" color={COLORS.white} size={28} />
       </View>
     </TouchableOpacity>
   );
@@ -37,14 +37,14 @@ export default function TabLayout() {
         name="report"
         options={{
           title: 'Báo cáo',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon={BarChart3} color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon="bar_chart" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
           title: 'Giao dịch',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon={CalendarIcon} color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon="calendar_month" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -58,14 +58,14 @@ export default function TabLayout() {
         name="wallet"
         options={{
           title: 'Ví',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon={Wallet} color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon="account_balance_wallet" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: 'Khác',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon={Menu} color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TabBarIcon icon="menu" color={color} size={size} />,
         }}
       />
     </Tabs>

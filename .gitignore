@@ -15,6 +15,7 @@ ios/
 agents/
 prompts/
 .claude/
+.stitch/
 
 # Environment files
 .env

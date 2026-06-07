@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   type ViewToken,
 } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import { useTransactions } from '@/hooks';
 import { BarWeek, type WeekBarDatum } from '@/components/charts/BarWeek';
@@ -83,7 +83,8 @@ export function WeeklySpendingSwiper({
           onPress={() => goTo(Math.max(0, activeIndex - 1))}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <ChevronLeft
+          <MaterialIcon
+            name="chevron_left"
             size={20}
             color={activeIndex === 0 ? COLORS.gray[300] : COLORS.gray[700]}
           />
@@ -96,7 +97,8 @@ export function WeeklySpendingSwiper({
           onPress={() => goTo(Math.min(lastIndex, activeIndex + 1))}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <ChevronRight
+          <MaterialIcon
+            name="chevron_right"
             size={20}
             color={activeIndex === lastIndex ? COLORS.gray[300] : COLORS.gray[700]}
           />

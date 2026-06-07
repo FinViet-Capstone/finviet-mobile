@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Wallet } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import {
   COLORS,
@@ -47,7 +47,7 @@ export default function EditBudgetScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} title="Không tìm thấy" />
         <EmptyState
-          icon={Wallet}
+          icon="account_balance_wallet"
           title="Không tìm thấy ngân sách"
           subtitle="Ngân sách này có thể đã bị xóa."
         />

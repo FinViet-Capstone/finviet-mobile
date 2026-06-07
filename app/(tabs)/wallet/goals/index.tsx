@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Trophy } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import {
   COLORS,
@@ -53,7 +53,7 @@ export default function GoalsScreen() {
 
         {visible.length === 0 ? (
           <EmptyState
-            icon={Trophy}
+            icon="emoji_events"
             title="Chưa có mục tiêu"
             subtitle="Tạo mục tiêu đầu tiên để bắt đầu tiết kiệm có kế hoạch."
           />
