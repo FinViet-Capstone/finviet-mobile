@@ -83,10 +83,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Legacy tabs — hidden from tab bar, routes still accessible */}
-      <Tabs.Screen name="report" options={{ href: null }} />
-      <Tabs.Screen name="wallet" options={{ href: null }} />
-      <Tabs.Screen name="more" options={{ href: null }} />
     </Tabs>
   );
 }
