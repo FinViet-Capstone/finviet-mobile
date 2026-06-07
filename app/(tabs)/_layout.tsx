@@ -1,4 +1,4 @@
-import { Tabs, router } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
@@ -13,7 +13,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       style={styles.entryWrapper}
     >
       <View style={styles.entryButton}>
-        <MaterialIcon name="add" color={COLORS.white} size={28} />
+        <MaterialIcon name="add" color={COLORS.onPrimary} size={28} />
       </View>
     </TouchableOpacity>
   );
@@ -24,27 +24,37 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor:   COLORS.brand[500],
-        tabBarInactiveTintColor: COLORS.gray[400],
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.onSurfaceVariant,
         tabBarStyle: {
-          borderTopColor: COLORS.gray[200],
-          height: 60,
-          paddingBottom: 8,
+          backgroundColor: `${COLORS.surfaceContainer}E6`,
+          borderTopColor: `${COLORS.outlineVariant}66`,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
         },
       }}
     >
       <Tabs.Screen
-        name="report"
+        name="home"
         options={{
-          title: 'Báo cáo',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon="bar_chart" color={color} size={size} />,
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon icon="home" color={color} size={24} />
+          ),
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
-          title: 'Giao dịch',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon="calendar_month" color={color} size={size} />,
+          title: 'Lịch sử',
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon icon="receipt_long" color={color} size={24} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -55,19 +65,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="wallet"
+        name="wallets"
         options={{
           title: 'Ví',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon="account_balance_wallet" color={color} size={size} />,
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon icon="account_balance_wallet" color={color} size={24} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="more"
+        name="budgets"
         options={{
-          title: 'Khác',
-          tabBarIcon: ({ color, size }) => <TabBarIcon icon="menu" color={color} size={size} />,
+          title: 'Ngân sách',
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon icon="pie_chart" color={color} size={24} />
+          ),
         }}
       />
+
+      {/* Legacy tabs — hidden from tab bar, routes still accessible */}
+      <Tabs.Screen name="report" options={{ href: null }} />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
+      <Tabs.Screen name="more" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -82,13 +101,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.20,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 4,
+    borderColor: COLORS.background,
   },
 });

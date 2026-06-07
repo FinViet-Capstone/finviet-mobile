@@ -32,7 +32,7 @@ export default function WeeklyReportScreen() {
       <SafeAreaView style={styles.container}>
         <Header onBack={() => router.back()} />
         <EmptyState
-          icon={FileText}
+          icon="description"
           title="Chưa có báo cáo tuần"
           subtitle="Báo cáo sẽ được tạo vào sáng thứ Hai mỗi tuần."
         />
@@ -81,7 +81,7 @@ export default function WeeklyReportScreen() {
 
         <TouchableOpacity
           style={styles.advisorCta}
-          onPress={() => router.push('/(tabs)/report/advisor')}
+          onPress={() => router.push('/(tabs)/home/advisor')}
           activeOpacity={0.85}
         >
           <Text style={styles.advisorIcon}>🤖</Text>

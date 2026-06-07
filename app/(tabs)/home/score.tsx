@@ -97,7 +97,7 @@ export default function SpendingScoreDetail() {
 
         <TouchableOpacity
           style={styles.advisorCta}
-          onPress={() => router.push('/(tabs)/report/advisor')}
+          onPress={() => router.push('/(tabs)/home/advisor')}
           activeOpacity={0.85}
         >
           <Text style={styles.advisorIcon}>🤖</Text>
