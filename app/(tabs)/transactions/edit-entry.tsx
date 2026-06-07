@@ -432,7 +432,7 @@ function EditMode({ txId }: { txId: string }) {
                   activeOpacity={0.75}
                 >
                   <Text style={styles.walletEmoji}>
-                    {item.type === 'basic' ? '💵' : item.type === 'linked' ? '🔗' : '🎯'}
+                    {item.type === 'linked' ? '🔗' : '💵'}
                   </Text>
                   <Text style={styles.listRowText}>{item.name}</Text>
                   {walletId === item.id ? (

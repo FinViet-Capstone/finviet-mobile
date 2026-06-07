@@ -104,7 +104,7 @@ export default function AuthScreen() {
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data, {
       onSuccess: (user) =>
-        router.replace(user.onboardingDone ? '/(tabs)/report' : '/onboarding'),
+        router.replace(user.onboardingDone ? '/(tabs)/home' : '/onboarding'),
     });
   };
 
@@ -128,7 +128,7 @@ export default function AuthScreen() {
   const handleGoogleAuth = () => {
     googleMutation.mutate(undefined, {
       onSuccess: (user) =>
-        router.replace(user.onboardingDone ? '/(tabs)/report' : '/onboarding'),
+        router.replace(user.onboardingDone ? '/(tabs)/home' : '/onboarding'),
     });
   };
 

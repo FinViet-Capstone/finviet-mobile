@@ -7,5 +7,5 @@ export default function Index() {
 
   if (!isAuthenticated) return <Redirect href="/(auth)" />;
   if (!onboardingDone)  return <Redirect href="/onboarding" />;
-  return <Redirect href="/(tabs)/report" />;
+  return <Redirect href="/(tabs)/home" />;
 }

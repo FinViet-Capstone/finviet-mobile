@@ -1,28 +1,51 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, BORDER_RADIUS } from '@/constants/theme';
 
-export function ChatbotFAB() {
+const BASE_BOTTOM = 24;
+
+export interface ChatbotFABProps {
+  readonly extraBottomOffset?: number;
+}
+
+export function ChatbotFAB({ extraBottomOffset = 0 }: ChatbotFABProps) {
   const router = useRouter();
+  const bottomAnim = useSharedValue(BASE_BOTTOM + extraBottomOffset);
+
+  useEffect(() => {
+    bottomAnim.value = withTiming(BASE_BOTTOM + extraBottomOffset, { duration: 220 });
+  }, [extraBottomOffset]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    bottom: bottomAnim.value,
+  }));
 
   return (
-    <TouchableOpacity
-      style={styles.fab}
-      onPress={() => router.push('/(tabs)/home/advisor')}
-      activeOpacity={0.85}
-    >
-      <MaterialIcon name="smart_toy" size={26} color={COLORS.onPrimary} />
-    </TouchableOpacity>
+    <Animated.View style={[styles.wrapper, animatedStyle]}>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/(tabs)/home/advisor')}
+        activeOpacity={0.85}
+      >
+        <MaterialIcon name="smart_toy" size={26} color={COLORS.onPrimary} />
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  fab: {
+  wrapper: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: BORDER_RADIUS.full,

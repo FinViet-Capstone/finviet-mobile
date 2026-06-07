@@ -1,4 +1,4 @@
-export type WalletType = 'basic' | 'linked' | 'goal';
+export type WalletType = 'basic' | 'linked';
 
 export interface LinkedWalletMetadata {
   institutionId: string;

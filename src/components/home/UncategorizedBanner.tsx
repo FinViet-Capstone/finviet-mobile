@@ -8,36 +8,32 @@ export interface UncategorizedBannerProps {
   readonly count: number;
 }
 
+// Renders the pill only. Caller is responsible for absolute positioning.
 export function UncategorizedBanner({ count }: UncategorizedBannerProps) {
   const router = useRouter();
 
   if (count === 0) return null;
 
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.bubble}>
-        <View style={styles.iconWrapper}>
-          <MaterialIcon name="category" size={18} color={COLORS.secondary} />
-        </View>
-        <Text style={styles.label}>{count} giao dịch chưa phân loại</Text>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push('/(tabs)/transactions')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionText}>Phân loại</Text>
-        </TouchableOpacity>
+    <View style={styles.bubble}>
+      <View style={styles.iconWrapper}>
+        <MaterialIcon name="category" size={18} color={COLORS.secondary} />
       </View>
+      <Text style={styles.label} numberOfLines={1}>
+        {count} giao dịch chưa phân loại
+      </Text>
+      <TouchableOpacity
+        style={styles.actionBtn}
+        onPress={() => router.push('/(tabs)/transactions')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.actionText}>Phân loại</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[4],
-  },
   bubble: {
     flexDirection: 'row',
     alignItems: 'center',

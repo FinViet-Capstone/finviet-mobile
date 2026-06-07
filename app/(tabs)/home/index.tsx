@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import {
@@ -29,11 +36,11 @@ import { SavingsGoalCard } from '@/components/home/SavingsGoalCard';
 import { RecentTransactionsList } from '@/components/home/RecentTransactionsList';
 import { UncategorizedBanner } from '@/components/home/UncategorizedBanner';
 import { ChatbotFAB } from '@/components/home/ChatbotFAB';
-import { useQueryClient } from '@tanstack/react-query';
-import { CATEGORIES } from '@/constants/categories';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
 const UNCATEGORIZED_WARNING_THRESHOLD = 0.2;
+// Approximate pill height — matches UncategorizedBanner bubble paddingVertical*2 + iconWrapper height
+const BANNER_H = 52;
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -49,6 +56,8 @@ const SAVINGS_CATEGORY_IDS = ['cat_savings'];
 export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const tabBarHeight = useBottomTabBarHeight();
+
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -68,12 +77,16 @@ export default function HomeScreen() {
   });
   const { data: recentTx } = useRecentTransactions(5);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await queryClient.invalidateQueries();
-    setRefreshing(false);
-  };
+  // ── Banner animation ────────────────────────────────────────────────────────
+  const bannerOpacity = useSharedValue(0);
+  const bannerTranslateY = useSharedValue(BANNER_H);
 
+  const animatedBannerStyle = useAnimatedStyle(() => ({
+    opacity: bannerOpacity.value,
+    transform: [{ translateY: bannerTranslateY.value }],
+  }));
+
+  // ── Derived data ────────────────────────────────────────────────────────────
   const walletNames = useMemo(
     () => (walletData?.wallets ?? []).map((w) => w.name).slice(0, 3),
     [walletData],
@@ -81,24 +94,17 @@ export default function HomeScreen() {
 
   const { needsSpent, wantsSpent, savingsSpent } = useMemo(() => {
     const expTx = (monthTx ?? []).filter((t) => t.type === 'expense' && t.categoryId !== null);
-    const needs = expTx
-      .filter((t) => NEEDS_CATEGORY_IDS.includes(t.categoryId!))
-      .reduce((s, t) => s + t.amount, 0);
-    const wants = expTx
-      .filter((t) => WANTS_CATEGORY_IDS.includes(t.categoryId!))
-      .reduce((s, t) => s + t.amount, 0);
-    const savings = expTx
-      .filter((t) => SAVINGS_CATEGORY_IDS.includes(t.categoryId!))
-      .reduce((s, t) => s + t.amount, 0);
-    return { needsSpent: needs, wantsSpent: wants, savingsSpent: savings };
+    return {
+      needsSpent: expTx.filter((t) => NEEDS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
+      wantsSpent: expTx.filter((t) => WANTS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
+      savingsSpent: expTx.filter((t) => SAVINGS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
+    };
   }, [monthTx]);
 
   const { needsLimit, wantsLimit, savingsLimit } = useMemo(() => {
     const budgetList = budgets ?? [];
     const sumLimit = (ids: string[]) =>
-      budgetList
-        .filter((b) => ids.includes(b.categoryId))
-        .reduce((s, b) => s + b.monthlyLimit, 0);
+      budgetList.filter((b) => ids.includes(b.categoryId)).reduce((s, b) => s + b.monthlyLimit, 0);
     return {
       needsLimit: sumLimit(NEEDS_CATEGORY_IDS),
       wantsLimit: sumLimit(WANTS_CATEGORY_IDS),
@@ -109,21 +115,36 @@ export default function HomeScreen() {
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);
     if (activeGoals.length === 0) return null;
-    return activeGoals.sort((a, b) => {
-      const daysA = new Date(a.deadline).getTime() - Date.now();
-      const daysB = new Date(b.deadline).getTime() - Date.now();
-      return daysA - daysB;
-    })[0];
+    return activeGoals.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())[0];
   }, [goals]);
 
   const uncategorizedCount = useMemo(() => {
-    const allTx = monthTx ?? [];
-    const expenses = allTx.filter((t) => t.type === 'expense');
+    const expenses = (monthTx ?? []).filter((t) => t.type === 'expense');
     if (expenses.length === 0) return 0;
     const uncategorized = expenses.filter((t) => t.categoryId === null).length;
     if (uncategorized / expenses.length < UNCATEGORIZED_WARNING_THRESHOLD) return 0;
     return uncategorized;
   }, [monthTx]);
+
+  // Animate banner in when count becomes non-zero
+  useEffect(() => {
+    if (uncategorizedCount > 0) {
+      bannerOpacity.value = withTiming(1, { duration: 200 });
+      bannerTranslateY.value = withTiming(0, { duration: 250 });
+    } else {
+      bannerOpacity.value = 0;
+      bannerTranslateY.value = BANNER_H;
+    }
+  }, [uncategorizedCount]);
+
+  // FAB offset: clears banner when visible
+  const fabExtraOffset = tabBarHeight + SPACING[4] + (uncategorizedCount > 0 ? BANNER_H + SPACING[2] : 0);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries();
+    setRefreshing(false);
+  };
 
   const displayName = user?.displayName?.split(' ').slice(-1)[0] ?? 'bạn';
 
@@ -131,6 +152,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.avatarWrapper}
@@ -152,9 +174,14 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Scrollable content ─────────────────────────────────────────────── */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          // Extra clearance so last card stays above FAB + banner
+          { paddingBottom: tabBarHeight + BANNER_H + 56 + SPACING[4] },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -185,13 +212,23 @@ export default function HomeScreen() {
         <SavingsGoalCard goal={topGoal} />
 
         <RecentTransactionsList transactions={recentTx ?? []} />
-
-        <UncategorizedBanner count={uncategorizedCount} />
-
-        <View style={styles.fabSpacer} />
       </ScrollView>
 
-      <ChatbotFAB />
+      {/* ── Fixed bottom: banner (slides in from below) ─────────────────────── */}
+      {uncategorizedCount > 0 && (
+        <Animated.View
+          style={[
+            styles.bannerContainer,
+            { bottom: tabBarHeight },
+            animatedBannerStyle,
+          ]}
+        >
+          <UncategorizedBanner count={uncategorizedCount} />
+        </Animated.View>
+      )}
+
+      {/* ── Fixed bottom: chatbot FAB (floats above banner) ────────────────── */}
+      <ChatbotFAB extraBottomOffset={fabExtraOffset} />
     </SafeAreaView>
   );
 }
@@ -241,10 +278,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[4],
-    paddingBottom: SPACING[8],
     gap: SPACING[4],
   },
-  fabSpacer: {
-    height: 70,
+  bannerContainer: {
+    position: 'absolute',
+    left: SPACING[4],
+    right: SPACING[4],
   },
 });

@@ -6,6 +6,14 @@ import { formatVND } from '@/utils/formatters';
 
 const TICK_COUNT = 10;
 
+function getPctColor(spent: number, limit: number): string {
+  if (limit === 0) return COLORS.budget.safe;
+  const pct = (spent / limit) * 100;
+  if (pct > 85) return COLORS.budget.danger;
+  if (pct > 60) return COLORS.budget.warning;
+  return COLORS.budget.safe;
+}
+
 interface BucketRow {
   label: string;
   spent: number;
@@ -39,15 +47,28 @@ function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number
   );
 }
 
+function PctBadge({ spent, limit }: { spent: number; limit: number }) {
+  const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+  const color = getPctColor(spent, limit);
+  return (
+    <View style={[styles.pctBadge, { backgroundColor: `${color}26` }]}>
+      <Text style={[styles.pctText, { color }]}>{pct}%</Text>
+    </View>
+  );
+}
+
 function BucketItem({ label, spent, limit, activeColor }: BucketRow) {
   return (
     <View style={styles.bucketItem}>
       <View style={styles.bucketHeader}>
         <Text style={styles.bucketLabel}>{label}</Text>
-        <Text style={styles.bucketAmount}>
-          <Text style={styles.bucketSpent}>{formatVND(spent)}</Text>
-          <Text style={styles.bucketLimit}> / {formatVND(limit)}</Text>
-        </Text>
+        <View style={styles.bucketRight}>
+          <Text style={styles.bucketAmount}>
+            <Text style={styles.bucketSpent}>{formatVND(spent)}</Text>
+            <Text style={styles.bucketLimit}> / {formatVND(limit)}</Text>
+          </Text>
+          <PctBadge spent={spent} limit={limit} />
+        </View>
       </View>
       <EnergyBar spent={spent} limit={limit} activeColor={activeColor} />
     </View>
@@ -131,6 +152,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  bucketRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  pctBadge: {
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  pctText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.bold,
   },
   bucketLabel: {
     fontSize: FONT_SIZE.sm,
