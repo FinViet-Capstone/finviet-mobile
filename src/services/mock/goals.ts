@@ -116,9 +116,10 @@ export function getGoalById(id: string): SavingsGoalWithProgress | undefined {
 
 export interface CreateGoalInput {
   name: string;
+  iconEmoji?: string;
   targetAmount: number;
   deadline: string;
-  fundingWalletId: string;
+  fundingWalletId?: string;
   initialAmount?: number;
 }
 
@@ -131,6 +132,7 @@ export async function createGoal(
     id: genId(),
     userId: USER_ID,
     name: input.name.trim(),
+    iconEmoji: input.iconEmoji,
     targetAmount: input.targetAmount,
     currentAmount: initial,
     deadline: input.deadline,
@@ -142,7 +144,7 @@ export async function createGoal(
   };
   const goal = recomputeProgress(base);
   GOALS = [...GOALS, goal];
-  if (initial > 0) {
+  if (initial > 0 && input.fundingWalletId) {
     adjustWalletBalance(input.fundingWalletId, -initial);
   }
   return goal;
