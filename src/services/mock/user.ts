@@ -15,6 +15,9 @@ const MOCK_USER: User = {
   avatarUrl: null,      // user has not uploaded a photo yet
   displayName: 'Nguyễn Khánh Khôi',
   monthlyIncome: 12_000_000,
+  needsPct: 50,
+  wantsPct: 30,
+  savingsPct: 20,
   defaultWalletId: 'wallet_cash_01',
   defaultCurrency: 'VND',
   language: 'vi',

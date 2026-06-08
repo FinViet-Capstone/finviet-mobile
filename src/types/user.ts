@@ -54,6 +54,10 @@ export interface User {
   avatarUrl: string | null;
   /** Estimated monthly income in whole VND; null until set during onboarding */
   monthlyIncome: number | null;
+  /** Bucket allocation percentages (must sum to 100). Default 50/30/20. */
+  needsPct: number;
+  wantsPct: number;
+  savingsPct: number;
   defaultWalletId: string | null;
   defaultCurrency: string;
   language: AppLanguage;
