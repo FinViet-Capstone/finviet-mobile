@@ -31,6 +31,10 @@ export function useMonthlyTransactions(
   year: number,
   monthIdx: number,
   selectedWalletId: string | null,
+  searchQuery: string = '',
+  filterType: 'all' | 'income' | 'expense' = 'all',
+  filterCategoryId: string | null = null,
+  uncategorizedOnly: boolean = false,
 ) {
   // ── Date ranges ──────────────────────────────────────────────────────────
   const monthStart = isoDate(year, monthIdx, 1);
@@ -54,7 +58,17 @@ export function useMonthlyTransactions(
   });
   const { data: walletsData } = useWallets();
 
-  const transactions = useMemo(() => txData ?? [], [txData]);
+  const transactions = useMemo(() => {
+    let txs = txData ?? [];
+    if (uncategorizedOnly) return txs.filter((tx) => !tx.categoryId);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      txs = txs.filter((tx) => tx.merchant?.toLowerCase().includes(q) || tx.description?.toLowerCase().includes(q));
+    }
+    if (filterType !== 'all') txs = txs.filter((tx) => tx.type === filterType);
+    if (filterCategoryId) txs = txs.filter((tx) => tx.categoryId === filterCategoryId);
+    return txs;
+  }, [txData, searchQuery, filterType, filterCategoryId, uncategorizedOnly]);
   const prevTransactions = useMemo(() => prevTxData ?? [], [prevTxData]);
   const wallets = walletsData?.wallets ?? [];
   const totalBalance = walletsData?.totalBalance ?? 0;
