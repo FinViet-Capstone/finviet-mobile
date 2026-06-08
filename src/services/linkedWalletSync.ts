@@ -1,9 +1,7 @@
-import type { Transaction } from '@/types';
-import type { FinVerseTransaction } from './finverse';
-import { finverseClient } from './finverse';
+import type { SePayTransaction } from './sepay';
+import { sepayClient } from './sepay';
 import { createTransaction, type CreateTransactionInput } from './mock/transactions';
 import { MOCK_BANK_TRANSACTIONS, MOCK_BANK_ACCOUNT } from './mock/mockBankData';
-import { USER_ID } from './mock/wallets';
 
 export interface SyncResult {
   synced: number;
@@ -18,51 +16,55 @@ export interface MockLinkResult {
   transactionsSynced: number;
 }
 
-function mapFinVerseToTransaction(
-  fvTx: FinVerseTransaction,
+function mapSePayToTransaction(
+  spTx: SePayTransaction,
   walletId: string,
-  userId: string,
 ): CreateTransactionInput {
   return {
     walletId,
     categoryId: null,
-    amount: Math.abs(fvTx.amount),
-    type: fvTx.transaction_type === 'credit' ? 'income' : 'expense',
-    description: fvTx.description,
-    merchant: fvTx.merchant_name || null,
-    transactionDate: fvTx.date,
+    amount: Math.abs(spTx.amount),
+    type: spTx.direction === 'in' ? 'income' : 'expense',
+    description: spTx.description,
+    merchant: spTx.counterparty || null,
+    transactionDate: spTx.transaction_date,
     entryMethod: 'linked',
-    externalId: fvTx.id,
+    externalId: spTx.id,
   };
 }
 
+/**
+ * Pull transactions for a linked SePay account and persist them as 'linked'
+ * entries. SePay authenticates via a static API token (configured in env), so
+ * no per-request access token is needed — the `_accessToken` param is retained
+ * for signature stability with the Phase-2 connect flow.
+ */
 export async function syncLinkedWalletTransactions(
   walletId: string,
   userId: string,
-  accessToken: string,
+  _accessToken: string,
   accountId: string,
   startDate?: string,
 ): Promise<SyncResult> {
   const result: SyncResult = { synced: 0, skipped: 0, errors: [] };
 
   try {
-    const response = await finverseClient.syncTransactions(accessToken, {
+    const response = await sepayClient.syncTransactions({
       account_id: accountId,
       start_date: startDate,
     });
 
-    for (const fvTx of response.transactions) {
-      if (fvTx.pending) {
+    for (const spTx of response.transactions) {
+      if (spTx.pending) {
         result.skipped++;
         continue;
       }
 
       try {
-        const input = mapFinVerseToTransaction(fvTx, walletId, userId);
-        await createTransaction(input);
+        await createTransaction(mapSePayToTransaction(spTx, walletId));
         result.synced++;
       } catch (err) {
-        result.errors.push(`Failed to sync tx ${fvTx.id}: ${err}`);
+        result.errors.push(`Failed to sync tx ${spTx.id}: ${err}`);
       }
     }
   } catch (err) {
@@ -72,25 +74,26 @@ export async function syncLinkedWalletTransactions(
   return result;
 }
 
-export async function getLinkedAccounts(accessToken: string) {
-  return finverseClient.getAccounts(accessToken);
+export async function getLinkedAccounts(_accessToken?: string) {
+  return sepayClient.getAccounts();
 }
 
 export async function getInstitutions(country: string = 'VN') {
-  return finverseClient.getInstitutions(country);
+  return sepayClient.getInstitutions(country);
 }
 
-export async function createLinkToken(userId: string) {
-  return finverseClient.createLinkToken(userId);
+export async function createConnectToken(userId: string) {
+  return sepayClient.createConnectToken(userId);
 }
 
-export async function exchangePublicToken(publicToken: string) {
-  return finverseClient.exchangePublicToken(publicToken);
+export async function exchangeConnection(connectToken: string) {
+  return sepayClient.exchangeConnectToken(connectToken);
 }
 
 /**
- * Mock function to simulate linking a bank account and syncing transactions
- * For demo purposes only - simulates the full FinVerse flow
+ * Mock helper: simulate linking a SePay bank account and importing its
+ * transactions. Demo only — injects MOCK_BANK_TRANSACTIONS without hitting the
+ * live SePay client.
  */
 export async function mockLinkBankAccount(
   institutionId: string,
@@ -99,7 +102,7 @@ export async function mockLinkBankAccount(
   password: string,
 ): Promise<MockLinkResult> {
   // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Create a linked wallet
   const { createWallet } = await import('./mock/wallets');

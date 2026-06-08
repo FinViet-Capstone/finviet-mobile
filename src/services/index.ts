@@ -113,12 +113,12 @@ export type {
   MockChangePasswordInput,
 } from './mock/auth';
 
-// Linked Wallet Sync
+// Linked Wallet Sync (SePay)
 export {
   syncLinkedWalletTransactions,
   getLinkedAccounts,
   getInstitutions,
-  createLinkToken,
-  exchangePublicToken,
+  createConnectToken,
+  exchangeConnection,
 } from './linkedWalletSync';
 export type { SyncResult } from './linkedWalletSync';

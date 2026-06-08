@@ -109,8 +109,7 @@ export default function TransactionsScreen() {
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const first = viewableItems.find((v) => v.isViewable);
       if (!first) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const section = (first as any).section as TxSection | undefined;
+      const section = (first as ViewToken & { section?: TxSection }).section;
       if (section?.title) setSelectedISO(section.title);
     },
   ).current;
@@ -124,7 +123,6 @@ export default function TransactionsScreen() {
 
   // useCallback gives SectionList a stable ListHeaderComponent reference so it
   // does not unmount/remount the header on every parent render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const renderListHeader = useCallback(() => (
     <>
       <MonthNavigator

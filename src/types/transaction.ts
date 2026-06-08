@@ -43,7 +43,7 @@ export interface Transaction {
   transferPairId: string | null;
   /** Source image URL for Photo Entry; null for manual / CSV transactions */
   imageUrl: string | null;
-  /** External transaction ID from linked wallet provider (FinVerse, etc.) */
+  /** External transaction ID from linked wallet provider (SePay, etc.) */
   externalId: string | null;
   /** ISO 8601 timestamp */
   createdAt: string;

@@ -89,22 +89,8 @@ export default function ManualEntryScreen() {
   const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  if (isLoading || !walletData) return <LoadingSpinner />;
-
-  const wallets: Wallet[] = walletData.wallets;
-  const primaryWalletId =
-    wallets.find((w) => w.isPrimary)?.id ?? wallets[0].id;
-  const effectiveWalletId = selectedWalletId ?? primaryWalletId;
-
-  // ── Derived ─────────────────────────────────────────────────────────────────
-  const selectedCategory: Category | null = selectedCategoryId
-    ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
-    : null;
-
-  const selectedWallet: Wallet =
-    wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
-
   // ── AI suggestion debounce (600 ms) ─────────────────────────────────────────
+  // Declared before any early return so hook order stays stable across renders.
   useEffect(() => {
     const trimmed = description.trim().toLowerCase();
     if (trimmed.length < 2) {
@@ -121,6 +107,21 @@ export default function ManualEntryScreen() {
     }, 600);
     return () => clearTimeout(timer);
   }, [description]);
+
+  if (isLoading || !walletData) return <LoadingSpinner />;
+
+  const wallets: Wallet[] = walletData.wallets;
+  const primaryWalletId =
+    wallets.find((w) => w.isPrimary)?.id ?? wallets[0].id;
+  const effectiveWalletId = selectedWalletId ?? primaryWalletId;
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const selectedCategory: Category | null = selectedCategoryId
+    ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
+    : null;
+
+  const selectedWallet: Wallet =
+    wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
