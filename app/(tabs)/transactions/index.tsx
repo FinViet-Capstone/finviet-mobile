@@ -72,7 +72,7 @@ export default function TransactionsScreen() {
       // Double-tap: open manual entry only for basic wallets
       setLastTap(null);
       if (selectedWallet?.type === 'linked') return;
-      router.push(`/(tabs)/entry/manual?date=${cell.iso}` as never);
+      router.push({ pathname: '/(tabs)/entry/manual', params: { date: cell.iso } });
       return;
     }
     setLastTap({ iso: cell.iso, at });
@@ -96,7 +96,7 @@ export default function TransactionsScreen() {
   const handleTxPress = (tx: Transaction) => {
     const wallet = wallets.find((w) => w.id === tx.walletId);
     const mode = wallet?.type === 'basic' ? 'full' : 'category';
-    router.push(`/(tabs)/transactions/${tx.id}?mode=${mode}` as never);
+    router.push({ pathname: '/(tabs)/transactions/[id]', params: { id: tx.id, mode } });
   };
 
   const handleWalletSelect = (id: string | null) => {

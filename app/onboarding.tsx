@@ -47,7 +47,7 @@ export default function OnboardingScreen() {
     setTimeout(() => {
       setLoading(false);
       markOnboardingDone();
-      router.replace('/(tabs)/report');
+      router.replace('/(tabs)/home');
     }, 500);
   };
 

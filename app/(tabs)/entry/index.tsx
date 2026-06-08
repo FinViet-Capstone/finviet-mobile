@@ -47,9 +47,6 @@ export default function EntryChooserScreen() {
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date?: string }>();
 
-  const buildHref = (route: string) =>
-    date ? `${route}?date=${date}` : route;
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -76,7 +73,12 @@ export default function EntryChooserScreen() {
               key={method.id}
               style={styles.card}
               activeOpacity={0.75}
-              onPress={() => router.push(buildHref(method.route) as never)}
+              onPress={() =>
+                router.push({
+                  pathname: method.route,
+                  params: date ? { date } : undefined,
+                })
+              }
             >
               {/* Icon column */}
               <View style={styles.iconWrapper}>

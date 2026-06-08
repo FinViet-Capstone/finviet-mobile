@@ -124,11 +124,10 @@ export default function SMSEntryScreen() {
             {
               text: 'Nhập tay',
               onPress: () =>
-                router.replace(
-                  `/(tabs)/entry/manual${
-                    dateParam ? `?date=${dateParam}` : ''
-                  }` as never,
-                ),
+                router.replace({
+                  pathname: '/(tabs)/entry/manual',
+                  params: dateParam ? { date: dateParam } : undefined,
+                }),
             },
             { text: 'Thử lại', onPress: () => setPhase('paste') },
           ],

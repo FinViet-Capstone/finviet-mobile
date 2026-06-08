@@ -43,10 +43,11 @@ export default function PhotoEntryScreen() {
   const router = useRouter();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
 
-  const buildConfirmHref = (uri: string) => {
-    const base = `/(tabs)/entry/photo-confirm?uri=${encodeURIComponent(uri)}`;
-    return dateParam ? `${base}&date=${dateParam}` : base;
-  };
+  const buildConfirmHref = (uri: string) =>
+    ({
+      pathname: '/(tabs)/entry/photo-confirm',
+      params: dateParam ? { uri, date: dateParam } : { uri },
+    }) as const;
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export default function PhotoEntryScreen() {
       });
       if (result.canceled) return;
       const uri = result.assets[0].uri;
-      router.push(buildConfirmHref(uri) as never);
+      router.push(buildConfirmHref(uri));
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +95,7 @@ export default function PhotoEntryScreen() {
       });
       if (result.canceled) return;
       const uri = result.assets[0].uri;
-      router.push(buildConfirmHref(uri) as never);
+      router.push(buildConfirmHref(uri));
     } finally {
       setIsLoading(false);
     }
