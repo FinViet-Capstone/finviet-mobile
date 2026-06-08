@@ -36,6 +36,7 @@ import { SavingsGoalCard } from '@/components/home/SavingsGoalCard';
 import { RecentTransactionsList } from '@/components/home/RecentTransactionsList';
 import { UncategorizedBanner } from '@/components/home/UncategorizedBanner';
 import { ChatbotFAB } from '@/components/home/ChatbotFAB';
+import { AIChatbotSheet } from '@/components/home/AIChatbotSheet';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
 const UNCATEGORIZED_WARNING_THRESHOLD = 0.2;
@@ -60,6 +61,7 @@ export default function HomeScreen() {
 
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [advisorOpen, setAdvisorOpen] = useState(false);
 
   const { data: user } = useUser();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
@@ -228,7 +230,9 @@ export default function HomeScreen() {
       )}
 
       {/* ── Fixed bottom: chatbot FAB (floats above banner) ────────────────── */}
-      <ChatbotFAB extraBottomOffset={fabExtraOffset} />
+      <ChatbotFAB extraBottomOffset={fabExtraOffset} onOpen={() => setAdvisorOpen(true)} />
+
+      <AIChatbotSheet visible={advisorOpen} onClose={() => setAdvisorOpen(false)} />
     </SafeAreaView>
   );
 }

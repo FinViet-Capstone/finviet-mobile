@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,10 +12,10 @@ const BASE_BOTTOM = 24;
 
 export interface ChatbotFABProps {
   readonly extraBottomOffset?: number;
+  readonly onOpen: () => void;
 }
 
-export function ChatbotFAB({ extraBottomOffset = 0 }: ChatbotFABProps) {
-  const router = useRouter();
+export function ChatbotFAB({ extraBottomOffset = 0, onOpen }: ChatbotFABProps) {
   const bottomAnim = useSharedValue(BASE_BOTTOM + extraBottomOffset);
 
   useEffect(() => {
@@ -31,7 +30,7 @@ export function ChatbotFAB({ extraBottomOffset = 0 }: ChatbotFABProps) {
     <Animated.View style={[styles.wrapper, animatedStyle]}>
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => router.push('/(tabs)/home/advisor')}
+        onPress={onOpen}
         activeOpacity={0.85}
       >
         <MaterialIcon name="smart_toy" size={26} color={COLORS.onPrimary} />
