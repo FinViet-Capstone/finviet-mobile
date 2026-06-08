@@ -54,3 +54,26 @@ function _compact(val: number, suffix: string): string {
   const str = rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
   return str + suffix;
 }
+
+/**
+ * Compact VND with an explicit +/- sign — used for net/surplus figures where
+ * the direction matters (e.g. month total, per-day net).
+ *
+ * @example signedCompact(2_500_000)  → "+2.5m"
+ * @example signedCompact(-500_000)   → "-500k"
+ */
+export function signedCompact(amount: number): string {
+  return (amount >= 0 ? '+' : '-') + formatVNDCompact(Math.abs(amount));
+}
+
+/**
+ * Percent change between two values, as a rounded absolute-value string.
+ * Returns "—" when there is no baseline to compare against.
+ *
+ * @example pctChange(120, 100) → "20%"
+ * @example pctChange(50, 0)    → "—"
+ */
+export function pctChange(curr: number, prev: number): string {
+  if (prev === 0) return '—';
+  return `${Math.round((Math.abs(curr - prev) / prev) * 100)}%`;
+}

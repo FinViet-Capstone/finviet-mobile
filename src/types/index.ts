@@ -15,3 +15,4 @@ export * from './notification';
 export * from './extraction';
 export * from './auth';
 export * from './api';
+export * from './rule';

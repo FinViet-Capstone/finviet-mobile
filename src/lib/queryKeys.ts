@@ -52,6 +52,9 @@ export const queryKeys = {
     all: () => ['notifications'] as const,
     unread: () => [...queryKeys.notifications.all(), 'unread'] as const,
   },
+  rules: {
+    all: () => ['rules'] as const,
+  },
   linkedWallet: {
     institutions: (country: string) => ['institutions', country] as const,
     accounts: (accessToken: string | undefined) =>

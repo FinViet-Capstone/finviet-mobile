@@ -52,3 +52,4 @@ export {
   useLinkedAccounts,
   useSyncLinkedWallet,
 } from './useLinkedWallet';
+export { useRules, useCreateRule } from './useRules';

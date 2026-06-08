@@ -734,6 +734,29 @@ export function getTransactionById(id: string): Transaction | undefined {
   return TRANSACTIONS.find((t) => t.id === id);
 }
 
+/**
+ * Retroactively assign `categoryId` to every non-transfer transaction whose
+ * merchant contains `keyword` (case-insensitive). Used by the rules engine when
+ * a user creates a merchant→category rule. Returns the count updated.
+ *
+ * Lives here (not in rules.ts) so the TRANSACTIONS array stays encapsulated —
+ * same pattern as adjustWalletBalance in wallets.ts. Category changes don't
+ * affect wallet balances, so no balance adjustment is needed.
+ */
+export function applyMerchantRule(keyword: string, categoryId: string): number {
+  const needle = keyword.trim().toLowerCase();
+  if (!needle) return 0;
+  let count = 0;
+  TRANSACTIONS = TRANSACTIONS.map((t) => {
+    if (t.type === 'transfer_in' || t.type === 'transfer_out') return t;
+    if (!t.merchant || !t.merchant.toLowerCase().includes(needle)) return t;
+    if (t.categoryId === categoryId) return t;
+    count += 1;
+    return { ...t, categoryId, aiOverridden: true, updatedAt: nowIso() };
+  });
+  return count;
+}
+
 export function getRecentTransactions(n: number = 10): Transaction[] {
   return getTransactions().slice(0, n);
 }
@@ -801,7 +824,7 @@ export async function updateTransaction(
   if (!before) throw new Error('Transaction not found');
 
   // Transfer legs are immutable on amount/category/wallet (per ARCHITECTURE §5).
-  // Higher layers (edit-entry screen) prevent the user from changing those, but
+  // Higher layers (transactions/[id] screen) prevent the user from changing those, but
   // belt-and-braces: scrub them out of the patch so a stray call can't corrupt
   // the transfer_pair invariant.
   if (before.type === 'transfer_in' || before.type === 'transfer_out') {

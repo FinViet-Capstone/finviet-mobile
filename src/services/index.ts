@@ -8,6 +8,18 @@
  * the real service modules — screen code needs zero changes.
  */
 
+/**
+ * USE_MOCK — single switch between the mock and (future) real API service
+ * modules. Reads EXPO_PUBLIC_USE_MOCK; defaults to mock until the .NET API
+ * ships. On integration day, branch the re-exports below on this flag — no
+ * screen or hook file changes.
+ */
+export const USE_MOCK =
+  (process.env.EXPO_PUBLIC_USE_MOCK ?? 'true').toLowerCase() !== 'false';
+
+/** Base URL of the .NET 8 Web API, read from the active .env file. */
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+
 // User
 export { getUser } from './mock/user';
 
@@ -81,6 +93,10 @@ export {
 
 // Photo / SMS Extraction (mock — frozen contract; see types/extraction.ts and constants/extraction.ts)
 export { extractFromPhoto, extractFromSMS } from './mock/extraction';
+
+// Rules (merchant → category auto-classification)
+export { getRules, createRule, deleteRule } from './mock/rules';
+export type { CreateRuleInput, CreateRuleResult } from './mock/rules';
 
 // Auth
 export {

@@ -1,121 +1,145 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
+import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
-import { AmountText } from '@/components/common/AmountText';
-import { Transaction } from '@/types/transaction';
+import { formatVNDCompact } from '@/utils/formatters';
+import type { Transaction } from '@/types/transaction';
 
 export interface TransactionCardProps {
   transaction: Transaction;
+  /** Wallet display name, resolved by the caller (keeps this presentational). */
+  walletName?: string;
   onPress?: () => void;
-  /** Renders a small chevron at the right edge to signal "tap for detail". */
-  showChevron?: boolean;
 }
 
-export function TransactionCard({ transaction, onPress, showChevron = false }: TransactionCardProps) {
-  const category = transaction.categoryId
-    ? getCategoryById(transaction.categoryId)
-    : undefined;
-
-  const categoryColor = category?.color ?? COLORS.gray[400];
+/**
+ * Dense transaction list row (M3). Shows category icon, an AI badge for
+ * un-overridden AI suggestions, an amber left border + "classify now" hint when
+ * uncategorized, and the wallet name. Income amounts are green with a + prefix;
+ * expenses are unsigned (per the Transactions design).
+ */
+export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
+  const category = tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
   const iconName = getCategoryIcon(category?.icon);
+  const catColor = category?.color ?? COLORS.outlineVariant;
+  const isUncategorized = !tx.categoryId;
+  const isIncome = tx.type === 'income';
 
-  const [year, month, day] = transaction.transactionDate.split('-');
-  const formattedDate = `${day}/${month}/${year}`;
-
-  const content = (
-    <View style={styles.row}>
-      <View style={[styles.categoryCircle, { backgroundColor: categoryColor + '26' }]}>
-        <MaterialIcon name={iconName} size={20} color={categoryColor} />
-      </View>
-
-      <View style={styles.middle}>
-        <Text style={styles.description} numberOfLines={1}>
-          {transaction.description ?? category?.nameVi ?? 'Giao dịch'}
-        </Text>
-        {transaction.merchant ? (
-          <Text style={styles.merchant} numberOfLines={1}>
-            {transaction.merchant}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.right}>
-        <AmountText
-          amount={transaction.amount}
-          type={transaction.type}
-          size="sm"
+  return (
+    <TouchableOpacity
+      style={[styles.txRow, isUncategorized && styles.txRowUncat]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.txIcon, { backgroundColor: `${catColor}26` }]}>
+        <MaterialIcon
+          name={isUncategorized ? 'help_outline' : iconName}
+          size={20}
+          color={isUncategorized ? COLORS.secondary : catColor}
         />
-        <Text style={styles.date}>{formattedDate}</Text>
       </View>
 
-      {showChevron ? (
-        <MaterialIcon name="chevron_right" size={18} color={COLORS.gray[300]} style={styles.cardChevron} />
-      ) : null}
-    </View>
+      <View style={styles.txMeta}>
+        <View style={styles.txTitleRow}>
+          <Text style={styles.txTitle} numberOfLines={1}>
+            {tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch')}
+          </Text>
+          {tx.aiSuggestedCategoryId && !tx.aiOverridden && (
+            <View style={styles.aiBadge}>
+              <MaterialIcon name="auto_awesome" size={10} color={COLORS.primary} />
+              <Text style={styles.aiBadgeText}>{'AI'}</Text>
+            </View>
+          )}
+        </View>
+        <Text
+          style={[styles.txSubtitle, isUncategorized && { color: COLORS.secondary }]}
+          numberOfLines={1}
+        >
+          {isUncategorized ? 'Phân loại ngay →' : (category?.nameVi ?? walletName)}
+        </Text>
+      </View>
+
+      <View style={styles.txRight}>
+        <Text style={[styles.txAmount, { color: isIncome ? COLORS.tertiary : COLORS.onSurface }]}>
+          {isIncome ? `+${formatVNDCompact(tx.amount)}` : formatVNDCompact(tx.amount)}
+        </Text>
+        <Text style={styles.txWalletLabel} numberOfLines={1}>{walletName}</Text>
+      </View>
+    </TouchableOpacity>
   );
-
-  if (onPress) {
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={onPress}
-        activeOpacity={0.85}
-      >
-        {content}
-      </TouchableOpacity>
-    );
-  }
-
-  return <View style={styles.card}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    marginBottom: SPACING[2],
-    ...SHADOW.sm,
-  },
-  row: {
+  txRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    backgroundColor: COLORS.surfaceContainerLow,
+    marginHorizontal: SPACING[4],
+    marginBottom: SPACING[2],
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING[3],
   },
-  categoryCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  txRowUncat: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.secondary,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING[3],
+    flexShrink: 0,
   },
-  middle: {
+  txMeta: {
     flex: 1,
-    marginRight: SPACING[2],
+    gap: 2,
   },
-  description: {
+  txTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  txTitle: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[800],
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    flexShrink: 1,
   },
-  merchant: {
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: `${COLORS.primaryContainer}33`,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  aiBadgeText: {
+    fontSize: 9,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.primary,
+  },
+  txSubtitle: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
-    marginTop: 2,
+    color: COLORS.onSurfaceVariant,
   },
-  right: {
+  txRight: {
     alignItems: 'flex-end',
+    gap: 2,
+    flexShrink: 0,
   },
-  date: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[400],
-    marginTop: 2,
+  txAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
   },
-  cardChevron: {
-    marginLeft: SPACING[2],
+  txWalletLabel: {
+    fontSize: 10,
+    color: COLORS.onSurfaceVariant,
+    maxWidth: 80,
   },
 });
