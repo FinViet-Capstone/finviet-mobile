@@ -8,17 +8,23 @@ import {
   type CreateBudgetInput,
   type UpdateBudgetInput,
 } from '@/services';
+import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useBudgets = () =>
-  useQuery({ queryKey: ['budgets'], queryFn: () => getBudgets() });
+  useQuery({
+    queryKey: queryKeys.budgets.all(),
+    queryFn: () => getBudgets(),
+    staleTime: STALE_TIME.medium,
+  });
 
 export const useBudgetById = (id: string | undefined) =>
   useQuery({
-    queryKey: ['budgets', id],
+    queryKey: queryKeys.budgets.detail(id),
     queryFn: () => (id ? getBudgetById(id) ?? null : null),
     enabled: !!id,
+    staleTime: STALE_TIME.medium,
   });
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -27,7 +33,7 @@ export const useCreateBudget = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateBudgetInput) => createBudget(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
   });
 };
 
@@ -36,7 +42,7 @@ export const useUpdateBudget = () => {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateBudgetInput }) =>
       updateBudget(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
   });
 };
 
@@ -44,6 +50,6 @@ export const useDeleteBudget = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteBudget(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
   });
 };

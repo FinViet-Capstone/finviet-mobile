@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import DraggableFlatList, {
   ScaleDecorator,
   RenderItemParams,
@@ -57,11 +57,6 @@ export function OnboardingCategories({
   const [sheetVisible, setSheetVisible] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<BucketKey>('needs');
 
-  // Convert Material Symbols naming (underscore) to MaterialIcons naming (hyphen)
-  const convertIconName = (symbolsName: string): string => {
-    return symbolsName.replace(/_/g, '-');
-  };
-
   const handleOpenSheet = (bucketKey: BucketKey) => {
     setSelectedBucket(bucketKey);
     setSheetVisible(true);
@@ -99,7 +94,7 @@ export function OnboardingCategories({
     const category = getCategoryById(categoryId);
     if (!category) return null;
 
-    const iconName = convertIconName(getCategoryIcon(category.icon));
+    const iconName = getCategoryIcon(category.icon);
 
     return (
       <ScaleDecorator>
@@ -114,15 +109,15 @@ export function OnboardingCategories({
             ]}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="drag-indicator" size={20} color={COLORS.onSurfaceVariant} />
-            <MaterialIcons name={iconName as any} size={20} color={COLORS.onSurface} />
+            <MaterialIcon name="drag_indicator" size={20} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name={iconName} size={20} color={COLORS.onSurface} />
             <Text style={styles.categoryLabel}>{category.nameVi}</Text>
             <TouchableOpacity
               onPress={() => handleRemoveCategory(bucketId, categoryId)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.removeButton}
             >
-              <MaterialIcons name="close" size={18} color={COLORS.onSurfaceVariant} />
+              <MaterialIcon name="close" size={18} color={COLORS.onSurfaceVariant} />
             </TouchableOpacity>
           </TouchableOpacity>
         </View>
@@ -171,7 +166,7 @@ export function OnboardingCategories({
                       activeOpacity={0.7}
                       onPress={() => handleOpenSheet(bucket.key)}
                     >
-                      <MaterialIcons name="add" size={20} color={COLORS.onSurfaceVariant} />
+                      <MaterialIcon name="add" size={20} color={COLORS.onSurfaceVariant} />
                       <Text style={styles.addLabel}>Thêm từ thư viện</Text>
                     </TouchableOpacity>
                   }
@@ -190,7 +185,7 @@ export function OnboardingCategories({
           activeOpacity={0.9}
         >
           <Text style={styles.buttonText}>{ONBOARDING_STRINGS.categories.button}</Text>
-          <MaterialIcons name="arrow-forward" size={24} color={COLORS.onPrimary} />
+          <MaterialIcon name="arrow_forward" size={24} color={COLORS.onPrimary} />
         </TouchableOpacity>
       </View>
 

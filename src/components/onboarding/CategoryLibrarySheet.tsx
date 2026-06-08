@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CATEGORIES } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { CATEGORY_DEFAULT_BUCKETS, CATEGORY_LIBRARY_STRINGS } from '@/data/categoryLibraryData';
@@ -31,11 +31,6 @@ export function CategoryLibrarySheet({
   onSelect,
   onClose,
 }: CategoryLibrarySheetProps) {
-  // Convert Material Symbols naming (underscore) to MaterialIcons naming (hyphen)
-  const convertIconName = (symbolsName: string): string => {
-    return symbolsName.replace(/_/g, '-');
-  };
-
   // Filter available categories
   const availableCategories = useMemo(() => {
     return CATEGORIES.filter(
@@ -99,7 +94,7 @@ export function CategoryLibrarySheet({
                     style={styles.closeButton}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MaterialIcons name="close" size={24} color={COLORS.onSurfaceVariant} />
+                    <MaterialIcon name="close" size={24} color={COLORS.onSurfaceVariant} />
                   </TouchableOpacity>
                 </View>
 
@@ -128,7 +123,7 @@ export function CategoryLibrarySheet({
                               {CATEGORY_LIBRARY_STRINGS.sectionTitles[bucket]}
                             </Text>
                             {categories.map((category) => {
-                              const iconName = convertIconName(getCategoryIcon(category.icon));
+                              const iconName = getCategoryIcon(category.icon);
                               const isTargetBucket = bucket === targetBucket;
 
                               return (
@@ -142,8 +137,8 @@ export function CategoryLibrarySheet({
                                   activeOpacity={0.7}
                                 >
                                   <View style={styles.categoryLeft}>
-                                    <MaterialIcons
-                                      name={iconName as any}
+                                    <MaterialIcon
+                                      name={iconName}
                                       size={24}
                                       color={COLORS.onSurface}
                                     />

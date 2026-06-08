@@ -12,6 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
+import { queryKeys } from '@/lib/queryKeys';
 import type { User } from '@/types';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
@@ -21,9 +22,9 @@ const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 export const useUser = () => {
   const sessionUser = useAuthStore((s) => s.user);
   return useQuery<User | null>({
-    queryKey: ['user', sessionUser?.id ?? null, sessionUser?.email ?? null],
+    queryKey: queryKeys.user.session(sessionUser?.id ?? null, sessionUser?.email ?? null),
     queryFn: async () => sessionUser ?? null,
-    staleTime: Infinity,
+    staleTime: Infinity, // session is derived from the auth store, never refetched
   });
 };
 
@@ -50,7 +51,7 @@ export const useUpdateProfile = () => {
         updatedAt: new Date().toISOString(),
       });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['user'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.user.all() }),
   });
 };
 
@@ -93,6 +94,6 @@ export const useUpdatePreferences = () => {
         updatedAt: new Date().toISOString(),
       });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['user'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.user.all() }),
   });
 };

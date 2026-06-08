@@ -5,16 +5,22 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from '@/services';
+import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useNotifications = () =>
-  useQuery({ queryKey: ['notifications'], queryFn: () => getNotifications() });
+  useQuery({
+    queryKey: queryKeys.notifications.all(),
+    queryFn: () => getNotifications(),
+    staleTime: STALE_TIME.short,
+  });
 
 export const useUnreadNotifications = () =>
   useQuery({
-    queryKey: ['notifications', 'unread'],
+    queryKey: queryKeys.notifications.unread(),
     queryFn: () => getUnreadNotifications(),
+    staleTime: STALE_TIME.short,
   });
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -23,7 +29,7 @@ export const useMarkNotificationRead = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => markNotificationRead(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.notifications.all() }),
   });
 };
 
@@ -31,6 +37,6 @@ export const useMarkAllNotificationsRead = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => markAllNotificationsRead(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.notifications.all() }),
   });
 };

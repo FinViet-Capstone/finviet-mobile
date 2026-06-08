@@ -10,25 +10,31 @@ import {
   type UpdateWalletInput,
   type CreateTransferInput,
 } from '@/services';
+import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useWallets = () =>
-  useQuery({ queryKey: ['wallets'], queryFn: () => getWallets() });
+  useQuery({
+    queryKey: queryKeys.wallets.all(),
+    queryFn: () => getWallets(),
+    staleTime: STALE_TIME.medium,
+  });
 
 export const useWalletById = (id: string | undefined) =>
   useQuery({
-    queryKey: ['wallets', id],
+    queryKey: queryKeys.wallets.detail(id),
     queryFn: () => (id ? getWalletById(id) ?? null : null),
     enabled: !!id,
+    staleTime: STALE_TIME.medium,
   });
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 function invalidateWalletDependents(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: ['wallets'] });
-  qc.invalidateQueries({ queryKey: ['transactions'] });
-  qc.invalidateQueries({ queryKey: ['user'] });
+  qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.user.all() });
 }
 
 export const useCreateWallet = () => {
@@ -61,9 +67,9 @@ export const useCreateTransfer = () => {
   return useMutation({
     mutationFn: (input: CreateTransferInput) => createTransfer(input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['wallets'] });
-      qc.invalidateQueries({ queryKey: ['transactions'] });
-      qc.invalidateQueries({ queryKey: ['budgets'] });
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
     },
   });
 };

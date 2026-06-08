@@ -5,18 +5,21 @@ import {
   syncLinkedWalletTransactions,
   type SyncResult,
 } from '@/services';
+import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 export const useInstitutions = (country: string = 'VN') =>
   useQuery({
-    queryKey: ['institutions', country],
+    queryKey: queryKeys.linkedWallet.institutions(country),
     queryFn: () => getInstitutions(country),
+    staleTime: STALE_TIME.reference,
   });
 
 export const useLinkedAccounts = (accessToken: string | undefined) =>
   useQuery({
-    queryKey: ['linked-accounts', accessToken],
+    queryKey: queryKeys.linkedWallet.accounts(accessToken),
     queryFn: () => (accessToken ? getLinkedAccounts(accessToken) : []),
     enabled: !!accessToken,
+    staleTime: STALE_TIME.long,
   });
 
 export const useSyncLinkedWallet = () =>

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Pressable,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 
 export interface NumericKeypadProps {
@@ -41,8 +41,8 @@ export function NumericKeypad({
           ]}
           onPress={onBackspace}
         >
-          <MaterialCommunityIcons
-            name="backspace-outline"
+          <MaterialIcon
+            name="backspace"
             size={28}
             color={COLORS.primary}
           />

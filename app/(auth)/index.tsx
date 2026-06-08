@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
@@ -246,8 +246,8 @@ export default function AuthScreen() {
                           onPress={() => setShowPassword((prev) => !prev)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <MaterialCommunityIcons
-                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                          <MaterialIcon
+                            name={showPassword ? 'visibility_off' : 'visibility'}
                             size={20}
                             color={COLORS.onSurfaceVariant}
                           />
@@ -342,8 +342,8 @@ export default function AuthScreen() {
                           onPress={() => setShowPassword((prev) => !prev)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <MaterialCommunityIcons
-                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                          <MaterialIcon
+                            name={showPassword ? 'visibility_off' : 'visibility'}
                             size={20}
                             color={COLORS.onSurfaceVariant}
                           />
@@ -375,9 +375,9 @@ export default function AuthScreen() {
                           onPress={() => setShowConfirmPassword((prev) => !prev)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <MaterialCommunityIcons
+                          <MaterialIcon
                             name={
-                              showConfirmPassword ? 'eye-off-outline' : 'eye-outline'
+                              showConfirmPassword ? 'visibility_off' : 'visibility'
                             }
                             size={20}
                             color={COLORS.onSurfaceVariant}
