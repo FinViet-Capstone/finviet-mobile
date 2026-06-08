@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from "react";
 import {
   SectionList,
   StyleSheet,
@@ -7,22 +7,37 @@ import {
   TouchableOpacity,
   View,
   ViewToken,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { MonthNavigator } from '@/components/transaction/MonthNavigator';
-import { TransactionSummaryBanner } from '@/components/transaction/TransactionSummaryBanner';
-import { TransactionCalendar } from '@/components/transaction/TransactionCalendar';
-import { TransactionCard } from '@/components/transaction/TransactionCard';
-import { WalletPickerSheet } from '@/components/transaction/WalletPickerSheet';
-import { UncategorizedPill } from '@/components/transaction/UncategorizedPill';
-import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
-import { useMonthlyTransactions, type TxSection, type DayCell } from '@/hooks/useMonthlyTransactions';
-import { sectionLabel, todayISO } from '@/utils/date';
-import { signedCompact } from '@/utils/formatters';
-import type { Transaction } from '@/types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { MonthNavigator } from "@/components/transaction/MonthNavigator";
+import { TransactionSummaryBanner } from "@/components/transaction/TransactionSummaryBanner";
+import { TransactionCalendar } from "@/components/transaction/TransactionCalendar";
+import { TransactionCard } from "@/components/transaction/TransactionCard";
+import { WalletPickerSheet } from "@/components/transaction/WalletPickerSheet";
+import { UncategorizedPill } from "@/components/transaction/UncategorizedPill";
+import {
+  BORDER_RADIUS,
+  COLORS,
+  FONT_SIZE,
+  FONT_WEIGHT,
+  SPACING,
+} from "@/constants/theme";
+import {
+  useMonthlyTransactions,
+  type TxSection,
+  type DayCell,
+} from "@/hooks/useMonthlyTransactions";
+import { sectionLabel, todayISO } from "@/utils/date";
+import { signedCompact } from "@/utils/formatters";
+import type { Transaction } from "@/types";
+
+const VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 30,
+  minimumViewTime: 150,
+};
 
 export default function TransactionsScreen() {
   const router = useRouter();
@@ -35,10 +50,9 @@ export default function TransactionsScreen() {
   const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [lastTap, setLastTap] = useState<{ iso: string; at: number } | null>(null);
 
-  // Search & filter state
   const [searchVisible, setSearchVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterVisible, setFilterVisible] = useState(false);
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
 
@@ -58,69 +72,85 @@ export default function TransactionsScreen() {
     sections,
     dayCells,
     leadingBlanks,
-  } = useMonthlyTransactions(year, monthIdx, selectedWalletId, searchQuery, filterType, null, uncategorizedOnly);
+  } = useMonthlyTransactions(
+    year,
+    monthIdx,
+    selectedWalletId,
+    searchQuery,
+    filterType,
+    null,
+    uncategorizedOnly,
+  );
 
-  // -- Stable refs (must be outside render, not .current accessed during render) --
-
-  const onViewableItemsChangedRef = useRef(
+  const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const first = viewableItems.find((v) => v.isViewable);
       if (!first) return;
       const section = (first as ViewToken & { section?: TxSection }).section;
       if (section?.title) setSelectedISO(section.title);
     },
+    [],
   );
 
-  const viewabilityConfigRef = useRef({
-    itemVisiblePercentThreshold: 30,
-    minimumViewTime: 150,
-  });
-
-  // -- Handlers --
-
   const handlePrevMonth = () => {
-    if (monthIdx === 0) { setYear((y) => y - 1); setMonthIdx(11); }
-    else setMonthIdx((m) => m - 1);
-    setSelectedISO('');
+    if (monthIdx === 0) {
+      setYear((y) => y - 1);
+      setMonthIdx(11);
+    } else setMonthIdx((m) => m - 1);
+    setSelectedISO("");
   };
 
   const handleNextMonth = () => {
-    if (monthIdx === 11) { setYear((y) => y + 1); setMonthIdx(0); }
-    else setMonthIdx((m) => m + 1);
-    setSelectedISO('');
+    if (monthIdx === 11) {
+      setYear((y) => y + 1);
+      setMonthIdx(0);
+    } else setMonthIdx((m) => m + 1);
+    setSelectedISO("");
   };
 
-  const handleDayPress = useCallback((cell: DayCell) => {
-    const at = Date.now();
-    if (lastTap?.iso === cell.iso && at - lastTap.at < 300) {
-      setLastTap(null);
-      if (selectedWallet?.type === 'linked') return;
-      router.push({ pathname: '/(tabs)/entry/manual', params: { date: cell.iso } });
-      return;
-    }
-    setLastTap({ iso: cell.iso, at });
-    setSelectedISO(cell.iso);
-
-    const idx = sections.findIndex((s) => s.title === cell.iso);
-    if (idx >= 0) {
-      try {
-        sectionListRef.current?.scrollToLocation({
-          sectionIndex: idx,
-          itemIndex: 0,
-          animated: true,
-          viewOffset: 0,
+  const handleDayPress = useCallback(
+    (cell: DayCell) => {
+      const at = Date.now();
+      if (lastTap?.iso === cell.iso && at - lastTap.at < 300) {
+        setLastTap(null);
+        if (selectedWallet?.type === "linked") return;
+        router.push({
+          pathname: "/(tabs)/entry/manual",
+          params: { date: cell.iso },
         });
-      } catch {
-        // section may not be rendered if off-screen -- ignore
+        return;
       }
-    }
-  }, [lastTap, selectedWallet, router, sections]);
+      setLastTap({ iso: cell.iso, at });
+      setSelectedISO(cell.iso);
 
-  const handleTxPress = useCallback((tx: Transaction) => {
-    const wallet = wallets.find((w) => w.id === tx.walletId);
-    const mode = wallet?.type === 'basic' ? 'full' : 'category';
-    router.push({ pathname: '/(tabs)/transactions/[id]', params: { id: tx.id, mode } });
-  }, [wallets, router]);
+      const idx = sections.findIndex((s) => s.title === cell.iso);
+      if (idx >= 0) {
+        try {
+          sectionListRef.current?.scrollToLocation({
+            sectionIndex: idx,
+            itemIndex: 0,
+            animated: true,
+            viewOffset: 0,
+          });
+        } catch {
+          // section may not be rendered if off-screen -- ignore
+        }
+      }
+    },
+    [lastTap, selectedWallet, router, sections],
+  );
+
+  const handleTxPress = useCallback(
+    (tx: Transaction) => {
+      const wallet = wallets.find((w) => w.id === tx.walletId);
+      const mode = wallet?.type === "basic" ? "full" : "category";
+      router.push({
+        pathname: "/(tabs)/transactions/[id]",
+        params: { id: tx.id, mode },
+      });
+    },
+    [wallets, router],
+  );
 
   const handleWalletSelect = useCallback((id: string | null) => {
     setSelectedWalletId(id);
@@ -133,7 +163,7 @@ export default function TransactionsScreen() {
 
   const handleSearchToggle = useCallback(() => {
     setSearchVisible((v) => {
-      if (v) setSearchQuery('');
+      if (v) setSearchQuery("");
       return !v;
     });
   }, []);
@@ -142,78 +172,96 @@ export default function TransactionsScreen() {
     setFilterVisible((v) => !v);
   }, []);
 
-  const handleFilterType = useCallback((type: 'all' | 'income' | 'expense') => {
+  const handleFilterType = useCallback((type: "all" | "income" | "expense") => {
     setFilterType(type);
     setFilterVisible(false);
   }, []);
 
-  // -- Sub-renders --
+  const renderListHeader = useCallback(
+    () => (
+      <>
+        <MonthNavigator
+          monthIdx={monthIdx}
+          year={year}
+          onPrev={handlePrevMonth}
+          onNext={handleNextMonth}
+        />
+        <TransactionSummaryBanner
+          income={income}
+          expense={expense}
+          monthNet={monthNet}
+          prevIncome={prevIncome}
+          prevExpense={prevExpense}
+        />
+        <TransactionCalendar
+          dayCells={dayCells}
+          selectedISO={selectedISO}
+          leadingBlanks={leadingBlanks}
+          onDayPress={handleDayPress}
+        />
+        {sections.length > 0 && (
+          <Text style={styles.listLabel}>{"LỊCH SỬ GIAO DỊCH"}</Text>
+        )}
+      </>
+    ),
+    [
+      year,
+      monthIdx,
+      income,
+      expense,
+      prevIncome,
+      prevExpense,
+      monthNet,
+      dayCells,
+      leadingBlanks,
+      sections.length,
+      selectedISO,
+      handlePrevMonth,
+      handleNextMonth,
+      handleDayPress,
+    ],
+  );
 
-  const renderListHeader = useCallback(() => (
-    <>
-      <MonthNavigator
-        monthIdx={monthIdx}
-        year={year}
-        onPrev={handlePrevMonth}
-        onNext={handleNextMonth}
+  const renderListEmpty = useCallback(
+    () => (
+      <View style={styles.emptyState}>
+        <MaterialIcon name="receipt_long" size={40} color={COLORS.outlineVariant} />
+        <Text style={styles.emptyText}>{"Không có giao dịch trong tháng này"}</Text>
+        <Text style={styles.emptyHint}>{"Nhấn đúp vào ngày để nhập giao dịch"}</Text>
+      </View>
+    ),
+    [],
+  );
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: TxSection }) => (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionDate}>{sectionLabel(section.title)}</Text>
+        <Text style={[styles.sectionNet, { color: section.dayNet >= 0 ? COLORS.tertiary : COLORS.error }]}>
+          {signedCompact(section.dayNet)}
+        </Text>
+      </View>
+    ),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: tx }: { item: Transaction }) => (
+      <TransactionCard
+        transaction={tx}
+        walletName={wallets.find((w) => w.id === tx.walletId)?.name ?? ""}
+        onPress={() => handleTxPress(tx)}
       />
-      <TransactionSummaryBanner
-        income={income}
-        expense={expense}
-        monthNet={monthNet}
-        prevIncome={prevIncome}
-        prevExpense={prevExpense}
-      />
-      <TransactionCalendar
-        dayCells={dayCells}
-        selectedISO={selectedISO}
-        leadingBlanks={leadingBlanks}
-        onDayPress={handleDayPress}
-      />
-      {sections.length > 0 && (
-        <Text style={styles.listLabel}>{'LICH SU GIAO DICH'}</Text>
-      )}
-    </>
-  ), [year, monthIdx, income, expense, prevIncome, prevExpense, monthNet,
-      dayCells, leadingBlanks, sections.length, selectedISO,
-      handlePrevMonth, handleNextMonth, handleDayPress]);
-
-  const renderListEmpty = useCallback(() => (
-    <View style={styles.emptyState}>
-      <MaterialIcon name="receipt_long" size={40} color={COLORS.outlineVariant} />
-      <Text style={styles.emptyText}>{'Khong co giao dich trong thang nay'}</Text>
-      <Text style={styles.emptyHint}>{'Nhan dup vao ngay de nhap giao dich'}</Text>
-    </View>
-  ), []);
-
-  const renderSectionHeader = useCallback(({ section }: { section: TxSection }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionDate}>{sectionLabel(section.title)}</Text>
-      <Text style={[styles.sectionNet, { color: section.dayNet >= 0 ? COLORS.tertiary : COLORS.error }]}>
-        {signedCompact(section.dayNet)}
-      </Text>
-    </View>
-  ), []);
-
-  const renderItem = useCallback(({ item: tx }: { item: Transaction }) => (
-    <TransactionCard
-      transaction={tx}
-      walletName={wallets.find((w) => w.id === tx.walletId)?.name ?? ''}
-      onPress={() => handleTxPress(tx)}
-    />
-  ), [wallets, handleTxPress]);
+    ),
+    [wallets, handleTxPress],
+  );
 
   if (isLoading) return <LoadingSpinner />;
 
-  const onViewableItemsChangedHandler = onViewableItemsChangedRef.current;
-  const viewabilityConfigValue = viewabilityConfigRef.current;
-  const isFiltered = filterType !== 'all' || uncategorizedOnly || searchQuery.trim().length > 0;
-
-  // -- Main render --
+  const isFiltered = filterType !== "all" || uncategorizedOnly || searchQuery.trim().length > 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.walletPill}
@@ -222,24 +270,29 @@ export default function TransactionsScreen() {
         >
           <MaterialIcon name="account_balance_wallet" size={14} color={COLORS.primary} />
           <Text style={styles.walletPillText} numberOfLines={1}>
-            {selectedWallet?.name ?? 'Tat ca vi'}
+            {selectedWallet?.name ?? "Tất cả ví"}
           </Text>
           <MaterialIcon name="expand_more" size={14} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={[styles.iconBtn, searchVisible && styles.iconBtnActive]}
-            activeOpacity={0.75} onPress={handleSearchToggle}>
+          <TouchableOpacity
+            style={[styles.iconBtn, searchVisible && styles.iconBtnActive]}
+            activeOpacity={0.75}
+            onPress={handleSearchToggle}
+          >
             <MaterialIcon name="search" size={22} color={searchVisible ? COLORS.primary : COLORS.onSurface} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, isFiltered && styles.iconBtnActive]}
-            activeOpacity={0.75} onPress={handleFilterToggle}>
+          <TouchableOpacity
+            style={[styles.iconBtn, isFiltered && styles.iconBtnActive]}
+            activeOpacity={0.75}
+            onPress={handleFilterToggle}
+          >
             <MaterialIcon name="tune" size={22} color={isFiltered ? COLORS.primary : COLORS.onSurface} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search bar */}
       {searchVisible && (
         <View style={styles.searchBar}>
           <MaterialIcon name="search" size={18} color={COLORS.onSurfaceVariant} />
@@ -247,42 +300,45 @@ export default function TransactionsScreen() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Tim theo ten merchant..."
+            placeholder="Tìm theo tên merchant..."
             placeholderTextColor={COLORS.onSurfaceVariant}
             autoFocus
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchQuery('')}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchQuery("")}>
               <MaterialIcon name="close" size={18} color={COLORS.onSurfaceVariant} />
             </TouchableOpacity>
           )}
         </View>
       )}
 
-      {/* Filter chips */}
       {filterVisible && (
         <View style={styles.filterRow}>
-          {(['all', 'income', 'expense'] as const).map((type) => (
-            <TouchableOpacity key={type} activeOpacity={0.7}
+          {(["all", "income", "expense"] as const).map((type) => (
+            <TouchableOpacity
+              key={type}
+              activeOpacity={0.7}
               style={[styles.filterChip, filterType === type && styles.filterChipActive]}
-              onPress={() => handleFilterType(type)}>
+              onPress={() => handleFilterType(type)}
+            >
               <Text style={[styles.filterChipText, filterType === type && styles.filterChipTextActive]}>
-                {type === 'all' ? 'Tat ca' : type === 'income' ? 'Thu nhap' : 'Chi tieu'}
+                {type === "all" ? "Tất cả" : type === "income" ? "Thu nhập" : "Chi tiêu"}
               </Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity activeOpacity={0.7}
+          <TouchableOpacity
+            activeOpacity={0.7}
             style={[styles.filterChip, uncategorizedOnly && styles.filterChipActive]}
-            onPress={() => { setUncategorizedOnly((v) => !v); setFilterVisible(false); }}>
+            onPress={() => { setUncategorizedOnly((v) => !v); setFilterVisible(false); }}
+          >
             <Text style={[styles.filterChipText, uncategorizedOnly && styles.filterChipTextActive]}>
-              Chua phan loai
+              Chưa phân loại
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* SectionList */}
       <SectionList<Transaction, TxSection>
         ref={sectionListRef}
         style={styles.sectionList}
@@ -295,8 +351,8 @@ export default function TransactionsScreen() {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChangedHandler}
-        viewabilityConfig={viewabilityConfigValue}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={VIEWABILITY_CONFIG}
       />
 
       <UncategorizedPill count={uncategorizedCount} onPress={handleUncategorizedPillPress} />
@@ -313,42 +369,65 @@ export default function TransactionsScreen() {
   );
 }
 
-// -- Styles --
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
     backgroundColor: COLORS.surfaceContainerLow,
-    borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
   walletPill: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING[1],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[1],
     backgroundColor: COLORS.surfaceContainerHigh,
-    paddingHorizontal: SPACING[3], paddingVertical: SPACING[2],
-    borderRadius: BORDER_RADIUS.full, maxWidth: 180,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: BORDER_RADIUS.full,
+    maxWidth: 180,
   },
-  walletPillText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface, flexShrink: 1 },
-  headerActions: { flexDirection: 'row', gap: SPACING[1] },
-  iconBtn: { width: 40, height: 40, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  walletPillText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    flexShrink: 1,
+  },
+  headerActions: { flexDirection: "row", gap: SPACING[1] },
+  iconBtn: { width: 40, height: 40, borderRadius: BORDER_RADIUS.full, alignItems: "center", justifyContent: "center" },
   iconBtnActive: { backgroundColor: `${COLORS.primary}15` },
   searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[2],
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
     backgroundColor: COLORS.surfaceContainerLow,
-    borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
   searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.onSurface, height: 36, padding: 0 },
   filterRow: {
-    flexDirection: 'row', gap: SPACING[2], paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],
+    flexDirection: "row",
+    gap: SPACING[2],
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
     backgroundColor: COLORS.surfaceContainerLow,
-    borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant, flexWrap: 'wrap',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    flexWrap: "wrap",
   },
   filterChip: {
-    paddingHorizontal: SPACING[3], paddingVertical: SPACING[1],
-    borderRadius: BORDER_RADIUS.full, backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1],
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.surfaceContainer,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   filterChipActive: { backgroundColor: `${COLORS.primary}20`, borderColor: `${COLORS.primary}50` },
   filterChipText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
@@ -356,16 +435,24 @@ const styles = StyleSheet.create({
   sectionList: { flex: 1 },
   listContent: { paddingBottom: SPACING[16] },
   listLabel: {
-    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant,
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[3], letterSpacing: 0.8,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurfaceVariant,
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    letterSpacing: 0.8,
   },
   sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[2], backgroundColor: COLORS.background,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
+    backgroundColor: COLORS.background,
   },
   sectionDate: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
   sectionNet: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold },
-  emptyState: { alignItems: 'center', paddingVertical: SPACING[10], gap: SPACING[2] },
+  emptyState: { alignItems: "center", paddingVertical: SPACING[10], gap: SPACING[2] },
   emptyText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.medium },
   emptyHint: { fontSize: FONT_SIZE.xs, color: COLORS.outlineVariant },
 });
