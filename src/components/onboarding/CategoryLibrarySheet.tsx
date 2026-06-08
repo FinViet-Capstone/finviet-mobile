@@ -36,8 +36,8 @@ export function CategoryLibrarySheet({
     return CATEGORIES.filter(
       (cat) =>
         !alreadyAddedIds.includes(cat.id) &&
-        cat.id !== 'cat_income' && // Income doesn't belong to any bucket
-        cat.id !== 'cat_other' // Other is a catch-all, not assignable
+        cat.id !== 'cat_income' &&
+        cat.id !== 'cat_uncategorized'
     );
   }, [alreadyAddedIds]);
 

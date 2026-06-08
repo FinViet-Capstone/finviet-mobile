@@ -35,6 +35,7 @@ const ICON_MAP: Record<string, string> = {
   shirt: 'checkroom',
   gift: 'card_giftcard',
   heart: 'favorite',
+  'trending-up': 'trending_up',
 };
 
 /**
