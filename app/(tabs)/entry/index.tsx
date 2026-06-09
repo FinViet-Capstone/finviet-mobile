@@ -8,91 +8,118 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 
-import {
-  COLORS,
-  SPACING,
-  FONT_SIZE,
-  FONT_WEIGHT,
-  BORDER_RADIUS,
-  SHADOW,
-} from '@/constants/theme';
+// ─── Strings ─────────────────────────────────────────────────────────────────
 
-// Non-entity UI content — static copy for entry method selection cards.
-const MOCK_ENTRY_METHODS = [
-  {
-    id: 'manual',
-    icon: '✏️',
-    title: 'Nhập Tay',
-    description: 'Tự nhập số tiền, mô tả và danh mục giao dịch.',
-    route: '/(tabs)/entry/manual',
-  },
-  {
-    id: 'photo',
-    icon: '📷',
-    title: 'Chụp Ảnh',
-    description: 'Chụp ảnh hóa đơn hoặc tải ảnh lên để nhận diện tự động.',
-    route: '/(tabs)/entry/photo',
-  },
-  {
-    id: 'sms',
-    icon: '💬',
-    title: 'Dán SMS',
-    description: 'Dán tin nhắn ngân hàng để AI tự động trích xuất giao dịch.',
-    route: '/(tabs)/entry/sms',
-  },
-] as const;
+const S = {
+  title: 'Thêm Giao Dịch',
+  subtitle: 'Chọn phương thức nhập',
+  methods: [
+    {
+      id: 'manual',
+      icon: 'edit_note',
+      title: 'Nhập Thủ Công',
+      description: 'Tự nhập số tiền, danh mục và ví.',
+      route: '/(tabs)/entry/manual' as const,
+      color: '#d0bcff',
+      bgColor: `${COLORS.primary}20`,
+    },
+    {
+      id: 'sms',
+      icon: 'sms',
+      title: 'Dán SMS',
+      description: 'Dán tin nhắn ngân hàng, AI trích xuất tự động.',
+      route: '/(tabs)/entry/sms' as const,
+      color: '#ffb690',
+      bgColor: `${COLORS.secondary}20`,
+    },
+    {
+      id: 'photo',
+      icon: 'photo_camera',
+      title: 'Scan Hóa Đơn',
+      description: 'Chụp ảnh hóa đơn, AI đọc và nhập tự động.',
+      route: '/(tabs)/entry/photo' as const,
+      color: '#4edea3',
+      bgColor: `${COLORS.tertiary}20`,
+    },
+    {
+      id: 'csv',
+      icon: 'upload_file',
+      title: 'Nhập CSV',
+      description: 'Tải file CSV từ ngân hàng để nhập hàng loạt.',
+      route: '/(tabs)/entry/csv-import' as const,
+      color: '#a0c4ff',
+      bgColor: '#a0c4ff20',
+    },
+  ],
+};
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function EntryChooserScreen() {
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date?: string }>();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Thêm Giao Dịch</Text>
-        {date ? (
-          <Text style={styles.headerSubtitle}>
-            Ngày: {formatDate(date)}
-          </Text>
-        ) : null}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.closeBtn}
+          onPress={() => router.back()}
+        >
+          <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.title}>{S.title}</Text>
+          <Text style={styles.subtitle}>{S.subtitle}</Text>
+        </View>
+        <View style={styles.closeBtn} />
       </View>
 
-      {/* Body */}
+      {/* AI hint badge */}
+      <View style={styles.aiBadge}>
+        <MaterialIcon name="auto_awesome" size={14} color={COLORS.primary} />
+        <Text style={styles.aiBadgeText}>
+          Dán SMS / Scan ảnh / CSV — AI phân tích tự động
+        </Text>
+      </View>
+
+      {/* Method grid */}
       <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.prompt}>Chọn phương thức nhập</Text>
-
-        <View style={styles.cardsContainer}>
-          {MOCK_ENTRY_METHODS.map((method) => (
+        <View style={styles.grid}>
+          {S.methods.map((m) => (
             <TouchableOpacity
-              key={method.id}
-              style={styles.card}
+              key={m.id}
               activeOpacity={0.75}
+              style={styles.card}
               onPress={() =>
                 router.push({
-                  pathname: method.route,
+                  pathname: m.route,
                   params: date ? { date } : undefined,
                 })
               }
             >
-              {/* Icon column */}
-              <View style={styles.iconWrapper}>
-                <Text style={styles.cardIcon}>{method.icon}</Text>
+              {/* Icon circle */}
+              <View style={[styles.iconWrap, { backgroundColor: m.bgColor }]}>
+                <MaterialIcon name={m.icon} size={28} color={m.color} />
               </View>
 
-              {/* Text column */}
-              <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>{method.title}</Text>
-                <Text style={styles.cardDescription}>{method.description}</Text>
-              </View>
+              {/* Text */}
+              <Text style={styles.cardTitle}>{m.title}</Text>
+              <Text style={styles.cardDesc}>{m.description}</Text>
 
-              {/* Chevron */}
-              <Text style={styles.chevron}>›</Text>
+              {/* Arrow */}
+              <View style={styles.cardArrow}>
+                <MaterialIcon name="arrow_forward" size={16} color={COLORS.outlineVariant} />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -101,110 +128,114 @@ export default function EntryChooserScreen() {
   );
 }
 
-function formatDate(iso: string): string {
-  const parts = iso.split('-');
-  if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // ─── Root ────────────────────────────────────────────────────────────────────
   container: {
     flex: 1,
-    backgroundColor: COLORS.gray[100],
+    backgroundColor: COLORS.background,
   },
 
-  // ─── Header ──────────────────────────────────────────────────────────────────
+  // Header
   header: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-  },
-  headerTitle: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-  },
-  headerSubtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.brand[500],
-    fontWeight: FONT_WEIGHT.medium,
-    marginTop: SPACING[1],
-  },
-
-  // ─── Body ────────────────────────────────────────────────────────────────────
-  body: {
-    flex: 1,
-  },
-  bodyContent: {
-    paddingHorizontal: SPACING[5],
-    paddingTop: SPACING[6],
-    paddingBottom: SPACING[8],
-  },
-  prompt: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SPACING[4],
-  },
-
-  // ─── Cards ───────────────────────────────────────────────────────────────────
-  cardsContainer: {
-    gap: SPACING[4],
-  },
-  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[5],
-    paddingHorizontal: SPACING[5],
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.brand[500],
-    ...SHADOW.md,
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
-
-  // ─── Icon ────────────────────────────────────────────────────────────────────
-  iconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.brand[50],
+  closeBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING[4],
+    borderRadius: BORDER_RADIUS.full,
   },
-  cardIcon: {
-    fontSize: 28,
-    lineHeight: 34,
-  },
-
-  // ─── Text block ──────────────────────────────────────────────────────────────
-  cardText: {
+  headerCenter: {
     flex: 1,
+    alignItems: 'center',
   },
-  cardTitle: {
+  title: {
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[500],
-    marginBottom: SPACING[1],
+    color: COLORS.onBackground,
   },
-  cardDescription: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.normal,
-    color: COLORS.gray[500],
-    lineHeight: 20,
+  subtitle: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    marginTop: 2,
   },
 
-  // ─── Chevron ─────────────────────────────────────────────────────────────────
-  chevron: {
-    fontSize: FONT_SIZE['2xl'],
-    color: COLORS.gray[300],
-    marginLeft: SPACING[2],
-    lineHeight: 28,
+  // AI badge
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: SPACING[1],
+    backgroundColor: `${COLORS.primary}15`,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}30`,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1] + 2,
+    marginTop: SPACING[3],
+    marginBottom: SPACING[1],
+  },
+  aiBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.primary,
+  },
+
+  // Scroll
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[4],
+    paddingBottom: SPACING[8],
+  },
+
+  // Grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING[3],
+  },
+
+  // Card
+  card: {
+    width: '47.5%',
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: BORDER_RADIUS['2xl'],
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING[4],
+    minHeight: 164,
+    position: 'relative',
+  },
+  iconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: BORDER_RADIUS.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING[3],
+  },
+  cardTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    marginBottom: SPACING[1],
+  },
+  cardDesc: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    lineHeight: 18,
+    flex: 1,
+  },
+  cardArrow: {
+    position: 'absolute',
+    bottom: SPACING[3],
+    right: SPACING[3],
   },
 });

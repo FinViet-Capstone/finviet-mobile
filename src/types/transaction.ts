@@ -13,7 +13,7 @@
  */
 
 export type TransactionType = 'expense' | 'income' | 'transfer_out' | 'transfer_in';
-export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked';
+export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste';
 
 export interface Transaction {
   id: string;

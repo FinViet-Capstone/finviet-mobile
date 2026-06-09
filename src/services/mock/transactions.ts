@@ -1,4 +1,4 @@
-import type { Transaction, TransactionType } from '../../types';
+import type { Transaction, TransactionType, EntryMethod } from '../../types';
 import { USER_ID, WALLET_IDS, adjustWalletBalance } from './wallets';
 
 // ─── Filter Type ───────────────────────────────────────────────────────────────
@@ -773,7 +773,7 @@ export interface CreateTransactionInput {
   transactionDate: string;
   aiSuggestedCategoryId?: string | null;
   aiOverridden?: boolean;
-  entryMethod: 'manual' | 'photo' | 'csv_import' | 'linked';
+  entryMethod: EntryMethod;
   imageUrl?: string | null;
   externalId?: string | null;
 }
@@ -920,7 +920,7 @@ export async function createTransfer(
     updatedAt: nowIso(),
   };
   // Microsecond gap so the createdAt sort is stable: out leg comes first.
-  await new Promise((r) => setTimeout(r, 1));
+  await new Promise<void>((r) => setTimeout(r, 1));
   const inTx: Transaction = {
     id: genTxId(),
     userId: USER_ID,
