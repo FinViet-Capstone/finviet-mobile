@@ -8,6 +8,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useWalletById } from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
@@ -39,7 +40,7 @@ export default function WalletDetailScreen() {
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
 
-  const { data: txData, refetch: refetchTx } = useTransactions({ walletId: id ?? undefined, startDate, endDate });
+  const { data: txData, isLoading: txLoading, isError: txIsError, refetch: refetchTx } = useTransactions({ walletId: id ?? undefined, startDate, endDate });
   const transactions = (txData ?? []) as Transaction[];
 
   const handleTxPress = useCallback((tx: Transaction) => {
@@ -91,8 +92,12 @@ export default function WalletDetailScreen() {
 
         {/* Transaction history */}
         <Text style={styles.sectionLabel}>{S.history}</Text>
-        {transactions.length === 0 ? (
-          <Text style={styles.emptyText}>{S.empty}</Text>
+        {txLoading ? (
+          <LoadingSpinner />
+        ) : txIsError ? (
+          <ErrorState message="Không thể tải giao dịch" onRetry={refetchTx} />
+        ) : transactions.length === 0 ? (
+          <EmptyState icon="receipt_long" title={S.empty} />
         ) : (
           transactions.map((tx) => (
             <TransactionCard key={tx.id} transaction={tx}
@@ -125,5 +130,4 @@ const styles = StyleSheet.create({
   typeText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
   syncText: { fontSize: FONT_SIZE.xs },
   sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
-  emptyText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[6] },
 });
