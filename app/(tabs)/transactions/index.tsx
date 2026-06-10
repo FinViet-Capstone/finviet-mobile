@@ -174,18 +174,11 @@ export default function TransactionsScreen() {
 
   const handleFilterType = useCallback((type: "all" | "income" | "expense") => {
     setFilterType(type);
-    setFilterVisible(false);
   }, []);
 
   const renderListHeader = useCallback(
     () => (
       <>
-        <MonthNavigator
-          monthIdx={monthIdx}
-          year={year}
-          onPrev={handlePrevMonth}
-          onNext={handleNextMonth}
-        />
         <TransactionSummaryBanner
           income={income}
           expense={expense}
@@ -193,32 +186,18 @@ export default function TransactionsScreen() {
           prevIncome={prevIncome}
           prevExpense={prevExpense}
         />
-        <TransactionCalendar
-          dayCells={dayCells}
-          selectedISO={selectedISO}
-          leadingBlanks={leadingBlanks}
-          onDayPress={handleDayPress}
-        />
         {sections.length > 0 && (
           <Text style={styles.listLabel}>{"LỊCH SỬ GIAO DỊCH"}</Text>
         )}
       </>
     ),
     [
-      year,
-      monthIdx,
       income,
       expense,
       prevIncome,
       prevExpense,
       monthNet,
-      dayCells,
-      leadingBlanks,
       sections.length,
-      selectedISO,
-      handlePrevMonth,
-      handleNextMonth,
-      handleDayPress,
     ],
   );
 
@@ -330,7 +309,7 @@ export default function TransactionsScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             style={[styles.filterChip, uncategorizedOnly && styles.filterChipActive]}
-            onPress={() => { setUncategorizedOnly((v) => !v); setFilterVisible(false); }}
+            onPress={() => setUncategorizedOnly((v) => !v)}
           >
             <Text style={[styles.filterChipText, uncategorizedOnly && styles.filterChipTextActive]}>
               Chưa phân loại
@@ -338,6 +317,22 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Sticky calendar header */}
+      <View style={styles.stickyHeader}>
+        <MonthNavigator
+          monthIdx={monthIdx}
+          year={year}
+          onPrev={handlePrevMonth}
+          onNext={handleNextMonth}
+        />
+        <TransactionCalendar
+          dayCells={dayCells}
+          selectedISO={selectedISO}
+          leadingBlanks={leadingBlanks}
+          onDayPress={handleDayPress}
+        />
+      </View>
 
       <SectionList<Transaction, TxSection>
         ref={sectionListRef}
@@ -371,6 +366,11 @@ export default function TransactionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  stickyHeader: {
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",

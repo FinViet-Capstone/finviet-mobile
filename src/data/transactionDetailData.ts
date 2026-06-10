@@ -14,8 +14,12 @@ export const TX_DETAIL_STRINGS = {
   loadErrorTitle: 'Không tải được giao dịch',
   loadErrorSubtitle: 'Đã có lỗi xảy ra. Hãy thử lại.',
 
-  transferBanner: 'Đây là giao dịch chuyển khoản. Một số trường không thể chỉnh sửa.',
+  transferBanner: 'Đây là giao dịch chuyển quỹ. Một số trường không thể chỉnh sửa.',
   linkedBanner: 'Ví liên kết — chỉ có thể chỉnh sửa danh mục.',
+
+  income: 'Thu nhập',
+  expense: 'Chi tiêu',
+  transfer: 'Chuyển quỹ',
 
   amountLabel: 'Số tiền',
   descriptionLabel: 'Mô tả',
@@ -41,7 +45,7 @@ export const TX_DETAIL_STRINGS = {
 
   deleteTitle: 'Xóa giao dịch?',
   deleteMsgTransfer:
-    'Đây là giao dịch chuyển khoản. Cả hai chiều (nhận + chuyển) sẽ bị xóa.',
+    'Đây là giao dịch chuyển quỹ. Cả hai chiều (nhận + chuyển) sẽ bị xóa.',
   deleteMsg: 'Hành động này không thể hoàn tác.',
   deletedTitle: 'Đã xóa',
   deletedMsg: 'Giao dịch đã được xóa.',

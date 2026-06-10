@@ -20,6 +20,7 @@ export function TransactionSummaryBanner({
   prevIncome,
   prevExpense,
 }: TransactionSummaryBannerProps) {
+  const hasPrevData = prevIncome > 0 || prevExpense > 0;
   const incomeUp = income >= prevIncome;
   const expenseDown = expense <= prevExpense;
   const prevNet = prevIncome - prevExpense;
@@ -32,16 +33,18 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: COLORS.tertiary }]}>
           {formatVNDCompact(income)}
         </Text>
-        <View style={styles.trendRow}>
-          <MaterialIcon
-            name={incomeUp ? 'arrow_upward' : 'arrow_downward'}
-            size={11}
-            color={incomeUp ? COLORS.tertiary : COLORS.error}
-          />
-          <Text style={[styles.trendText, { color: incomeUp ? COLORS.tertiary : COLORS.error }]}>
-            {pctChange(income, prevIncome)}
-          </Text>
-        </View>
+        {hasPrevData && (
+          <View style={styles.trendRow}>
+            <MaterialIcon
+              name={incomeUp ? 'arrow_upward' : 'arrow_downward'}
+              size={11}
+              color={incomeUp ? COLORS.tertiary : COLORS.error}
+            />
+            <Text style={[styles.trendText, { color: incomeUp ? COLORS.tertiary : COLORS.error }]}>
+              {pctChange(income, prevIncome)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.summaryDivider} />
@@ -52,16 +55,18 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: COLORS.error }]}>
           {formatVNDCompact(expense)}
         </Text>
-        <View style={styles.trendRow}>
-          <MaterialIcon
-            name={expenseDown ? 'arrow_downward' : 'arrow_upward'}
-            size={11}
-            color={expenseDown ? COLORS.tertiary : COLORS.error}
-          />
-          <Text style={[styles.trendText, { color: expenseDown ? COLORS.tertiary : COLORS.error }]}>
-            {pctChange(expense, prevExpense)}
-          </Text>
-        </View>
+        {hasPrevData && (
+          <View style={styles.trendRow}>
+            <MaterialIcon
+              name={expenseDown ? 'arrow_downward' : 'arrow_upward'}
+              size={11}
+              color={expenseDown ? COLORS.tertiary : COLORS.error}
+            />
+            <Text style={[styles.trendText, { color: expenseDown ? COLORS.tertiary : COLORS.error }]}>
+              {pctChange(expense, prevExpense)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.summaryDivider} />
@@ -72,13 +77,15 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: monthNet >= 0 ? COLORS.tertiary : COLORS.error }]}>
           {signedCompact(monthNet)}
         </Text>
-        <View style={styles.trendRow}>
-          <MaterialIcon
-            name={monthNet >= prevNet ? 'arrow_upward' : 'arrow_downward'}
-            size={11}
-            color={COLORS.onSurfaceVariant}
-          />
-        </View>
+        {hasPrevData && (
+          <View style={styles.trendRow}>
+            <MaterialIcon
+              name={monthNet >= prevNet ? 'arrow_upward' : 'arrow_downward'}
+              size={11}
+              color={COLORS.onSurfaceVariant}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
