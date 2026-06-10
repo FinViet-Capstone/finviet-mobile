@@ -16,6 +16,7 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
 import { useUser } from '@/hooks/useUser';
+import { useBucketSpend } from '@/hooks/useBucketSpend';
 import { EXPENSE_CATEGORIES, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
@@ -256,6 +257,7 @@ export default function BudgetsScreen() {
 
   const selectedRange = useMemo(() => monthRange(year, month), [year, month]);
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
+  const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
   const { data: user } = useUser();
 
@@ -281,13 +283,15 @@ export default function BudgetsScreen() {
     const bucketTypes: BucketType[] = ['needs', 'wants', 'savings'];
     return bucketTypes.map((bucket) => {
       const cats = EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === bucket);
-      const spent = cats.reduce((s, c) => s + (budgetMap[c.id]?.spent ?? 0), 0);
+      // Spend = ALL expense in the bucket (incl. unbudgeted categories), shared
+      // with Home via useBucketSpend — not just the budgeted categories' spend.
+      const spent = bucketSpend[bucket];
       const monthlyLimit = cats.reduce((s, c) => s + (budgetMap[c.id]?.monthlyLimit ?? 0), 0);
       const cap = Math.round(income * bucketPct[bucket]);
       const percentage = cap > 0 ? (spent / cap) * 100 : 0;
       return { bucket, spent, monthlyLimit, allocationCap: cap, percentage };
     });
-  }, [budgetMap, income, bucketPct]);
+  }, [bucketSpend, budgetMap, income, bucketPct]);
 
   const handlePrevMonth = useCallback(() => {
     if (month === 0) { setYear((y) => y - 1); setMonth(11); }

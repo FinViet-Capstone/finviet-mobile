@@ -23,7 +23,7 @@ import {
   useTransactions,
   useRecentTransactions,
   useSpendingScore,
-  useBudgets,
+  useBucketSpend,
   useGoals,
   useUser,
 } from '@/hooks';
@@ -50,10 +50,6 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-const NEEDS_CATEGORY_IDS = ['cat_food', 'cat_transport', 'cat_health', 'cat_education', 'cat_housing', 'cat_family'];
-const WANTS_CATEGORY_IDS = ['cat_entertain', 'cat_beauty', 'cat_bills', 'cat_shopping'];
-const SAVINGS_CATEGORY_IDS = ['cat_savings'];
-
 export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -67,17 +63,21 @@ export default function HomeScreen() {
   const { data: user } = useUser();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
   const { data: score } = useSpendingScore(scoreView);
-  const { data: budgets } = useBudgets();
   const { data: goals } = useGoals();
 
   const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const curYear = today.getFullYear();
+  const curMonth = today.getMonth();
+  const monthRange = useMemo(
+    () => ({
+      startDate: ymd(new Date(curYear, curMonth, 1)),
+      endDate: ymd(new Date(curYear, curMonth + 1, 0)),
+    }),
+    [curYear, curMonth],
+  );
 
-  const { data: monthTx } = useTransactions({
-    startDate: ymd(monthStart),
-    endDate: ymd(monthEnd),
-  });
+  const { data: monthTx } = useTransactions(monthRange);
+  const bucketSpend = useBucketSpend(monthRange);
   const { data: recentTx } = useRecentTransactions(5);
 
   // ── Banner animation ────────────────────────────────────────────────────────
@@ -95,25 +95,16 @@ export default function HomeScreen() {
     [walletData],
   );
 
-  const { needsSpent, wantsSpent, savingsSpent } = useMemo(() => {
-    const expTx = (monthTx ?? []).filter((t) => t.type === 'expense' && t.categoryId !== null);
-    return {
-      needsSpent: expTx.filter((t) => NEEDS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
-      wantsSpent: expTx.filter((t) => WANTS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
-      savingsSpent: expTx.filter((t) => SAVINGS_CATEGORY_IDS.includes(t.categoryId!)).reduce((s, t) => s + t.amount, 0),
-    };
-  }, [monthTx]);
+  // Spend per bucket — shared derivation (all expense tx grouped by defaultBucket),
+  // identical to the Budgets tab. Includes spend in categories with no budget set.
+  const { needs: needsSpent, wants: wantsSpent, savings: savingsSpent } = bucketSpend;
 
-  const { needsLimit, wantsLimit, savingsLimit } = useMemo(() => {
-    const budgetList = budgets ?? [];
-    const sumLimit = (ids: string[]) =>
-      budgetList.filter((b) => ids.includes(b.categoryId)).reduce((s, b) => s + b.monthlyLimit, 0);
-    return {
-      needsLimit: sumLimit(NEEDS_CATEGORY_IDS),
-      wantsLimit: sumLimit(WANTS_CATEGORY_IDS),
-      savingsLimit: sumLimit(SAVINGS_CATEGORY_IDS),
-    };
-  }, [budgets]);
+  // Bucket denominator = allocation cap (income × bucket %), matching the Budgets
+  // tab — NOT the sum of per-category limits — so the two screens never disagree.
+  const income = user?.monthlyIncome ?? 0;
+  const needsLimit = Math.round((income * (user?.needsPct ?? 50)) / 100);
+  const wantsLimit = Math.round((income * (user?.wantsPct ?? 30)) / 100);
+  const savingsLimit = Math.round((income * (user?.savingsPct ?? 20)) / 100);
 
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);

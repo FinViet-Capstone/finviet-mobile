@@ -50,11 +50,34 @@ function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
  * Transactions design).
  */
 export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
-  const category = tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
-  const iconName = getCategoryIcon(category?.icon);
-  const catColor = category?.color ?? COLORS.outlineVariant;
-  const isUncategorized = !tx.categoryId;
+  const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
   const isIncome = tx.type === 'income';
+  const category = !isTransfer && tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
+  // Transfer legs carry categoryId === null but are NOT uncategorized spend —
+  // they get their own swap styling, never the amber "classify now" treatment.
+  const isUncategorized = !isTransfer && !tx.categoryId;
+  const catColor = category?.color ?? COLORS.outlineVariant;
+
+  const iconName = isTransfer ? 'swap_horiz' : isUncategorized ? 'help_outline' : getCategoryIcon(category?.icon);
+  const iconColor = isTransfer ? COLORS.onSurfaceVariant : isUncategorized ? COLORS.secondary : catColor;
+  const iconBg = isTransfer ? `${COLORS.onSurfaceVariant}26` : `${catColor}26`;
+
+  // Income / transfer-in are credits (+, green); transfer-out is a debit (−, neutral);
+  // expenses stay unsigned per the Transactions design.
+  const isCredit = isIncome || tx.type === 'transfer_in';
+  const amountPrefix = isCredit ? '+' : tx.type === 'transfer_out' ? '−' : '';
+  const amountColor = isCredit
+    ? COLORS.tertiary
+    : tx.type === 'transfer_out'
+    ? COLORS.onSurfaceVariant
+    : COLORS.onSurface;
+
+  const title = isTransfer
+    ? tx.description || 'Chuyển quỹ'
+    : tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch');
+  const subtitle = isTransfer
+    ? tx.type === 'transfer_out' ? 'Chuyển đi' : 'Nhận về'
+    : isUncategorized ? 'Phân loại ngay →' : (category?.nameVi ?? walletName);
 
   return (
     <TouchableOpacity
@@ -62,32 +85,26 @@ export function TransactionCard({ transaction: tx, walletName = '', onPress }: T
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <View style={[styles.txIcon, { backgroundColor: `${catColor}26` }]}>
-        <MaterialIcon
-          name={isUncategorized ? 'help_outline' : iconName}
-          size={20}
-          color={isUncategorized ? COLORS.secondary : catColor}
-        />
+      <View style={[styles.txIcon, { backgroundColor: iconBg }]}>
+        <MaterialIcon name={iconName} size={20} color={iconColor} />
       </View>
 
       <View style={styles.txMeta}>
         <View style={styles.txTitleRow}>
-          <Text style={styles.txTitle} numberOfLines={1}>
-            {tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch')}
-          </Text>
+          <Text style={styles.txTitle} numberOfLines={1}>{title}</Text>
           <MethodTag method={tx.entryMethod} />
         </View>
         <Text
           style={[styles.txSubtitle, isUncategorized && { color: COLORS.secondary }]}
           numberOfLines={1}
         >
-          {isUncategorized ? 'Phân loại ngay →' : (category?.nameVi ?? walletName)}
+          {subtitle}
         </Text>
       </View>
 
       <View style={styles.txRight}>
-        <Text style={[styles.txAmount, { color: isIncome ? COLORS.tertiary : COLORS.onSurface }]}>
-          {isIncome ? `+${formatVNDCompact(tx.amount)}` : formatVNDCompact(tx.amount)}
+        <Text style={[styles.txAmount, { color: amountColor }]}>
+          {amountPrefix}{formatVNDCompact(tx.amount)}
         </Text>
         <Text style={styles.txWalletLabel} numberOfLines={1}>{walletName}</Text>
       </View>

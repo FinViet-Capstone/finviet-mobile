@@ -87,10 +87,16 @@ function notifIconBg(type: NotificationType): string {
 
 function notifDeepLinkRoute(deepLink: string | null): string | null {
   if (!deepLink) return null;
-  if (deepLink.startsWith('/budget')) return '/(tabs)/budgets';
-  if (deepLink.startsWith('/report')) return '/(tabs)/home/weekly';
-  if (deepLink.startsWith('/goal')) return '/(tabs)/budgets/goals';
-  if (deepLink.startsWith('/wallet')) return '/(tabs)/wallets';
+  // Seeded deep links use legacy (pre-revamp) paths — map them to current routes.
+  // Use `includes` (the legacy paths are prefixed, e.g. '/more/budget/...') and
+  // check goals first: '/wallet/goals/<id>' contains both 'wallet' and 'goal'.
+  if (deepLink.includes('/goals/')) {
+    const id = deepLink.split('/goals/')[1]?.split('/')[0];
+    return id ? `/(tabs)/budgets/goals/${id}` : '/(tabs)/budgets/goals';
+  }
+  if (deepLink.includes('/budget')) return '/(tabs)/budgets';
+  if (deepLink.includes('/report')) return '/(tabs)/home/weekly';
+  if (deepLink.includes('/wallet')) return '/(tabs)/wallets';
   return null;
 }
 

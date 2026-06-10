@@ -29,7 +29,7 @@ export const TX_DETAIL_STRINGS = {
   categoryLabel: 'Danh mục',
   categoryPlaceholder: 'Chưa phân loại — chạm để chọn',
   walletLabel: 'Ví',
-  walletUnknown: 'Không xác định',
+  walletUnknown: 'Ví đã xóa',
   dateLabel: 'Ngày',
 
   save: 'Lưu thay đổi',

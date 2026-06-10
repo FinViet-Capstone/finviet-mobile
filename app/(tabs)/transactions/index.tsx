@@ -211,7 +211,7 @@ export default function TransactionsScreen() {
     ({ item: tx }: { item: Transaction }) => (
       <TransactionCard
         transaction={tx}
-        walletName={wallets.find((w) => w.id === tx.walletId)?.name ?? ""}
+        walletName={wallets.find((w) => w.id === tx.walletId)?.name ?? "Ví đã xóa"}
         onPress={() => handleTxPress(tx)}
       />
     ),

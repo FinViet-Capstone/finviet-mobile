@@ -30,6 +30,7 @@ export {
   useDeleteGoal,
   useAddContribution,
 } from './useGoals';
+export { useBucketSpend, type BucketSpend } from './useBucketSpend';
 export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
 export {
   useNotifications,
