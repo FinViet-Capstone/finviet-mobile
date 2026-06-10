@@ -12,7 +12,8 @@ import Slider from '@react-native-community/slider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useUser, useUpdatePreferences } from '@/hooks/useUser';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { useUser, useUpdatePreferences, useUpdateProfile } from '@/hooks/useUser';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ const S = {
   save: 'Lưu',
   incomeLabel: 'Thu nhập khả dụng',
   incomeUnit: '/tháng',
+  incomePlaceholder: 'Nhập thu nhập',
   resetDefault: 'Dùng mặc định 50/30/20',
   totalValid: 'Tổng: 100%',
   totalInvalid: (n: number) => `Tổng: ${n}% — phải bằng 100%`,
@@ -94,20 +96,25 @@ export default function BudgetAllocationScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useUser();
   const updatePrefs = useUpdatePreferences();
+  const updateProfile = useUpdateProfile();
 
   const [needs, setNeeds] = useState(50);
   const [wants, setWants] = useState(30);
   const [savings, setSavings] = useState(20);
+  const [incomeRaw, setIncomeRaw] = useState('');
+  const [incomeFocused, setIncomeFocused] = useState(false);
 
   useEffect(() => {
     if (user) {
       setNeeds(user.needsPct ?? 50);
       setWants(user.wantsPct ?? 30);
       setSavings(user.savingsPct ?? 20);
+      setIncomeRaw(user.monthlyIncome ? String(user.monthlyIncome) : '');
     }
   }, [user?.id]);
 
-  const income = user?.monthlyIncome ?? 0;
+  const parsedIncome = parseInt(incomeRaw || '0', 10);
+  const income = parsedIncome > 0 ? parsedIncome : (user?.monthlyIncome ?? 0);
   const total = needs + wants + savings;
   const isValid = total === 100;
 
@@ -115,7 +122,16 @@ export default function BudgetAllocationScreen() {
   const wantsAmount = Math.round((wants / 100) * income);
   const savingsAmount = Math.round((savings / 100) * income);
 
-  // Adjust other two buckets proportionally when one changes
+  const handleIncomeNumberPress = useCallback((key: string) => {
+    setIncomeRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleIncomeBackspace = useCallback(() => setIncomeRaw((prev) => prev.slice(0, -1)), []);
+  const handleIncomeClear = useCallback(() => setIncomeRaw(''), []);
+
   const handleNeeds = useCallback((v: number) => {
     setNeeds(v);
     const rem = 100 - v;
@@ -146,9 +162,13 @@ export default function BudgetAllocationScreen() {
 
   const handleSave = useCallback(async () => {
     if (!isValid) return;
+    if (!isValid) return;
+    if (parsedIncome > 0) {
+      await updateProfile.mutateAsync({ monthlyIncome: parsedIncome });
+    }
     await updatePrefs.mutateAsync({} as any); // prefs don't have pct yet — scaffold for real API
     router.back();
-  }, [isValid, updatePrefs, router]);
+  }, [isValid, parsedIncome, updateProfile, updatePrefs, router]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -169,18 +189,24 @@ export default function BudgetAllocationScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
 
-        {/* Income display */}
-        <View style={styles.incomeCard}>
+        {/* Income — tappable to edit via numpad */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.incomeCard, incomeFocused && styles.incomeCardFocused]}
+          onPress={() => setIncomeFocused(true)}
+        >
           <Text style={styles.incomeLabel}>{S.incomeLabel}</Text>
           <Text style={styles.incomeAmount}>
-            {income > 0 ? formatVND(income) : '—'}
+            {parsedIncome > 0
+              ? parsedIncome.toLocaleString('vi-VN') + 'đ'
+              : income > 0 ? formatVND(income) : S.incomePlaceholder}
             <Text style={styles.incomeUnit}>{S.incomeUnit}</Text>
           </Text>
           <TouchableOpacity activeOpacity={0.7} style={styles.resetBtn} onPress={handleReset}>
             <MaterialIcon name="auto_awesome" size={16} color={COLORS.primary} filled />
             <Text style={styles.resetText}>{S.resetDefault}</Text>
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* Bucket sliders */}
         <BucketCard label={S.buckets.needs.label} hint={S.buckets.needs.hint}
@@ -205,6 +231,15 @@ export default function BudgetAllocationScreen() {
           </Text>
         </View>
       </View>
+
+      {incomeFocused && (
+        <NumericKeypad
+          onNumberPress={handleIncomeNumberPress}
+          onBackspace={handleIncomeBackspace}
+          onClear={handleIncomeClear}
+          onDone={() => setIncomeFocused(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -230,6 +265,10 @@ const styles = StyleSheet.create({
   incomeCard: {
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4], alignItems: 'center', gap: SPACING[3],
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+  },
+  incomeCardFocused: {
+    borderColor: COLORS.primary,
   },
   incomeLabel: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
   incomeAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },

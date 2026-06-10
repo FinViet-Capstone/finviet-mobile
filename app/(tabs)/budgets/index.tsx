@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
+import { useUser } from '@/hooks/useUser';
 import { EXPENSE_CATEGORIES, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
@@ -58,23 +59,47 @@ function formatVND(amount: number): string {
   return amount.toLocaleString('vi-VN');
 }
 
+function pacingStatus(currentDay: number, daysInMonth: number, buckets: BucketSummary[]): 'good' | 'warning' | 'over' {
+  const over = buckets.filter((b) => b.allocationCap > 0 && b.percentage > 100);
+  if (over.length > 0) return 'over';
+  const paced = buckets.filter((b) => b.allocationCap > 0);
+  if (paced.length === 0) return 'good';
+  const avgPct = paced.reduce((s, b) => s + b.percentage, 0) / paced.length;
+  const expectedPct = (currentDay / daysInMonth) * 100;
+  if (avgPct > expectedPct * 1.1) return 'warning';
+  return 'good';
+}
+
+function pacingHeadline(status: 'good' | 'warning' | 'over'): string {
+  if (status === 'over') return 'Vượt ngân sách';
+  if (status === 'warning') return 'Chi tiêu hơi nhanh';
+  return 'Tiến độ tốt';
+}
+
 function pacingMessage(day: number, daysInMonth: number, buckets: BucketSummary[]): string {
-  const over = buckets.filter((b) => b.percentage > 100);
+  const daysLeft = daysInMonth - day;
+  const paced = buckets.filter((b) => b.allocationCap > 0);
+
+  if (paced.length === 0) return `Hôm nay là ngày ${day}/${daysInMonth} — chưa có hạn mức nào để theo dõi.`;
+
+  const totalCap = paced.reduce((s, b) => s + b.allocationCap, 0);
+  const totalSpent = paced.reduce((s, b) => s + b.spent, 0);
+  const remaining = totalCap - totalSpent;
+
+  const over = buckets.filter((b) => b.allocationCap > 0 && b.percentage > 100);
   if (over.length > 0) {
     const names = over.map((b) => getBucketLabel(b.bucket)).join(', ');
-    return `${names} đang vượt ngân sách tháng này. Hãy cân nhắc chi tiêu thêm.`;
+    return `${names} đã vượt hạn mức. Hãy điều chỉnh chi tiêu để tránh thâm hụt thêm.`;
   }
-  const paced = buckets.filter((b) => b.monthlyLimit > 0);
-  if (paced.length === 0) return `Hôm nay là ngày ${day}/${daysInMonth} — chưa có hạn mức nào.`;
-  const avgPct = paced.reduce((s, b) => s + b.percentage, 0) / paced.length;
-  const expectedPct = (day / daysInMonth) * 100;
-  if (avgPct < expectedPct * 0.8) {
-    return `Hôm nay là ngày ${day}/${daysInMonth} — bạn đang chi tiêu rất hợp lý. Tiếp tục phát huy!`;
+
+  if (daysLeft <= 0) {
+    return remaining >= 0
+      ? `Tháng kết thúc. Bạn còn dư ${formatVND(remaining)}đ trong ngân sách.`
+      : `Tháng kết thúc. Bạn đã chi vượt ${formatVND(-remaining)}đ so với hạn mức.`;
   }
-  if (avgPct > expectedPct * 1.1) {
-    return `Hôm nay là ngày ${day}/${daysInMonth} — tốc độ chi tiêu hơi nhanh. Bạn còn ${daysInMonth - day} ngày để điều chỉnh.`;
-  }
-  return `Hôm nay là ngày ${day}/${daysInMonth} — bạn đang chi tiêu đúng tiến độ.`;
+
+  const dailyAllowance = Math.max(0, Math.round(remaining / daysLeft));
+  return `Bạn có thể chi tiêu ${formatVND(dailyAllowance)}đ mỗi ngày để giữ đúng ngân sách đến cuối tháng.`;
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -86,14 +111,18 @@ function daysInMonth(year: number, month: number): number {
 interface BucketSummary {
   bucket: BucketType;
   spent: number;
-  monthlyLimit: number;
-  percentage: number;
+  monthlyLimit: number;   // Σ category limits — for display / "vượt phân bổ" badge
+  allocationCap: number;  // income × bucketPct — denominator for progress + pacing
+  percentage: number;     // spent / allocationCap × 100
 }
 
 interface SetLimitTarget {
   categoryId: string;
   categoryName: string;
+  bucket: BucketType;
   existingLimit?: number;
+  allocationCap: number;
+  remainingCap: number;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -102,22 +131,25 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
   const color = getBucketColor(summary.bucket);
   const icon = getBucketIcon(summary.bucket);
   const label = getBucketLabel(summary.bucket);
-  const isOver = summary.percentage > 100;
-  const barColor = isOver ? COLORS.error : color;
+  const isOverSpend = summary.percentage > 100;
+  const isOverAllocated = summary.allocationCap > 0 && summary.monthlyLimit > summary.allocationCap;
+  const barColor = isOverSpend ? COLORS.error : color;
   const barWidth = Math.min(summary.percentage, 100);
 
   return (
-    <View style={[styles.bucketCard, isOver && { borderColor: COLORS.error }]}>
+    <View style={[styles.bucketCard, isOverSpend && { borderColor: COLORS.error }]}>
       <View style={styles.bucketCardTop}>
         <Text style={[styles.bucketLabel, { color }]}>{label}</Text>
-        <MaterialIcon name={icon} size={16} color={color} />
+        {isOverAllocated
+          ? <View style={styles.overAllocBadge}><Text style={styles.overAllocText}>vượt phân bổ</Text></View>
+          : <MaterialIcon name={icon} size={16} color={color} />}
       </View>
       <View style={styles.bucketAmounts}>
-        <Text style={[styles.bucketSpent, isOver && { color: COLORS.error }]}>
+        <Text style={[styles.bucketSpent, isOverSpend && { color: COLORS.error }]}>
           {formatVND(summary.spent)}
         </Text>
         <Text style={styles.bucketLimit}>
-          {summary.monthlyLimit > 0 ? `/ ${formatVND(summary.monthlyLimit)}` : '—'}
+          {summary.allocationCap > 0 ? `/ ${formatVND(summary.allocationCap)}` : '—'}
         </Text>
       </View>
       <View style={styles.bucketBarTrack}>
@@ -138,10 +170,12 @@ interface CategoryRowProps {
   icon: string;
   bucket: BucketType;
   budget?: BudgetWithSpend;
+  allocationCap: number;
+  remainingCap: number;
   onSetLimit: (target: SetLimitTarget) => void;
 }
 
-function CategoryRow({ categoryId, nameVi, icon, budget, onSetLimit }: CategoryRowProps) {
+function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, remainingCap, onSetLimit }: CategoryRowProps) {
   const msIcon = getCategoryIcon(icon);
   const hasLimit = !!budget;
   const isOver = hasLimit && budget.percentage > 100;
@@ -155,6 +189,7 @@ function CategoryRow({ categoryId, nameVi, icon, budget, onSetLimit }: CategoryR
     <TouchableOpacity
       activeOpacity={0.7}
       style={[styles.categoryRow, isOver && styles.categoryRowOver]}
+      onPress={() => onSetLimit({ categoryId, categoryName: nameVi, bucket, existingLimit: budget?.monthlyLimit, allocationCap, remainingCap })}
     >
       <View style={styles.categoryLeft}>
         <View style={[styles.categoryIconWrap, { backgroundColor: `${COLORS.primary}20` }]}>
@@ -187,16 +222,10 @@ function CategoryRow({ categoryId, nameVi, icon, budget, onSetLimit }: CategoryR
           </View>
         </View>
       ) : (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.setLimitBtn}
-          onPress={() =>
-            onSetLimit({ categoryId, categoryName: nameVi, existingLimit: undefined })
-          }
-        >
+        <View style={styles.setLimitBtn}>
           <MaterialIcon name="add" size={14} color={COLORS.primary} />
           <Text style={styles.setLimitText}>{S.setLimit}</Text>
-        </TouchableOpacity>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -211,9 +240,18 @@ export default function BudgetsScreen() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [limitTarget, setLimitTarget] = useState<SetLimitTarget | null>(null);
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Set<BucketType>>(new Set());
 
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets();
   const { data: wallets = [] } = useWallets();
+  const { data: user } = useUser();
+
+  const income = user?.monthlyIncome ?? 0;
+  const bucketPct: Record<BucketType, number> = {
+    needs: (user?.needsPct ?? 50) / 100,
+    wants: (user?.wantsPct ?? 30) / 100,
+    savings: (user?.savingsPct ?? 20) / 100,
+  };
 
   const totalDays = daysInMonth(year, month);
   const currentDay = year === now.getFullYear() && month === now.getMonth() ? now.getDate() : totalDays;
@@ -225,17 +263,18 @@ export default function BudgetsScreen() {
     return map;
   }, [budgets]);
 
-  // Bucket summaries for the 3-col cards
+  // Bucket summaries — denominator is allocationCap, not Σ category limits
   const bucketSummaries = useMemo((): BucketSummary[] => {
-    const buckets: BucketType[] = ['needs', 'wants', 'savings'];
-    return buckets.map((bucket) => {
+    const bucketTypes: BucketType[] = ['needs', 'wants', 'savings'];
+    return bucketTypes.map((bucket) => {
       const cats = EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === bucket);
       const spent = cats.reduce((s, c) => s + (budgetMap[c.id]?.spent ?? 0), 0);
       const monthlyLimit = cats.reduce((s, c) => s + (budgetMap[c.id]?.monthlyLimit ?? 0), 0);
-      const percentage = monthlyLimit > 0 ? (spent / monthlyLimit) * 100 : 0;
-      return { bucket, spent, monthlyLimit, percentage };
+      const cap = Math.round(income * bucketPct[bucket]);
+      const percentage = cap > 0 ? (spent / cap) * 100 : 0;
+      return { bucket, spent, monthlyLimit, allocationCap: cap, percentage };
     });
-  }, [budgetMap]);
+  }, [budgetMap, income, bucketPct]);
 
   const handlePrevMonth = useCallback(() => {
     if (month === 0) { setYear((y) => y - 1); setMonth(11); }
@@ -251,6 +290,15 @@ export default function BudgetsScreen() {
     setYear(now.getFullYear());
     setMonth(now.getMonth());
   }, [now]);
+
+  const handleToggleBucket = useCallback((bucket: BucketType) => {
+    setCollapsedBuckets((prev) => {
+      const next = new Set(prev);
+      if (next.has(bucket)) next.delete(bucket);
+      else next.add(bucket);
+      return next;
+    });
+  }, []);
 
   const handleSetLimit = useCallback((target: SetLimitTarget) => {
     setLimitTarget(target);
@@ -312,18 +360,27 @@ export default function BudgetsScreen() {
           </View>
         </View>
 
-        {/* AI Dự báo banner */}
-        <View style={styles.aiBanner}>
-          <View style={styles.aiBadgeRow}>
-            <View style={styles.aiBadge}>
-              <MaterialIcon name={S.aiIcon} size={14} color={COLORS.primary} />
-              <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
+        {/* AI Dự báo banner — Progress-First style */}
+        {(() => {
+          const status = pacingStatus(currentDay, totalDays, bucketSummaries);
+          const accentColor = status === 'over' ? COLORS.error : status === 'warning' ? COLORS.secondary : COLORS.tertiary;
+          return (
+            <View style={[styles.aiBanner, { borderLeftColor: accentColor }]}>
+              <View style={styles.aiBadgeRow}>
+                <View style={styles.aiBadge}>
+                  <MaterialIcon name={S.aiIcon} size={14} color={COLORS.primary} />
+                  <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
+                </View>
+              </View>
+              <Text style={[styles.aiHeadline, { color: accentColor }]}>
+                {pacingHeadline(status)}
+              </Text>
+              <Text style={styles.aiMessage}>
+                {pacingMessage(currentDay, totalDays, bucketSummaries)}
+              </Text>
             </View>
-          </View>
-          <Text style={styles.aiMessage}>
-            {pacingMessage(currentDay, totalDays, bucketSummaries)}
-          </Text>
-        </View>
+          );
+        })()}
 
         {/* 3-col bucket cards */}
         <View style={styles.bucketRow}>
@@ -332,28 +389,63 @@ export default function BudgetsScreen() {
           ))}
         </View>
 
-        {/* Category groups */}
+        {/* Category groups — Reddit thread style */}
         {buckets.map((bucket) => {
           const cats = EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === bucket);
+          const isCollapsed = collapsedBuckets.has(bucket);
+          const color = getBucketColor(bucket);
           return (
             <View key={bucket} style={styles.categoryGroup}>
-              <View style={styles.groupHeader}>
-                <View style={[styles.groupDot, { backgroundColor: getBucketColor(bucket) }]} />
-                <Text style={[styles.groupTitle, { color: getBucketColor(bucket) }]}>
-                  {getBucketLabel(bucket)}
-                </Text>
-              </View>
-              {cats.map((cat) => (
-                <CategoryRow
-                  key={cat.id}
-                  categoryId={cat.id}
-                  nameVi={cat.nameVi}
-                  icon={cat.icon}
-                  bucket={bucket}
-                  budget={budgetMap[cat.id]}
-                  onSetLimit={handleSetLimit}
+              {/* Collapsible group header */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.groupHeader}
+                onPress={() => handleToggleBucket(bucket)}
+              >
+                <View style={[styles.groupDot, { backgroundColor: color }]} />
+                <Text style={[styles.groupTitle, { color }]}>{getBucketLabel(bucket)}</Text>
+                <Text style={styles.groupCount}>{cats.length}</Text>
+                <MaterialIcon
+                  name={isCollapsed ? 'expand_more' : 'expand_less'}
+                  size={20}
+                  color={COLORS.onSurfaceVariant}
                 />
-              ))}
+              </TouchableOpacity>
+
+              {/* Thread-line + category rows */}
+              {!isCollapsed && (
+                <View style={styles.threadWrap}>
+                  {/* Vertical thread line */}
+                  <View style={[styles.threadLine, { backgroundColor: color }]} />
+                  <View style={styles.threadRows}>
+                    {cats.map((cat, idx) => {
+                      const cap = Math.round(income * bucketPct[bucket]);
+                      const otherLimitsSum = cats
+                        .filter((c) => c.id !== cat.id)
+                        .reduce((s, c) => s + (budgetMap[c.id]?.monthlyLimit ?? 0), 0);
+                      const remaining = cap - otherLimitsSum;
+                      return (
+                        <View key={cat.id} style={styles.threadRowWrap}>
+                          {/* Horizontal connector */}
+                          <View style={[styles.threadConnector, { borderColor: color }]} />
+                          <View style={{ flex: 1 }}>
+                            <CategoryRow
+                              categoryId={cat.id}
+                              nameVi={cat.nameVi}
+                              icon={cat.icon}
+                              bucket={bucket}
+                              budget={budgetMap[cat.id]}
+                              allocationCap={cap}
+                              remainingCap={remaining}
+                              onSetLimit={handleSetLimit}
+                            />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </View>
           );
         })}
@@ -365,7 +457,10 @@ export default function BudgetsScreen() {
           visible={!!limitTarget}
           categoryId={limitTarget.categoryId}
           categoryName={limitTarget.categoryName}
+          bucket={getBucketLabel(limitTarget.bucket)}
           existingLimit={limitTarget.existingLimit}
+          allocationCap={limitTarget.allocationCap}
+          remainingCap={limitTarget.remainingCap}
           onClose={() => setLimitTarget(null)}
         />
       )}
@@ -457,6 +552,7 @@ const styles = StyleSheet.create({
     padding: SPACING[4],
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
+    borderLeftWidth: 4,
     gap: SPACING[2],
     overflow: 'hidden',
   },
@@ -476,6 +572,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.primary,
+  },
+  aiHeadline: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
   },
   aiMessage: {
     fontSize: FONT_SIZE.sm,
@@ -533,7 +633,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    paddingBottom: SPACING[2],
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[2],
     borderBottomWidth: 1,
     borderBottomColor: COLORS.surfaceVariant,
   },
@@ -545,6 +646,39 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
+    flex: 1,
+  },
+  groupCount: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    fontWeight: FONT_WEIGHT.semibold,
+  },
+  // Thread-line layout
+  threadWrap: {
+    flexDirection: 'row',
+    paddingLeft: SPACING[3],
+  },
+  threadLine: {
+    width: 2,
+    borderRadius: BORDER_RADIUS.full,
+    marginRight: SPACING[2],
+    opacity: 0.4,
+  },
+  threadRows: {
+    flex: 1,
+    gap: SPACING[2],
+  },
+  threadRowWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  threadConnector: {
+    width: SPACING[3],
+    height: 1,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+    marginRight: SPACING[1],
+    opacity: 0.4,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -625,5 +759,18 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.primary,
+  },
+  overAllocBadge: {
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: `${COLORS.secondary}20`,
+    borderWidth: 1,
+    borderColor: `${COLORS.secondary}40`,
+  },
+  overAllocText: {
+    fontSize: 10,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.secondary,
   },
 });
