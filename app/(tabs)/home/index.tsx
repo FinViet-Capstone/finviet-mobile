@@ -58,6 +58,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
+  const [scoreView, setScoreView] = useState<'weekly' | 'monthly'>('weekly');
 
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +66,7 @@ export default function HomeScreen() {
 
   const { data: user } = useUser();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
-  const { data: score } = useSpendingScore();
+  const { data: score } = useSpendingScore(scoreView);
   const { data: budgets } = useBudgets();
   const { data: goals } = useGoals();
 
@@ -193,7 +194,7 @@ export default function HomeScreen() {
           />
         }
       >
-        <SpendingScoreCard score={score} />
+        <SpendingScoreCard score={score} onToggleView={setScoreView} />
 
         <TotalBalanceCard
           totalBalance={walletData?.totalBalance ?? 0}

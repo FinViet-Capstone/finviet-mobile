@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,131 +8,41 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-
-import {
-  COLORS,
-  SPACING,
-  FONT_SIZE,
-  FONT_WEIGHT,
-  BORDER_RADIUS,
-  SHADOW,
-} from '@/constants/theme';
-import { useSpendingScore } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { RingBadge } from '@/components/charts/RingBadge';
+import { ChatbotFAB } from '@/components/home/ChatbotFAB';
+import { AIChatbotSheet } from '@/components/home/AIChatbotSheet';
+import { useSpendingScore } from '@/hooks';
 
-export default function SpendingScoreDetail() {
-  const router = useRouter();
-  const { data: score, isLoading } = useSpendingScore();
+// ─── Strings ──────────────────────────────────────────────────────────────────
 
-  if (isLoading) return <LoadingSpinner />;
-  if (!score) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header onBack={() => router.back()} />
-        <EmptyState
-          icon="bar_chart"
-          title="Chưa có điểm số"
-          subtitle="Cần thêm dữ liệu chi tiêu để tính điểm."
-        />
-      </SafeAreaView>
-    );
-  }
+const S = {
+  title: 'Chấm Điểm Ví',
+  noScoreTitle: 'Chưa có điểm số',
+  noScoreSubtitle: 'Cần thêm dữ liệu chi tiêu để tính điểm.',
+  quickReview: 'Đánh giá nhanh',
+  aiAnalysis: 'Phân tích chi tiết AI',
+  howScore: 'Cách tính điểm',
+  scaleGood: 'Tốt',
+  scaleAvg: 'Trung bình',
+  scaleNeedWork: 'Cần cải thiện',
+  scaleNote: 'Điểm số dựa trên 3 yếu tố: tuân thủ ngân sách, đều đặn tiết kiệm, và biến động chi tiêu bất thường.',
+};
 
-  // Format weekStart "YYYY-MM-DD" → DD/MM
-  const [, mm, dd] = score.weekStart.split('-');
-  const weekStartDisplay = `${dd}/${mm}`;
-  const weekStartDate = new Date(score.weekStart);
-  const weekEnd = new Date(weekStartDate);
-  weekEnd.setDate(weekStartDate.getDate() + 6);
-  const weekEndDisplay = `${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+// ─── Score color helper ────────────────────────────────────────────────────────
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header onBack={() => router.back()} />
-
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <RingBadge
-            score={score.score}
-            color={score.color}
-            verdict={score.verdictVi}
-            size={160}
-          />
-          <Text style={styles.weekRange}>
-            Tuần {weekStartDisplay} – {weekEndDisplay}
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Đánh giá nhanh</Text>
-          <View style={styles.reasonCard}>
-            <Text style={styles.reasonText}>{score.reasonVi}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Phân tích chi tiết AI</Text>
-          <View style={styles.commentaryCard}>
-            <Text style={styles.commentaryText}>{score.commentaryVi}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cách tính điểm</Text>
-          <View style={styles.scaleCard}>
-            <ScaleRow color={COLORS.score.green} label="Tốt" range="≥ 70" />
-            <ScaleRow color={COLORS.score.amber} label="Trung bình" range="40 – 69" />
-            <ScaleRow color={COLORS.score.red} label="Cần cải thiện" range="< 40" />
-            <Text style={styles.scaleNote}>
-              Điểm số dựa trên 3 yếu tố: tuân thủ ngân sách, đều đặn tiết kiệm, và biến động chi tiêu bất thường.
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.advisorCta}
-          onPress={() => router.push('/(tabs)/home/advisor')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.advisorIcon}>🤖</Text>
-          <View style={styles.advisorTextWrap}>
-            <Text style={styles.advisorTitle}>Hỏi AI Cố vấn</Text>
-            <Text style={styles.advisorSub}>Tìm hiểu cách cải thiện điểm số</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
+function getScoreColor(color: 'green' | 'amber' | 'red'): string {
+  if (color === 'green') return COLORS.tertiary;
+  if (color === 'amber') return COLORS.secondary;
+  return COLORS.error;
 }
 
-function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.headerBtn} onPress={onBack}>
-        <Text style={styles.headerIcon}>‹</Text>
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>Chấm Điểm Ví</Text>
-      <View style={styles.headerBtn} />
-    </View>
-  );
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ScaleRow({
-  color,
-  label,
-  range,
-}: {
-  color: string;
-  label: string;
-  range: string;
-}) {
+function ScaleRow({ color, label, range }: { color: string; label: string; range: string }) {
   return (
     <View style={styles.scaleRow}>
       <View style={[styles.scaleDot, { backgroundColor: color }]} />
@@ -142,84 +52,177 @@ function ScaleRow({
   );
 }
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+export default function SpendingScoreDetail() {
+  const router = useRouter();
+  const { data: score, isLoading } = useSpendingScore('weekly');
+  const [chatOpen, setChatOpen] = useState(false);
+
+  if (isLoading) return <LoadingSpinner />;
+
+  if (!score) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Header onBack={() => router.back()} />
+        <EmptyState icon="bar_chart" title={S.noScoreTitle} subtitle={S.noScoreSubtitle} />
+      </SafeAreaView>
+    );
+  }
+
+  const [, mm, dd] = score.weekStart.split('-');
+  const weekStartDisplay = `${dd}/${mm}`;
+  const weekStartDate = new Date(score.weekStart);
+  const weekEnd = new Date(weekStartDate);
+  weekEnd.setDate(weekStartDate.getDate() + 6);
+  const weekEndDisplay = `${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+  const accentColor = getScoreColor(score.color);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Header onBack={() => router.back()} />
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero ring */}
+        <View style={[styles.heroCard, { borderColor: `${accentColor}33` }]}>
+          <RingBadge score={score.score} color={score.color} verdict={score.verdictVi} size={160} />
+          <Text style={styles.weekRange}>
+            Tuần {weekStartDisplay} – {weekEndDisplay}
+          </Text>
+        </View>
+
+        {/* Quick review */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{S.quickReview}</Text>
+          <View style={[styles.reasonCard, { borderLeftColor: accentColor }]}>
+            <Text style={styles.reasonText}>{score.reasonVi}</Text>
+          </View>
+        </View>
+
+        {/* AI commentary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{S.aiAnalysis}</Text>
+          <View style={styles.commentaryCard}>
+            <MaterialIcon name="auto_awesome" size={16} color={COLORS.primary} />
+            <Text style={styles.commentaryText}>{score.commentaryVi}</Text>
+          </View>
+        </View>
+
+        {/* Scale */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{S.howScore}</Text>
+          <View style={styles.scaleCard}>
+            <ScaleRow color={COLORS.tertiary} label={S.scaleGood} range="≥ 70" />
+            <ScaleRow color={COLORS.secondary} label={S.scaleAvg} range="40 – 69" />
+            <ScaleRow color={COLORS.error} label={S.scaleNeedWork} range="< 40" />
+            <Text style={styles.scaleNote}>{S.scaleNote}</Text>
+          </View>
+        </View>
+
+        {/* Bottom padding for FAB */}
+        <View style={{ height: 80 }} />
+      </ScrollView>
+
+      <ChatbotFAB onOpen={() => setChatOpen(true)} />
+      <AIChatbotSheet visible={chatOpen} onClose={() => setChatOpen(false)} />
+    </SafeAreaView>
+  );
+}
+
+function Header({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}>
+        <MaterialIcon name="arrow_back" size={24} color={COLORS.onSurface} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>{S.title}</Text>
+      <View style={styles.headerBtn} />
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.gray[100] },
+  container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { paddingBottom: SPACING[8] },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING[3],
+    paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[3],
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.outlineVariant,
   },
-  headerBtn: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerIcon: { fontSize: 28, color: COLORS.gray[700] },
+  headerBtn: { width: 44, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    flex: 1, textAlign: 'center',
+    fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface,
   },
 
   heroCard: {
-    margin: SPACING[5],
+    margin: SPACING[4],
     padding: SPACING[6],
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS['2xl'],
     alignItems: 'center',
-    ...SHADOW.md,
+    borderWidth: 1,
   },
   weekRange: {
     marginTop: SPACING[3],
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     fontWeight: FONT_WEIGHT.medium,
   },
 
-  section: { paddingHorizontal: SPACING[5], marginBottom: SPACING[4] },
+  section: { paddingHorizontal: SPACING[4], marginBottom: SPACING[4] },
   sectionTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: COLORS.onSurface,
     marginBottom: SPACING[2],
   },
 
   reasonCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.brand[500],
-    ...SHADOW.sm,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   reasonText: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.gray[800],
+    color: COLORS.onSurface,
     lineHeight: 24,
     fontWeight: FONT_WEIGHT.medium,
   },
 
   commentaryCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
-    ...SHADOW.sm,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    gap: SPACING[2],
   },
   commentaryText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[700],
+    color: COLORS.onSurface,
     lineHeight: 22,
   },
 
   scaleCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
-    ...SHADOW.sm,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   scaleRow: {
     flexDirection: 'row',
@@ -231,43 +234,21 @@ const styles = StyleSheet.create({
   scaleLabel: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[800],
+    color: COLORS.onSurface,
     fontWeight: FONT_WEIGHT.medium,
   },
   scaleRange: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     fontWeight: FONT_WEIGHT.semibold,
   },
   scaleNote: {
     marginTop: SPACING[3],
     paddingTop: SPACING[3],
     borderTopWidth: 1,
-    borderTopColor: COLORS.gray[100],
+    borderTopColor: COLORS.outlineVariant,
     fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     lineHeight: 18,
-  },
-
-  advisorCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: SPACING[5],
-    padding: SPACING[4],
-    backgroundColor: COLORS.brand[50],
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING[3],
-  },
-  advisorIcon: { fontSize: 28 },
-  advisorTextWrap: { flex: 1 },
-  advisorTitle: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[700],
-  },
-  advisorSub: { fontSize: FONT_SIZE.xs, color: COLORS.brand[600], marginTop: 2 },
-  chevron: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.brand[600],
   },
 });

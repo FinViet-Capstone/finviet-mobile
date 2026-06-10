@@ -81,6 +81,8 @@ export {
   getSpendingScore,
   getWeeklyReport,
   getChatHistory,
+  getChatSessions,
+  getChatSessionMessages,
 } from './mock/reports';
 
 // Notifications

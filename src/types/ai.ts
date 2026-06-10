@@ -19,6 +19,8 @@ export type ScoreColor = 'green' | 'amber' | 'red';
 export interface SpendingScore {
   id: string;
   userId: string;
+  /** Which formula was used */
+  view: 'weekly' | 'monthly';
   /** Integer 0-100 */
   score: number;
   /** green >= 70 | amber 40-69 | red < 40 */
@@ -66,6 +68,17 @@ export interface ChatMessage {
   sessionId: string;
   /** ISO 8601 timestamp */
   createdAt: string;
+}
+
+export interface ChatSession {
+  sessionId: string;
+  userId: string;
+  /** Preview of the first user message */
+  previewText: string;
+  /** ISO 8601 timestamp of most recent message */
+  lastMessageAt: string;
+  /** Total message count in the session */
+  messageCount: number;
 }
 
 // -------------------------------------------------------------------------

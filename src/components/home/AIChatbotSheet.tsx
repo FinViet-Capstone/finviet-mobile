@@ -23,6 +23,8 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { useChatSessions, useChatSessionMessages } from '@/hooks/useReports';
+import type { ChatSession } from '@/types/ai';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,9 @@ const S = {
   tapToStop: 'Chạm để dừng',
   greeting: 'Xin chào! Tôi có thể giúp gì cho bạn về quản lý tài chính hôm nay?',
   chips: ['Phân tích chi tiêu', 'Ngân sách tháng này', 'Mục tiêu tiết kiệm', 'Giao dịch gần đây'],
+  historyTitle: 'Lịch sử hội thoại',
+  historyEmpty: 'Chưa có hội thoại nào.',
+  messages: (n: number) => `${n} tin nhắn`,
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -183,7 +188,12 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
+
+  const { data: sessions = [] } = useChatSessions();
+  const { data: sessionMessages } = useChatSessionMessages(loadingSessionId);
 
   const translateY = useSharedValue(0);
 
@@ -212,6 +222,29 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+  }, []);
+
+  // Load session messages when a session is selected
+  useEffect(() => {
+    if (!sessionMessages || !loadingSessionId) return;
+    const converted: Message[] = sessionMessages.map((m) => ({
+      id: m.id,
+      role: m.role === 'user' ? 'user' : 'ai',
+      text: m.content,
+      timestamp: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    }));
+    setMessages(converted);
+    setLoadingSessionId(null);
+    setHistoryOpen(false);
+  }, [sessionMessages, loadingSessionId]);
+
+  const handleLoadSession = useCallback((sessionId: string) => {
+    setLoadingSessionId(sessionId);
+  }, []);
+
+  const handleNewChat = useCallback(() => {
+    setMessages(INITIAL_MESSAGES);
+    setHistoryOpen(false);
   }, []);
 
   const handleSend = useCallback((text: string) => {
@@ -268,9 +301,14 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
           {/* Header — drag target */}
           <GestureDetector gesture={pan}>
             <View style={styles.header}>
-              <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
-                <MaterialIcon name="drag_handle" size={22} color={COLORS.onSurfaceVariant} />
-              </TouchableOpacity>
+              <View style={styles.headerLeft}>
+                <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => setHistoryOpen((v) => !v)}>
+                  <MaterialIcon name="history" size={22} color={historyOpen ? COLORS.primary : COLORS.onSurfaceVariant} />
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleNewChat}>
+                  <MaterialIcon name="add" size={22} color={COLORS.onSurfaceVariant} />
+                </TouchableOpacity>
+              </View>
               <View style={styles.headerTitle}>
                 <MaterialIcon name="auto_awesome" size={18} color={COLORS.primary} filled />
                 <Text style={styles.headerTitleText}>{S.title}</Text>
@@ -280,6 +318,38 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
               </TouchableOpacity>
             </View>
           </GestureDetector>
+
+          {/* History drawer */}
+          {historyOpen && (
+            <View style={styles.historyDrawer}>
+              <Text style={styles.historyTitle}>{S.historyTitle}</Text>
+              {sessions.length === 0 ? (
+                <Text style={styles.historyEmpty}>{S.historyEmpty}</Text>
+              ) : (
+                sessions.map((session: ChatSession) => {
+                  const date = new Date(session.lastMessageAt);
+                  const dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+                  return (
+                    <TouchableOpacity
+                      key={session.sessionId}
+                      activeOpacity={0.7}
+                      style={styles.sessionRow}
+                      onPress={() => handleLoadSession(session.sessionId)}
+                    >
+                      <View style={styles.sessionIcon}>
+                        <MaterialIcon name="chat" size={16} color={COLORS.primary} />
+                      </View>
+                      <View style={styles.sessionInfo}>
+                        <Text style={styles.sessionPreview} numberOfLines={1}>{session.previewText}</Text>
+                        <Text style={styles.sessionMeta}>{dateStr} · {S.messages(session.messageCount)}</Text>
+                      </View>
+                      <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          )}
 
           {/* Chat list */}
           <FlatList
@@ -385,6 +455,60 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyDrawer: {
+    backgroundColor: COLORS.surfaceContainerHighest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    maxHeight: 280,
+  },
+  historyTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SPACING[2],
+  },
+  historyEmpty: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+    paddingVertical: SPACING[3],
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+  },
+  sessionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: `${COLORS.primary}20`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  sessionInfo: { flex: 1, minWidth: 0 },
+  sessionPreview: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.medium,
+    color: COLORS.onSurface,
+  },
+  sessionMeta: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    marginTop: 2,
   },
   headerTitle: {
     flexDirection: 'row',
