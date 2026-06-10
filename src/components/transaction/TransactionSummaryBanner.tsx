@@ -24,6 +24,13 @@ export function TransactionSummaryBanner({
   const incomeUp = income >= prevIncome;
   const expenseDown = expense <= prevExpense;
   const prevNet = prevIncome - prevExpense;
+  // Net trend: a higher surplus is "up/good". % is relative to |prevNet| since
+  // net can be negative (a deficit month), where the plain pctChange util breaks.
+  const netUp = monthNet >= prevNet;
+  const netPct =
+    prevNet !== 0
+      ? `${Math.round((Math.abs(monthNet - prevNet) / Math.abs(prevNet)) * 100)}%`
+      : '—';
 
   return (
     <View style={styles.summaryBanner}>
@@ -80,10 +87,13 @@ export function TransactionSummaryBanner({
         {hasPrevData && (
           <View style={styles.trendRow}>
             <MaterialIcon
-              name={monthNet >= prevNet ? 'arrow_upward' : 'arrow_downward'}
+              name={netUp ? 'arrow_upward' : 'arrow_downward'}
               size={11}
-              color={COLORS.onSurfaceVariant}
+              color={netUp ? COLORS.tertiary : COLORS.error}
             />
+            <Text style={[styles.trendText, { color: netUp ? COLORS.tertiary : COLORS.error }]}>
+              {netPct}
+            </Text>
           </View>
         )}
       </View>
@@ -96,7 +106,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: COLORS.surfaceContainerLow,
     paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[4],
+    paddingTop: SPACING[1],
+    paddingBottom: SPACING[2],
     gap: SPACING[2],
   },
   summaryCol: {
@@ -105,7 +116,7 @@ const styles = StyleSheet.create({
     gap: 2,
     backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[3],
+    paddingVertical: SPACING[2],
   },
   summaryLabel: {
     fontSize: FONT_SIZE.xs,

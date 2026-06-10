@@ -177,28 +177,11 @@ export default function TransactionsScreen() {
   }, []);
 
   const renderListHeader = useCallback(
-    () => (
-      <>
-        <TransactionSummaryBanner
-          income={income}
-          expense={expense}
-          monthNet={monthNet}
-          prevIncome={prevIncome}
-          prevExpense={prevExpense}
-        />
-        {sections.length > 0 && (
-          <Text style={styles.listLabel}>{"LỊCH SỬ GIAO DỊCH"}</Text>
-        )}
-      </>
-    ),
-    [
-      income,
-      expense,
-      prevIncome,
-      prevExpense,
-      monthNet,
-      sections.length,
-    ],
+    () =>
+      sections.length > 0 ? (
+        <Text style={styles.listLabel}>{"LỊCH SỬ GIAO DỊCH"}</Text>
+      ) : null,
+    [sections.length],
   );
 
   const renderListEmpty = useCallback(
@@ -318,13 +301,20 @@ export default function TransactionsScreen() {
         </View>
       )}
 
-      {/* Sticky calendar header */}
+      {/* Sticky header: month nav + summary banner + calendar grid (all pinned) */}
       <View style={styles.stickyHeader}>
         <MonthNavigator
           monthIdx={monthIdx}
           year={year}
           onPrev={handlePrevMonth}
           onNext={handleNextMonth}
+        />
+        <TransactionSummaryBanner
+          income={income}
+          expense={expense}
+          monthNet={monthNet}
+          prevIncome={prevIncome}
+          prevExpense={prevExpense}
         />
         <TransactionCalendar
           dayCells={dayCells}

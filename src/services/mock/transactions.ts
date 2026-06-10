@@ -1403,7 +1403,14 @@ export function getTransactions(filters?: TransactionFilters): Transaction[] {
     result = result.filter((t) => t.type === filters.type);
   }
   if (filters?.uncategorizedOnly === true) {
-    result = result.filter((t) => t.categoryId === null);
+    // Transfer legs carry categoryId === null but are NOT "uncategorized spend" —
+    // they must never count toward the uncategorized total/warning.
+    result = result.filter(
+      (t) =>
+        t.categoryId === null &&
+        t.type !== 'transfer_in' &&
+        t.type !== 'transfer_out',
+    );
   } else if (filters?.categoryId !== undefined) {
     result = result.filter((t) => t.categoryId === filters.categoryId);
   }

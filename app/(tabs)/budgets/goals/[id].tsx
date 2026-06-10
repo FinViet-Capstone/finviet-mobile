@@ -17,6 +17,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useGoalById, useAddContribution, useDeleteGoal } from '@/hooks/useGoals';
+import { useWallets } from '@/hooks/useWallets';
+import type { SavingsGoalWithProgress } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,10 @@ const S = {
   notePlaceholder: 'VD: Lương tháng 6',
   save: 'Lưu',
   cancel: 'Huỷ',
+  available: (s: string) => `Số dư khả dụng: ${s}`,
+  errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
+  errOverRemaining: (s: string) => `Vượt số tiền còn thiếu (${s})`,
+  zeroBalance: (name: string) => `Ví ${name} đã hết số dư. Vui lòng chọn ví khác.`,
   deleteConfirmTitle: 'Xoá mục tiêu?',
   deleteConfirmMsg: 'Bạn có chắc muốn xoá mục tiêu này không? Hành động này không thể hoàn tác.',
   deleteConfirm: 'Xoá',
@@ -71,48 +77,88 @@ function daysUntil(iso: string): number {
 
 function ContributionSheet({
   visible,
-  goalId,
+  goal,
   onClose,
 }: {
   visible: boolean;
-  goalId: string;
+  goal: SavingsGoalWithProgress;
   onClose: () => void;
 }) {
   const addContrib = useAddContribution();
+  const { data: walletData } = useWallets();
   const [amountRaw, setAmountRaw] = useState('');
   const [note, setNote] = useState('');
+
+  // The funding wallet is the source the contribution is deducted from. Its
+  // balance is a hard ceiling — you can't contribute money the wallet doesn't hold.
+  const fundingWallet = goal.fundingWalletId
+    ? walletData?.wallets.find((w) => w.id === goal.fundingWalletId)
+    : undefined;
+  const walletBalance = fundingWallet ? fundingWallet.balance : null;
+  const zeroBalance = walletBalance !== null && walletBalance <= 0;
 
   const parsedAmount = parseInt(amountRaw || '0', 10);
   const amountDisplay = parsedAmount > 0 ? parsedAmount.toLocaleString('vi-VN') + 'đ' : '';
 
-  const handleNumberPress = useCallback((key: string) => {
-    setAmountRaw((prev) => {
-      if (key === '000') return prev === '' ? '' : prev + '000';
-      return prev + key;
-    });
-  }, []);
+  const overBalance = walletBalance !== null && parsedAmount > walletBalance;
+  const overRemaining = !overBalance && parsedAmount > goal.remainingAmount;
+  const hasError = parsedAmount > 0 && (overBalance || overRemaining);
+  const canSave =
+    !!amountRaw && parsedAmount > 0 && !hasError && !zeroBalance && !addContrib.isPending;
+
+  const handleNumberPress = useCallback(
+    (key: string) => {
+      if (zeroBalance) return; // input locked when the wallet is empty
+      setAmountRaw((prev) => {
+        if (key === '000') return prev === '' ? '' : prev + '000';
+        return prev + key;
+      });
+    },
+    [zeroBalance],
+  );
 
   const handleBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
   const handleClear = useCallback(() => setAmountRaw(''), []);
 
   const handleSave = useCallback(async () => {
-    if (!parsedAmount) return;
-    await addContrib.mutateAsync({ goalId, input: { amount: parsedAmount, note: note.trim() || undefined } });
+    if (!canSave) return;
+    await addContrib.mutateAsync({
+      goalId: goal.id,
+      input: { amount: parsedAmount, note: note.trim() || undefined },
+    });
     setAmountRaw(''); setNote('');
     onClose();
-  }, [parsedAmount, note, goalId, addContrib, onClose]);
+  }, [canSave, parsedAmount, note, goal.id, addContrib, onClose]);
 
   return (
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={styles.sheet}>
         <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
 
-        <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
-        <View style={styles.amountDisplay}>
-          <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
-            {amountDisplay || S.amountPlaceholder}
-          </Text>
-        </View>
+        {zeroBalance ? (
+          <View style={styles.zeroBalanceBox}>
+            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <Text style={styles.zeroBalanceText}>{S.zeroBalance(fundingWallet?.name ?? '')}</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
+            <View style={[styles.amountDisplay, hasError && styles.amountDisplayError]}>
+              <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
+                {amountDisplay || S.amountPlaceholder}
+              </Text>
+            </View>
+            {hasError ? (
+              <Text style={styles.errorText}>
+                {overBalance
+                  ? S.errInsufficient(formatFull(walletBalance!))
+                  : S.errOverRemaining(formatFull(goal.remainingAmount))}
+              </Text>
+            ) : walletBalance !== null ? (
+              <Text style={styles.helperText}>{S.available(formatFull(walletBalance))}</Text>
+            ) : null}
+          </>
+        )}
 
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
         <View style={styles.noteDisplay}>
@@ -126,20 +172,22 @@ function ContributionSheet({
             <Text style={styles.cancelText}>{S.cancel}</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.7}
-            style={[styles.saveBtn, (!amountRaw || addContrib.isPending) && styles.saveBtnDisabled]}
-            onPress={handleSave} disabled={!amountRaw || addContrib.isPending}>
+            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            onPress={handleSave} disabled={!canSave}>
             {addContrib.isPending
               ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
       </View>
-      <NumericKeypad
-        onNumberPress={handleNumberPress}
-        onBackspace={handleBackspace}
-        onClear={handleClear}
-        onDone={onClose}
-      />
+      {!zeroBalance && (
+        <NumericKeypad
+          onNumberPress={handleNumberPress}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onDone={onClose}
+        />
+      )}
     </DraggableSheet>
   );
 }
@@ -260,7 +308,7 @@ export default function GoalDetailScreen() {
         </View>
       </ScrollView>
 
-      <ContributionSheet visible={contribVisible} goalId={id ?? ''} onClose={() => setContribVisible(false)} />
+      <ContributionSheet visible={contribVisible} goal={goal} onClose={() => setContribVisible(false)} />
 
       {/* Delete confirm */}
       <Modal visible={deleteVisible} transparent animationType="fade" onRequestClose={() => setDeleteVisible(false)}>
@@ -349,7 +397,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
   },
   amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
+  amountDisplayError: { borderColor: COLORS.error },
   amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
+  errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: SPACING[1] },
+  helperText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: SPACING[1] },
+  zeroBalanceBox: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+    backgroundColor: `${COLORS.error}15`, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.error}40`,
+    padding: SPACING[3], marginTop: SPACING[2],
+  },
+  zeroBalanceText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.error, lineHeight: 18 },
   noteDisplay: {
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1, borderColor: COLORS.outlineVariant,

@@ -31,6 +31,8 @@ const S = {
   failedExtraction: 'Không đọc được ảnh. Vui lòng nhập thủ công.',
   uncertainNotice: 'Các trường màu cam cần kiểm tra lại.',
   confirmAll: 'Chấp nhận tất cả',
+  needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
+  needCategory: 'Chọn danh mục →',
   retake: 'Chụp lại',
   amountLabel: 'Số tiền',
   merchantLabel: 'Nơi bán',
@@ -83,12 +85,15 @@ function ReviewRow({
   row,
   index,
   total,
+  blocking,
   onToggle,
   onEditCategory,
 }: {
   row: ExtractedRow;
   index: number;
   total: number;
+  /** Selected + extracted but has no category → blocks the batch submit. */
+  blocking: boolean;
   onToggle: () => void;
   onEditCategory: () => void;
 }) {
@@ -105,6 +110,7 @@ function ReviewRow({
         uncertain && styles.reviewRowUncertain,
         row.isDuplicate && styles.reviewRowDuplicate,
         isFailed && styles.reviewRowFailed,
+        blocking && styles.reviewRowBlocking,
       ]}
       onPress={onToggle}
     >
@@ -177,9 +183,11 @@ function ReviewRow({
                     </Text>
                   </>
                 ) : (
-                  <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
+                  <Text style={[styles.uncategorizedText, blocking && styles.needCategoryText]}>
+                    {blocking ? S.needCategory : S.uncategorized}
+                  </Text>
                 )}
-                <MaterialIcon name="chevron_right" size={16} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon name="chevron_right" size={16} color={blocking ? COLORS.error : COLORS.onSurfaceVariant} />
               </View>
             </TouchableOpacity>
 
@@ -281,6 +289,9 @@ export default function PhotoConfirmScreen() {
 
     const toSave = rows.filter((r) => r.selected && r.status === 'done' && r.amount > 0);
     if (!toSave.length) return;
+    // Strict gate: never commit a row without a category (defensive — the button
+    // is already disabled while any savable row is uncategorized).
+    if (toSave.some((r) => r.categoryId === null)) return;
 
     setIsImporting(true);
     try {
@@ -307,7 +318,11 @@ export default function PhotoConfirmScreen() {
     }
   }, [rows, walletsData, createMutation, router]);
 
-  const selectedCount = rows.filter((r) => r.selected && r.status === 'done').length;
+  // Strict gate (Path A): the batch can only be submitted when every selected,
+  // successfully-extracted row has a category. Uncategorized selected rows block it.
+  const savableRows = rows.filter((r) => r.selected && r.status === 'done' && r.amount > 0);
+  const unresolvedCount = savableRows.filter((r) => r.categoryId === null).length;
+  const isReadyToSubmit = savableRows.length > 0 && unresolvedCount === 0;
 
   if (allProcessing) {
     return (
@@ -345,6 +360,7 @@ export default function PhotoConfirmScreen() {
             row={item}
             index={index}
             total={rows.length}
+            blocking={item.selected && item.status === 'done' && item.amount > 0 && item.categoryId === null}
             onToggle={() => handleToggle(index)}
             onEditCategory={() => setEditingIdx(index)}
           />
@@ -358,13 +374,19 @@ export default function PhotoConfirmScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           activeOpacity={0.7}
-          style={[styles.confirmBtn, (!selectedCount || isImporting) && styles.confirmBtnDisabled]}
+          style={[styles.confirmBtn, (!isReadyToSubmit || isImporting) && styles.confirmBtnDisabled]}
           onPress={handleConfirmAll}
-          disabled={!selectedCount || isImporting}
+          disabled={!isReadyToSubmit || isImporting}
         >
           {isImporting
             ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
-            : <Text style={styles.confirmText}>{S.confirmAll} ({selectedCount})</Text>}
+            : (
+              <Text style={styles.confirmText}>
+                {unresolvedCount > 0
+                  ? S.needCategorize(unresolvedCount)
+                  : `${S.confirmAll} (${savableRows.length})`}
+              </Text>
+            )}
         </TouchableOpacity>
       </View>
 
@@ -426,6 +448,7 @@ const styles = StyleSheet.create({
   reviewRowUncertain: { borderColor: `${COLORS.secondary}60` },
   reviewRowDuplicate: { borderColor: `${COLORS.tertiary}50`, backgroundColor: `${COLORS.tertiary}08` },
   reviewRowFailed: { borderColor: `${COLORS.error}40`, backgroundColor: `${COLORS.error}08` },
+  reviewRowBlocking: { borderColor: `${COLORS.error}55` },
 
   reviewThumbWrap: { position: 'relative', width: 64, flexShrink: 0 },
   reviewThumb: { width: 64, height: 80, borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.surfaceVariant },
@@ -449,6 +472,7 @@ const styles = StyleSheet.create({
   reviewCategoryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 2, justifyContent: 'flex-end' },
   catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
   uncategorizedText: { fontSize: FONT_SIZE.xs, color: COLORS.secondary, fontStyle: 'italic' },
+  needCategoryText: { color: COLORS.error, fontStyle: 'normal', fontWeight: FONT_WEIGHT.semibold },
   failedText: { fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 18 },
 
   // Bottom bar

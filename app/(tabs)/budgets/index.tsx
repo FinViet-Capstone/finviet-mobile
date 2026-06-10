@@ -106,6 +106,18 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/** Inclusive YYYY-MM-DD range for a calendar month. */
+function monthRange(year: number, month: number): { startDate: string; endDate: string } {
+  return {
+    startDate: `${year}-${pad2(month + 1)}-01`,
+    endDate: `${year}-${pad2(month + 1)}-${pad2(daysInMonth(year, month))}`,
+  };
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BucketSummary {
@@ -242,7 +254,8 @@ export default function BudgetsScreen() {
   const [limitTarget, setLimitTarget] = useState<SetLimitTarget | null>(null);
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<BucketType>>(new Set());
 
-  const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets();
+  const selectedRange = useMemo(() => monthRange(year, month), [year, month]);
+  const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const { data: wallets = [] } = useWallets();
   const { data: user } = useUser();
 

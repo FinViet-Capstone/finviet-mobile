@@ -7,15 +7,21 @@ import {
   deleteBudget,
   type CreateBudgetInput,
   type UpdateBudgetInput,
+  type MonthRange,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export const useBudgets = () =>
+/**
+ * @param range Optional month window. Omit for the current calendar month
+ * (Home). The Budgets screen passes the month the user is viewing so `spent`
+ * reflects that month instead of always "now".
+ */
+export const useBudgets = (range?: MonthRange) =>
   useQuery({
-    queryKey: queryKeys.budgets.all(),
-    queryFn: () => getBudgets(),
+    queryKey: queryKeys.budgets.list(range ?? null),
+    queryFn: () => getBudgets(range),
     staleTime: STALE_TIME.medium,
   });
 

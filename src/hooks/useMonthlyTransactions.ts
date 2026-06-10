@@ -27,6 +27,14 @@ export interface DayCell {
   isToday: boolean;
 }
 
+/**
+ * A transaction is "uncategorized spend" only if it has no category AND is not a
+ * transfer leg. Transfer legs carry categoryId === null by design and must be
+ * excluded from the uncategorized count / filter / day badge.
+ */
+const isUncategorizedSpend = (tx: Transaction): boolean =>
+  tx.categoryId === null && tx.type !== 'transfer_in' && tx.type !== 'transfer_out';
+
 export function useMonthlyTransactions(
   year: number,
   monthIdx: number,
@@ -60,7 +68,7 @@ export function useMonthlyTransactions(
 
   const transactions = useMemo(() => {
     let txs = txData ?? [];
-    if (uncategorizedOnly) return txs.filter((tx) => !tx.categoryId);
+    if (uncategorizedOnly) return txs.filter(isUncategorizedSpend);
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       txs = txs.filter((tx) => tx.merchant?.toLowerCase().includes(q) || tx.description?.toLowerCase().includes(q));
@@ -96,7 +104,7 @@ export function useMonthlyTransactions(
   const monthNet = income - expense;
 
   const uncategorizedCount = useMemo(
-    () => transactions.filter((tx) => !tx.categoryId).length,
+    () => transactions.filter(isUncategorizedSpend).length,
     [transactions],
   );
 

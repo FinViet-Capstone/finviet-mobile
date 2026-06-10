@@ -78,12 +78,12 @@ const styles = StyleSheet.create({
   calendarCard: {
     backgroundColor: COLORS.surfaceContainerLow,
     paddingHorizontal: SPACING[3],
-    paddingBottom: SPACING[4],
-    marginBottom: SPACING[2],
+    paddingBottom: SPACING[2],
+    marginBottom: SPACING[1],
   },
   dowRow: {
     flexDirection: 'row',
-    paddingVertical: SPACING[2],
+    paddingVertical: SPACING[1],
   },
   dowLabel: {
     width: '14.285714%',
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   cell: {
     width: '14.285714%',
     alignItems: 'center',
-    paddingVertical: SPACING[1],
+    paddingVertical: 2,
   },
   dayCircle: {
     width: 30,

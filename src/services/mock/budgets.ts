@@ -27,17 +27,25 @@ function currentMonthRange(): { startDate: string; endDate: string } {
   return { startDate: fmt(first), endDate: fmt(last) };
 }
 
+export interface MonthRange {
+  startDate: string;
+  endDate: string;
+}
+
 /** Recompute spent/remaining/percentage/status from live transactions. */
-function withSpend(budget: {
-  id: string;
-  userId: string;
-  categoryId: string;
-  monthlyLimit: number;
-  resetDay: number;
-  createdAt: string;
-  updatedAt: string;
-}): BudgetWithSpend {
-  const { startDate, endDate } = currentMonthRange();
+function withSpend(
+  budget: {
+    id: string;
+    userId: string;
+    categoryId: string;
+    monthlyLimit: number;
+    resetDay: number;
+    createdAt: string;
+    updatedAt: string;
+  },
+  range?: MonthRange,
+): BudgetWithSpend {
+  const { startDate, endDate } = range ?? currentMonthRange();
   const cat = getCategoryById(budget.categoryId);
   const txs = getTransactions({
     categoryId: budget.categoryId,
@@ -130,13 +138,13 @@ let BUDGETS: BaseBudget[] = [
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
-export function getBudgets(): BudgetWithSpend[] {
-  return BUDGETS.map(withSpend);
+export function getBudgets(range?: MonthRange): BudgetWithSpend[] {
+  return BUDGETS.map((b) => withSpend(b, range));
 }
 
-export function getBudgetById(id: string): BudgetWithSpend | undefined {
+export function getBudgetById(id: string, range?: MonthRange): BudgetWithSpend | undefined {
   const base = BUDGETS.find((b) => b.id === id);
-  return base ? withSpend(base) : undefined;
+  return base ? withSpend(base, range) : undefined;
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────

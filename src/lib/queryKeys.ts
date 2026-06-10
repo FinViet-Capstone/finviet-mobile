@@ -36,6 +36,9 @@ export const queryKeys = {
   },
   budgets: {
     all: () => ['budgets'] as const,
+    /** Month-scoped list. `range = null` → current calendar month. */
+    list: (range: { startDate: string; endDate: string } | null) =>
+      [...queryKeys.budgets.all(), 'list', range] as const,
     detail: (id: string | undefined) => [...queryKeys.budgets.all(), id] as const,
   },
   goals: {

@@ -59,7 +59,7 @@ export {
   updateBudget,
   deleteBudget,
 } from './mock/budgets';
-export type { CreateBudgetInput, UpdateBudgetInput } from './mock/budgets';
+export type { CreateBudgetInput, UpdateBudgetInput, MonthRange } from './mock/budgets';
 
 // Goals
 export {
