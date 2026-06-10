@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateTransaction } from '@/hooks/useTransactions';
 import { getCategoryById, CATEGORIES } from '@/constants/categories';
@@ -24,11 +26,12 @@ const S = {
   title: 'Nhập từ file CSV',
   back: 'arrow_back_ios_new',
   uploadTitle: 'Chọn file CSV từ máy hoặc kéo thả vào đây.',
-  uploadSubtitle: 'Hỗ trợ định dạng .csv, tối đa 10MB',
+  uploadSubtitle: 'Hỗ trợ mọi định dạng .csv — AI tự nhận diện cột',
   uploadIcon: 'cloud_upload',
   templateBtn: 'Tải file mẫu .csv',
   templateIcon: 'download',
-  banksSection: 'Ngân hàng hỗ trợ tự động',
+  aiBadge: 'AI tự phân loại mọi định dạng CSV',
+  aiBadgeIcon: 'auto_awesome',
   guideTitle: 'Hướng dẫn xuất file',
   guideHelp: 'help',
   guideSteps: [
@@ -36,27 +39,20 @@ const S = {
     { title: 'Tra cứu lịch sử giao dịch', body: 'Vào mục Tài khoản > Lịch sử giao dịch, chọn khoảng thời gian cần xuất.' },
     { title: 'Tải xuống định dạng CSV', body: 'Tìm nút "Xuất file" hoặc "Tải xuống" và chọn định dạng Excel/CSV.' },
   ],
-  step1Title: 'Chọn ngân hàng',
-  step1Hint: 'Chọn định dạng file CSV ngân hàng của bạn',
+  parseBtn: 'Phân tích CSV (Demo)',
+  confirmBtn: 'Chấp nhận tất cả',
+  cancelBtn: 'Huỷ',
+  duplicate: 'Có thể trùng',
+  uncategorized: 'Chưa phân loại',
+  pickCategory: 'Chọn danh mục',
+  successMsg: (n: number) => `Đã nhập ${n} giao dịch thành công`,
+  noWallets: 'Không có ví nào',
+  selectWalletFirst: 'Vui lòng chọn ví trước',
+  startBtn: 'Chọn file & phân tích',
   step2Title: 'Chọn ví',
   step2Hint: 'Giao dịch sẽ được nhập vào ví này',
   step3Title: 'Xem trước dữ liệu',
   step3Hint: 'Kiểm tra và xác nhận trước khi nhập',
-  parseBtn: 'Phân tích CSV (Demo)',
-  confirmBtn: 'Nhập tất cả',
-  cancelBtn: 'Huỷ',
-  duplicate: 'Có thể trùng',
-  uncategorized: 'Chưa phân loại',
-  successMsg: (n: number) => `Đã nhập ${n} giao dịch thành công`,
-  noWallets: 'Không có ví nào',
-  selectWalletFirst: 'Vui lòng chọn ví trước',
-  startBtn: 'Bắt đầu nhập',
-  banks: [
-    { id: 'vietcombank', label: 'Vietcombank', icon: 'account_balance' },
-    { id: 'bidv',        label: 'BIDV',        icon: 'account_balance' },
-    { id: 'vietinbank', label: 'VietinBank',  icon: 'account_balance' },
-    { id: 'techcombank',label: 'Techcombank', icon: 'account_balance' },
-  ],
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,7 +70,7 @@ interface ParsedRow {
 
 // ─── Mock CSV parser ──────────────────────────────────────────────────────────
 
-function mockParseCsv(bankId: string): ParsedRow[] {
+function mockParseCsv(): ParsedRow[] {
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
   return [
@@ -82,23 +78,13 @@ function mockParseCsv(bankId: string): ParsedRow[] {
     { id: 'csv_02', date: today,     merchant: 'Grab',              amount: 65_000,     type: 'expense', suggestedCategoryId: 'cat_transport',  isDuplicate: false, selected: true },
     { id: 'csv_03', date: yesterday, merchant: 'VNPAY',             amount: 250_000,    type: 'expense', suggestedCategoryId: null,             isDuplicate: false, selected: true },
     { id: 'csv_04', date: yesterday, merchant: 'Grab Food',         amount: 85_000,     type: 'expense', suggestedCategoryId: 'cat_dining',     isDuplicate: true,  selected: false },
-    { id: 'csv_05', date: yesterday, merchant: `Cty ${bankId.toUpperCase()}`, amount: 12_000_000, type: 'income',  suggestedCategoryId: 'cat_income',    isDuplicate: false, selected: true },
+    { id: 'csv_05', date: yesterday, merchant: 'Cty TNHH ABC',      amount: 12_000_000, type: 'income',  suggestedCategoryId: 'cat_income',    isDuplicate: false, selected: true },
   ];
 }
 
 function formatVND(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function BankCard({ bank, selected, onPress }: { bank: typeof S.banks[number]; selected: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity activeOpacity={0.7} style={[styles.bankCard, selected && styles.bankCardActive]} onPress={onPress}>
-      <MaterialIcon name={bank.icon} size={22} color={selected ? COLORS.primary : COLORS.onSurfaceVariant} />
-      <Text style={[styles.bankLabel, selected && { color: COLORS.primary }]}>{bank.label}</Text>
-      {selected && <MaterialIcon name="check_circle" size={16} color={COLORS.primary} />}
-    </TouchableOpacity>
-  );
-}
 
 function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: boolean; onPress: () => void }) {
   return (
@@ -113,19 +99,24 @@ function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: b
   );
 }
 
-function PreviewRow({ row, onToggle }: { row: ParsedRow; onToggle: () => void }) {
+function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggle: () => void; onEditCategory: () => void }) {
   const cat = row.suggestedCategoryId ? getCategoryById(row.suggestedCategoryId) : null;
   const icon = cat ? getCategoryIcon(cat.icon) : 'more_horiz';
   const isIncome = row.type === 'income';
+  const needsCategoryEdit = !row.suggestedCategoryId;
 
   return (
     <TouchableOpacity activeOpacity={0.7} style={[styles.previewRow, !row.selected && styles.previewRowDeselected, row.isDuplicate && styles.previewRowDuplicate]} onPress={onToggle}>
       {/* Checkbox */}
       <MaterialIcon name={row.selected ? 'check_box' : 'check_box_outline_blank'} size={20} color={row.selected ? COLORS.primary : COLORS.onSurfaceVariant} />
-      {/* Category icon */}
-      <View style={[styles.rowIconWrap, { backgroundColor: cat ? `${cat.color}25` : `${COLORS.outlineVariant}40` }]}>
-        <MaterialIcon name={icon} size={14} color={cat?.color ?? COLORS.onSurfaceVariant} />
-      </View>
+      {/* Category icon — tappable if uncategorized */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={needsCategoryEdit ? onEditCategory : undefined}
+        style={[styles.rowIconWrap, { backgroundColor: cat ? `${cat.color}25` : `${COLORS.secondary}20` }, needsCategoryEdit && styles.rowIconWrapUncategorized]}
+      >
+        <MaterialIcon name={icon} size={14} color={needsCategoryEdit ? COLORS.secondary : (cat?.color ?? COLORS.onSurfaceVariant)} />
+      </TouchableOpacity>
       {/* Info */}
       <View style={styles.rowInfo}>
         <Text style={[styles.rowMerchant, !row.selected && styles.dimText]} numberOfLines={1}>{row.merchant}</Text>
@@ -137,7 +128,11 @@ function PreviewRow({ row, onToggle }: { row: ParsedRow; onToggle: () => void })
           {isIncome ? '+' : '-'}{formatVND(row.amount)}
         </Text>
         {row.isDuplicate && <View style={styles.dupBadge}><Text style={styles.dupBadgeText}>{S.duplicate}</Text></View>}
-        {!row.suggestedCategoryId && <View style={styles.uncatBadge}><Text style={styles.uncatBadgeText}>{S.uncategorized}</Text></View>}
+        {needsCategoryEdit && (
+          <TouchableOpacity activeOpacity={0.7} onPress={onEditCategory} style={styles.uncatBadge}>
+            <Text style={styles.uncatBadgeText}>{S.uncategorized}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -152,21 +147,29 @@ export default function CsvImportScreen() {
 
   const wallets = (walletsData as any)?.wallets ?? (Array.isArray(walletsData) ? walletsData : []) as Wallet[];
 
-  const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const handleParse = useCallback(() => {
-    if (!selectedBank) return;
     setIsParsing(true);
-    setTimeout(() => { setRows(mockParseCsv(selectedBank)); setIsParsing(false); }, 800);
-  }, [selectedBank]);
+    setTimeout(() => { setRows(mockParseCsv()); setIsParsing(false); }, 800);
+  }, []);
 
   const handleToggleRow = useCallback((id: string) => {
     setRows((prev) => prev.map((r) => r.id === id ? { ...r, selected: !r.selected } : r));
   }, []);
+
+  const handleEditCategory = useCallback((id: string) => {
+    setEditingRowId(id);
+  }, []);
+
+  const handleCategorySelect = useCallback((categoryId: string) => {
+    setRows((prev) => prev.map((r) => r.id === editingRowId ? { ...r, suggestedCategoryId: categoryId } : r));
+    setEditingRowId(null);
+  }, [editingRowId]);
 
   const handleImport = useCallback(async () => {
     if (!selectedWalletId) { Alert.alert('', S.selectWalletFirst); return; }
@@ -198,13 +201,21 @@ export default function CsvImportScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Upload area */}
-        <TouchableOpacity activeOpacity={0.75} style={styles.uploadArea}>
+        <TouchableOpacity activeOpacity={0.75} style={styles.uploadArea} onPress={handleParse} disabled={isParsing}>
           <View style={styles.uploadIconWrap}>
-            <MaterialIcon name={S.uploadIcon} size={32} color={COLORS.primary} />
+            {isParsing
+              ? <ActivityIndicator size="small" color={COLORS.primary} />
+              : <MaterialIcon name={S.uploadIcon} size={32} color={COLORS.primary} />}
           </View>
           <Text style={styles.uploadTitle}>{S.uploadTitle}</Text>
           <Text style={styles.uploadSubtitle}>{S.uploadSubtitle}</Text>
         </TouchableOpacity>
+
+        {/* AI badge — AI is the categorisation engine, any CSV format works */}
+        <View style={styles.aiBadge}>
+          <MaterialIcon name={S.aiBadgeIcon} size={16} color={COLORS.primary} />
+          <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
+        </View>
 
         {/* Template link */}
         <TouchableOpacity activeOpacity={0.7} style={styles.templateBtn}>
@@ -212,27 +223,7 @@ export default function CsvImportScreen() {
           <Text style={styles.templateBtnText}>{S.templateBtn}</Text>
         </TouchableOpacity>
 
-        {/* Step 1: Bank */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{S.banksSection}</Text>
-          <View style={styles.bankRow}>
-            {S.banks.map((bank) => (
-              <BankCard key={bank.id} bank={bank} selected={selectedBank === bank.id} onPress={() => { setSelectedBank(bank.id); setRows([]); }} />
-            ))}
-          </View>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[styles.parseBtn, (!selectedBank || isParsing) && styles.parseBtnDisabled]}
-            onPress={handleParse}
-            disabled={!selectedBank || isParsing}
-          >
-            {isParsing
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
-              : <Text style={styles.parseBtnText}>{S.parseBtn}</Text>}
-          </TouchableOpacity>
-        </View>
-
-        {/* Step 2: Wallet */}
+        {/* Step: Wallet */}
         {rows.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.stepTitle}>{S.step2Title}</Text>
@@ -258,7 +249,7 @@ export default function CsvImportScreen() {
             </View>
             <Text style={styles.stepHint}>{S.step3Hint}</Text>
             {rows.map((row) => (
-              <PreviewRow key={row.id} row={row} onToggle={() => handleToggleRow(row.id)} />
+              <PreviewRow key={row.id} row={row} onToggle={() => handleToggleRow(row.id)} onEditCategory={() => handleEditCategory(row.id)} />
             ))}
           </View>
         )}
@@ -304,14 +295,45 @@ export default function CsvImportScreen() {
         ) : (
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[styles.startBtn, !selectedBank && styles.confirmBtnDisabled]}
-            disabled={!selectedBank}
+            style={[styles.startBtn, isParsing && styles.confirmBtnDisabled]}
+            disabled={isParsing}
             onPress={handleParse}
           >
-            <Text style={[styles.confirmText, !selectedBank && { color: COLORS.onSurfaceVariant }]}>{S.startBtn}</Text>
+            {isParsing
+              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              : <Text style={styles.confirmText}>{S.startBtn}</Text>}
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Category picker for uncategorized rows */}
+      <DraggableSheet visible={editingRowId !== null} onClose={() => setEditingRowId(null)}>
+        <View style={styles.catSheetContent}>
+          <Text style={styles.catSheetTitle}>{S.pickCategory}</Text>
+          <FlatList
+            data={[...CATEGORIES]}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const editing = rows.find((r) => r.id === editingRowId);
+              const selected = editing?.suggestedCategoryId === item.id;
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[styles.catRow, selected && styles.catRowSelected]}
+                  onPress={() => handleCategorySelect(item.id)}
+                >
+                  <View style={[styles.catIconWrap, { backgroundColor: `${item.color}25` }]}>
+                    <MaterialIcon name={getCategoryIcon(item.icon)} size={16} color={item.color} />
+                  </View>
+                  <Text style={styles.catRowText}>{item.nameVi}</Text>
+                  {selected && <MaterialIcon name="check" size={18} color={COLORS.primary} />}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </DraggableSheet>
     </SafeAreaView>
   );
 }
@@ -374,38 +396,25 @@ const styles = StyleSheet.create({
 
   // Section
   section: { gap: SPACING[3] },
-  sectionLabel: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 1.2 },
   stepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
   stepTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   stepHint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: -SPACING[2] },
   selectedCount: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
   emptyText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
 
-  // Banks
-  bankRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[2] },
-  bankCard: {
+  // AI badge
+  aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[2],
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2] + 2,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  bankCardActive: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
-  bankLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-
-  parseBtn: {
-    height: 48,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.inversePrimary,
-    alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING[2],
+    alignSelf: 'center',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: `${COLORS.primary}15`,
   },
-  parseBtnDisabled: { opacity: 0.45 },
-  parseBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  aiBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
 
   // Wallets
   walletList: { gap: SPACING[2] },
@@ -440,6 +449,7 @@ const styles = StyleSheet.create({
   previewRowDeselected: { opacity: 0.5 },
   previewRowDuplicate: { borderColor: `${COLORS.secondary}50`, backgroundColor: `${COLORS.secondary}08` },
   rowIconWrap: { width: 30, height: 30, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  rowIconWrapUncategorized: { borderWidth: 1, borderColor: `${COLORS.secondary}50`, borderStyle: 'dashed' },
   rowInfo: { flex: 1, minWidth: 0 },
   rowMerchant: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: COLORS.onSurface },
   rowDate: { fontSize: 11, color: COLORS.onSurfaceVariant, marginTop: 2 },
@@ -448,8 +458,16 @@ const styles = StyleSheet.create({
   rowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
   dupBadge: { backgroundColor: `${COLORS.secondary}20`, paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
   dupBadgeText: { fontSize: 10, color: COLORS.secondary, fontWeight: FONT_WEIGHT.semibold },
-  uncatBadge: { backgroundColor: `${COLORS.outlineVariant}40`, paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
-  uncatBadgeText: { fontSize: 10, color: COLORS.onSurfaceVariant },
+  uncatBadge: { backgroundColor: `${COLORS.secondary}20`, paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
+  uncatBadgeText: { fontSize: 10, color: COLORS.secondary, fontWeight: FONT_WEIGHT.semibold },
+
+  // Category picker sheet
+  catSheetContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[8], maxHeight: '70%' },
+  catSheetTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, marginBottom: SPACING[3] },
+  catRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[3], borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant },
+  catRowSelected: { backgroundColor: `${COLORS.primaryContainer}22`, borderRadius: BORDER_RADIUS.md, paddingHorizontal: SPACING[2], borderBottomWidth: 0, marginVertical: SPACING[1] },
+  catIconWrap: { width: 32, height: 32, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  catRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
 
   // Guide
   guideCard: {

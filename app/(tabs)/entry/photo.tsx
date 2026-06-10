@@ -22,7 +22,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
 const S = {
-  title: 'Scan hóa đơn',
+  title: 'Scan ảnh',
   galleryBtn: 'photo_library',
   tip: 'Căn chỉnh hóa đơn vào khung để quét chính xác nhất.',
   flashOff: 'flash_off',
@@ -45,9 +45,9 @@ export default function PhotoEntryScreen() {
   const [permError, setPermError] = useState<string | null>(null);
   const [flashOn, setFlashOn] = useState(false);
 
-  const buildConfirmHref = (uri: string) => ({
+  const buildConfirmHref = (uris: string[]) => ({
     pathname: '/(tabs)/entry/photo-confirm' as const,
-    params: dateParam ? { uri, date: dateParam } : { uri },
+    params: dateParam ? { uris: JSON.stringify(uris), date: dateParam } : { uris: JSON.stringify(uris) },
   });
 
   const handleCamera = async () => {
@@ -61,7 +61,7 @@ export default function PhotoEntryScreen() {
         quality: 0.85,
       });
       if (result.canceled) return;
-      router.push(buildConfirmHref(result.assets[0].uri));
+      router.push(buildConfirmHref([result.assets[0].uri]));
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +80,7 @@ export default function PhotoEntryScreen() {
         selectionLimit: 5,
       });
       if (result.canceled) return;
-      router.push(buildConfirmHref(result.assets[0].uri));
+      router.push(buildConfirmHref(result.assets.map((a) => a.uri)));
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +102,7 @@ export default function PhotoEntryScreen() {
       {/* Camera viewfinder area (top ~60%) */}
       <View style={styles.viewfinder}>
         {/* Dark overlay hint */}
-        <View style={styles.overlay} />
+        <View style={styles.overlay} pointerEvents="none" />
 
         {/* Scanning frame */}
         <View style={styles.frameWrap}>
@@ -202,6 +202,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
+    elevation: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
