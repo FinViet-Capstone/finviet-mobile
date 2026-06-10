@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
-  Modal,
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +26,8 @@ import { TextInput } from '@/components/common/TextInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { DatePickerField } from '@/components/common/DatePickerField';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import {
   useTransactionById,
   useWallets,
@@ -82,6 +83,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
+  const [amountFocused, setAmountFocused] = useState(false);
 
   useEffect(() => {
     if (!tx) return;
@@ -119,6 +121,17 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const categoryOnly =
     modeParam === 'category' || selectedWallet?.type === 'linked';
   const fieldsLocked = isTransfer || categoryOnly;
+
+  const handleAmountNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+    if (amountError) setAmountError(undefined);
+  }, [amountError]);
+
+  const handleAmountBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleAmountClear = useCallback(() => setAmountRaw(''), []);
 
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
     const catName =
@@ -247,7 +260,9 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 setAmountRaw(t.replace(/\D/g, ''));
                 if (amountError) setAmountError(undefined);
               }}
-              keyboardType="numeric"
+              showSoftInputOnFocus={false}
+              onFocus={() => { if (!fieldsLocked) setAmountFocused(true); }}
+              onBlur={() => setAmountFocused(false)}
               placeholder="0"
               error={amountError}
               editable={!fieldsLocked}
@@ -363,19 +378,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
       </KeyboardAvoidingView>
 
       {/* Category picker */}
-      <Modal
+      <DraggableSheet
         visible={showCategoryModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCategoryModal(false)}
+        onClose={() => setShowCategoryModal(false)}
       >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowCategoryModal(false)}
-        />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+        <View style={styles.sheetContent}>
           <Text style={styles.sheetTitle}>{S.pickCategory}</Text>
           <FlatList
             data={[...CATEGORIES]}
@@ -384,10 +391,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[styles.listRow, categoryId === item.id && styles.listRowSelected]}
-                onPress={() => {
-                  setCategoryId(item.id);
-                  setShowCategoryModal(false);
-                }}
+                onPress={() => { setCategoryId(item.id); setShowCategoryModal(false); }}
                 activeOpacity={0.75}
               >
                 <View style={[styles.iconWrap, { backgroundColor: `${item.color}26` }]}>
@@ -401,22 +405,14 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             )}
           />
         </View>
-      </Modal>
+      </DraggableSheet>
 
       {/* Wallet picker */}
-      <Modal
+      <DraggableSheet
         visible={showWalletModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowWalletModal(false)}
+        onClose={() => setShowWalletModal(false)}
       >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowWalletModal(false)}
-        />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+        <View style={styles.sheetContent}>
           <Text style={styles.sheetTitle}>{S.pickWallet}</Text>
           <FlatList
             data={wallets}
@@ -425,10 +421,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[styles.listRow, walletId === item.id && styles.listRowSelected]}
-                onPress={() => {
-                  setWalletId(item.id);
-                  setShowWalletModal(false);
-                }}
+                onPress={() => { setWalletId(item.id); setShowWalletModal(false); }}
                 activeOpacity={0.75}
               >
                 <View style={styles.iconWrap}>
@@ -446,7 +439,16 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             )}
           />
         </View>
-      </Modal>
+      </DraggableSheet>
+
+      {amountFocused && (
+        <NumericKeypad
+          onNumberPress={handleAmountNumberPress}
+          onBackspace={handleAmountBackspace}
+          onClear={handleAmountClear}
+          onDone={() => setAmountFocused(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -558,27 +560,10 @@ const styles = StyleSheet.create({
 
   submit: { marginTop: SPACING[2], marginBottom: SPACING[2] },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
+  sheetContent: {
     paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[8],
     maxHeight: '72%',
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,

@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
 import { formatVND } from '@/utils/formatters';
 import type { Wallet } from '@/types';
@@ -25,15 +26,8 @@ export function WalletPickerSheet({
   onClose,
 }: WalletPickerSheetProps) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={styles.walletModal}>
-        <View style={styles.modalHandle} />
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={styles.content}>
         <Text style={styles.modalTitle}>{'Chọn ví'}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -82,30 +76,15 @@ export function WalletPickerSheet({
           ))}
         </ScrollView>
       </View>
-    </Modal>
+    </DraggableSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  walletModal: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[5],
+  content: {
+    paddingHorizontal: SPACING[5],
     paddingBottom: SPACING[10],
     maxHeight: '60%',
-  },
-  modalHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
   },
   modalTitle: {
     fontSize: FONT_SIZE.lg,

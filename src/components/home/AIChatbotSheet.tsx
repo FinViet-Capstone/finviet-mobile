@@ -12,6 +12,14 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -177,6 +185,31 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
   const [isListening, setIsListening] = useState(false);
   const listRef = useRef<FlatList>(null);
 
+  const translateY = useSharedValue(0);
+
+  const pan = Gesture.Pan()
+    .activeOffsetY(10)
+    .failOffsetY(-5)
+    .onUpdate((e) => {
+      if (e.translationY > 0) translateY.value = e.translationY;
+    })
+    .onEnd((e) => {
+      if (e.translationY > 120) {
+        translateY.value = withTiming(800, { duration: 250 });
+        runOnJS(onClose)();
+      } else {
+        translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+      }
+    });
+
+  useEffect(() => {
+    if (visible) translateY.value = 0;
+  }, [visible]);
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
   const scrollToBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   }, []);
@@ -231,20 +264,22 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
-              <MaterialIcon name="drag_handle" size={22} color={COLORS.onSurfaceVariant} />
-            </TouchableOpacity>
-            <View style={styles.headerTitle}>
-              <MaterialIcon name="auto_awesome" size={18} color={COLORS.primary} filled />
-              <Text style={styles.headerTitleText}>{S.title}</Text>
+        <Reanimated.View style={[styles.sheet, { paddingBottom: insets.bottom }, sheetStyle]}>
+          {/* Header — drag target */}
+          <GestureDetector gesture={pan}>
+            <View style={styles.header}>
+              <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
+                <MaterialIcon name="drag_handle" size={22} color={COLORS.onSurfaceVariant} />
+              </TouchableOpacity>
+              <View style={styles.headerTitle}>
+                <MaterialIcon name="auto_awesome" size={18} color={COLORS.primary} filled />
+                <Text style={styles.headerTitleText}>{S.title}</Text>
+              </View>
+              <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={onClose}>
+                <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={onClose}>
-              <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
+          </GestureDetector>
 
           {/* Chat list */}
           <FlatList
@@ -307,7 +342,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
               style={styles.chipsList}
             />
           </View>
-        </View>
+        </Reanimated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

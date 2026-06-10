@@ -7,17 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from 'react-native';import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useGoalById, useAddContribution, useDeleteGoal } from '@/hooks/useGoals';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -81,55 +79,68 @@ function ContributionSheet({
   onClose: () => void;
 }) {
   const addContrib = useAddContribution();
-  const [amount, setAmount] = useState('');
+  const [amountRaw, setAmountRaw] = useState('');
   const [note, setNote] = useState('');
 
-  const formatAmount = useCallback((v: string) => {
-    const digits = v.replace(/\D/g, '');
-    return digits ? Number(digits).toLocaleString('vi-VN') : '';
+  const parsedAmount = parseInt(amountRaw || '0', 10);
+  const amountDisplay = parsedAmount > 0 ? parsedAmount.toLocaleString('vi-VN') + 'đ' : '';
+
+  const handleNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
   }, []);
 
+  const handleBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleClear = useCallback(() => setAmountRaw(''), []);
+
   const handleSave = useCallback(async () => {
-    const parsed = parseInt(amount.replace(/\D/g, ''), 10);
-    if (!parsed) return;
-    await addContrib.mutateAsync({ goalId, input: { amount: parsed, note: note.trim() || undefined } });
-    setAmount(''); setNote('');
+    if (!parsedAmount) return;
+    await addContrib.mutateAsync({ goalId, input: { amount: parsedAmount, note: note.trim() || undefined } });
+    setAmountRaw(''); setNote('');
     onClose();
-  }, [amount, note, goalId, addContrib, onClose]);
+  }, [parsedAmount, note, goalId, addContrib, onClose]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetWrap}>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={styles.sheet}>
+        <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
 
-          <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
-          <TextInput style={styles.fieldInput} value={amount} keyboardType="numeric"
-            onChangeText={(v) => setAmount(formatAmount(v))}
-            placeholder={S.amountPlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
-            autoFocus />
-
-          <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
-          <TextInput style={styles.fieldInput} value={note} onChangeText={setNote}
-            placeholder={S.notePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
-
-          <View style={styles.sheetActions}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>{S.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7}
-              style={[styles.saveBtn, (!amount || addContrib.isPending) && styles.saveBtnDisabled]}
-              onPress={handleSave} disabled={!amount || addContrib.isPending}>
-              {addContrib.isPending
-                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
-                : <Text style={styles.saveText}>{S.save}</Text>}
-            </TouchableOpacity>
-          </View>
+        <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
+        <View style={styles.amountDisplay}>
+          <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
+            {amountDisplay || S.amountPlaceholder}
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
+        <View style={styles.noteDisplay}>
+          <Text style={[styles.noteText, !note && styles.amountPlaceholder]}>
+            {note || S.notePlaceholder}
+          </Text>
+        </View>
+
+        <View style={styles.sheetActions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+            <Text style={styles.cancelText}>{S.cancel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}
+            style={[styles.saveBtn, (!amountRaw || addContrib.isPending) && styles.saveBtnDisabled]}
+            onPress={handleSave} disabled={!amountRaw || addContrib.isPending}>
+            {addContrib.isPending
+              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              : <Text style={styles.saveText}>{S.save}</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+      <NumericKeypad
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={onClose}
+      />
+    </DraggableSheet>
   );
 }
 
@@ -326,13 +337,25 @@ const styles = StyleSheet.create({
   historyLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
   historyEmpty: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
   // Sheet
-  backdrop: { flex: 1, backgroundColor: `${COLORS.black}80` },
-  sheetWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   sheet: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'], borderTopRightRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[4], paddingTop: SPACING[2], paddingBottom: SPACING[8],
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
+  backdrop: { flex: 1, backgroundColor: `${COLORS.black}80` },
+  amountDisplay: {
+    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
+  },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
+  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
+  noteDisplay: {
+    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
+  },
+  noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   sheetHandle: {
     width: 40, height: 4, borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.outlineVariant, alignSelf: 'center', marginBottom: SPACING[4],

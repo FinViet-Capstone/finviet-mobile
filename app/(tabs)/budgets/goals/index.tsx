@@ -6,10 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +15,8 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useGoals, useCreateGoal } from '@/hooks/useGoals';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
@@ -83,70 +82,92 @@ function barColor(goal: SavingsGoalWithProgress): string {
 function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const createGoal = useCreateGoal();
   const [name, setName] = useState('');
-  const [target, setTarget] = useState('');
+  const [targetRaw, setTargetRaw] = useState('');
   const [deadline, setDeadline] = useState('');
   const [emoji, setEmoji] = useState('');
+  const [targetFocused, setTargetFocused] = useState(false);
+
+  const parsedTarget = parseInt(targetRaw || '0', 10);
+  const targetDisplay = parsedTarget > 0 ? parsedTarget.toLocaleString('vi-VN') + 'đ' : '';
+
+  const handleNumberPress = useCallback((key: string) => {
+    setTargetRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleBackspace = useCallback(() => setTargetRaw((prev) => prev.slice(0, -1)), []);
+  const handleClear = useCallback(() => setTargetRaw(''), []);
 
   const handleSave = useCallback(async () => {
-    const amount = parseInt(target.replace(/\D/g, ''), 10);
-    if (!name.trim() || !amount || !deadline.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+    if (!name.trim() || !parsedTarget || !deadline.match(/^\d{4}-\d{2}-\d{2}$/)) return;
     await createGoal.mutateAsync({
       name: name.trim(),
-      targetAmount: amount,
+      targetAmount: parsedTarget,
       deadline,
       iconEmoji: emoji.trim() || undefined,
     });
-    setName(''); setTarget(''); setDeadline(''); setEmoji('');
+    setName(''); setTargetRaw(''); setDeadline(''); setEmoji(''); setTargetFocused(false);
     onClose();
-  }, [name, target, deadline, emoji, createGoal, onClose]);
+  }, [name, parsedTarget, deadline, emoji, createGoal, onClose]);
 
-  const formatTarget = useCallback((v: string) => {
-    const digits = v.replace(/\D/g, '');
-    return digits ? Number(digits).toLocaleString('vi-VN') : '';
-  }, []);
-
-  const isValid = name.trim() && target && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
+  const isValid = name.trim() && targetRaw && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetWrap}>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={styles.sheet}>
+        <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
 
-          <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
-          <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
-            placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
+        <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
+        <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
+          placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setTargetFocused(false)} />
 
-          <Text style={styles.fieldLabel}>{S.targetLabel}</Text>
-          <TextInput style={styles.fieldInput} value={target} keyboardType="numeric"
-            onChangeText={(v) => setTarget(formatTarget(v))}
-            placeholder={S.targetPlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
+        <Text style={styles.fieldLabel}>{S.targetLabel}</Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.fieldInput, styles.amountDisplay, targetFocused && styles.amountDisplayFocused]}
+          onPress={() => setTargetFocused(true)}
+        >
+          <Text style={[styles.amountText, !targetDisplay && styles.amountPlaceholder]}>
+            {targetDisplay || S.targetPlaceholder}
+          </Text>
+          <MaterialIcon name="dialpad" size={16} color={COLORS.onSurfaceVariant} />
+        </TouchableOpacity>
 
-          <Text style={styles.fieldLabel}>{S.deadlineLabel}</Text>
-          <TextInput style={styles.fieldInput} value={deadline} onChangeText={setDeadline}
-            placeholder={S.deadlinePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
+        <Text style={styles.fieldLabel}>{S.deadlineLabel}</Text>
+        <TextInput style={styles.fieldInput} value={deadline} onChangeText={setDeadline}
+          placeholder={S.deadlinePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setTargetFocused(false)} />
 
-          <Text style={styles.fieldLabel}>{S.emojiLabel}</Text>
-          <TextInput style={styles.fieldInput} value={emoji} onChangeText={setEmoji}
-            placeholder={S.emojiPlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
+        <Text style={styles.fieldLabel}>{S.emojiLabel}</Text>
+        <TextInput style={styles.fieldInput} value={emoji} onChangeText={setEmoji}
+          placeholder={S.emojiPlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setTargetFocused(false)} />
 
-          <View style={styles.sheetActions}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>{S.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7}
-              style={[styles.saveBtn, (!isValid || createGoal.isPending) && styles.saveBtnDisabled]}
-              onPress={handleSave} disabled={!isValid || createGoal.isPending}>
-              {createGoal.isPending
-                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
-                : <Text style={styles.saveText}>{S.save}</Text>}
-            </TouchableOpacity>
-          </View>
+        <View style={styles.sheetActions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+            <Text style={styles.cancelText}>{S.cancel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}
+            style={[styles.saveBtn, (!isValid || createGoal.isPending) && styles.saveBtnDisabled]}
+            onPress={handleSave} disabled={!isValid || createGoal.isPending}>
+            {createGoal.isPending
+              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              : <Text style={styles.saveText}>{S.save}</Text>}
+          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+      {targetFocused && (
+        <NumericKeypad
+          onNumberPress={handleNumberPress}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onDone={() => setTargetFocused(false)}
+        />
+      )}
+    </DraggableSheet>
   );
 }
 
@@ -367,13 +388,16 @@ const styles = StyleSheet.create({
   barTrack: { height: 4, backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   // Sheet
-  backdrop: { flex: 1, backgroundColor: `${COLORS.black}80` },
-  sheetWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  // Sheet
   sheet: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'], borderTopRightRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[4], paddingTop: SPACING[2], paddingBottom: SPACING[8],
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
+  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  amountDisplayFocused: { borderColor: COLORS.primary },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
+  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
   sheetHandle: {
     width: 40, height: 4, borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.outlineVariant, alignSelf: 'center', marginBottom: SPACING[4],

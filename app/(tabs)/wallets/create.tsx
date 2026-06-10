@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { useCreateWallet } from '@/hooks/useWallets';
 
 const S = {
@@ -13,7 +14,7 @@ const S = {
   nameLabel: 'Tên ví',
   namePlaceholder: 'VD: Tiền mặt, Vietcombank',
   balanceLabel: 'Số dư ban đầu',
-  balancePlaceholder: '0',
+  balancePlaceholder: '0đ',
   save: 'Tạo ví',
   cancel: 'Huỷ',
   primaryLabel: 'Đặt làm ví chính',
@@ -26,18 +27,31 @@ export default function CreateWalletScreen() {
   const router = useRouter();
   const createWallet = useCreateWallet();
   const [name, setName] = useState('');
-  const [balance, setBalance] = useState('');
+  const [balanceRaw, setBalanceRaw] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
+  const [balanceFocused, setBalanceFocused] = useState(false);
 
-  const formatBalance = (v: string) => {
-    const digits = v.replace(/\D/g, '');
-    return digits ? Number(digits).toLocaleString('vi-VN') : '';
-  };
+  const parsedBalance = parseInt(balanceRaw || '0', 10);
+  const balanceDisplay = parsedBalance > 0 ? parsedBalance.toLocaleString('vi-VN') + 'đ' : '';
+
+  const handleNumberPress = useCallback((key: string) => {
+    setBalanceRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleBackspace = useCallback(() => {
+    setBalanceRaw((prev) => prev.slice(0, -1));
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setBalanceRaw('');
+  }, []);
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    const initialBalance = parseInt(balance.replace(/\D/g, ''), 10) || 0;
-    await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parseInt(balance.replace(/\D/g, ''), 10) || 0, isPrimary });
+    await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parsedBalance, isPrimary });
     router.back();
   };
 
@@ -51,48 +65,64 @@ export default function CreateWalletScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-          {/* Type selector — only basic active */}
-          <View style={styles.typeRow}>
-            <View style={[styles.typeCard, styles.typeCardActive]}>
-              <MaterialIcon name="account_balance_wallet" size={28} color={COLORS.primary} />
-              <Text style={styles.typeActiveText}>{S.typeBasic}</Text>
-            </View>
-            <View style={styles.typeCard}>
-              <MaterialIcon name="account_balance" size={28} color={COLORS.onSurfaceVariant} />
-              <Text style={styles.typeInactiveText}>{S.typeLinked}</Text>
-              <Text style={styles.comingSoon}>{S.comingSoon}</Text>
-            </View>
+        {/* Type selector — only basic active */}
+        <View style={styles.typeRow}>
+          <View style={[styles.typeCard, styles.typeCardActive]}>
+            <MaterialIcon name="account_balance_wallet" size={28} color={COLORS.primary} />
+            <Text style={styles.typeActiveText}>{S.typeBasic}</Text>
           </View>
+          <View style={styles.typeCard}>
+            <MaterialIcon name="account_balance" size={28} color={COLORS.onSurfaceVariant} />
+            <Text style={styles.typeInactiveText}>{S.typeLinked}</Text>
+            <Text style={styles.comingSoon}>{S.comingSoon}</Text>
+          </View>
+        </View>
 
-          <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
-          <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
-            placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} autoFocus />
+        <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
+        <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
+          placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setBalanceFocused(false)} autoFocus />
 
-          <Text style={styles.fieldLabel}>{S.balanceLabel}</Text>
-          <TextInput style={styles.fieldInput} value={balance} keyboardType="numeric"
-            onChangeText={(v) => setBalance(formatBalance(v))}
-            placeholder={S.balancePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant} />
+        {/* Balance — tappable display, numpad below */}
+        <Text style={styles.fieldLabel}>{S.balanceLabel}</Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.amountDisplay, balanceFocused && styles.amountDisplayFocused]}
+          onPress={() => setBalanceFocused(true)}
+        >
+          <Text style={[styles.amountText, !balanceDisplay && styles.amountPlaceholder]}>
+            {balanceDisplay || S.balancePlaceholder}
+          </Text>
+          <MaterialIcon name="dialpad" size={18} color={COLORS.onSurfaceVariant} />
+        </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.7} style={styles.primaryRow} onPress={() => setIsPrimary((v) => !v)}>
-            <MaterialIcon name={isPrimary ? 'check_box' : 'check_box_outline_blank'} size={22} color={isPrimary ? COLORS.primary : COLORS.onSurfaceVariant} />
-            <Text style={styles.primaryLabel}>{S.primaryLabel}</Text>
+        <TouchableOpacity activeOpacity={0.7} style={styles.primaryRow} onPress={() => setIsPrimary((v) => !v)}>
+          <MaterialIcon name={isPrimary ? 'check_box' : 'check_box_outline_blank'} size={22} color={isPrimary ? COLORS.primary : COLORS.onSurfaceVariant} />
+          <Text style={styles.primaryLabel}>{S.primaryLabel}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.actions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
+            <Text style={styles.cancelText}>{S.cancel}</Text>
           </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}
+            style={[styles.saveBtn, (!name.trim() || createWallet.isPending) && styles.saveBtnDisabled]}
+            onPress={handleSave} disabled={!name.trim() || createWallet.isPending}>
+            <Text style={styles.saveText}>{S.save}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-          <View style={styles.actions}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
-              <Text style={styles.cancelText}>{S.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7}
-              style={[styles.saveBtn, (!name.trim() || createWallet.isPending) && styles.saveBtnDisabled]}
-              onPress={handleSave} disabled={!name.trim() || createWallet.isPending}>
-              <Text style={styles.saveText}>{S.save}</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      {balanceFocused && (
+        <NumericKeypad
+          onNumberPress={handleNumberPress}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onDone={() => setBalanceFocused(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -111,6 +141,10 @@ const styles = StyleSheet.create({
   comingSoon: { fontSize: 10, color: COLORS.onSurfaceVariant },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
   fieldInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
+  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
+  amountDisplayFocused: { borderColor: COLORS.primary },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
+  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
   primaryRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[2] },
   primaryLabel: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },

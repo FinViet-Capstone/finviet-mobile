@@ -10,7 +10,6 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -34,6 +33,8 @@ import { CATEGORIES } from '@/constants/categories';
 import type { Category } from '@/constants/categories';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useWallets, useCreateTransaction } from '@/hooks';
 import type { Wallet } from '@/types/wallet';
 import { formatVND } from '@/utils/formatters';
@@ -123,7 +124,7 @@ export default function ManualEntryScreen() {
     if (key === 'del') {
       setAmountRaw((prev) => prev.slice(0, -1));
     } else if (key === '000') {
-      setAmountRaw((prev) => (prev === '0' ? prev : prev + '000'));
+      setAmountRaw((prev) => (prev === '' ? '' : prev + '000'));
     } else {
       setAmountRaw((prev) => {
         if (prev === '0' && key !== '.') return key;
@@ -340,121 +341,67 @@ export default function ManualEntryScreen() {
       </KeyboardAvoidingView>
 
       {/* Custom numpad */}
-      <View style={styles.numpad}>
-        {[
-          ['1', '2', '3'],
-          ['4', '5', '6'],
-          ['7', '8', '9'],
-          ['000', '0', 'del'],
-        ].map((row, ri) => (
-          <View key={ri} style={styles.numpadRow}>
-            {row.map((key) => (
+      <NumericKeypad
+        onNumberPress={(key) => handleAmountKey(key)}
+        onBackspace={() => handleAmountKey('del')}
+        onClear={() => { setAmountRaw(''); setAmountError(undefined); }}
+      />
+
+      {/* ── Category Sheet ── */}
+      <DraggableSheet
+        visible={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{S.sheetCategory}</Text>
+          <FlatList
+            data={[...CATEGORIES]}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                key={key}
-                activeOpacity={0.6}
-                style={styles.numpadKey}
-                onPress={() => handleAmountKey(key)}
+                style={[styles.sheetRow, selectedCategoryId === item.id && styles.sheetRowSelected]}
+                onPress={() => { setSelectedCategoryId(item.id); setShowCategoryModal(false); }}
+                activeOpacity={0.7}
               >
-                {key === 'del' ? (
-                  <MaterialIcon name="backspace" size={20} color={COLORS.onSurfaceVariant} />
-                ) : (
-                  <Text style={styles.numpadKeyText}>{key}</Text>
+                <View style={[styles.sheetDot, { backgroundColor: item.color }]} />
+                <Text style={styles.sheetRowText}>{item.nameVi}</Text>
+                {selectedCategoryId === item.id && (
+                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
                 )}
               </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </View>
+            )}
+          />
+        </View>
+      </DraggableSheet>
 
-      {/* ── Category Modal ── */}
-      <Modal
-        visible={showCategoryModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowCategoryModal(false)}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{S.sheetCategory}</Text>
-            <FlatList
-              data={[...CATEGORIES]}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.sheetRow,
-                    selectedCategoryId === item.id && styles.sheetRowSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedCategoryId(item.id);
-                    setShowCategoryModal(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.sheetDot, { backgroundColor: item.color }]} />
-                  <Text style={styles.sheetRowText}>{item.nameVi}</Text>
-                  {selectedCategoryId === item.id && (
-                    <MaterialIcon name="check" size={18} color={COLORS.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ── Wallet Modal ── */}
-      <Modal
+      {/* ── Wallet Sheet ── */}
+      <DraggableSheet
         visible={showWalletModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowWalletModal(false)}
+        onClose={() => setShowWalletModal(false)}
       >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowWalletModal(false)}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{S.sheetWallet}</Text>
-            <FlatList
-              data={wallets}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.sheetRow,
-                    selectedWalletId === item.id && styles.sheetRowSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedWalletId(item.id);
-                    setShowWalletModal(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcon
-                    name="account_balance_wallet"
-                    size={18}
-                    color={COLORS.onSurfaceVariant}
-                  />
-                  <Text style={styles.sheetRowText}>{item.name}</Text>
-                  {selectedWalletId === item.id && (
-                    <MaterialIcon name="check" size={18} color={COLORS.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{S.sheetWallet}</Text>
+          <FlatList
+            data={wallets}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.sheetRow, selectedWalletId === item.id && styles.sheetRowSelected]}
+                onPress={() => { setSelectedWalletId(item.id); setShowWalletModal(false); }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.onSurfaceVariant} />
+                <Text style={styles.sheetRowText}>{item.name}</Text>
+                {selectedWalletId === item.id && (
+                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </DraggableSheet>
     </SafeAreaView>
   );
 }
@@ -585,56 +532,12 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.medium,
   },
 
-  // Numpad
-  numpad: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-    paddingHorizontal: SPACING[2],
-    paddingTop: SPACING[2],
-    paddingBottom: SPACING[4],
-  },
-  numpadRow: {
-    flexDirection: 'row',
-    gap: SPACING[2],
-    marginBottom: SPACING[2],
-  },
-  numpadKey: {
-    flex: 1,
-    height: 52,
-    backgroundColor: COLORS.surfaceContainerHighest,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numpadKeyText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurface,
-  },
-
   // Modal
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   sheet: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
     paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[8],
     maxHeight: '70%',
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,

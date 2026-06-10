@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Modal,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,6 +14,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useWallets } from '@/hooks/useWallets';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import type { Wallet } from '@/types/wallet';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -24,7 +23,7 @@ const S = {
   title: 'Ví của tôi',
   totalLabel: 'Tổng tài sản',
   addWallet: 'Thêm ví mới',
-  transfer: 'Chuyển khoản giữa các ví',
+  transfer: 'Chuyển quỹ giữa các ví',
   setBudget: 'Đặt ngân sách',
   syncOk: 'Đã đồng bộ',
   syncError: 'Lỗi kết nối',
@@ -46,7 +45,6 @@ function formatVND(amount: number): string {
 
 function walletIcon(wallet: Wallet): string {
   if (wallet.type === 'linked') return 'account_balance';
-  if (wallet.name.toLowerCase().includes('momo')) return 'account_balance_wallet';
   if (wallet.name.toLowerCase().includes('tiền mặt') || wallet.name.toLowerCase().includes('cash')) return 'payments';
   return 'account_balance_wallet';
 }
@@ -81,30 +79,26 @@ function AddWalletSheet({
   onSelectBasic: () => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>{S.addSheetTitle}</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.sheetCloseBtn}>
-            <MaterialIcon name="close" size={20} color={COLORS.onSurfaceVariant} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.sheetOptions}>
-          <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectBasic}>
-            <MaterialIcon name="account_balance_wallet" size={32} color={COLORS.primary} />
-            <Text style={styles.optionLabelActive}>{S.optionBasic}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.7} style={styles.optionInactive}>
-            <MaterialIcon name="account_balance" size={32} color={COLORS.onSurfaceVariant} />
-            <Text style={styles.optionLabelInactive}>{S.optionLinked}</Text>
-            <Text style={styles.comingSoon}>{S.comingSoon}</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.sheetHint}>{S.addSheetHint}</Text>
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={styles.sheetHeader}>
+        <Text style={styles.sheetTitle}>{S.addSheetTitle}</Text>
+        <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.sheetCloseBtn}>
+          <MaterialIcon name="close" size={20} color={COLORS.onSurfaceVariant} />
+        </TouchableOpacity>
       </View>
-    </Modal>
+      <View style={styles.sheetOptions}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectBasic}>
+          <MaterialIcon name="account_balance_wallet" size={32} color={COLORS.primary} />
+          <Text style={styles.optionLabelActive}>{S.optionBasic}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.7} style={styles.optionInactive}>
+          <MaterialIcon name="account_balance" size={32} color={COLORS.onSurfaceVariant} />
+          <Text style={styles.optionLabelInactive}>{S.optionLinked}</Text>
+          <Text style={styles.comingSoon}>{S.comingSoon}</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.sheetHint}>{S.addSheetHint}</Text>
+    </DraggableSheet>
   );
 }
 
@@ -405,30 +399,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   // Sheet
-  backdrop: {
-    flex: 1,
-    backgroundColor: `${COLORS.black}80`,
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[8],
-    paddingTop: SPACING[2],
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
-  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

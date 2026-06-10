@@ -1,19 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Modal,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateBudget } from '@/hooks/useBudgets';
 import type { Wallet } from '@/types/wallet';
@@ -44,18 +41,6 @@ interface Props {
 
 type ScopeOption = { id: string | null; name: string; hint: string };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatAmount(raw: string): string {
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) return '';
-  return Number(digits).toLocaleString('vi-VN');
-}
-
-function parseAmount(formatted: string): number {
-  return parseInt(formatted.replace(/\./g, '').replace(/,/g, ''), 10) || 0;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SetLimitSheet({
@@ -70,9 +55,12 @@ export default function SetLimitSheet({
   const createBudget = useCreateBudget();
 
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [amountText, setAmountText] = useState(
-    existingLimit ? formatAmount(String(existingLimit)) : '',
+  const [amountRaw, setAmountRaw] = useState(
+    existingLimit ? String(existingLimit) : '',
   );
+
+  const parsedAmount = parseInt(amountRaw || '0', 10);
+  const amountDisplay = parsedAmount > 0 ? parsedAmount.toLocaleString('vi-VN') + 'đ' : '';
 
   const scopeOptions: ScopeOption[] = [
     { id: null, name: S.allWallets, hint: S.allWalletsHint },
@@ -83,17 +71,21 @@ export default function SetLimitSheet({
     })),
   ];
 
-  const handleAmountChange = useCallback((text: string) => {
-    const digits = text.replace(/\D/g, '');
-    setAmountText(digits ? Number(digits).toLocaleString('vi-VN') : '');
+  const handleNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
   }, []);
 
+  const handleBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleClear = useCallback(() => setAmountRaw(''), []);
+
   const handleSave = useCallback(async () => {
-    const amount = parseAmount(amountText);
-    if (!amount) return;
-    await createBudget.mutateAsync({ categoryId, monthlyLimit: amount });
+    if (!parsedAmount) return;
+    await createBudget.mutateAsync({ categoryId, monthlyLimit: parsedAmount });
     onClose();
-  }, [amountText, categoryId, createBudget, onClose]);
+  }, [parsedAmount, categoryId, createBudget, onClose]);
 
   const renderScope = useCallback(
     ({ item }: { item: ScopeOption }) => {
@@ -125,110 +117,70 @@ export default function SetLimitSheet({
   );
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.sheetWrapper}
-      >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING[4] }]}>
-          {/* Handle */}
-          <View style={styles.handle} />
-
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{S.title}</Text>
-            <Text style={styles.categoryName}>{categoryName}</Text>
-          </View>
-
-          {/* Scope picker */}
-          <Text style={styles.sectionLabel}>{S.subtitle}</Text>
-          <FlatList
-            data={scopeOptions}
-            keyExtractor={(item) => item.id ?? 'all'}
-            renderItem={renderScope}
-            scrollEnabled={false}
-            style={styles.scopeList}
-          />
-
-          {/* Amount input */}
-          <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
-          <View style={styles.amountRow}>
-            <TextInput
-              style={styles.amountInput}
-              value={amountText}
-              onChangeText={handleAmountChange}
-              keyboardType="numeric"
-              placeholder={S.amountPlaceholder}
-              placeholderTextColor={COLORS.onSurfaceVariant}
-              autoFocus
-            />
-            <Text style={styles.amountSuffix}>₫{S.monthly}</Text>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.cancelBtn}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelText}>{S.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[
-                styles.saveBtn,
-                (!amountText || createBudget.isPending) && styles.saveBtnDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!amountText || createBudget.isPending}
-            >
-              {createBudget.isPending ? (
-                <ActivityIndicator size="small" color={COLORS.onPrimary} />
-              ) : (
-                <Text style={styles.saveText}>{S.save}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{S.title}</Text>
+          <Text style={styles.categoryName}>{categoryName}</Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        {/* Scope picker */}
+        <Text style={styles.sectionLabel}>{S.subtitle}</Text>
+        <FlatList
+          data={scopeOptions}
+          keyExtractor={(item) => item.id ?? 'all'}
+          renderItem={renderScope}
+          scrollEnabled={false}
+          style={styles.scopeList}
+        />
+
+        {/* Amount — tappable display */}
+        <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
+        <View style={styles.amountRow}>
+          <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
+            {amountDisplay || S.amountPlaceholder}
+          </Text>
+          <Text style={styles.amountSuffix}>₫{S.monthly}</Text>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+            <Text style={styles.cancelText}>{S.cancel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.saveBtn, (!amountRaw || createBudget.isPending) && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={!amountRaw || createBudget.isPending}
+          >
+            {createBudget.isPending ? (
+              <ActivityIndicator size="small" color={COLORS.onPrimary} />
+            ) : (
+              <Text style={styles.saveText}>{S.save}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <NumericKeypad
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={onClose}
+      />
+    </DraggableSheet>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: `${COLORS.black}80`,
-  },
-  sheetWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
   sheet: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
+    paddingBottom: SPACING[4],
   },
   header: {
     marginBottom: SPACING[4],
@@ -293,15 +245,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     paddingHorizontal: SPACING[4],
-    marginBottom: SPACING[6],
+    marginBottom: SPACING[4],
     height: 56,
   },
-  amountInput: {
+  amountText: {
     flex: 1,
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onSurface,
-    height: '100%',
+  },
+  amountPlaceholder: {
+    color: COLORS.onSurfaceVariant,
+    fontWeight: FONT_WEIGHT.normal,
   },
   amountSuffix: {
     fontSize: FONT_SIZE.sm,
