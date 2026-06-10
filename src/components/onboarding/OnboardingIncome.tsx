@@ -18,6 +18,10 @@ export interface OnboardingIncomeProps {
 }
 
 export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingIncomeProps) {
+  // Numpad is a modal overlay — auto-open on mount (income is the only field);
+  // tapping the amount re-opens it, Done/outside dismisses to reveal "Tiếp tục".
+  const [focused, setFocused] = useState(true);
+
   const handleNumberPress = (num: string) => {
     const currentValue = value.replace(/\./g, '');
     const newValue = currentValue + num;
@@ -52,7 +56,11 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
       {/* Input Area with Glassmorphism */}
       <View style={styles.inputWrapper}>
         <View style={styles.glowBackground} />
-        <View style={styles.glassCard}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.glassCard}
+          onPress={() => setFocused(true)}
+        >
           <View style={styles.inputRow}>
             <Text style={styles.displayText}>
               {value || ONBOARDING_STRINGS.income.placeholder}
@@ -61,7 +69,7 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
           </View>
 
           {/* Removed AI Badge */}
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Next Button */}
@@ -75,11 +83,14 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
         </TouchableOpacity>
       </View>
 
-      {/* Custom Numeric Keypad */}
+      {/* Custom Numeric Keypad — modal overlay, opens when the amount is focused */}
       <NumericKeypad
+        visible={focused}
+        onClose={() => setFocused(false)}
         onNumberPress={handleNumberPress}
         onBackspace={handleBackspace}
         onClear={handleClear}
+        onDone={() => setFocused(false)}
       />
     </KeyboardAvoidingView>
   );

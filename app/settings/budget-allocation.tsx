@@ -232,14 +232,14 @@ export default function BudgetAllocationScreen() {
         </View>
       </View>
 
-      {incomeFocused && (
-        <NumericKeypad
-          onNumberPress={handleIncomeNumberPress}
-          onBackspace={handleIncomeBackspace}
-          onClear={handleIncomeClear}
-          onDone={() => setIncomeFocused(false)}
-        />
-      )}
+      <NumericKeypad
+        visible={incomeFocused}
+        onClose={() => setIncomeFocused(false)}
+        onNumberPress={handleIncomeNumberPress}
+        onBackspace={handleIncomeBackspace}
+        onClear={handleIncomeClear}
+        onDone={() => setIncomeFocused(false)}
+      />
     </SafeAreaView>
   );
 }

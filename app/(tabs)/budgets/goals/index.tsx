@@ -115,6 +115,7 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   const isValid = name.trim() && targetRaw && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
 
   return (
+    <>
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={styles.sheet}>
         <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
@@ -159,15 +160,16 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
           </TouchableOpacity>
         </View>
       </View>
-      {targetFocused && (
-        <NumericKeypad
-          onNumberPress={handleNumberPress}
-          onBackspace={handleBackspace}
-          onClear={handleClear}
-          onDone={() => setTargetFocused(false)}
-        />
-      )}
     </DraggableSheet>
+    <NumericKeypad
+      visible={visible && targetFocused}
+      onClose={() => setTargetFocused(false)}
+      onNumberPress={handleNumberPress}
+      onBackspace={handleBackspace}
+      onClear={handleClear}
+      onDone={() => setTargetFocused(false)}
+    />
+    </>
   );
 }
 

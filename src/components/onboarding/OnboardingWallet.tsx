@@ -181,14 +181,14 @@ export function OnboardingWallet({
       </TouchableWithoutFeedback>
 
       {/* Show numeric keypad when balance is focused */}
-      {isBalanceFocused && walletType === 'basic' && (
-        <NumericKeypad
-          onNumberPress={handleNumberPress}
-          onBackspace={handleBackspace}
-          onClear={handleClear}
-          onDone={handleDismissKeypad}
-        />
-      )}
+      <NumericKeypad
+        visible={isBalanceFocused && walletType === 'basic'}
+        onClose={handleDismissKeypad}
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={handleDismissKeypad}
+      />
     </KeyboardAvoidingView>
   );
 }

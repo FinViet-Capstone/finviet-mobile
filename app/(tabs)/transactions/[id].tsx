@@ -417,14 +417,14 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         </View>
       </DraggableSheet>
 
-      {amountFocused && (
-        <NumericKeypad
-          onNumberPress={handleAmountNumberPress}
-          onBackspace={handleAmountBackspace}
-          onClear={handleAmountClear}
-          onDone={() => setAmountFocused(false)}
-        />
-      )}
+      <NumericKeypad
+        visible={amountFocused}
+        onClose={() => setAmountFocused(false)}
+        onNumberPress={handleAmountNumberPress}
+        onBackspace={handleAmountBackspace}
+        onClear={handleAmountClear}
+        onDone={() => setAmountFocused(false)}
+      />
     </SafeAreaView>
   );
 }

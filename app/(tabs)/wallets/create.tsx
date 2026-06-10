@@ -115,14 +115,14 @@ export default function CreateWalletScreen() {
         </View>
       </ScrollView>
 
-      {balanceFocused && (
-        <NumericKeypad
-          onNumberPress={handleNumberPress}
-          onBackspace={handleBackspace}
-          onClear={handleClear}
-          onDone={() => setBalanceFocused(false)}
-        />
-      )}
+      <NumericKeypad
+        visible={balanceFocused}
+        onClose={() => setBalanceFocused(false)}
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={() => setBalanceFocused(false)}
+      />
     </SafeAreaView>
   );
 }

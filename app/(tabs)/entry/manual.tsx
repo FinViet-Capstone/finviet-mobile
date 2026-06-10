@@ -5,7 +5,7 @@
  * Accepts optional `date` query-param ("YYYY-MM-DD") from Calendar double-tap.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -16,11 +16,11 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { TextInput as RNTextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { z } from 'zod';
+  TextInput as RNTextInput,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { z } from "zod";
 
 import {
   BORDER_RADIUS,
@@ -28,51 +28,51 @@ import {
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from '@/constants/theme';
-import { CATEGORIES } from '@/constants/categories';
-import type { Category } from '@/constants/categories';
-import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
-import { DraggableSheet } from '@/components/common/DraggableSheet';
-import { useWallets, useCreateTransaction } from '@/hooks';
-import type { Wallet } from '@/types/wallet';
-import { formatVND } from '@/utils/formatters';
-import { todayISO } from '@/utils/date';
+} from "@/constants/theme";
+import { CATEGORIES } from "@/constants/categories";
+import type { Category } from "@/constants/categories";
+import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { NumericKeypad } from "@/components/common/NumericKeypad";
+import { DraggableSheet } from "@/components/common/DraggableSheet";
+import { useWallets, useCreateTransaction } from "@/hooks";
+import type { Wallet } from "@/types/wallet";
+import { formatVND } from "@/utils/formatters";
+import { todayISO } from "@/utils/date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EntryType = 'expense' | 'income';
+type EntryType = "expense" | "income";
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 const entrySchema = z.object({
   amount: z
-    .number({ invalid_type_error: 'Vui lòng nhập số tiền' })
-    .positive('Số tiền phải lớn hơn 0'),
+    .number({ invalid_type_error: "Vui lòng nhập số tiền" })
+    .positive("Số tiền phải lớn hơn 0"),
 });
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
 const S = {
-  titleAdd: 'Thêm Giao Dịch',
-  cancel: 'Hủy',
-  save: 'Lưu',
-  expense: 'Chi tiêu',
-  income: 'Thu nhập',
-  fieldWallet: 'Ví',
-  fieldCategory: 'Danh mục',
-  fieldDate: 'Ngày',
-  fieldPayee: 'Tên thụ hưởng',
-  fieldNote: 'Ghi chú',
-  payeePlaceholder: 'Không bắt buộc',
-  notePlaceholder: 'Không bắt buộc',
-  pickCategory: 'Chọn danh mục',
-  pickWallet: 'Chọn ví',
-  sheetCategory: 'Chọn danh mục',
-  sheetWallet: 'Chọn ví',
-  saveSuccess: 'Giao dịch đã được lưu!',
-  saveError: 'Không thể lưu. Hãy thử lại.',
+  titleAdd: "Thêm Giao Dịch",
+  cancel: "Hủy",
+  save: "Lưu",
+  expense: "Chi tiêu",
+  income: "Thu nhập",
+  fieldWallet: "Ví",
+  fieldCategory: "Danh mục",
+  fieldDate: "Ngày",
+  fieldPayee: "Tên thụ hưởng",
+  fieldNote: "Ghi chú",
+  payeePlaceholder: "Không bắt buộc",
+  notePlaceholder: "Không bắt buộc",
+  pickCategory: "Chọn danh mục",
+  pickWallet: "Chọn ví",
+  sheetCategory: "Chọn danh mục",
+  sheetWallet: "Chọn ví",
+  saveSuccess: "Giao dịch đã được lưu!",
+  saveError: "Không thể lưu. Hãy thử lại.",
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -86,23 +86,29 @@ export default function ManualEntryScreen() {
   const initialISO = dateParam ?? todayISO();
 
   // Form state
-  const [amountRaw, setAmountRaw] = useState('');
-  const [entryType, setEntryType] = useState<EntryType>('expense');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [amountRaw, setAmountRaw] = useState("");
+  const [entryType, setEntryType] = useState<EntryType>("expense");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null,
+  );
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [dateIso, setDateIso] = useState(initialISO);
-  const [payee, setPayee] = useState('');
-  const [note, setNote] = useState('');
+  const [payee, setPayee] = useState("");
+  const [note, setNote] = useState("");
 
   // UI state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
+  // Numpad is a modal overlay (backdrop + slide-up). Auto-open on mount since the
+  // amount is the primary field; tapping the amount re-opens it, Done/outside closes.
+  const [amountFocused, setAmountFocused] = useState(true);
 
   // Pre-select primary wallet
   useEffect(() => {
     if (walletData?.wallets && selectedWalletId === null) {
-      const primary = walletData.wallets.find((w) => w.isPrimary) ?? walletData.wallets[0];
+      const primary =
+        walletData.wallets.find((w) => w.isPrimary) ?? walletData.wallets[0];
       setSelectedWalletId(primary?.id ?? null);
     }
   }, [walletData, selectedWalletId]);
@@ -112,22 +118,23 @@ export default function ManualEntryScreen() {
   const wallets: Wallet[] = walletData.wallets;
   const effectiveWalletId = selectedWalletId ?? wallets[0]?.id;
   const selectedCategory = selectedCategoryId
-    ? CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null
+    ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
     : null;
-  const selectedWallet = wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
+  const selectedWallet =
+    wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
 
-  const amountNum = parseInt(amountRaw.replace(/\D/g, '') || '0', 10);
+  const amountNum = parseInt(amountRaw.replace(/\D/g, "") || "0", 10);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleAmountKey = (key: string) => {
-    if (key === 'del') {
+    if (key === "del") {
       setAmountRaw((prev) => prev.slice(0, -1));
-    } else if (key === '000') {
-      setAmountRaw((prev) => (prev === '' ? '' : prev + '000'));
+    } else if (key === "000") {
+      setAmountRaw((prev) => (prev === "" ? "" : prev + "000"));
     } else {
       setAmountRaw((prev) => {
-        if (prev === '0' && key !== '.') return key;
+        if (prev === "0" && key !== ".") return key;
         return prev + key;
       });
     }
@@ -152,12 +159,14 @@ export default function ManualEntryScreen() {
         transactionDate: dateIso,
         aiSuggestedCategoryId: null,
         aiOverridden: false,
-        entryMethod: 'manual',
+        entryMethod: "manual",
       },
       {
         onSuccess: () =>
-          Alert.alert('', S.saveSuccess, [{ text: 'OK', onPress: () => router.back() }]),
-        onError: () => Alert.alert('', S.saveError),
+          Alert.alert("", S.saveSuccess, [
+            { text: "OK", onPress: () => router.back() },
+          ]),
+        onError: () => Alert.alert("", S.saveError),
       },
     );
   };
@@ -165,18 +174,18 @@ export default function ManualEntryScreen() {
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   const formatDateDisplay = (iso: string) => {
-    const parts = iso.split('-');
+    const parts = iso.split("-");
     if (parts.length !== 3) return iso;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
-  const isExpense = entryType === 'expense';
+  const isExpense = entryType === "expense";
   const amountColor = isExpense ? COLORS.error : COLORS.tertiary;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity
@@ -193,7 +202,12 @@ export default function ManualEntryScreen() {
           onPress={handleSubmit}
           disabled={createMutation.isPending}
         >
-          <Text style={[styles.topBarSave, createMutation.isPending && styles.disabled]}>
+          <Text
+            style={[
+              styles.topBarSave,
+              createMutation.isPending && styles.disabled,
+            ]}
+          >
             {S.save}
           </Text>
         </TouchableOpacity>
@@ -202,13 +216,16 @@ export default function ManualEntryScreen() {
       {/* Type toggle */}
       <View style={styles.typeToggleWrap}>
         <View style={styles.typeToggle}>
-          {(['expense', 'income'] as EntryType[]).map((t) => (
+          {(["expense", "income"] as EntryType[]).map((t) => (
             <TouchableOpacity
               key={t}
               activeOpacity={0.7}
               style={[
                 styles.typeOption,
-                entryType === t && (t === 'expense' ? styles.typeExpenseActive : styles.typeIncomeActive),
+                entryType === t &&
+                  (t === "expense"
+                    ? styles.typeExpenseActive
+                    : styles.typeIncomeActive),
               ]}
               onPress={() => setEntryType(t)}
             >
@@ -216,31 +233,36 @@ export default function ManualEntryScreen() {
                 style={[
                   styles.typeOptionText,
                   entryType === t && styles.typeOptionTextActive,
-                  entryType === t && t === 'expense' && { color: COLORS.error },
-                  entryType === t && t === 'income' && { color: COLORS.tertiary },
+                  entryType === t && t === "expense" && { color: COLORS.error },
+                  entryType === t &&
+                    t === "income" && { color: COLORS.tertiary },
                 ]}
               >
-                {t === 'expense' ? S.expense : S.income}
+                {t === "expense" ? S.expense : S.income}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Amount display */}
-      <View style={styles.amountSection}>
+      {/* Amount display — tap to (re)open the numpad */}
+      <TouchableOpacity
+        activeOpacity={1}
+        style={styles.amountSection}
+        onPress={() => setAmountFocused(true)}
+      >
         <Text style={[styles.amountDisplay, { color: amountColor }]}>
-          {amountNum > 0 ? formatVND(amountNum) : '0 đ'}
+          {amountNum > 0 ? formatVND(amountNum) : "0 đ"}
         </Text>
         {amountError ? (
           <Text style={styles.amountError}>{amountError}</Text>
         ) : null}
-      </View>
+      </TouchableOpacity>
 
       {/* Form fields */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           style={styles.fieldsScroll}
@@ -254,8 +276,17 @@ export default function ManualEntryScreen() {
             style={styles.fieldRow}
             onPress={() => setShowWalletModal(true)}
           >
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}20` }]}>
-              <MaterialIcon name="account_balance_wallet" size={20} color={COLORS.primary} />
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.primary}20` },
+              ]}
+            >
+              <MaterialIcon
+                name="account_balance_wallet"
+                size={20}
+                color={COLORS.primary}
+              />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldWallet}</Text>
@@ -263,7 +294,11 @@ export default function ManualEntryScreen() {
                 {selectedWallet?.name ?? S.pickWallet}
               </Text>
             </View>
-            <MaterialIcon name="chevron_right" size={20} color={COLORS.outlineVariant} />
+            <MaterialIcon
+              name="chevron_right"
+              size={20}
+              color={COLORS.outlineVariant}
+            />
           </TouchableOpacity>
 
           {/* Category */}
@@ -275,7 +310,11 @@ export default function ManualEntryScreen() {
             <View
               style={[
                 styles.fieldIconWrap,
-                { backgroundColor: selectedCategory ? `${selectedCategory.color}25` : `${COLORS.secondary}20` },
+                {
+                  backgroundColor: selectedCategory
+                    ? `${selectedCategory.color}25`
+                    : `${COLORS.secondary}20`,
+                },
               ]}
             >
               <MaterialIcon
@@ -286,27 +325,52 @@ export default function ManualEntryScreen() {
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldCategory}</Text>
-              <Text style={[styles.fieldValue, !selectedCategory && styles.fieldPlaceholder]}>
+              <Text
+                style={[
+                  styles.fieldValue,
+                  !selectedCategory && styles.fieldPlaceholder,
+                ]}
+              >
                 {selectedCategory?.nameVi ?? S.pickCategory}
               </Text>
             </View>
-            <MaterialIcon name="chevron_right" size={20} color={COLORS.outlineVariant} />
+            <MaterialIcon
+              name="chevron_right"
+              size={20}
+              color={COLORS.outlineVariant}
+            />
           </TouchableOpacity>
 
           {/* Date */}
           <View style={styles.fieldRow}>
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}15` }]}>
-              <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.primary}15` },
+              ]}
+            >
+              <MaterialIcon
+                name="calendar_today"
+                size={20}
+                color={COLORS.onSurfaceVariant}
+              />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
-              <Text style={styles.fieldValue}>{formatDateDisplay(dateIso)}</Text>
+              <Text style={styles.fieldValue}>
+                {formatDateDisplay(dateIso)}
+              </Text>
             </View>
           </View>
 
           {/* Payee */}
           <View style={styles.fieldRow}>
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.outline}20` }]}>
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.outline}20` },
+              ]}
+            >
               <MaterialIcon name="person" size={20} color={COLORS.outline} />
             </View>
             <View style={styles.fieldTextWrap}>
@@ -323,7 +387,12 @@ export default function ManualEntryScreen() {
 
           {/* Note */}
           <View style={styles.fieldRow}>
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.outline}20` }]}>
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.outline}20` },
+              ]}
+            >
               <MaterialIcon name="notes" size={20} color={COLORS.outline} />
             </View>
             <View style={styles.fieldTextWrap}>
@@ -340,11 +409,17 @@ export default function ManualEntryScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Custom numpad */}
+      {/* Custom numpad — modal overlay, opens when the amount is focused */}
       <NumericKeypad
+        visible={amountFocused}
+        onClose={() => setAmountFocused(false)}
         onNumberPress={(key) => handleAmountKey(key)}
-        onBackspace={() => handleAmountKey('del')}
-        onClear={() => { setAmountRaw(''); setAmountError(undefined); }}
+        onBackspace={() => handleAmountKey("del")}
+        onClear={() => {
+          setAmountRaw("");
+          setAmountError(undefined);
+        }}
+        onDone={() => setAmountFocused(false)}
       />
 
       {/* ── Category Sheet ── */}
@@ -360,11 +435,19 @@ export default function ManualEntryScreen() {
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.sheetRow, selectedCategoryId === item.id && styles.sheetRowSelected]}
-                onPress={() => { setSelectedCategoryId(item.id); setShowCategoryModal(false); }}
+                style={[
+                  styles.sheetRow,
+                  selectedCategoryId === item.id && styles.sheetRowSelected,
+                ]}
+                onPress={() => {
+                  setSelectedCategoryId(item.id);
+                  setShowCategoryModal(false);
+                }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.sheetDot, { backgroundColor: item.color }]} />
+                <View
+                  style={[styles.sheetDot, { backgroundColor: item.color }]}
+                />
                 <Text style={styles.sheetRowText}>{item.nameVi}</Text>
                 {selectedCategoryId === item.id && (
                   <MaterialIcon name="check" size={18} color={COLORS.primary} />
@@ -388,11 +471,21 @@ export default function ManualEntryScreen() {
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.sheetRow, selectedWalletId === item.id && styles.sheetRowSelected]}
-                onPress={() => { setSelectedWalletId(item.id); setShowWalletModal(false); }}
+                style={[
+                  styles.sheetRow,
+                  selectedWalletId === item.id && styles.sheetRowSelected,
+                ]}
+                onPress={() => {
+                  setSelectedWalletId(item.id);
+                  setShowWalletModal(false);
+                }}
                 activeOpacity={0.7}
               >
-                <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon
+                  name="account_balance_wallet"
+                  size={18}
+                  color={COLORS.onSurfaceVariant}
+                />
                 <Text style={styles.sheetRowText}>{item.name}</Text>
                 {selectedWalletId === item.id && (
                   <MaterialIcon name="check" size={18} color={COLORS.primary} />
@@ -413,15 +506,15 @@ const styles = StyleSheet.create({
 
   // Top bar
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: SPACING[4],
     height: 52,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,
   },
-  topBarBtn: { minWidth: 56, alignItems: 'center' },
+  topBarBtn: { minWidth: 56, alignItems: "center" },
   topBarTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
@@ -441,7 +534,7 @@ const styles = StyleSheet.create({
   // Type toggle
   typeToggleWrap: { paddingHorizontal: SPACING[4], paddingTop: SPACING[3] },
   typeToggle: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: COLORS.surfaceContainerHigh,
     borderRadius: BORDER_RADIUS.full,
     padding: 4,
@@ -449,7 +542,7 @@ const styles = StyleSheet.create({
   typeOption: {
     flex: 1,
     paddingVertical: SPACING[2],
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: BORDER_RADIUS.full,
   },
   typeExpenseActive: {
@@ -469,12 +562,12 @@ const styles = StyleSheet.create({
 
   // Amount
   amountSection: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: SPACING[4],
     paddingHorizontal: SPACING[4],
   },
   amountDisplay: {
-    fontSize: FONT_SIZE['4xl'],
+    fontSize: FONT_SIZE["4xl"],
     fontWeight: FONT_WEIGHT.bold,
     letterSpacing: -1,
   },
@@ -494,8 +587,8 @@ const styles = StyleSheet.create({
 
   // Field row
   fieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
@@ -506,8 +599,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   fieldTextWrap: { flex: 1 },
@@ -537,7 +630,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
     paddingBottom: SPACING[8],
-    maxHeight: '70%',
+    maxHeight: "70%",
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,
@@ -546,8 +639,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[3],
   },
   sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: SPACING[3],
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,

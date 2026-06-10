@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,10 @@ function ContributionSheet({
   const { data: walletData } = useWallets();
   const [amountRaw, setAmountRaw] = useState('');
   const [note, setNote] = useState('');
+  // Numpad is a screen-level modal overlay (NOT a child of the sheet — that would
+  // clip its absolute-fill). Auto-open when the sheet opens; Done/outside dismisses.
+  const [amountFocused, setAmountFocused] = useState(true);
+  useEffect(() => { if (visible) setAmountFocused(true); }, [visible]);
 
   // The funding wallet is the source the contribution is deducted from. Its
   // balance is a hard ceiling — you can't contribute money the wallet doesn't hold.
@@ -131,6 +135,7 @@ function ContributionSheet({
   }, [canSave, parsedAmount, note, goal.id, addContrib, onClose]);
 
   return (
+    <>
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={styles.sheet}>
         <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
@@ -143,11 +148,15 @@ function ContributionSheet({
         ) : (
           <>
             <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
-            <View style={[styles.amountDisplay, hasError && styles.amountDisplayError]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.amountDisplay, hasError && styles.amountDisplayError]}
+              onPress={() => setAmountFocused(true)}
+            >
               <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
                 {amountDisplay || S.amountPlaceholder}
               </Text>
-            </View>
+            </TouchableOpacity>
             {hasError ? (
               <Text style={styles.errorText}>
                 {overBalance
@@ -180,15 +189,16 @@ function ContributionSheet({
           </TouchableOpacity>
         </View>
       </View>
-      {!zeroBalance && (
-        <NumericKeypad
-          onNumberPress={handleNumberPress}
-          onBackspace={handleBackspace}
-          onClear={handleClear}
-          onDone={onClose}
-        />
-      )}
     </DraggableSheet>
+    <NumericKeypad
+      visible={visible && amountFocused && !zeroBalance}
+      onClose={() => setAmountFocused(false)}
+      onNumberPress={handleNumberPress}
+      onBackspace={handleBackspace}
+      onClear={handleClear}
+      onDone={() => setAmountFocused(false)}
+    />
+    </>
   );
 }
 

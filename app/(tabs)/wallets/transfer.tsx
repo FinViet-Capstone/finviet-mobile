@@ -173,14 +173,14 @@ export default function TransferScreen() {
         </View>
       </ScrollView>
 
-      {amountFocused && (
-        <NumericKeypad
-          onNumberPress={handleNumberPress}
-          onBackspace={handleBackspace}
-          onClear={handleClear}
-          onDone={() => setAmountFocused(false)}
-        />
-      )}
+      <NumericKeypad
+        visible={amountFocused}
+        onClose={() => setAmountFocused(false)}
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={() => setAmountFocused(false)}
+      />
     </SafeAreaView>
   );
 }
