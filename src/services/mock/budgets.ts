@@ -118,10 +118,10 @@ let BUDGETS: BaseBudget[] = [
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
   {
-    id: 'budget_bills_01',
+    id: 'budget_housing_01',
     userId: USER_ID,
-    categoryId: 'cat_bills',
-    monthlyLimit: 1_000_000,
+    categoryId: 'cat_housing',
+    monthlyLimit: 4_500_000,
     resetDay: 1,
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',

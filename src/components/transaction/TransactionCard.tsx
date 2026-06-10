@@ -15,10 +15,39 @@ export interface TransactionCardProps {
 }
 
 /**
- * Dense transaction list row (M3). Shows category icon, an AI badge for
- * un-overridden AI suggestions, an amber left border + "classify now" hint when
- * uncategorized, and the wallet name. Income amounts are green with a + prefix;
- * expenses are unsigned (per the Transactions design).
+ * Entry-method tag — shows HOW the transaction was captured.
+ * manual → nothing; photo → camera icon; csv_import → sheet icon;
+ * sms_paste → "sms" text; linked → link icon.
+ */
+function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
+  if (method === 'manual') return null;
+
+  if (method === 'sms_paste') {
+    return (
+      <View style={styles.methodTag}>
+        <Text style={styles.methodTagText}>{'SMS'}</Text>
+      </View>
+    );
+  }
+
+  const icon =
+    method === 'photo' ? 'photo_camera'
+    : method === 'csv_import' ? 'description'
+    : 'link'; // linked
+
+  return (
+    <View style={styles.methodTag}>
+      <MaterialIcon name={icon} size={11} color={COLORS.onSurfaceVariant} />
+    </View>
+  );
+}
+
+/**
+ * Dense transaction list row (M3). Shows category icon, an entry-method tag
+ * (how the tx was captured: photo / csv / sms / linked — manual shows none),
+ * an amber left border + "classify now" hint when uncategorized, and the wallet
+ * name. Income amounts are green with a + prefix; expenses are unsigned (per the
+ * Transactions design).
  */
 export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
   const category = tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
@@ -46,12 +75,7 @@ export function TransactionCard({ transaction: tx, walletName = '', onPress }: T
           <Text style={styles.txTitle} numberOfLines={1}>
             {tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch')}
           </Text>
-          {tx.aiSuggestedCategoryId && !tx.aiOverridden && (
-            <View style={styles.aiBadge}>
-              <MaterialIcon name="auto_awesome" size={10} color={COLORS.primary} />
-              <Text style={styles.aiBadgeText}>{'AI'}</Text>
-            </View>
-          )}
+          <MethodTag method={tx.entryMethod} />
         </View>
         <Text
           style={[styles.txSubtitle, isUncategorized && { color: COLORS.secondary }]}
@@ -110,19 +134,20 @@ const styles = StyleSheet.create({
     color: COLORS.onSurface,
     flexShrink: 1,
   },
-  aiBadge: {
+  methodTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: `${COLORS.primaryContainer}33`,
+    backgroundColor: COLORS.surfaceContainerHighest,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: BORDER_RADIUS.sm,
   },
-  aiBadgeText: {
+  methodTagText: {
     fontSize: 9,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
+    color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.3,
   },
   txSubtitle: {
     fontSize: FONT_SIZE.xs,

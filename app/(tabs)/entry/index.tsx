@@ -38,7 +38,7 @@ const S = {
     {
       id: 'photo',
       icon: 'photo_camera',
-      title: 'Scan Hóa Đơn',
+      title: 'Scan Ảnh',
       description: 'Chụp ảnh hóa đơn, AI đọc và nhập tự động.',
       route: '/(tabs)/entry/photo' as const,
       color: '#4edea3',

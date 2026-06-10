@@ -24,11 +24,12 @@ export const CATEGORY_DEFAULT_BUCKETS: Record<string, 'needs' | 'wants' | 'savin
   cat_housing: 'needs',
   cat_health: 'needs',
   cat_education: 'needs',
-  cat_bills: 'needs',
   cat_family: 'needs',
   cat_shopping: 'wants',
   cat_entertain: 'wants',
   cat_beauty: 'wants',
+  cat_dining: 'wants',
   cat_savings: 'savings',
-  // cat_income and cat_other don't belong to any bucket
+  cat_invest: 'savings',
+  // cat_income and cat_uncategorized don't belong to any bucket
 } as const;

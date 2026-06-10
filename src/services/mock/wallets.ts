@@ -7,7 +7,6 @@ export const USER_ID = 'user_khoi_01' as const;
 
 export const WALLET_IDS = {
   CASH: 'wallet_cash_01',
-  MOMO: 'wallet_momo_01',
   BANK: 'wallet_bank_01',
 } as const;
 
@@ -25,17 +24,6 @@ let WALLETS: Wallet[] = [
     isPrimary: true,
     isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-05-21T00:00:00.000Z',
-  },
-  {
-    id: WALLET_IDS.MOMO,
-    userId: USER_ID,
-    name: 'Ví MoMo',
-    type: 'basic',
-    balance: 890_000,
-    isPrimary: false,
-    isDeleted: false,
-    createdAt: '2026-01-15T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
   {
