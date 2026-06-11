@@ -15,7 +15,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useGoals, useCreateGoal } from '@/hooks/useGoals';
 import type { SavingsGoalWithProgress } from '@/types/goal';
@@ -117,7 +117,7 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}>
         <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>

@@ -25,7 +25,7 @@ import {
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import {
   useTransactionById,
@@ -90,6 +90,20 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
     setDateIso(tx.transactionDate);
   }, [tx]);
 
+  // Hooks MUST run before the early returns below (rules of hooks) — these
+  // useCallbacks previously sat after the loading/error guards and crashed
+  // ("rendered more hooks than during the previous render") once tx loaded.
+  const handleAmountNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+    if (amountError) setAmountError(undefined);
+  }, [amountError]);
+
+  const handleAmountBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleAmountClear = useCallback(() => setAmountRaw(''), []);
+
   if (isLoading) return <LoadingSpinner />;
 
   if (isError || !tx) {
@@ -115,17 +129,6 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
   const amountNum = parseInt(amountRaw, 10) || 0;
   const isIncome = tx.type === 'income';
-
-  const handleAmountNumberPress = useCallback((key: string) => {
-    setAmountRaw((prev) => {
-      if (key === '000') return prev === '' ? '' : prev + '000';
-      return prev + key;
-    });
-    if (amountError) setAmountError(undefined);
-  }, [amountError]);
-
-  const handleAmountBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
-  const handleAmountClear = useCallback(() => setAmountRaw(''), []);
 
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
     const catName = CATEGORIES.find((c) => c.id === catId)?.nameVi ?? S.categoryLabel;
@@ -244,7 +247,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.fieldsContent}
+          contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

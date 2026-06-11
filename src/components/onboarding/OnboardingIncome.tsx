@@ -7,7 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, formatVietnameseCurrency } from '@/data/onboardingData';
 
@@ -44,7 +44,7 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, focused && { paddingBottom: NUMPAD_HEIGHT }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header Text */}

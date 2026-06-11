@@ -33,7 +33,7 @@ import { CATEGORIES } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { NumericKeypad } from "@/components/common/NumericKeypad";
+import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { useWallets, useCreateTransaction } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
@@ -266,7 +266,7 @@ export default function ManualEntryScreen() {
       >
         <ScrollView
           style={styles.fieldsScroll}
-          contentContainerStyle={styles.fieldsContent}
+          contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >

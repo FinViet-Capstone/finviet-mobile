@@ -14,7 +14,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { useGoalById, useAddContribution, useDeleteGoal } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
@@ -137,7 +137,7 @@ function ContributionSheet({
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, amountFocused && !zeroBalance && { paddingBottom: NUMPAD_HEIGHT }]}>
         <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
 
         {zeroBalance ? (

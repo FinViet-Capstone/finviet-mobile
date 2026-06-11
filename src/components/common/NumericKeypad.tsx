@@ -24,7 +24,16 @@ export interface NumericKeypadProps {
   activeOperator?: Operator | null;
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const GAP = SPACING[3];   // 12
+const H_PAD = SPACING[4]; // 16
+const KEY_W = (SCREEN_WIDTH - 2 * H_PAD - 4 * GAP) / 5;
+
+/**
+ * Approx height of the solid panel. Screens add this as bottom padding so the
+ * focused input/buttons sit ABOVE the numpad instead of behind it.
+ */
+export const NUMPAD_HEIGHT = Math.round(SPACING[5] + 4 * KEY_W + 3 * GAP + SPACING[10]);
 
 // Each key: (screenWidth - 2*16px padding - 4*12px gaps) / 5
 // We use fixed pixel calculations via onLayout or just use a fixed aspect approach.
@@ -195,13 +204,12 @@ export function NumericKeypad({
   );
 }
 
-const GAP = SPACING[3];   // 12
-const H_PAD = SPACING[4]; // 16
-
 const styles = StyleSheet.create({
+  // Transparent — the keypad must NOT dim/obscure the form above it. (Tap here
+  // still dismisses via onClose; it blocks touch, not the view.)
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'transparent',
   },
   panel: {
     position: 'absolute',
@@ -211,9 +219,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: BORDER_RADIUS['2xl'],
     borderTopRightRadius: BORDER_RADIUS['2xl'],
     overflow: 'hidden',
-    backgroundColor: 'rgba(31, 41, 55, 0.45)',
+    backgroundColor: COLORS.surfaceContainerHigh, // solid (no glassmorphism)
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.outlineVariant,
   },
   blur: {
     paddingTop: SPACING[5],
@@ -240,10 +248,10 @@ const styles = StyleSheet.create({
   key: {
     flex: 1,
     aspectRatio: 1,
-    backgroundColor: 'rgba(46, 53, 69, 0.6)',
+    backgroundColor: COLORS.surfaceContainerHighest,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: 'rgba(149, 142, 160, 0.2)',
+    borderColor: COLORS.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -254,31 +262,31 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   keyPressed: {
-    backgroundColor: 'rgba(46, 53, 69, 0.92)',
+    backgroundColor: COLORS.surfaceVariant,
     transform: [{ scale: 0.95 }],
   },
   keyOp: {
-    backgroundColor: 'rgba(46, 53, 69, 0.6)',
+    backgroundColor: COLORS.surfaceContainerHighest,
   },
   keyOpActive: {
-    backgroundColor: 'rgba(160, 120, 255, 0.6)',
-    borderColor: 'rgba(208, 188, 255, 0.45)',
+    backgroundColor: COLORS.primaryContainer,
+    borderColor: COLORS.primary,
   },
   clearKey: {
-    backgroundColor: `${COLORS.errorContainer}99`,
-    borderColor: `${COLORS.error}33`,
+    backgroundColor: COLORS.errorContainer,
+    borderColor: COLORS.error,
   },
   doneKey: {
     flex: 1, // 1 of 5 columns
-    backgroundColor: 'rgba(160, 120, 255, 0.68)',
+    backgroundColor: COLORS.primary,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: 'rgba(208, 188, 255, 0.45)',
+    borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   doneKeyPressed: {
-    backgroundColor: 'rgba(160, 120, 255, 0.95)',
+    backgroundColor: COLORS.primaryContainer,
     transform: [{ scale: 0.97 }],
   },
   keyText: {
@@ -290,12 +298,12 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
   },
   opTextActive: {
-    color: COLORS.primary,
+    color: COLORS.onPrimaryContainer,
   },
   clearText: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.error,
+    color: COLORS.onErrorContainer,
   },
   equalText: {
     fontSize: FONT_SIZE['3xl'],
