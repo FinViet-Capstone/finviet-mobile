@@ -36,7 +36,7 @@ export function CategoryLibrarySheet({
     return CATEGORIES.filter(
       (cat) =>
         !alreadyAddedIds.includes(cat.id) &&
-        cat.id !== 'cat_income' &&
+        cat.type !== 'income' &&
         cat.id !== 'cat_uncategorized'
     );
   }, [alreadyAddedIds]);

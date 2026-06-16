@@ -54,3 +54,5 @@ export {
   useSyncLinkedWallet,
 } from './useLinkedWallet';
 export { useRules, useCreateRule } from './useRules';
+export { useCustomerCategories, useMoveBucket } from './useCustomerCategories';
+export { useCategoryRequests, useCreateCategoryRequest } from './useCategoryRequests';

@@ -19,7 +19,7 @@ export const MOCK_BANK_TRANSACTIONS: Omit<
   'id' | 'customerId' | 'walletId' | 'createdAt' | 'updatedAt'
 >[] = [
   {
-    categoryId: 'cat_income',
+    categoryId: 'cat_salary',
     amount: 15_000_000,
     type: 'income',
     description: 'Lương tháng 4/2026',

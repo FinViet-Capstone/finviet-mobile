@@ -63,6 +63,10 @@ export const queryKeys = {
     accounts: (accessToken: string | undefined) =>
       ['linked-accounts', accessToken] as const,
   },
+  customerCategories: (customerId: string | null) =>
+    ['customer-categories', customerId] as const,
+  categoryRequests: (customerId: string | null) =>
+    ['category-requests', customerId] as const,
 } as const;
 
 /**

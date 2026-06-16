@@ -21,6 +21,8 @@
 
 export type BucketType = 'needs' | 'wants' | 'savings';
 
+export type CategoryType = 'expense' | 'income';
+
 export interface Category {
   readonly id: string;
   readonly nameVi: string;
@@ -30,12 +32,18 @@ export interface Category {
   readonly color: string;
   readonly isSystem: true;
   readonly sortOrder: number;
+  /** Whether this is an expense or income category */
+  readonly type: CategoryType;
   /**
    * System-level bucket fallback.
-   * Nullable only for cat_income and cat_uncategorized.
+   * Null for income categories and cat_uncategorized.
    * All expense categories must have a value.
    */
   readonly defaultBucket: BucketType | null;
+  /**
+   * true = only auto-assigned (e.g. cat_savings_goal); never shown in manual pickers.
+   */
+  readonly autoOnly?: true;
 }
 
 // -------------------------------------------------------------------------
@@ -52,6 +60,7 @@ export const CATEGORIES = [
     color: '#F97316',
     isSystem: true as const,
     sortOrder: 1,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   {
@@ -62,6 +71,7 @@ export const CATEGORIES = [
     color: '#14B8A6',
     isSystem: true as const,
     sortOrder: 2,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   {
@@ -72,6 +82,7 @@ export const CATEGORIES = [
     color: '#3B82F6',
     isSystem: true as const,
     sortOrder: 3,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   {
@@ -82,6 +93,7 @@ export const CATEGORIES = [
     color: '#EF4444',
     isSystem: true as const,
     sortOrder: 4,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   {
@@ -92,6 +104,7 @@ export const CATEGORIES = [
     color: '#8B5CF6',
     isSystem: true as const,
     sortOrder: 5,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   {
@@ -102,6 +115,7 @@ export const CATEGORIES = [
     color: '#0EA5E9',
     isSystem: true as const,
     sortOrder: 6,
+    type: 'expense' as const,
     defaultBucket: 'needs' as const,
   },
   // ── Wants ──────────────────────────────────────────────────────────────
@@ -113,6 +127,7 @@ export const CATEGORIES = [
     color: '#F59E0B',
     isSystem: true as const,
     sortOrder: 7,
+    type: 'expense' as const,
     defaultBucket: 'wants' as const,
   },
   {
@@ -123,6 +138,7 @@ export const CATEGORIES = [
     color: '#D946EF',
     isSystem: true as const,
     sortOrder: 8,
+    type: 'expense' as const,
     defaultBucket: 'wants' as const,
   },
   {
@@ -133,6 +149,7 @@ export const CATEGORIES = [
     color: '#EC4899',
     isSystem: true as const,
     sortOrder: 9,
+    type: 'expense' as const,
     defaultBucket: 'wants' as const,
   },
   {
@@ -143,6 +160,7 @@ export const CATEGORIES = [
     color: '#A16207',
     isSystem: true as const,
     sortOrder: 10,
+    type: 'expense' as const,
     defaultBucket: 'wants' as const,
   },
   // ── Savings ────────────────────────────────────────────────────────────
@@ -154,6 +172,7 @@ export const CATEGORIES = [
     color: '#22C55E',
     isSystem: true as const,
     sortOrder: 11,
+    type: 'expense' as const,
     defaultBucket: 'savings' as const,
   },
   {
@@ -164,19 +183,79 @@ export const CATEGORIES = [
     color: '#10B981',
     isSystem: true as const,
     sortOrder: 12,
+    type: 'expense' as const,
     defaultBucket: 'savings' as const,
   },
-  // ── Special (no bucket) ────────────────────────────────────────────────
+  // Auto-only: goal contributions routed here by the system, never shown in pickers
   {
-    id: 'cat_income',
-    nameVi: 'Thu nhập',
-    nameEn: 'Income',
-    icon: 'banknote',
-    color: '#1A6B3C',
+    id: 'cat_savings_goal',
+    nameVi: 'Đóng góp mục tiêu',
+    nameEn: 'Goal Contribution',
+    icon: 'target',
+    color: '#10B981',
     isSystem: true as const,
     sortOrder: 13,
+    type: 'expense' as const,
+    defaultBucket: 'savings' as const,
+    autoOnly: true as const,
+  },
+  // ── Income (global, never in customer_categories) ──────────────────────
+  {
+    id: 'cat_salary',
+    nameVi: 'Lương',
+    nameEn: 'Salary',
+    icon: 'banknote',
+    color: '#22C55E',
+    isSystem: true as const,
+    sortOrder: 14,
+    type: 'income' as const,
     defaultBucket: null,
   },
+  {
+    id: 'cat_freelance',
+    nameVi: 'Tự do / Freelance',
+    nameEn: 'Freelance',
+    icon: 'laptop',
+    color: '#3B82F6',
+    isSystem: true as const,
+    sortOrder: 15,
+    type: 'income' as const,
+    defaultBucket: null,
+  },
+  {
+    id: 'cat_investment_return',
+    nameVi: 'Lợi nhuận đầu tư',
+    nameEn: 'Investment Return',
+    icon: 'trending-up',
+    color: '#10B981',
+    isSystem: true as const,
+    sortOrder: 16,
+    type: 'income' as const,
+    defaultBucket: null,
+  },
+  {
+    id: 'cat_gift',
+    nameVi: 'Quà tặng / Thưởng',
+    nameEn: 'Gift / Bonus',
+    icon: 'gift',
+    color: '#F59E0B',
+    isSystem: true as const,
+    sortOrder: 17,
+    type: 'income' as const,
+    defaultBucket: null,
+  },
+  {
+    id: 'cat_income_other',
+    nameVi: 'Thu nhập khác',
+    nameEn: 'Other Income',
+    icon: 'plus-circle',
+    color: '#94A3B8',
+    isSystem: true as const,
+    sortOrder: 18,
+    type: 'income' as const,
+    defaultBucket: null,
+  },
+  // ── Special ────────────────────────────────────────────────────────────
   {
     id: 'cat_uncategorized',
     nameVi: 'Chưa phân loại',
@@ -184,7 +263,8 @@ export const CATEGORIES = [
     icon: 'ellipsis',
     color: '#94A3B8',
     isSystem: true as const,
-    sortOrder: 14,
+    sortOrder: 19,
+    type: 'expense' as const,
     defaultBucket: null,
   },
 ] as const satisfies readonly Category[];
@@ -200,14 +280,23 @@ export type CategoryId = (typeof CATEGORIES)[number]['id'];
 // -------------------------------------------------------------------------
 
 export const EXPENSE_CATEGORIES = CATEGORIES.filter(
-  (c) => c.id !== 'cat_income' && c.id !== 'cat_uncategorized',
+  (c) => c.type === 'expense' && c.id !== 'cat_uncategorized' && !('autoOnly' in c),
 ) as unknown as readonly (Category & { defaultBucket: BucketType })[];
+
+export const INCOME_CATEGORIES = CATEGORIES.filter(
+  (c) => c.type === 'income',
+) as unknown as readonly Category[];
 
 export const CATEGORIES_BY_BUCKET: Record<BucketType, readonly Category[]> = {
   needs: EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === 'needs'),
   wants: EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === 'wants'),
   savings: EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === 'savings'),
 };
+
+/** Return picker-safe categories filtered by type. */
+export function getCategories(type: 'expense' | 'income'): readonly Category[] {
+  return type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+}
 
 export function getCategoryById(id: string): Category | undefined {
   return CATEGORIES.find((c) => c.id === id);
