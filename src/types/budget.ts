@@ -17,7 +17,7 @@ export type BudgetStatus = 'safe' | 'warning' | 'danger';
 
 export interface Budget {
   id: string;
-  userId: string;
+  customerId: string;
   categoryId: string;
   /** Monthly spending cap in whole VND */
   monthlyLimit: number;

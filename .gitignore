@@ -15,10 +15,14 @@ ios/
 agents/
 prompts/
 .claude/
+.stitch/
 
 # Environment files
+# Committed: .env.example, .env.development (safe mock-mode defaults).
+# Ignored: real infra + any local overrides.
 .env
-.env.local
+.env*.local
+.env.staging
 .env.production
 
 # Firebase secrets
@@ -34,3 +38,4 @@ Thumbs.db
 .idea/
 *.swp
 
+scripts/

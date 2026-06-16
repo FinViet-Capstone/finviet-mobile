@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
-import { BarChart3 } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
 import { COLORS, FONT_SIZE } from '@/constants/theme';
 
@@ -48,7 +47,7 @@ export function BarWeek({
   if (!hasData) {
     return (
       <EmptyState
-        icon={BarChart3}
+        icon="bar_chart"
         title="Chưa có dữ liệu"
         subtitle="Thêm giao dịch để xem biểu đồ"
       />

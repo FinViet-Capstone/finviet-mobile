@@ -13,11 +13,11 @@
  */
 
 export type TransactionType = 'expense' | 'income' | 'transfer_out' | 'transfer_in';
-export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked';
+export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste';
 
 export interface Transaction {
   id: string;
-  userId: string;
+  customerId: string;
   walletId: string;
   /**
    * null = uncategorized (task-specified: string | null, not optional).
@@ -31,19 +31,13 @@ export interface Transaction {
   merchant: string | null;
   /** ISO 8601 date string "YYYY-MM-DD" */
   transactionDate: string;
-  /** AI-suggested category before user confirmation */
-  aiSuggestedCategoryId: string | null;
-  /** true when user overrode the AI suggestion */
-  aiOverridden: boolean;
   entryMethod: EntryMethod;
   /**
    * null = not a transfer leg; non-null = UUID linking the paired transfer_out / transfer_in.
    * (task-specified: string | null, not optional)
    */
   transferPairId: string | null;
-  /** Source image URL for Photo Entry; null for manual / CSV transactions */
-  imageUrl: string | null;
-  /** External transaction ID from linked wallet provider (FinVerse, etc.) */
+  /** External transaction ID from linked wallet provider (SePay, etc.) */
   externalId: string | null;
   /** ISO 8601 timestamp */
   createdAt: string;

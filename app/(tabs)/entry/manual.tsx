@@ -1,69 +1,79 @@
 /**
  * ManualEntryScreen — app/(tabs)/entry/manual.tsx
  *
- * Fields: Amount · Description (+ AI suggestion) · Category · Wallet · Date · Type
- * Accepts optional `date` query-param ("YYYY-MM-DD") from Calendar double-tap flow.
+ * Fields: Amount · Type toggle · Category · Wallet · Date · Payee · Note
+ * Accepts optional `date` query-param ("YYYY-MM-DD") from Calendar double-tap.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { z } from 'zod';
+  TextInput as RNTextInput,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { z } from "zod";
 
 import {
   BORDER_RADIUS,
   COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
-  SHADOW,
   SPACING,
-} from '@/constants/theme';
-import { CATEGORIES } from '@/constants/categories';
-import type { Category } from '@/constants/categories';
-import { TextInput } from '@/components/common/TextInput';
-import { Button } from '@/components/common/Button';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { DatePickerField } from '@/components/common/DatePickerField';
-import { useWallets, useCreateTransaction } from '@/hooks';
-import type { Wallet } from '@/types/wallet';
-import { formatVND } from '@/utils/formatters';
+} from "@/constants/theme";
+import { CATEGORIES, getCategories } from "@/constants/categories";
+import type { Category } from "@/constants/categories";
+import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
+import { DraggableSheet } from "@/components/common/DraggableSheet";
+import { useWallets, useCreateTransaction } from "@/hooks";
+import type { Wallet } from "@/types/wallet";
+import { formatVND } from "@/utils/formatters";
+import { todayISO } from "@/utils/date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EntryType = 'expense' | 'income';
+type EntryType = "expense" | "income";
 
-type FormErrors = {
-  amount?: string;
-  description?: string;
-};
-
-// ─── Validation schema ────────────────────────────────────────────────────────
+// ─── Validation ───────────────────────────────────────────────────────────────
 
 const entrySchema = z.object({
   amount: z
-    .number({ invalid_type_error: 'Vui lòng nhập số tiền' })
-    .positive('Số tiền phải lớn hơn 0'),
-  description: z.string().min(1, 'Vui lòng nhập mô tả'),
+    .number({ invalid_type_error: "Vui lòng nhập số tiền" })
+    .positive("Số tiền phải lớn hơn 0"),
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Strings ──────────────────────────────────────────────────────────────────
 
-/** Returns today's date as "YYYY-MM-DD". */
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
-}
+const S = {
+  titleAdd: "Thêm Giao Dịch",
+  cancel: "Hủy",
+  save: "Lưu",
+  expense: "Chi tiêu",
+  income: "Thu nhập",
+  fieldWallet: "Ví",
+  fieldCategory: "Danh mục",
+  fieldDate: "Ngày",
+  fieldPayee: "Tên thụ hưởng",
+  fieldNote: "Ghi chú",
+  payeePlaceholder: "Không bắt buộc",
+  notePlaceholder: "Không bắt buộc",
+  pickCategory: "Chọn danh mục",
+  pickWallet: "Chọn ví",
+  sheetCategory: "Chọn danh mục",
+  sheetWallet: "Chọn ví",
+  saveSuccess: "Giao dịch đã được lưu!",
+  saveError: "Không thể lưu. Hãy thử lại.",
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -75,388 +85,414 @@ export default function ManualEntryScreen() {
 
   const initialISO = dateParam ?? todayISO();
 
-  // ── Form state ──────────────────────────────────────────────────────────────
-  const [amountRaw, setAmountRaw] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  // Form state
+  const [amountRaw, setAmountRaw] = useState("");
+  const [entryType, setEntryType] = useState<EntryType>("expense");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null,
+  );
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [dateIso, setDateIso] = useState<string>(initialISO);
-  const [entryType, setEntryType] = useState<EntryType>('expense');
+  const [dateIso, setDateIso] = useState(initialISO);
+  const [payee, setPayee] = useState("");
+  const [note, setNote] = useState("");
 
-  // ── UI state ────────────────────────────────────────────────────────────────
-  const [aiSuggestion, setAiSuggestion] = useState<Category | null>(null);
-  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
-  const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  // UI state
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [amountError, setAmountError] = useState<string | undefined>();
+  // Numpad is a modal overlay (backdrop + slide-up). Auto-open on mount since the
+  // amount is the primary field; tapping the amount re-opens it, Done/outside closes.
+  const [amountFocused, setAmountFocused] = useState(true);
+
+  // Pre-select primary wallet
+  useEffect(() => {
+    if (walletData?.wallets && selectedWalletId === null) {
+      const primary =
+        walletData.wallets[0];
+      setSelectedWalletId(primary?.id ?? null);
+    }
+  }, [walletData, selectedWalletId]);
 
   if (isLoading || !walletData) return <LoadingSpinner />;
 
   const wallets: Wallet[] = walletData.wallets;
-  const primaryWalletId =
-    wallets.find((w) => w.isPrimary)?.id ?? wallets[0].id;
-  const effectiveWalletId = selectedWalletId ?? primaryWalletId;
-
-  // ── Derived ─────────────────────────────────────────────────────────────────
-  const selectedCategory: Category | null = selectedCategoryId
+  const effectiveWalletId = selectedWalletId ?? wallets[0]?.id;
+  const selectedCategory = selectedCategoryId
     ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
     : null;
-
-  const selectedWallet: Wallet =
+  const selectedWallet =
     wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
 
-  // ── AI suggestion debounce (600 ms) ─────────────────────────────────────────
-  useEffect(() => {
-    const trimmed = description.trim().toLowerCase();
-    if (trimmed.length < 2) {
-      setAiSuggestion(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      const match = [...CATEGORIES].find(
-        (c) =>
-          c.nameVi.toLowerCase().includes(trimmed) ||
-          trimmed.includes(c.nameVi.toLowerCase()),
-      );
-      setAiSuggestion(match ?? null);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [description]);
+  const amountNum = parseInt(amountRaw.replace(/\D/g, "") || "0", 10);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
-  const handleAmountChange = (text: string) => {
-    setAmountRaw(text.replace(/\D/g, ''));
-    if (errors.amount) setErrors((prev) => ({ ...prev, amount: undefined }));
+  const handleAmountKey = (key: string) => {
+    if (key === "del") {
+      setAmountRaw((prev) => prev.slice(0, -1));
+    } else if (key === "000") {
+      setAmountRaw((prev) => (prev === "" ? "" : prev + "000"));
+    } else {
+      setAmountRaw((prev) => {
+        if (prev === "0" && key !== ".") return key;
+        return prev + key;
+      });
+    }
+    if (amountError) setAmountError(undefined);
   };
-
-  const handleDescriptionChange = (text: string) => {
-    setDescription(text);
-    if (errors.description) setErrors((prev) => ({ ...prev, description: undefined }));
-  };
-
-  const handleAcceptSuggestion = () => {
-    if (!aiSuggestion) return;
-    setSelectedCategoryId(aiSuggestion.id);
-    setAiSuggestion(null);
-  };
-
-  const handleDismissSuggestion = () => setAiSuggestion(null);
 
   const handleSubmit = () => {
-    const digits = amountRaw.replace(/\D/g, '');
-    const amountNum = digits ? parseInt(digits, 10) : 0;
-
-    const result = entrySchema.safeParse({
-      amount: amountNum,
-      description: description.trim(),
-    });
-
+    const result = entrySchema.safeParse({ amount: amountNum });
     if (!result.success) {
-      const fe = result.error.flatten().fieldErrors;
-      setErrors({
-        amount: fe.amount?.[0],
-        description: fe.description?.[0],
-      });
+      setAmountError(result.error.flatten().fieldErrors.amount?.[0]);
       return;
     }
 
-    setErrors({});
     createMutation.mutate(
       {
         walletId: effectiveWalletId,
         categoryId: selectedCategoryId,
         amount: amountNum,
         type: entryType,
-        description: description.trim(),
-        merchant: null,
+        description: note.trim() || null,
+        merchant: payee.trim() || null,
         transactionDate: dateIso,
-        aiSuggestedCategoryId: aiSuggestion?.id ?? null,
-        aiOverridden:
-          selectedCategoryId !== null &&
-          aiSuggestion !== null &&
-          selectedCategoryId !== aiSuggestion.id,
-        entryMethod: 'manual',
+        entryMethod: "manual",
       },
       {
         onSuccess: () =>
-          Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại thành công.', [
-            { text: 'OK', onPress: () => router.back() },
+          Alert.alert("", S.saveSuccess, [
+            { text: "OK", onPress: () => router.back() },
           ]),
-        onError: () =>
-          Alert.alert('Không lưu được', 'Hãy thử lại sau.'),
+        onError: () => Alert.alert("", S.saveError),
       },
     );
   };
 
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  const formatDateDisplay = (iso: string) => {
+    const parts = iso.split("-");
+    if (parts.length !== 3) return iso;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+
+  const isExpense = entryType === "expense";
+  const amountColor = isExpense ? COLORS.error : COLORS.tertiary;
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.kav}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backIcon}>{'‹'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{'Nhập Tay'}</Text>
-          {/* Mirror of backBtn to keep title centered */}
-          <View style={styles.backBtn} />
-        </View>
-
-        {/* ── Scrollable form ── */}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.topBarBtn}
+          onPress={() => router.back()}
         >
-          {/* ─ Amount ─ */}
-          <View style={styles.card}>
-            <TextInput
-              label="Số tiền"
-              value={amountRaw}
-              onChangeText={handleAmountChange}
-              keyboardType="numeric"
-              autoFocus={true}
-              placeholder="0"
-              error={errors.amount}
-              containerStyle={styles.amountInputContainer}
-            />
-            <Text style={styles.amountPreview}>{formatVND(parseInt(amountRaw, 10) || 0)}</Text>
-          </View>
+          <Text style={styles.topBarCancel}>{S.cancel}</Text>
+        </TouchableOpacity>
+        <Text style={styles.topBarTitle}>{S.titleAdd}</Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.topBarBtn}
+          onPress={handleSubmit}
+          disabled={createMutation.isPending}
+        >
+          <Text
+            style={[
+              styles.topBarSave,
+              createMutation.isPending && styles.disabled,
+            ]}
+          >
+            {S.save}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* ─ Description ─ */}
-          <View style={styles.card}>
-            <TextInput
-              label="Mô tả"
-              value={description}
-              onChangeText={handleDescriptionChange}
-              placeholder="Ăn trưa, xăng xe, mua sắm ..."
-              error={errors.description}
-              returnKeyType="next"
-            />
-
-            {/* AI suggestion chip */}
-            {aiSuggestion !== null ? (
-              <View style={styles.suggestionRow}>
-                <Text style={styles.suggestionLabel}>{'Gợi ý AI:'}</Text>
-                <TouchableOpacity
-                  style={[styles.suggestionChip, { borderColor: aiSuggestion.color }]}
-                  onPress={handleAcceptSuggestion}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.dot, { backgroundColor: aiSuggestion.color }]} />
-                  <Text style={[styles.chipText, { color: aiSuggestion.color }]}>
-                    {aiSuggestion.nameVi}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dismissBtn}
-                  onPress={handleDismissSuggestion}
-                >
-                  <Text style={styles.dismissIcon}>{'✕'}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-
-          {/* ─ Category ─ */}
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Danh mục'}</Text>
+      {/* Type toggle */}
+      <View style={styles.typeToggleWrap}>
+        <View style={styles.typeToggle}>
+          {(["expense", "income"] as EntryType[]).map((t) => (
             <TouchableOpacity
-              style={styles.selectRow}
-              onPress={() => setShowCategoryModal(true)}
-              activeOpacity={0.75}
+              key={t}
+              activeOpacity={0.7}
+              style={[
+                styles.typeOption,
+                entryType === t &&
+                  (t === "expense"
+                    ? styles.typeExpenseActive
+                    : styles.typeIncomeActive),
+              ]}
+              onPress={() => { setEntryType(t); setSelectedCategoryId(null); }}
             >
-              {selectedCategory !== null ? (
-                <View style={styles.selectRowLeft}>
-                  <View style={[styles.dot, { backgroundColor: selectedCategory.color }]} />
-                  <Text style={styles.selectValue}>{selectedCategory.nameVi}</Text>
-                </View>
-              ) : (
-                <Text style={styles.selectPlaceholder}>{'Chọn danh mục'}</Text>
-              )}
-              <Text style={styles.chevron}>{'›'}</Text>
+              <Text
+                style={[
+                  styles.typeOptionText,
+                  entryType === t && styles.typeOptionTextActive,
+                  entryType === t && t === "expense" && { color: COLORS.error },
+                  entryType === t &&
+                    t === "income" && { color: COLORS.tertiary },
+                ]}
+              >
+                {t === "expense" ? S.expense : S.income}
+              </Text>
             </TouchableOpacity>
-          </View>
+          ))}
+        </View>
+      </View>
 
-          {/* ─ Wallet ─ */}
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Ví'}</Text>
-            <TouchableOpacity
-              style={styles.selectRow}
-              onPress={() => setShowWalletModal(true)}
-              activeOpacity={0.75}
+      {/* Amount display — tap to (re)open the numpad */}
+      <TouchableOpacity
+        activeOpacity={1}
+        style={styles.amountSection}
+        onPress={() => setAmountFocused(true)}
+      >
+        <Text style={[styles.amountDisplay, { color: amountColor }]}>
+          {amountNum > 0 ? formatVND(amountNum) : "0 đ"}
+        </Text>
+        {amountError ? (
+          <Text style={styles.amountError}>{amountError}</Text>
+        ) : null}
+      </TouchableOpacity>
+
+      {/* Form fields */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={styles.fieldsScroll}
+          contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Wallet */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.fieldRow}
+            onPress={() => setShowWalletModal(true)}
+          >
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.primary}20` },
+              ]}
             >
-              <Text style={styles.selectValue}>{selectedWallet.name}</Text>
-              <Text style={styles.chevron}>{'›'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ─ Date ─ */}
-          <View style={styles.card}>
-            <DatePickerField
-              label="Ngày"
-              value={dateIso}
-              onChange={setDateIso}
+              <MaterialIcon
+                name="account_balance_wallet"
+                size={20}
+                color={COLORS.primary}
+              />
+            </View>
+            <View style={styles.fieldTextWrap}>
+              <Text style={styles.fieldLabel}>{S.fieldWallet}</Text>
+              <Text style={styles.fieldValue}>
+                {selectedWallet?.name ?? S.pickWallet}
+              </Text>
+            </View>
+            <MaterialIcon
+              name="chevron_right"
+              size={20}
+              color={COLORS.outlineVariant}
             />
-          </View>
+          </TouchableOpacity>
 
-          {/* ─ Type toggle ─ */}
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Loại giao dịch'}</Text>
-            <View style={styles.typeToggle}>
-              <TouchableOpacity
+          {/* Category */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.fieldRow}
+            onPress={() => setShowCategoryModal(true)}
+          >
+            <View
+              style={[
+                styles.fieldIconWrap,
+                {
+                  backgroundColor: selectedCategory
+                    ? `${selectedCategory.color}25`
+                    : `${COLORS.secondary}20`,
+                },
+              ]}
+            >
+              <MaterialIcon
+                name="category"
+                size={20}
+                color={selectedCategory?.color ?? COLORS.secondary}
+              />
+            </View>
+            <View style={styles.fieldTextWrap}>
+              <Text style={styles.fieldLabel}>{S.fieldCategory}</Text>
+              <Text
                 style={[
-                  styles.typeOption,
-                  entryType === 'expense' && styles.typeOptionExpenseActive,
+                  styles.fieldValue,
+                  !selectedCategory && styles.fieldPlaceholder,
                 ]}
-                onPress={() => setEntryType('expense')}
-                activeOpacity={0.75}
               >
-                <Text
-                  style={[
-                    styles.typeOptionText,
-                    entryType === 'expense' && styles.typeOptionTextActive,
-                  ]}
-                >
-                  {'Chi tiêu'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.typeOption,
-                  entryType === 'income' && styles.typeOptionIncomeActive,
-                ]}
-                onPress={() => setEntryType('income')}
-                activeOpacity={0.75}
-              >
-                <Text
-                  style={[
-                    styles.typeOptionText,
-                    entryType === 'income' && styles.typeOptionTextActive,
-                  ]}
-                >
-                  {'Thu nhập'}
-                </Text>
-              </TouchableOpacity>
+                {selectedCategory?.nameVi ?? S.pickCategory}
+              </Text>
+            </View>
+            <MaterialIcon
+              name="chevron_right"
+              size={20}
+              color={COLORS.outlineVariant}
+            />
+          </TouchableOpacity>
+
+          {/* Date */}
+          <View style={styles.fieldRow}>
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.primary}15` },
+              ]}
+            >
+              <MaterialIcon
+                name="calendar_today"
+                size={20}
+                color={COLORS.onSurfaceVariant}
+              />
+            </View>
+            <View style={styles.fieldTextWrap}>
+              <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
+              <Text style={styles.fieldValue}>
+                {formatDateDisplay(dateIso)}
+              </Text>
             </View>
           </View>
 
-          {/* ─ Submit ─ */}
-          <Button
-            title="Lưu giao dịch"
-            onPress={handleSubmit}
-            loading={createMutation.isPending}
-            style={styles.submitBtn}
-          />
+          {/* Payee */}
+          <View style={styles.fieldRow}>
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.outline}20` },
+              ]}
+            >
+              <MaterialIcon name="person" size={20} color={COLORS.outline} />
+            </View>
+            <View style={styles.fieldTextWrap}>
+              <Text style={styles.fieldLabel}>{S.fieldPayee}</Text>
+              <RNTextInput
+                value={payee}
+                onChangeText={setPayee}
+                placeholder={S.payeePlaceholder}
+                placeholderTextColor={COLORS.outlineVariant}
+                style={styles.inlineInput}
+              />
+            </View>
+          </View>
+
+          {/* Note */}
+          <View style={styles.fieldRow}>
+            <View
+              style={[
+                styles.fieldIconWrap,
+                { backgroundColor: `${COLORS.outline}20` },
+              ]}
+            >
+              <MaterialIcon name="notes" size={20} color={COLORS.outline} />
+            </View>
+            <View style={styles.fieldTextWrap}>
+              <Text style={styles.fieldLabel}>{S.fieldNote}</Text>
+              <RNTextInput
+                value={note}
+                onChangeText={setNote}
+                placeholder={S.notePlaceholder}
+                placeholderTextColor={COLORS.outlineVariant}
+                style={styles.inlineInput}
+              />
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ════ Category modal ════ */}
-      <Modal
-        visible={showCategoryModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        {/* Outer tap area closes the sheet */}
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowCategoryModal(false)}
-        >
-          {/* Inner touch absorbs taps so the sheet doesn't close itself */}
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => { /* absorb */ }}
-            style={styles.sheet}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{'Chọn danh mục'}</Text>
-            <FlatList
-              data={[...CATEGORIES]}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.listRow,
-                    selectedCategoryId === item.id && styles.listRowSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedCategoryId(item.id);
-                    setShowCategoryModal(false);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.dotMd, { backgroundColor: item.color }]} />
-                  <Text style={styles.listRowText}>{item.nameVi}</Text>
-                  {selectedCategoryId === item.id ? (
-                    <Text style={styles.checkmark}>{'✓'}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              )}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      {/* Custom numpad — modal overlay, opens when the amount is focused */}
+      <NumericKeypad
+        visible={amountFocused}
+        onClose={() => setAmountFocused(false)}
+        onNumberPress={(key) => handleAmountKey(key)}
+        onBackspace={() => handleAmountKey("del")}
+        onClear={() => {
+          setAmountRaw("");
+          setAmountError(undefined);
+        }}
+        onDone={() => setAmountFocused(false)}
+      />
 
-      {/* ════ Wallet modal ════ */}
-      <Modal
-        visible={showWalletModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowWalletModal(false)}
+      {/* ── Category Sheet ── */}
+      <DraggableSheet
+        visible={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
       >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowWalletModal(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => { /* absorb */ }}
-            style={styles.sheet}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{'Chọn ví'}</Text>
-            <FlatList
-              data={wallets}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.listRow,
-                    selectedWalletId === item.id && styles.listRowSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedWalletId(item.id);
-                    setShowWalletModal(false);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.walletEmoji}>
-                    {item.type === 'basic'
-                      ? '💵'
-                      : item.type === 'linked'
-                      ? '🔗'
-                      : '🎯'}
-                  </Text>
-                  <Text style={styles.listRowText}>{item.name}</Text>
-                  {selectedWalletId === item.id ? (
-                    <Text style={styles.checkmark}>{'✓'}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              )}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{S.sheetCategory}</Text>
+          <FlatList
+            data={[...getCategories(entryType)]}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.sheetRow,
+                  selectedCategoryId === item.id && styles.sheetRowSelected,
+                ]}
+                onPress={() => {
+                  setSelectedCategoryId(item.id);
+                  setShowCategoryModal(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[styles.sheetDot, { backgroundColor: item.color }]}
+                />
+                <Text style={styles.sheetRowText}>{item.nameVi}</Text>
+                {selectedCategoryId === item.id && (
+                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </DraggableSheet>
+
+      {/* ── Wallet Sheet ── */}
+      <DraggableSheet
+        visible={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+      >
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{S.sheetWallet}</Text>
+          <FlatList
+            data={wallets}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.sheetRow,
+                  selectedWalletId === item.id && styles.sheetRowSelected,
+                ]}
+                onPress={() => {
+                  setSelectedWalletId(item.id);
+                  setShowWalletModal(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcon
+                  name="account_balance_wallet"
+                  size={18}
+                  color={COLORS.onSurfaceVariant}
+                />
+                <Text style={styles.sheetRowText}>{item.name}</Text>
+                {selectedWalletId === item.id && (
+                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </DraggableSheet>
     </SafeAreaView>
   );
 }
@@ -464,255 +500,166 @@ export default function ManualEntryScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // Root
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.gray[100],
-  },
-  kav: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
+  // Top bar
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
+    height: 52,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.outlineVariant,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  topBarBtn: { minWidth: 56, alignItems: "center" },
+  topBarTitle: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
   },
-  backIcon: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: COLORS.gray[700],
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-  },
-
-  // Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SPACING[5],
-    paddingBottom: SPACING[12],
-  },
-
-  // Card wrapper for each field group
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    marginBottom: SPACING[4],
-    ...SHADOW.sm,
-  },
-
-  // Amount
-  amountInputContainer: {
-    marginBottom: SPACING[2],
-  },
-  amountPreview: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[500],
-    textAlign: 'right',
-  },
-
-  // Field label (for non-TextInput fields)
-  fieldLabel: {
+  topBarCancel: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-    marginBottom: SPACING[2],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: COLORS.onSurfaceVariant,
   },
-
-  // Select row (Category / Wallet / Date)
-  selectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[3],
-    backgroundColor: COLORS.white,
-    minHeight: 48,
-  },
-  selectRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectValue: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[900],
-    flex: 1,
-  },
-  selectPlaceholder: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[400],
-    flex: 1,
-  },
-  chevron: {
-    fontSize: FONT_SIZE['2xl'],
-    color: COLORS.gray[400],
-    lineHeight: 28,
-    marginLeft: SPACING[2],
-  },
-
-  // AI suggestion
-  suggestionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING[3],
-    flexWrap: 'wrap',
-    gap: SPACING[2],
-  },
-  suggestionLabel: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[400],
-  },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    gap: SPACING[1],
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  chipText: {
+  topBarSave: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.primary,
   },
-  dismissBtn: {
-    padding: SPACING[1],
-  },
-  dismissIcon: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[400],
-  },
+  disabled: { opacity: 0.5 },
 
-  // Type toggle (segmented control)
+  // Type toggle
+  typeToggleWrap: { paddingHorizontal: SPACING[4], paddingTop: SPACING[3] },
   typeToggle: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.gray[100],
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING[1],
+    flexDirection: "row",
+    backgroundColor: COLORS.surfaceContainerHigh,
+    borderRadius: BORDER_RADIUS.full,
+    padding: 4,
   },
   typeOption: {
     flex: 1,
     paddingVertical: SPACING[2],
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
+    alignItems: "center",
+    borderRadius: BORDER_RADIUS.full,
   },
-  typeOptionExpenseActive: {
-    backgroundColor: COLORS.danger,
-    ...SHADOW.sm,
+  typeExpenseActive: {
+    backgroundColor: `${COLORS.error}20`,
   },
-  typeOptionIncomeActive: {
-    backgroundColor: COLORS.brand[500],
-    ...SHADOW.sm,
+  typeIncomeActive: {
+    backgroundColor: `${COLORS.tertiary}20`,
   },
   typeOptionText: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[500],
+    fontWeight: FONT_WEIGHT.medium,
+    color: COLORS.onSurfaceVariant,
   },
   typeOptionTextActive: {
-    color: COLORS.white,
+    fontWeight: FONT_WEIGHT.semibold,
   },
 
-  // Submit
-  submitBtn: {
-    marginTop: SPACING[2],
+  // Amount
+  amountSection: {
+    alignItems: "center",
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[4],
+  },
+  amountDisplay: {
+    fontSize: FONT_SIZE["4xl"],
+    fontWeight: FONT_WEIGHT.bold,
+    letterSpacing: -1,
+  },
+  amountError: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.error,
+    marginTop: SPACING[1],
   },
 
-  // Modal overlay
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+  // Fields scroll
+  fieldsScroll: { flex: 1 },
+  fieldsContent: {
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[4],
+    gap: SPACING[2],
   },
-  sheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[5],
-    maxHeight: '72%',
+
+  // Field row
+  fieldRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[4],
+    gap: SPACING[3],
+    minHeight: 64,
   },
-  sheetHandle: {
+  fieldIconWrap: {
     width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.gray[300],
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  fieldTextWrap: { flex: 1 },
+  fieldLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: 2,
+  },
+  fieldValue: {
+    fontSize: FONT_SIZE.base,
+    color: COLORS.onSurface,
+    fontWeight: FONT_WEIGHT.medium,
+  },
+  fieldPlaceholder: {
+    color: COLORS.outlineVariant,
+    fontWeight: FONT_WEIGHT.normal,
+  },
+  inlineInput: {
+    fontSize: FONT_SIZE.base,
+    color: COLORS.onSurface,
+    padding: 0,
+    fontWeight: FONT_WEIGHT.medium,
+  },
+
+  // Modal
+  sheet: {
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[8],
+    maxHeight: "70%",
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: COLORS.onSurface,
     marginBottom: SPACING[3],
   },
-
-  // List rows inside modals
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING[4],
+  sheetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    borderBottomColor: COLORS.outlineVariant,
+    gap: SPACING[3],
   },
-  listRowSelected: {
-    backgroundColor: COLORS.brand[50],
+  sheetRowSelected: {
+    backgroundColor: `${COLORS.primary}10`,
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 0,
     marginVertical: SPACING[1],
   },
-  listRowText: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[800],
-    marginLeft: SPACING[3],
-  },
-  checkmark: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[500],
-  },
-  dotMd: {
+  sheetDot: {
     width: 14,
     height: 14,
     borderRadius: BORDER_RADIUS.full,
+    flexShrink: 0,
   },
-  walletEmoji: {
-    fontSize: 20,
-    lineHeight: 24,
+  sheetRowText: {
+    flex: 1,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.onSurface,
   },
 });

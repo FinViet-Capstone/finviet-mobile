@@ -18,7 +18,9 @@ export type ScoreColor = 'green' | 'amber' | 'red';
 
 export interface SpendingScore {
   id: string;
-  userId: string;
+  customerId: string;
+  /** Which formula was used */
+  view: 'weekly' | 'monthly';
   /** Integer 0-100 */
   score: number;
   /** green >= 70 | amber 40-69 | red < 40 */
@@ -41,7 +43,7 @@ export interface SpendingScore {
 
 export interface WeeklyReport {
   id: string;
-  userId: string;
+  customerId: string;
   /** 150-200 word Vietnamese narrative of last week's spending */
   reportTextVi: string;
   /** ISO 8601 date "YYYY-MM-DD" -- Monday of the reported week */
@@ -59,13 +61,24 @@ export type ChatRole = 'user' | 'assistant';
 
 export interface ChatMessage {
   id: string;
-  userId: string;
+  customerId: string;
   role: ChatRole;
   content: string;
   /** Groups messages belonging to the same conversation session */
   sessionId: string;
   /** ISO 8601 timestamp */
   createdAt: string;
+}
+
+export interface ChatSession {
+  sessionId: string;
+  customerId: string;
+  /** Preview of the first user message */
+  previewText: string;
+  /** ISO 8601 timestamp of most recent message */
+  lastMessageAt: string;
+  /** Total message count in the session */
+  messageCount: number;
 }
 
 // -------------------------------------------------------------------------

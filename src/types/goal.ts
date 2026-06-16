@@ -1,10 +1,11 @@
 export interface SavingsGoal {
   id: string;
-  userId: string;
+  customerId: string;
   name: string;
+  iconEmoji?: string;
   targetAmount: number;
   currentAmount: number;
-  deadline: string; // ISO date string
+  deadline: string;
   fundingWalletId?: string;
   isCompleted: boolean;
   isDeleted: boolean;
@@ -25,10 +26,13 @@ export interface GoalContribution {
   amount: number;
   contributedAt: string;
   note?: string;
+  /** Links to the expense transaction created when fundingWalletId is set */
+  transactionId?: string;
 }
 
 export interface CreateGoalPayload {
   name: string;
+  iconEmoji?: string;
   targetAmount: number;
   deadline: string;
   fundingWalletId?: string;

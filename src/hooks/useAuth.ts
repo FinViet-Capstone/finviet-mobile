@@ -22,11 +22,11 @@ import {
   type MockChangePasswordInput,
 } from '@/services';
 import { useAuthStore } from '@/stores/authStore';
-import type { User } from '@/types';
+import type { Customer } from '@/types';
 
 export const useLogin = () => {
   const setSession = useAuthStore((s) => s.setSession);
-  return useMutation<User, Error, MockLoginInput>({
+  return useMutation<Customer, Error, MockLoginInput>({
     mutationFn: (input) => login(input),
     onSuccess: (user) => setSession(user),
   });
@@ -34,7 +34,7 @@ export const useLogin = () => {
 
 export const useRegister = () => {
   const setSession = useAuthStore((s) => s.setSession);
-  return useMutation<User, Error, MockRegisterInput>({
+  return useMutation<Customer, Error, MockRegisterInput>({
     mutationFn: (input) => register(input),
     onSuccess: (user) => setSession(user),
   });
@@ -42,7 +42,7 @@ export const useRegister = () => {
 
 export const useGoogleOAuth = (mode: 'login' | 'register') => {
   const setSession = useAuthStore((s) => s.setSession);
-  return useMutation<User, Error, void>({
+  return useMutation<Customer, Error, void>({
     mutationFn: () => googleOAuth(mode),
     onSuccess: (user) => setSession(user),
   });

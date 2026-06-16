@@ -63,7 +63,7 @@ export default function VerifyEmailScreen() {
   };
 
   const handleUseDifferentEmail = () => {
-    router.replace('/(auth)/register');
+    router.replace('/(auth)');
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export default function VerifyEmailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -176,11 +176,10 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.brand[400],
+    backgroundColor: COLORS.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING[5],
-    ...SHADOW.md,
   },
   iconEmoji: {
     fontSize: 44,
@@ -188,20 +187,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZE['2xl'],
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.white,
+    color: COLORS.onBackground,
     textAlign: 'center',
     marginBottom: SPACING[2],
   },
   subtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.brand[100],
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     marginBottom: SPACING[1],
   },
   email: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.white,
+    color: COLORS.primary,
     textAlign: 'center',
   },
 
@@ -209,33 +208,34 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: SPACING[4],
     marginTop: -SPACING[2],
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS['2xl'],
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[6],
-    ...SHADOW.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   body: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[700],
+    color: COLORS.onSurface,
     lineHeight: 22,
     marginBottom: SPACING[3],
   },
   bodyBold: {
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[900],
+    color: COLORS.onBackground,
   },
   helperNote: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
     lineHeight: 18,
     marginBottom: SPACING[5],
   },
 
   // Success pill
   successPill: {
-    backgroundColor: COLORS.brand[50],
+    backgroundColor: COLORS.primaryContainer,
     borderWidth: 1,
-    borderColor: COLORS.brand[200],
+    borderColor: COLORS.primary + '40',
     borderRadius: BORDER_RADIUS.lg,
     paddingVertical: SPACING[2],
     paddingHorizontal: SPACING[3],
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   successText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.brand[600],
+    color: COLORS.onPrimaryContainer,
     fontWeight: FONT_WEIGHT.medium,
   },
 
@@ -258,10 +258,10 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.brand[500],
+    color: COLORS.primary,
   },
   disabledLabel: {
-    color: COLORS.gray[400],
+    color: COLORS.outline,
   },
   tertiaryAction: {
     alignItems: 'center',
@@ -269,6 +269,6 @@ const styles = StyleSheet.create({
   },
   tertiaryLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
+    color: COLORS.onSurfaceVariant,
   },
 });

@@ -41,7 +41,7 @@ export function Button({
     ? styles.secondaryLabel
     : styles.ghostLabel;
 
-  const spinnerColor = variant === 'primary' ? COLORS.white : COLORS.brand[500];
+  const spinnerColor = variant === 'primary' ? COLORS.onPrimary : COLORS.primary;
 
   return (
     <TouchableOpacity
@@ -68,12 +68,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[6],
   },
   primary: {
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: COLORS.primary,
   },
   secondary: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: COLORS.brand[500],
+    backgroundColor: COLORS.transparent,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   ghost: {
     backgroundColor: COLORS.transparent,
@@ -86,12 +86,12 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.semibold,
   },
   primaryLabel: {
-    color: COLORS.white,
+    color: COLORS.onPrimary,
   },
   secondaryLabel: {
-    color: COLORS.brand[500],
+    color: COLORS.onSurface,
   },
   ghostLabel: {
-    color: COLORS.brand[500],
+    color: COLORS.primary,
   },
 });

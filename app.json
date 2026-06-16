@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.finviet.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "FinViet needs camera access to scan receipts and bank screenshots.",
-        "NSPhotoLibraryUsageDescription": "FinViet needs photo library access to upload receipt images."
+        "NSPhotoLibraryUsageDescription": "FinViet needs photo library access to upload receipt images.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -28,13 +29,13 @@
       },
       "package": "com.finviet.mobile",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "POST_NOTIFICATIONS"
-      ],
-      // "googleServicesFile": "./google-services.json"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -61,9 +62,11 @@
       "@react-native-community/datetimepicker"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "56fb570a-2e39-46af-9838-551bd9c79645"
       }
-    }
+    },
+    "owner": "iamkoi"
   }
 }

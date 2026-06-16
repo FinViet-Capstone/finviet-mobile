@@ -1,4 +1,4 @@
-export { useUser, useUpdateProfile, useUpdatePreferences } from './useUser';
+export { useCustomer, useUpdateProfile, useUpdatePreferences } from './useCustomer';
 export {
   useWallets,
   useWalletById,
@@ -30,6 +30,7 @@ export {
   useDeleteGoal,
   useAddContribution,
 } from './useGoals';
+export { useBucketSpend, type BucketSpend } from './useBucketSpend';
 export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
 export {
   useNotifications,
@@ -52,3 +53,12 @@ export {
   useLinkedAccounts,
   useSyncLinkedWallet,
 } from './useLinkedWallet';
+export { useRules, useCreateRule } from './useRules';
+export { useCustomerCategories, useMoveBucket } from './useCustomerCategories';
+export { useCategoryRequests, useCreateCategoryRequest } from './useCategoryRequests';
+export {
+  useSubscriptionPlans,
+  useCurrentSubscription,
+  useUpgradePlan,
+  useCancelSubscription,
+} from './useSubscription';

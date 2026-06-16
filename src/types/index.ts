@@ -5,7 +5,7 @@
  *   import type { Transaction, TransactionType } from '@/types';
  */
 
-export * from './user';
+export * from './customer';
 export * from './wallet';
 export * from './transaction';
 export * from './budget';
@@ -14,3 +14,7 @@ export * from './ai';
 export * from './notification';
 export * from './extraction';
 export * from './auth';
+export * from './api';
+export * from './rule';
+export * from './category';
+export * from './subscription';

@@ -18,8 +18,8 @@
  */
 
 import { AuthError } from '@/types/auth';
-import type { User } from '@/types';
-import { getUser } from './user';
+import type { Customer } from '@/types';
+import { getCustomer } from './user';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ export interface MockLoginInput {
   password: string;
 }
 
-export async function login(input: MockLoginInput): Promise<User> {
+export async function login(input: MockLoginInput): Promise<Customer> {
   await delay();
   throwForMagicEmail(input.email);
 
@@ -52,10 +52,10 @@ export async function login(input: MockLoginInput): Promise<User> {
   if (e === 'wrongpw@test.com') throw new AuthError('invalid_credentials');
   if (e === 'locked@test.com') throw new AuthError('account_locked');
   if (e === 'unverified@test.com') {
-    return { ...getUser(), email: input.email, emailVerified: false, onboardingDone: true };
+    return { ...getCustomer(), email: input.email, emailVerified: false, onboardingDone: true };
   }
 
-  return { ...getUser(), email: input.email, onboardingDone: true };
+  return { ...getCustomer(), email: input.email, onboardingDone: true };
 }
 
 // ─── register ───────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ export interface MockRegisterInput {
   password: string;
 }
 
-export async function register(input: MockRegisterInput): Promise<User> {
+export async function register(input: MockRegisterInput): Promise<Customer> {
   await delay();
   throwForMagicEmail(input.email);
 
@@ -76,7 +76,7 @@ export async function register(input: MockRegisterInput): Promise<User> {
 
   // Fresh registration: not verified, not onboarded.
   return {
-    ...getUser(),
+    ...getCustomer(),
     email: input.email,
     displayName: input.displayName,
     emailVerified: false,
@@ -94,9 +94,9 @@ export async function register(input: MockRegisterInput): Promise<User> {
  * screen can visually confirm OAuth actually switched accounts -- without it
  * the existing demo user would mask any session-routing bugs.
  */
-export async function googleOAuth(mode: 'login' | 'register'): Promise<User> {
+export async function googleOAuth(mode: 'login' | 'register'): Promise<Customer> {
   await delay(700);
-  const base = getUser();
+  const base = getCustomer();
   return {
     ...base,
     id: 'user_google_demo',

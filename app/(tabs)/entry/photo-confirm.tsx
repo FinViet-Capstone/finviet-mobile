@@ -1,621 +1,797 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   BORDER_RADIUS,
   COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
-  SHADOW,
   SPACING,
-} from '@/constants/theme';
-import { CATEGORIES } from '@/constants/categories';
-import type { Category } from '@/constants/categories';
-import { TextInput } from '@/components/common/TextInput';
-import { Button } from '@/components/common/Button';
-import { DatePickerField } from '@/components/common/DatePickerField';
-import { formatVND } from '@/utils/formatters';
-import { useExtractFromPhoto, useCreateTransaction, useWallets } from '@/hooks';
-import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from '@/constants/extraction';
+} from "@/constants/theme";
+import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { DraggableSheet } from "@/components/common/DraggableSheet";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { CATEGORIES } from "@/constants/categories";
+import { getCategoryIcon } from "@/constants/categoryIcons";
+import { formatVND } from "@/utils/formatters";
+import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
+import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ─── Strings ──────────────────────────────────────────────────────────────────
 
-type ExtractionStatus = 'processing' | 'done' | 'failed';
+const S = {
+  title: "Xác nhận giao dịch",
+  back: "arrow_back",
+  processing: "Đang phân tích ảnh...",
+  failedExtraction: "Không đọc được ảnh. Vui lòng nhập thủ công.",
+  uncertainNotice: "Các trường màu cam cần kiểm tra lại.",
+  confirmAll: "Chấp nhận tất cả",
+  needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
+  needCategory: "Chọn danh mục →",
+  retake: "Chụp lại",
+  amountLabel: "Số tiền",
+  merchantLabel: "Người nhận",
+  categoryLabel: "Danh mục",
+  dateLabel: "Ngày",
+  pickCategory: "Chọn danh mục",
+  uncategorized: "Chưa phân loại",
+  duplicate: "Có thể trùng",
+  noWallet: "Chưa có ví",
+  noWalletMsg: "Hãy tạo ít nhất một ví trước khi lưu.",
+  savedMsg: (n: number) => `Đã lưu ${n} giao dịch`,
+  saveError: "Không lưu được. Hãy thử lại.",
+  imageOf: (i: number, n: number) => `Ảnh ${i}/${n}`,
+};
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ExtractedRow {
+  uri: string;
+  status: "processing" | "done" | "failed";
+  amount: number;
+  merchant: string;
+  dateIso: string;
+  categoryId: string | null;
+  amountUncertain: boolean;
+  merchantUncertain: boolean;
+  categoryUncertain: boolean;
+  selected: boolean;
+  isDuplicate: boolean;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
-function isoToDisplay(iso: string): string {
-  const parts = iso.split('-');
-  if (parts.length !== 3) return iso;
-  return parts[2] + '/' + parts[1] + '/' + parts[0];
+function formatDate(iso: string): string {
+  const p = iso.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
 }
 
-/** Returns true when the string looks like a valid image URI. */
-function isValidUri(uri: string | undefined): boolean {
-  return typeof uri === 'string' && uri.trim().length > 0 && uri.includes('://');
+function isUncertain(row: ExtractedRow): boolean {
+  return row.amountUncertain || row.merchantUncertain || row.categoryUncertain;
 }
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
+// ─── Review Row ───────────────────────────────────────────────────────────────
+
+function ReviewRow({
+  row,
+  index,
+  total,
+  blocking,
+  onToggle,
+  onEditCategory,
+}: {
+  row: ExtractedRow;
+  index: number;
+  total: number;
+  /** Selected + extracted but has no category → blocks the batch submit. */
+  blocking: boolean;
+  onToggle: () => void;
+  onEditCategory: () => void;
+}) {
+  const cat = row.categoryId
+    ? (CATEGORIES.find((c) => c.id === row.categoryId) ?? null)
+    : null;
+  const uncertain = isUncertain(row);
+  const isFailed = row.status === "failed";
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={[
+        styles.reviewRow,
+        !row.selected && styles.reviewRowDeselected,
+        uncertain && styles.reviewRowUncertain,
+        row.isDuplicate && styles.reviewRowDuplicate,
+        isFailed && styles.reviewRowFailed,
+        blocking && styles.reviewRowBlocking,
+      ]}
+      onPress={onToggle}
+    >
+      {/* Thumbnail + checkbox */}
+      <View style={styles.reviewThumbWrap}>
+        <Image
+          source={{ uri: row.uri }}
+          style={styles.reviewThumb}
+          resizeMode="cover"
+        />
+        <View style={styles.reviewCheckOverlay}>
+          <MaterialIcon
+            name={row.selected ? "check_circle" : "radio_button_unchecked"}
+            size={20}
+            color={row.selected ? COLORS.primary : COLORS.onSurfaceVariant}
+          />
+        </View>
+      </View>
+
+      {/* Content */}
+      <View style={styles.reviewContent}>
+        <View style={styles.reviewTopRow}>
+          <Text style={styles.reviewImageLabel}>
+            {S.imageOf(index + 1, total)}
+          </Text>
+          <View style={styles.reviewBadges}>
+            {uncertain && (
+              <View style={styles.uncertainBadge}>
+                <MaterialIcon
+                  name="warning"
+                  size={12}
+                  color={COLORS.secondary}
+                />
+                <Text style={styles.uncertainBadgeText}>Cần kiểm tra</Text>
+              </View>
+            )}
+            {row.isDuplicate && (
+              <View style={styles.dupBadge}>
+                <Text style={styles.dupBadgeText}>{S.duplicate}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {isFailed ? (
+          <Text style={styles.failedText}>{S.failedExtraction}</Text>
+        ) : (
+          <>
+            {/* Amount */}
+            <View style={styles.reviewField}>
+              <Text
+                style={[
+                  styles.reviewFieldLabel,
+                  row.amountUncertain && styles.uncertainLabel,
+                ]}
+              >
+                {S.amountLabel}
+              </Text>
+              <Text
+                style={[
+                  styles.reviewFieldValue,
+                  row.amountUncertain && styles.uncertainValue,
+                ]}
+              >
+                {row.amount > 0 ? formatVND(row.amount) : "—"}
+              </Text>
+            </View>
+
+            {/* Merchant */}
+            <View style={styles.reviewField}>
+              <Text
+                style={[
+                  styles.reviewFieldLabel,
+                  row.merchantUncertain && styles.uncertainLabel,
+                ]}
+              >
+                {S.merchantLabel}
+              </Text>
+              <Text
+                style={[
+                  styles.reviewFieldValue,
+                  row.merchantUncertain && styles.uncertainValue,
+                ]}
+                numberOfLines={1}
+              >
+                {row.merchant || "—"}
+              </Text>
+            </View>
+
+            {/* Category — tappable */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.reviewField}
+              onPress={onEditCategory}
+            >
+              <Text
+                style={[
+                  styles.reviewFieldLabel,
+                  row.categoryUncertain && styles.uncertainLabel,
+                ]}
+              >
+                {S.categoryLabel}
+              </Text>
+              <View style={styles.reviewCategoryRow}>
+                {cat ? (
+                  <>
+                    <View
+                      style={[styles.catDot, { backgroundColor: cat.color }]}
+                    />
+                    <Text
+                      style={[
+                        styles.reviewFieldValue,
+                        row.categoryUncertain && styles.uncertainValue,
+                      ]}
+                    >
+                      {cat.nameVi}
+                    </Text>
+                  </>
+                ) : (
+                  <Text
+                    style={[
+                      styles.uncategorizedText,
+                      blocking && styles.needCategoryText,
+                    ]}
+                  >
+                    {blocking ? S.needCategory : S.uncategorized}
+                  </Text>
+                )}
+                <MaterialIcon
+                  name="chevron_right"
+                  size={16}
+                  color={blocking ? COLORS.error : COLORS.onSurfaceVariant}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Date */}
+            <View style={styles.reviewField}>
+              <Text style={styles.reviewFieldLabel}>{S.dateLabel}</Text>
+              <Text style={styles.reviewFieldValue}>
+                {formatDate(row.dateIso)}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PhotoConfirmScreen() {
   const router = useRouter();
-  const { uri: rawUri, date: dateParam } = useLocalSearchParams<{
-    uri?: string;
+  const { uris: rawUris, date: dateParam } = useLocalSearchParams<{
+    uris?: string;
     date?: string;
   }>();
   const extract = useExtractFromPhoto();
   const createMutation = useCreateTransaction();
   const { data: walletsData } = useWallets();
 
-  const imageUri: string | null =
-    typeof rawUri === 'string' ? rawUri : null;
+  const uris: string[] = (() => {
+    try {
+      return JSON.parse(rawUris ?? "[]");
+    } catch {
+      return [];
+    }
+  })();
 
-  const canExtract = isValidUri(imageUri ?? undefined);
-
-  // Form / UI state
-  const [status, setStatus] = useState<ExtractionStatus>(
-    canExtract ? 'processing' : 'failed',
+  const [rows, setRows] = useState<ExtractedRow[]>(
+    uris.map((uri) => ({
+      uri,
+      status: "processing",
+      amount: 0,
+      merchant: "",
+      dateIso: dateParam ?? todayISO(),
+      categoryId: null,
+      amountUncertain: false,
+      merchantUncertain: false,
+      categoryUncertain: false,
+      selected: true,
+      isDuplicate: false,
+    })),
   );
-  const [amountRaw, setAmountRaw] = useState<string>('');
-  const [merchant, setMerchant] = useState<string>('');
-  const [dateIso, setDateIso] = useState<string>(dateParam ?? todayISO());
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [categoryUncertain, setCategoryUncertain] = useState<boolean>(false);
-  const [amountUncertain, setAmountUncertain] = useState<boolean>(false);
-  const [merchantUncertain, setMerchantUncertain] = useState<boolean>(false);
-  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
-  const [amountError, setAmountError] = useState<string | undefined>(undefined);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
-  // Run extraction when we have a valid URI
+  // Extract each image
   useEffect(() => {
-    if (!canExtract || !imageUri) return;
-    extract.mutate(imageUri, {
-      onSuccess: (result) => {
-        if (result.amount !== null) setAmountRaw(String(result.amount));
-        if (result.merchant !== null) setMerchant(result.merchant);
-        // Prefer extraction date; fall back to forwarded calendar date if extraction returns today
-        setDateIso(result.transactionDate);
-        setCategoryId(result.categoryId);
-        setAmountUncertain(
-          result.confidence.amount < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
-        );
-        setMerchantUncertain(
-          result.confidence.merchant < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
-        );
-        setCategoryUncertain(
-          result.confidence.categoryId < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
-        );
-        setStatus('done');
-      },
-      onError: () => setStatus('failed'),
+    uris.forEach((uri, idx) => {
+      extract.mutate(uri, {
+        onSuccess: (result) => {
+          setRows((prev) => {
+            const updated = prev.map((r, i) =>
+              i !== idx
+                ? r
+                : {
+                    ...r,
+                    status: "done" as const,
+                    amount: result.amount ?? 0,
+                    merchant: result.merchant ?? "",
+                    dateIso: result.transactionDate,
+                    categoryId: result.categoryId,
+                    amountUncertain:
+                      result.confidence.amount <
+                      PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
+                    merchantUncertain:
+                      result.confidence.merchant <
+                      PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
+                    categoryUncertain:
+                      result.confidence.categoryId <
+                      PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
+                  },
+            );
+            // Mark duplicates: same amount + merchant + date
+            const done = updated.filter((r) => r.status === "done");
+            return updated.map((r, i) => {
+              if (r.status !== "done") return r;
+              const isDuplicate = done.some(
+                (other, oi) =>
+                  oi !== i &&
+                  other.amount === r.amount &&
+                  other.merchant === r.merchant &&
+                  other.dateIso === r.dateIso,
+              );
+              return { ...r, isDuplicate };
+            });
+          });
+        },
+        onError: () => {
+          setRows((prev) =>
+            prev.map((r, i) =>
+              i === idx
+                ? { ...r, status: "failed" as const, selected: false }
+                : r,
+            ),
+          );
+        },
+      });
     });
-  // imageUri/canExtract are stable for the lifetime of this screen
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedCategory: Category | null = categoryId
-    ? (CATEGORIES.find((c) => c.id === categoryId) ?? null)
-    : null;
+  const allProcessing = rows.every((r) => r.status === "processing");
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
-  const handleAmountChange = (text: string) => {
-    setAmountRaw(text.replace(/\D/g, ''));
-    if (amountError) setAmountError(undefined);
-  };
-
-  const handleCategorySelect = (id: string) => {
-    setCategoryId(id);
-    setCategoryUncertain(false);
-    setShowCategoryModal(false);
-  };
-
-  const handleRetake = () => {
-    router.back();
-  };
-
-  const handleConfirm = () => {
-    const digits = amountRaw.replace(/\D/g, '');
-    const amount = digits ? parseInt(digits, 10) : 0;
-    if (amount <= 0) {
-      setAmountError('Số tiền phải lớn hơn 0');
-      return;
-    }
-    const wallets = walletsData?.wallets ?? [];
-    const primary = wallets.find((w) => w.isPrimary) ?? wallets[0];
-    if (!primary) {
-      Alert.alert('Chưa có ví', 'Hãy tạo ít nhất một ví trước khi lưu giao dịch.');
-      return;
-    }
-    createMutation.mutate(
-      {
-        walletId: primary.id,
-        categoryId,
-        amount,
-        type: 'expense',
-        description: merchant.trim() || null,
-        merchant: merchant.trim() || null,
-        transactionDate: dateIso,
-        aiSuggestedCategoryId: categoryId,
-        aiOverridden: false,
-        entryMethod: 'photo',
-        imageUrl: imageUri ?? null,
-      },
-      {
-        onSuccess: () =>
-          Alert.alert('Đã lưu!', 'Giao dịch đã được ghi lại.', [
-            { text: 'OK', onPress: () => router.back() },
-          ]),
-        onError: () => Alert.alert('Không lưu được', 'Hãy thử lại sau.'),
-      },
+  const handleToggle = useCallback((idx: number) => {
+    setRows((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, selected: !r.selected } : r)),
     );
-  };
+  }, []);
 
-  // ── Processing state ──────────────────────────────────────────────────────
+  const handleCategorySelect = useCallback(
+    (categoryId: string) => {
+      setRows((prev) =>
+        prev.map((r, i) =>
+          i === editingIdx ? { ...r, categoryId, categoryUncertain: false } : r,
+        ),
+      );
+      setEditingIdx(null);
+    },
+    [editingIdx],
+  );
 
-  if (status === 'processing') {
+  const handleConfirmAll = useCallback(async () => {
+    const wallets = walletsData?.wallets ?? [];
+    const primary = wallets[0];
+    if (!primary) {
+      Alert.alert(S.noWallet, S.noWalletMsg);
+      return;
+    }
+
+    const toSave = rows.filter(
+      (r) => r.selected && r.status === "done" && r.amount > 0,
+    );
+    if (!toSave.length) return;
+    // Strict gate: never commit a row without a category (defensive — the button
+    // is already disabled while any savable row is uncategorized).
+    if (toSave.some((r) => r.categoryId === null)) return;
+
+    setIsImporting(true);
+    try {
+      for (const row of toSave) {
+        await createMutation.mutateAsync({
+          walletId: primary.id,
+          categoryId: row.categoryId,
+          amount: row.amount,
+          type: "expense",
+          description: row.merchant.trim() || null,
+          merchant: row.merchant.trim() || null,
+          transactionDate: row.dateIso,
+          entryMethod: "photo",
+        });
+      }
+      Alert.alert("", S.savedMsg(toSave.length), [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch {
+      Alert.alert("", S.saveError);
+    } finally {
+      setIsImporting(false);
+    }
+  }, [rows, walletsData, createMutation, router]);
+
+  // Strict gate (Path A): the batch can only be submitted when every selected,
+  // successfully-extracted row has a category. Uncategorized selected rows block it.
+  const savableRows = rows.filter(
+    (r) => r.selected && r.status === "done" && r.amount > 0,
+  );
+  const unresolvedCount = savableRows.filter(
+    (r) => r.categoryId === null,
+  ).length;
+  const isReadyToSubmit = savableRows.length > 0 && unresolvedCount === 0;
+
+  if (allProcessing) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.processingBox}>
-          <ActivityIndicator size="large" color={COLORS.brand[500]} />
-          <Text style={styles.processingLabel}>{'Đang xử lý ảnh...'}</Text>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.headerBtn}
+            onPress={() => router.back()}
+          >
+            <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{S.title}</Text>
+          <View style={styles.headerBtn} />
         </View>
+        <LoadingSpinner />
       </SafeAreaView>
     );
   }
 
-  // ── Form state (done | failed) ────────────────────────────────────────────
-
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.kav}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backIcon}>{String.fromCharCode(8249)}</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{'Xác nhận giao dịch'}</Text>
-          <View style={styles.backBtn} />
-        </View>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Image thumbnail */}
-          {imageUri !== null ? (
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.thumbnail}
-              resizeMode="cover"
-            />
-          ) : null}
-
-          {/* Extraction failure banner */}
-          {status === 'failed' ? (
-            <View style={styles.failureBanner}>
-              <Text style={styles.failureText}>
-                {'Không đọc được ảnh. Vui lòng nhập thủ công.'}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Uncertain fields notice */}
-          {status === 'done' && categoryUncertain ? (
-            <View style={styles.uncertainNotice}>
-              <Text style={styles.uncertainNoticeText}>
-                {'Các trường màu cam cần kiểm tra lại trước khi xác nhận.'}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Amount */}
-          <View style={styles.card}>
-            <TextInput
-              label="Số tiền"
-              value={amountRaw}
-              onChangeText={handleAmountChange}
-              keyboardType="numeric"
-              placeholder="0"
-              error={amountError}
-              containerStyle={styles.fieldGap}
-            />
-            <Text style={styles.amountPreview}>{formatVND(parseInt(amountRaw, 10) || 0)}</Text>
-          </View>
-
-          {/* Merchant / Description */}
-          <View style={styles.card}>
-            <TextInput
-              label="Nơi bán / Mô tả"
-              value={merchant}
-              onChangeText={setMerchant}
-              placeholder="Tên cửa hàng, mô tả..."
-              returnKeyType="next"
-            />
-          </View>
-
-          {/* Category */}
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>{'Danh mục'}</Text>
-            <TouchableOpacity
-              style={[
-                styles.selectRow,
-                categoryUncertain && styles.selectRowUncertain,
-              ]}
-              onPress={() => setShowCategoryModal(true)}
-              activeOpacity={0.75}
-            >
-              {selectedCategory !== null ? (
-                <View style={styles.selectRowLeft}>
-                  <View style={[styles.dot, { backgroundColor: selectedCategory.color }]} />
-                  <Text style={styles.selectValue}>{selectedCategory.nameVi}</Text>
-                </View>
-              ) : (
-                <Text style={styles.selectPlaceholder}>{'Chọn danh mục'}</Text>
-              )}
-              {categoryUncertain ? (
-                <Text style={styles.uncertainBadge}>{'?'}</Text>
-              ) : (
-                <Text style={styles.chevron}>{String.fromCharCode(8250)}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Date */}
-          <View style={styles.card}>
-            <DatePickerField
-              label="Ngày"
-              value={dateIso}
-              onChange={setDateIso}
-            />
-          </View>
-
-          {/* Action buttons */}
-          <View style={styles.actionsRow}>
-            <Button
-              title="Chụp lại"
-              variant="secondary"
-              onPress={handleRetake}
-              style={styles.halfBtn}
-            />
-            <Button
-              title="Xác nhận"
-              onPress={handleConfirm}
-              loading={createMutation.isPending}
-              style={styles.halfBtn}
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Category modal */}
-      <Modal
-        visible={showCategoryModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setShowCategoryModal(false)}
+          activeOpacity={0.7}
+          style={styles.headerBtn}
+          onPress={() => router.back()}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => { /* absorb */ }}
-            style={styles.sheet}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{'Chọn danh mục'}</Text>
-            <FlatList
-              data={[...CATEGORIES]}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.listRow,
-                    categoryId === item.id && styles.listRowSelected,
-                  ]}
-                  onPress={() => handleCategorySelect(item.id)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.dotMd, { backgroundColor: item.color }]} />
-                  <Text style={styles.listRowText}>{item.nameVi}</Text>
-                  {categoryId === item.id ? (
-                    <Text style={styles.checkmark}>{String.fromCharCode(10003)}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              )}
-            />
-          </TouchableOpacity>
+          <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
-      </Modal>
+        <Text style={styles.headerTitle}>{S.title}</Text>
+        <View style={styles.headerBtn} />
+      </View>
+
+      <FlatList
+        data={rows}
+        keyExtractor={(_, i) => String(i)}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item, index }) => (
+          <ReviewRow
+            row={item}
+            index={index}
+            total={rows.length}
+            blocking={
+              item.selected &&
+              item.status === "done" &&
+              item.amount > 0 &&
+              item.categoryId === null
+            }
+            onToggle={() => handleToggle(index)}
+            onEditCategory={() => setEditingIdx(index)}
+          />
+        )}
+      />
+
+      {/* Bottom actions */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.retakeBtn}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.retakeText}>{S.retake}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[
+            styles.confirmBtn,
+            (!isReadyToSubmit || isImporting) && styles.confirmBtnDisabled,
+          ]}
+          onPress={handleConfirmAll}
+          disabled={!isReadyToSubmit || isImporting}
+        >
+          {isImporting ? (
+            <ActivityIndicator size="small" color={COLORS.onPrimary} />
+          ) : (
+            <Text style={styles.confirmText}>
+              {unresolvedCount > 0
+                ? S.needCategorize(unresolvedCount)
+                : `${S.confirmAll} (${savableRows.length})`}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Category picker sheet */}
+      <DraggableSheet
+        visible={editingIdx !== null}
+        onClose={() => setEditingIdx(null)}
+      >
+        <View style={styles.catSheetContent}>
+          <Text style={styles.catSheetTitle}>{S.pickCategory}</Text>
+          <FlatList
+            data={[...CATEGORIES]}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const selected =
+                editingIdx !== null && rows[editingIdx]?.categoryId === item.id;
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[styles.catRow, selected && styles.catRowSelected]}
+                  onPress={() => handleCategorySelect(item.id)}
+                >
+                  <View
+                    style={[
+                      styles.catIconWrap,
+                      { backgroundColor: `${item.color}25` },
+                    ]}
+                  >
+                    <MaterialIcon
+                      name={getCategoryIcon(item.icon)}
+                      size={16}
+                      color={item.color}
+                    />
+                  </View>
+                  <Text style={styles.catRowText}>{item.nameVi}</Text>
+                  {selected && (
+                    <MaterialIcon
+                      name="check"
+                      size={18}
+                      color={COLORS.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </DraggableSheet>
     </SafeAreaView>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.gray[100],
-  },
-  kav: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
 
-  // Processing
-  processingBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[4],
-  },
-  processingLabel: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-  },
-
-  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.outlineVariant,
   },
-  backBtn: {
+  headerBtn: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: COLORS.gray[700],
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: COLORS.onSurface,
   },
 
-  // Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SPACING[5],
-    paddingBottom: SPACING[12],
-  },
-
-  // Thumbnail
-  thumbnail: {
-    width: '100%',
-    height: 120,
-    borderRadius: BORDER_RADIUS.xl,
-    marginBottom: SPACING[4],
-    backgroundColor: COLORS.gray[200],
-  },
-
-  // Failure banner
-  failureBanner: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
+  listContent: {
     padding: SPACING[4],
-    marginBottom: SPACING[4],
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.warning,
-    ...SHADOW.sm,
-  },
-  failureText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[700],
-    lineHeight: 20,
-  },
-
-  // Uncertain notice
-  uncertainNotice: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    marginBottom: SPACING[4],
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.calendar.uncategorized,
-    ...SHADOW.sm,
-  },
-  uncertainNoticeText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[700],
-    lineHeight: 20,
-  },
-
-  // Card
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    marginBottom: SPACING[4],
-    ...SHADOW.sm,
-  },
-  fieldGap: {
-    marginBottom: SPACING[2],
-  },
-  amountPreview: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[500],
-    textAlign: 'right',
-  },
-
-  // Field label (non-TextInput fields)
-  fieldLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-    marginBottom: SPACING[2],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Select rows
-  selectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[3],
-    backgroundColor: COLORS.white,
-    minHeight: 48,
-  },
-  selectRowUncertain: {
-    borderColor: COLORS.calendar.uncategorized,
-    borderWidth: 2,
-  },
-  selectRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectValue: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[900],
-    flex: 1,
-  },
-  selectPlaceholder: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[400],
-    flex: 1,
-  },
-  chevron: {
-    fontSize: FONT_SIZE['2xl'],
-    color: COLORS.gray[400],
-    lineHeight: 28,
-    marginLeft: SPACING[2],
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: BORDER_RADIUS.full,
-    marginRight: SPACING[2],
-  },
-  uncertainBadge: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.calendar.uncategorized,
-    marginLeft: SPACING[2],
-  },
-
-  // Action row
-  actionsRow: {
-    flexDirection: 'row',
     gap: SPACING[3],
-    marginTop: SPACING[2],
-  },
-  halfBtn: {
-    flex: 1,
+    paddingBottom: SPACING[4],
   },
 
-  // Modal
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+  // Review row
+  reviewRow: {
+    flexDirection: "row",
+    gap: SPACING[3],
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[3],
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
-  sheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[5],
-    maxHeight: '72%',
+  reviewRowDeselected: { opacity: 0.5 },
+  reviewRowUncertain: { borderColor: `${COLORS.secondary}60` },
+  reviewRowDuplicate: {
+    borderColor: `${COLORS.tertiary}50`,
+    backgroundColor: `${COLORS.tertiary}08`,
   },
-  sheetHandle: {
-    width: 40,
-    height: 4,
+  reviewRowFailed: {
+    borderColor: `${COLORS.error}40`,
+    backgroundColor: `${COLORS.error}08`,
+  },
+  reviewRowBlocking: { borderColor: `${COLORS.error}55` },
+
+  reviewThumbWrap: { position: "relative", width: 64, flexShrink: 0 },
+  reviewThumb: {
+    width: 64,
+    height: 80,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceVariant,
+  },
+  reviewCheckOverlay: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: `${COLORS.background}CC`,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.gray[300],
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
   },
-  sheetTitle: {
+
+  reviewContent: { flex: 1, gap: SPACING[2] },
+  reviewTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reviewImageLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurfaceVariant,
+  },
+  reviewBadges: { flexDirection: "row", gap: SPACING[1] },
+
+  uncertainBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: `${COLORS.secondary}20`,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  uncertainBadgeText: {
+    fontSize: 10,
+    color: COLORS.secondary,
+    fontWeight: FONT_WEIGHT.semibold,
+  },
+  dupBadge: {
+    backgroundColor: `${COLORS.tertiary}20`,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  dupBadgeText: {
+    fontSize: 10,
+    color: COLORS.tertiary,
+    fontWeight: FONT_WEIGHT.semibold,
+  },
+
+  reviewField: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 20,
+  },
+  reviewFieldLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    flex: 1,
+  },
+  reviewFieldValue: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    flex: 2,
+    textAlign: "right",
+  },
+  uncertainLabel: { color: COLORS.secondary },
+  uncertainValue: { color: COLORS.secondary },
+  reviewCategoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flex: 2,
+    justifyContent: "flex-end",
+  },
+  catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
+  uncategorizedText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.secondary,
+    fontStyle: "italic",
+  },
+  needCategoryText: {
+    color: COLORS.error,
+    fontStyle: "normal",
+    fontWeight: FONT_WEIGHT.semibold,
+  },
+  failedText: { fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 18 },
+
+  // Bottom bar
+  bottomBar: {
+    flexDirection: "row",
+    gap: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    backgroundColor: COLORS.background,
+  },
+  retakeBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  retakeText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurfaceVariant,
+  },
+  confirmBtn: {
+    flex: 2,
+    height: 52,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnDisabled: { opacity: 0.45 },
+  confirmText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.onPrimary,
+  },
+
+  // Category sheet
+  catSheetContent: {
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[8],
+    maxHeight: "70%",
+  },
+  catSheetTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: COLORS.onSurface,
     marginBottom: SPACING[3],
   },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING[4],
+  catRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[3],
+    paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    borderBottomColor: COLORS.outlineVariant,
   },
-  listRowSelected: {
-    backgroundColor: COLORS.brand[50],
+  catRowSelected: {
+    backgroundColor: `${COLORS.primaryContainer}22`,
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 0,
     marginVertical: SPACING[1],
   },
-  dotMd: {
-    width: 14,
-    height: 14,
+  catIconWrap: {
+    width: 32,
+    height: 32,
     borderRadius: BORDER_RADIUS.full,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  listRowText: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[800],
-    marginLeft: SPACING[3],
-  },
-  checkmark: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[500],
-  },
+  catRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
 });

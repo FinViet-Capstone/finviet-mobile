@@ -1,121 +1,215 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
-import { AmountText } from '@/components/common/AmountText';
-import { Transaction } from '@/types/transaction';
+import { formatVNDCompact } from '@/utils/formatters';
+import type { Transaction } from '@/types/transaction';
 
 export interface TransactionCardProps {
   transaction: Transaction;
+  /** Wallet display name, resolved by the caller (keeps this presentational). */
+  walletName?: string;
   onPress?: () => void;
-  /** Renders a small chevron at the right edge to signal "tap for detail". */
-  showChevron?: boolean;
 }
 
-export function TransactionCard({ transaction, onPress, showChevron = false }: TransactionCardProps) {
-  const category = transaction.categoryId
-    ? getCategoryById(transaction.categoryId)
-    : undefined;
+/**
+ * Entry-method tag — shows HOW the transaction was captured.
+ * manual → nothing; photo → camera icon; csv_import → sheet icon;
+ * sms_paste → "sms" text; linked → link icon.
+ */
+function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
+  if (method === 'manual') return null;
 
-  const categoryColor = category?.color ?? COLORS.gray[400];
-  const Icon = getCategoryIcon(category?.icon);
-
-  const [year, month, day] = transaction.transactionDate.split('-');
-  const formattedDate = `${day}/${month}/${year}`;
-
-  const content = (
-    <View style={styles.row}>
-      <View style={[styles.categoryCircle, { backgroundColor: categoryColor + '26' }]}>
-        <Icon size={20} color={categoryColor} />
-      </View>
-
-      <View style={styles.middle}>
-        <Text style={styles.description} numberOfLines={1}>
-          {transaction.description ?? category?.nameVi ?? 'Giao dịch'}
-        </Text>
-        {transaction.merchant ? (
-          <Text style={styles.merchant} numberOfLines={1}>
-            {transaction.merchant}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.right}>
-        <AmountText
-          amount={transaction.amount}
-          type={transaction.type}
-          size="sm"
-        />
-        <Text style={styles.date}>{formattedDate}</Text>
-      </View>
-
-      {showChevron ? (
-        <ChevronRight size={18} color={COLORS.gray[300]} style={styles.cardChevron} />
-      ) : null}
-    </View>
-  );
-
-  if (onPress) {
+  if (method === 'sms_paste') {
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={onPress}
-        activeOpacity={0.85}
-      >
-        {content}
-      </TouchableOpacity>
+      <View style={styles.methodTag}>
+        <Text style={styles.methodTagText}>{'SMS'}</Text>
+      </View>
     );
   }
 
-  return <View style={styles.card}>{content}</View>;
+  const icon =
+    method === 'photo' ? 'photo_camera'
+    : method === 'csv_import' ? 'description'
+    : 'link'; // linked
+
+  return (
+    <View style={styles.methodTag}>
+      <MaterialIcon name={icon} size={11} color={COLORS.onSurfaceVariant} />
+    </View>
+  );
+}
+
+/**
+ * Dense transaction list row (M3). Shows category icon, an entry-method tag
+ * (how the tx was captured: photo / csv / sms / linked — manual shows none),
+ * an amber left border + "classify now" hint when uncategorized, and the wallet
+ * name. Income amounts are green with a + prefix; expenses are unsigned (per the
+ * Transactions design).
+ */
+export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
+  const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
+  const isIncome = tx.type === 'income';
+  const isGoalContrib = tx.categoryId === 'cat_savings_goal';
+  const category = !isTransfer && tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
+  // Transfer legs carry categoryId === null but are NOT uncategorized spend —
+  // they get their own swap styling, never the amber "classify now" treatment.
+  const isUncategorized = !isTransfer && !tx.categoryId;
+  const catColor = category?.color ?? COLORS.outlineVariant;
+
+  const iconName = isTransfer
+    ? 'swap_horiz'
+    : isGoalContrib
+    ? 'savings'
+    : isUncategorized
+    ? 'help_outline'
+    : getCategoryIcon(category?.icon);
+  const iconColor = isTransfer
+    ? COLORS.onSurfaceVariant
+    : isGoalContrib
+    ? COLORS.tertiary
+    : isUncategorized
+    ? COLORS.secondary
+    : catColor;
+  const iconBg = isTransfer
+    ? `${COLORS.onSurfaceVariant}26`
+    : isGoalContrib
+    ? `${COLORS.tertiary}26`
+    : `${catColor}26`;
+
+  // Income / transfer-in are credits (+, green); transfer-out is a debit (−, neutral);
+  // expenses stay unsigned per the Transactions design.
+  const isCredit = isIncome || tx.type === 'transfer_in';
+  const amountPrefix = isCredit ? '+' : tx.type === 'transfer_out' ? '−' : '';
+  const amountColor = isCredit
+    ? COLORS.tertiary
+    : tx.type === 'transfer_out'
+    ? COLORS.onSurfaceVariant
+    : COLORS.onSurface;
+
+  // Goal-contribution title: "Nạp mục tiêu: {name from description}"
+  const goalName = isGoalContrib && tx.description
+    ? tx.description.replace(/^Nạp mục tiêu:\s*/i, '')
+    : null;
+
+  const title = isTransfer
+    ? tx.description || 'Chuyển quỹ'
+    : isGoalContrib
+    ? `Nạp mục tiêu: ${goalName ?? ''}`
+    : tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch');
+  const subtitle = isTransfer
+    ? tx.type === 'transfer_out' ? 'Chuyển đi' : 'Nhận về'
+    : isGoalContrib
+    ? 'Tiết kiệm mục tiêu'
+    : isUncategorized
+    ? 'Phân loại ngay →'
+    : (category?.nameVi ?? walletName);
+
+  return (
+    <TouchableOpacity
+      style={[styles.txRow, isUncategorized && styles.txRowUncat]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.txIcon, { backgroundColor: iconBg }]}>
+        <MaterialIcon name={iconName} size={20} color={iconColor} />
+      </View>
+
+      <View style={styles.txMeta}>
+        <View style={styles.txTitleRow}>
+          <Text style={styles.txTitle} numberOfLines={1}>{title}</Text>
+          <MethodTag method={tx.entryMethod} />
+        </View>
+        <Text
+          style={[styles.txSubtitle, isUncategorized && { color: COLORS.secondary }]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      </View>
+
+      <View style={styles.txRight}>
+        <Text style={[styles.txAmount, { color: amountColor }]}>
+          {amountPrefix}{formatVNDCompact(tx.amount)}
+        </Text>
+        <Text style={styles.txWalletLabel} numberOfLines={1}>{walletName}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    marginBottom: SPACING[2],
-    ...SHADOW.sm,
-  },
-  row: {
+  txRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    backgroundColor: COLORS.surfaceContainerLow,
+    marginHorizontal: SPACING[4],
+    marginBottom: SPACING[2],
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING[3],
   },
-  categoryCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  txRowUncat: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.secondary,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING[3],
+    flexShrink: 0,
   },
-  middle: {
+  txMeta: {
     flex: 1,
-    marginRight: SPACING[2],
+    gap: 2,
   },
-  description: {
+  txTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  txTitle: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[800],
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    flexShrink: 1,
   },
-  merchant: {
+  methodTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: COLORS.surfaceContainerHighest,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  methodTagText: {
+    fontSize: 9,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.3,
+  },
+  txSubtitle: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
-    marginTop: 2,
+    color: COLORS.onSurfaceVariant,
   },
-  right: {
+  txRight: {
     alignItems: 'flex-end',
+    gap: 2,
+    flexShrink: 0,
   },
-  date: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[400],
-    marginTop: 2,
+  txAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
   },
-  cardChevron: {
-    marginLeft: SPACING[2],
+  txWalletLabel: {
+    fontSize: 10,
+    color: COLORS.onSurfaceVariant,
+    maxWidth: 80,
   },
 });

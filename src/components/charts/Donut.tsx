@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
-import { PieChart as PieChartIcon } from 'lucide-react-native';
 import { EmptyState } from '@/components/common/EmptyState';
 import { COLORS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 
@@ -50,7 +49,7 @@ export function Donut({
   if (sorted.length === 0) {
     return (
       <EmptyState
-        icon={PieChartIcon}
+        icon="pie_chart"
         title="Chưa có dữ liệu"
         subtitle="Thêm giao dịch để xem biểu đồ"
       />

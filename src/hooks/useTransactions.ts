@@ -10,26 +10,30 @@ import {
   type CreateTransactionInput,
   type UpdateTransactionInput,
 } from '@/services';
+import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const useTransactions = (filters?: TransactionFilters) =>
   useQuery({
-    queryKey: ['transactions', filters ?? null],
+    queryKey: queryKeys.transactions.list(filters ?? null),
     queryFn: () => getTransactions(filters),
+    staleTime: STALE_TIME.short,
   });
 
 export const useTransactionById = (id: string | undefined) =>
   useQuery({
-    queryKey: ['transactions', 'byId', id],
+    queryKey: queryKeys.transactions.detail(id),
     queryFn: () => (id ? getTransactionById(id) ?? null : null),
     enabled: !!id,
+    staleTime: STALE_TIME.short,
   });
 
 export const useRecentTransactions = (n: number = 10) =>
   useQuery({
-    queryKey: ['transactions', 'recent', n],
+    queryKey: queryKeys.transactions.recent(n),
     queryFn: () => getRecentTransactions(n),
+    staleTime: STALE_TIME.short,
   });
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -40,9 +44,9 @@ export const useRecentTransactions = (n: number = 10) =>
  * report dashboard reads recent transactions.
  */
 function invalidateTransactionDependents(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: ['transactions'] });
-  qc.invalidateQueries({ queryKey: ['wallets'] });
-  qc.invalidateQueries({ queryKey: ['budgets'] });
+  qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
 }
 
 export const useCreateTransaction = () => {

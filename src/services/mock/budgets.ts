@@ -27,17 +27,25 @@ function currentMonthRange(): { startDate: string; endDate: string } {
   return { startDate: fmt(first), endDate: fmt(last) };
 }
 
+export interface MonthRange {
+  startDate: string;
+  endDate: string;
+}
+
 /** Recompute spent/remaining/percentage/status from live transactions. */
-function withSpend(budget: {
-  id: string;
-  userId: string;
-  categoryId: string;
-  monthlyLimit: number;
-  resetDay: number;
-  createdAt: string;
-  updatedAt: string;
-}): BudgetWithSpend {
-  const { startDate, endDate } = currentMonthRange();
+function withSpend(
+  budget: {
+    id: string;
+    customerId: string;
+    categoryId: string;
+    monthlyLimit: number;
+    resetDay: number;
+    createdAt: string;
+    updatedAt: string;
+  },
+  range?: MonthRange,
+): BudgetWithSpend {
+  const { startDate, endDate } = range ?? currentMonthRange();
   const cat = getCategoryById(budget.categoryId);
   const txs = getTransactions({
     categoryId: budget.categoryId,
@@ -72,7 +80,7 @@ function withSpend(budget: {
 
 interface BaseBudget {
   id: string;
-  userId: string;
+  customerId: string;
   categoryId: string;
   monthlyLimit: number;
   resetDay: number;
@@ -83,7 +91,7 @@ interface BaseBudget {
 let BUDGETS: BaseBudget[] = [
   {
     id: 'budget_food_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_food',
     monthlyLimit: 2_000_000,
     resetDay: 1,
@@ -92,7 +100,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_shopping_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_shopping',
     monthlyLimit: 1_000_000,
     resetDay: 1,
@@ -101,7 +109,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_transport_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_transport',
     monthlyLimit: 350_000,
     resetDay: 1,
@@ -110,7 +118,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_health_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_health',
     monthlyLimit: 800_000,
     resetDay: 1,
@@ -118,10 +126,10 @@ let BUDGETS: BaseBudget[] = [
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
   {
-    id: 'budget_bills_01',
-    userId: USER_ID,
-    categoryId: 'cat_bills',
-    monthlyLimit: 1_000_000,
+    id: 'budget_housing_01',
+    customerId: USER_ID,
+    categoryId: 'cat_housing',
+    monthlyLimit: 4_500_000,
     resetDay: 1,
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
@@ -130,13 +138,13 @@ let BUDGETS: BaseBudget[] = [
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
-export function getBudgets(): BudgetWithSpend[] {
-  return BUDGETS.map(withSpend);
+export function getBudgets(range?: MonthRange): BudgetWithSpend[] {
+  return BUDGETS.map((b) => withSpend(b, range));
 }
 
-export function getBudgetById(id: string): BudgetWithSpend | undefined {
+export function getBudgetById(id: string, range?: MonthRange): BudgetWithSpend | undefined {
   const base = BUDGETS.find((b) => b.id === id);
-  return base ? withSpend(base) : undefined;
+  return base ? withSpend(base, range) : undefined;
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────
@@ -157,7 +165,7 @@ export async function createBudget(
   }
   const base: BaseBudget = {
     id: genId(),
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: input.categoryId,
     monthlyLimit: input.monthlyLimit,
     resetDay: 1,

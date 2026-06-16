@@ -22,7 +22,6 @@ export const createWalletSchema = z.object({
   name: z.string().min(1, 'Vui lòng đặt tên ví').max(50),
   type: z.enum(['cash', 'momo', 'bank_account']),
   initialBalance: z.number().min(0, 'Số dư không được âm'),
-  isPrimary: z.boolean().default(false),
 });
 
 export type UpsertBudgetInput = z.infer<typeof upsertBudgetSchema>;

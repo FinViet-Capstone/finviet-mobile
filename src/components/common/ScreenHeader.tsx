@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
 
 export interface ScreenHeaderProps {
@@ -29,7 +29,7 @@ export function ScreenHeader({
             style={styles.backButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <ChevronLeft size={24} color={COLORS.gray[800]} />
+            <MaterialIcon name="chevron_left" size={24} color={COLORS.gray[800]} />
           </TouchableOpacity>
         ) : null}
       </View>

@@ -2,7 +2,7 @@
 // Import COLORS, SPACING, FONT_SIZE, etc. instead of hardcoding values.
 
 export const COLORS = {
-  // Brand
+  // Brand (Original green palette - kept for backward compatibility)
   brand: {
     50:  '#E8F5EF',
     100: '#C6E6D4',
@@ -15,6 +15,49 @@ export const COLORS = {
     800: '#0A371C',
     900: '#052511',
   },
+
+  // New Design System - Purple/Dark Theme
+  primary: '#d0bcff',
+  primaryContainer: '#a078ff',
+  onPrimary: '#3c0091',
+  onPrimaryContainer: '#340080',
+  inversePrimary: '#6d3bd7',
+
+  secondary: '#ffb690',
+  secondaryContainer: '#ec6a06',
+  onSecondary: '#552100',
+  onSecondaryContainer: '#4a1c00',
+
+  tertiary: '#4edea3',
+  tertiaryContainer: '#00a572',
+  onTertiary: '#003824',
+  onTertiaryContainer: '#00311f',
+
+  background: '#15121b',
+  surface: '#15121b',
+  surfaceDim: '#15121b',
+  surfaceBright: '#3b3742',
+  surfaceContainerLowest: '#0f0d15',
+  surfaceContainerLow: '#1d1a23',
+  surfaceContainer: '#211e27',
+  surfaceContainerHigh: '#2c2832',
+  surfaceContainerHighest: '#37333d',
+
+  onBackground: '#e7e0ed',
+  onSurface: '#e7e0ed',
+  onSurfaceVariant: '#cbc3d7',
+  surfaceVariant: '#37333d',
+
+  outline: '#958ea0',
+  outlineVariant: '#494454',
+
+  error: '#ffb4ab',
+  errorContainer: '#93000a',
+  onError: '#690005',
+  onErrorContainer: '#ffdad6',
+
+  inverseSurface: '#e7e0ed',
+  inverseOnSurface: '#322f39',
 
   // Grays
   gray: {
