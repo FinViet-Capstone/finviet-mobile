@@ -33,8 +33,11 @@ export const useGoalById = (id: string | undefined) =>
 
 function invalidateGoalDependents(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.goals.all() });
-  // Initial contributions and contributions deduct from a wallet.
+  // A contribution deducts from a wallet AND creates a cat_savings_goal transaction
+  // that feeds the savings-bucket spend — invalidate all three dependents.
   qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+  qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
 }
 
 export const useCreateGoal = () => {
@@ -58,7 +61,7 @@ export const useDeleteGoal = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteGoal(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goals.all() }),
+    onSuccess: () => invalidateGoalDependents(qc), // delete reverses tx + refunds wallet
   });
 };
 

@@ -107,8 +107,21 @@ let GOALS: SavingsGoalWithProgress[] = [
   },
 ];
 
-// Contributions store — keyed by goalId
-let CONTRIBUTIONS: GoalContribution[] = [];
+// Contributions store — keyed by goalId.
+// Seed one contribution per goal so that currentAmount = Σ contributions holds for
+// the seed data too. Without this, adding a contribution to a seed goal would
+// recompute currentAmount = Σ (just the new one) and COLLAPSE the seeded balance.
+// Seed contributions have no transactionId (the seed savings were never tracked as
+// real transactions / never deducted a wallet) — so deleteGoal won't try to reverse them.
+let CONTRIBUTIONS: GoalContribution[] = GOALS.filter((g) => g.currentAmount > 0).map(
+  (g) => ({
+    id: `contrib_seed_${g.id}`,
+    goalId: g.id,
+    amount: g.currentAmount,
+    contributedAt: g.createdAt,
+    note: 'Số dư ban đầu',
+  }),
+);
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -257,6 +270,9 @@ export async function addGoalContribution(
   await delay();
   const goal = GOALS.find((g) => g.id === goalId);
   if (!goal) throw new Error('Goal not found');
+
+  // Guard: amount must be positive
+  if (input.amount <= 0) throw new Error('invalid_amount');
 
   const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
 
