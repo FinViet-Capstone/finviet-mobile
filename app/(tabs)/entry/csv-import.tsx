@@ -178,7 +178,7 @@ export default function CsvImportScreen() {
     setIsImporting(true);
     try {
       for (const row of toImport) {
-        await createTx.mutateAsync({ walletId: selectedWalletId, categoryId: row.suggestedCategoryId, amount: row.amount, type: row.type, description: null, merchant: row.merchant, transactionDate: row.date, aiSuggestedCategoryId: row.suggestedCategoryId, aiOverridden: false, entryMethod: 'csv_import' });
+        await createTx.mutateAsync({ walletId: selectedWalletId, categoryId: row.suggestedCategoryId, amount: row.amount, type: row.type, description: null, merchant: row.merchant, transactionDate: row.date, entryMethod: 'csv_import' });
       }
       Alert.alert('', S.successMsg(toImport.length), [{ text: 'OK', onPress: () => router.back() }]);
     } finally { setIsImporting(false); }

@@ -17,22 +17,20 @@ export const WALLET_IDS = {
 let WALLETS: Wallet[] = [
   {
     id: WALLET_IDS.CASH,
-    userId: USER_ID,
+    customerId: USER_ID,
     name: 'Tiền mặt',
     type: 'basic',
     balance: 2_350_000,
-    isPrimary: true,
     isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
   },
   {
     id: WALLET_IDS.BANK,
-    userId: USER_ID,
+    customerId: USER_ID,
     name: 'Vietcombank',
     type: 'basic',
     balance: 15_200_000,
-    isPrimary: false,
     isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-05-21T00:00:00.000Z',
@@ -69,7 +67,6 @@ export interface CreateWalletInput {
   name: string;
   type: WalletType;
   balance: number;
-  isPrimary?: boolean;
   linkedMetadata?: {
     institutionId: string;
     institutionName: string;
@@ -83,19 +80,12 @@ export interface CreateWalletInput {
 
 export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
   await delay();
-  // Demote the existing primary if the new wallet claims primary.
-  if (input.isPrimary) {
-    WALLETS = WALLETS.map((w) =>
-      w.isPrimary ? { ...w, isPrimary: false, updatedAt: nowIso() } : w,
-    );
-  }
   const wallet: Wallet = {
     id: genId(),
-    userId: USER_ID,
+    customerId: USER_ID,
     name: input.name.trim(),
     type: input.type,
     balance: input.balance,
-    isPrimary: input.isPrimary ?? WALLETS.filter((w) => !w.isDeleted).length === 0,
     isDeleted: false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -108,7 +98,6 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
 export interface UpdateWalletInput {
   name?: string;
   type?: WalletType;
-  isPrimary?: boolean;
 }
 
 export async function updateWallet(
@@ -119,18 +108,10 @@ export async function updateWallet(
   const target = WALLETS.find((w) => w.id === id);
   if (!target) throw new Error('Wallet not found');
 
-  // If we're promoting this wallet to primary, demote whichever was primary.
-  if (patch.isPrimary === true) {
-    WALLETS = WALLETS.map((w) =>
-      w.isPrimary && w.id !== id ? { ...w, isPrimary: false, updatedAt: nowIso() } : w,
-    );
-  }
-
   const updated: Wallet = {
     ...target,
     ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
     ...(patch.type !== undefined ? { type: patch.type } : {}),
-    ...(patch.isPrimary !== undefined ? { isPrimary: patch.isPrimary } : {}),
     updatedAt: nowIso(),
   };
   WALLETS = WALLETS.map((w) => (w.id === id ? updated : w));
@@ -141,7 +122,7 @@ export async function deleteWallet(id: string): Promise<void> {
   await delay();
   // Soft-delete: flip the flag, preserve transactions linked to this wallet.
   WALLETS = WALLETS.map((w) =>
-    w.id === id ? { ...w, isDeleted: true, isPrimary: false, updatedAt: nowIso() } : w,
+    w.id === id ? { ...w, isDeleted: true, updatedAt: nowIso() } : w,
   );
 }
 

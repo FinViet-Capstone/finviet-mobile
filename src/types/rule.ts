@@ -9,7 +9,7 @@
 
 export interface Rule {
   id: string;
-  userId: string;
+  customerId: string;
   /** Matched case-insensitively (substring) against transaction.merchant. */
   merchantKeyword: string;
   categoryId: string;

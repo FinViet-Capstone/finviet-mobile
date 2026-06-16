@@ -38,4 +38,4 @@ Thumbs.db
 .idea/
 *.swp
 
-scripts/fetch-stitch.sh
+scripts/

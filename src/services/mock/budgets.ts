@@ -36,7 +36,7 @@ export interface MonthRange {
 function withSpend(
   budget: {
     id: string;
-    userId: string;
+    customerId: string;
     categoryId: string;
     monthlyLimit: number;
     resetDay: number;
@@ -80,7 +80,7 @@ function withSpend(
 
 interface BaseBudget {
   id: string;
-  userId: string;
+  customerId: string;
   categoryId: string;
   monthlyLimit: number;
   resetDay: number;
@@ -91,7 +91,7 @@ interface BaseBudget {
 let BUDGETS: BaseBudget[] = [
   {
     id: 'budget_food_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_food',
     monthlyLimit: 2_000_000,
     resetDay: 1,
@@ -100,7 +100,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_shopping_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_shopping',
     monthlyLimit: 1_000_000,
     resetDay: 1,
@@ -109,7 +109,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_transport_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_transport',
     monthlyLimit: 350_000,
     resetDay: 1,
@@ -118,7 +118,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_health_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_health',
     monthlyLimit: 800_000,
     resetDay: 1,
@@ -127,7 +127,7 @@ let BUDGETS: BaseBudget[] = [
   },
   {
     id: 'budget_housing_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: 'cat_housing',
     monthlyLimit: 4_500_000,
     resetDay: 1,
@@ -165,7 +165,7 @@ export async function createBudget(
   }
   const base: BaseBudget = {
     id: genId(),
-    userId: USER_ID,
+    customerId: USER_ID,
     categoryId: input.categoryId,
     monthlyLimit: input.monthlyLimit,
     resetDay: 1,

@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useUser, useUpdatePreferences } from '@/hooks/useUser';
+import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
 import { useAuthStore } from '@/stores/authStore';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ function ToggleRow({
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { data: user, isLoading } = useUser();
+  const { data: user, isLoading } = useCustomer();
   const updatePrefs = useUpdatePreferences();
   const clearSession = useAuthStore((s) => s.clearSession);
   const [logoutVisible, setLogoutVisible] = useState(false);

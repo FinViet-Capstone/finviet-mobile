@@ -36,10 +36,10 @@ class SePayClient {
   }
 
   /** Begin the account-connect flow; returns a short-lived connect token. */
-  async createConnectToken(userId: string): Promise<SePayConnectToken> {
+  async createConnectToken(customerId: string): Promise<SePayConnectToken> {
     return this.request<SePayConnectToken>('/connect/token', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ user_id: customerId }),
     });
   }
 

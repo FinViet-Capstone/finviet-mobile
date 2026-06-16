@@ -1,4 +1,4 @@
-export { useUser, useUpdateProfile, useUpdatePreferences } from './useUser';
+export { useCustomer, useUpdateProfile, useUpdatePreferences } from './useCustomer';
 export {
   useWallets,
   useWalletById,

@@ -41,7 +41,7 @@ function mapSePayToTransaction(
  */
 export async function syncLinkedWalletTransactions(
   walletId: string,
-  userId: string,
+  customerId: string,
   _accessToken: string,
   accountId: string,
   startDate?: string,
@@ -82,8 +82,8 @@ export async function getInstitutions(country: string = 'VN') {
   return sepayClient.getInstitutions(country);
 }
 
-export async function createConnectToken(userId: string) {
-  return sepayClient.createConnectToken(userId);
+export async function createConnectToken(customerId: string) {
+  return sepayClient.createConnectToken(customerId);
 }
 
 export async function exchangeConnection(connectToken: string) {
@@ -110,7 +110,6 @@ export async function mockLinkBankAccount(
     name: `${institutionName} (${MOCK_BANK_ACCOUNT.accountNumber.slice(-4)})`,
     type: 'linked',
     balance: MOCK_BANK_ACCOUNT.balance,
-    isPrimary: false,
     linkedMetadata: {
       institutionId: MOCK_BANK_ACCOUNT.institutionId,
       institutionName: MOCK_BANK_ACCOUNT.institutionName,

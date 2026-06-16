@@ -1,6 +1,6 @@
 export interface SavingsGoal {
   id: string;
-  userId: string;
+  customerId: string;
   name: string;
   iconEmoji?: string;
   targetAmount: number;

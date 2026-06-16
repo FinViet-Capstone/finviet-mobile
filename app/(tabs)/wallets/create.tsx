@@ -17,7 +17,6 @@ const S = {
   balancePlaceholder: '0đ',
   save: 'Tạo ví',
   cancel: 'Huỷ',
-  primaryLabel: 'Đặt làm ví chính',
   comingSoon: 'Sắp ra mắt',
   typeBasic: 'Ví cơ bản',
   typeLinked: 'Liên kết ngân hàng',
@@ -28,7 +27,6 @@ export default function CreateWalletScreen() {
   const createWallet = useCreateWallet();
   const [name, setName] = useState('');
   const [balanceRaw, setBalanceRaw] = useState('');
-  const [isPrimary, setIsPrimary] = useState(false);
   const [balanceFocused, setBalanceFocused] = useState(false);
 
   const parsedBalance = parseInt(balanceRaw || '0', 10);
@@ -51,7 +49,7 @@ export default function CreateWalletScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parsedBalance, isPrimary });
+    await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parsedBalance });
     router.back();
   };
 
@@ -98,11 +96,6 @@ export default function CreateWalletScreen() {
           <MaterialIcon name="dialpad" size={18} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
 
-        <TouchableOpacity activeOpacity={0.7} style={styles.primaryRow} onPress={() => setIsPrimary((v) => !v)}>
-          <MaterialIcon name={isPrimary ? 'check_box' : 'check_box_outline_blank'} size={22} color={isPrimary ? COLORS.primary : COLORS.onSurfaceVariant} />
-          <Text style={styles.primaryLabel}>{S.primaryLabel}</Text>
-        </TouchableOpacity>
-
         <View style={styles.actions}>
           <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
             <Text style={styles.cancelText}>{S.cancel}</Text>
@@ -145,8 +138,6 @@ const styles = StyleSheet.create({
   amountDisplayFocused: { borderColor: COLORS.primary },
   amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
   amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
-  primaryRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[2] },
-  primaryLabel: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
   cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, alignItems: 'center', justifyContent: 'center' },
   cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },

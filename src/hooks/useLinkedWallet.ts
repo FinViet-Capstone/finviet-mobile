@@ -28,12 +28,12 @@ export const useSyncLinkedWallet = () =>
     Error,
     {
       walletId: string;
-      userId: string;
+      customerId: string;
       accessToken: string;
       accountId: string;
       startDate?: string;
     }
   >({
-    mutationFn: ({ walletId, userId, accessToken, accountId, startDate }) =>
-      syncLinkedWalletTransactions(walletId, userId, accessToken, accountId, startDate),
+    mutationFn: ({ walletId, customerId, accessToken, accountId, startDate }) =>
+      syncLinkedWalletTransactions(walletId, customerId, accessToken, accountId, startDate),
   });

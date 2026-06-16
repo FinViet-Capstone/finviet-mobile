@@ -15,7 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
-import { useUser } from '@/hooks/useUser';
+import { useCustomer } from '@/hooks/useCustomer';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
 import { EXPENSE_CATEGORIES, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
@@ -259,7 +259,7 @@ export default function BudgetsScreen() {
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
-  const { data: user } = useUser();
+  const { data: user } = useCustomer();
 
   const income = user?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {

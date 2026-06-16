@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User } from '@/types';
+import type { Customer } from '@/types';
 
 // UI-only auth state — drives which screen tree RootNavigator renders.
 // Token storage and API calls are deferred to the data layer iteration.
@@ -7,37 +7,37 @@ import type { User } from '@/types';
 interface AuthState {
   isAuthenticated: boolean;
   onboardingDone:  boolean;
-  user:            User | null;
+  customer:        Customer | null;
 
-  setSession:         (user: User) => void;
+  setSession:         (customer: Customer) => void;
   clearSession:       () => void;
-  updateUser:         (patch: Partial<User>) => void;
+  updateCustomer:     (patch: Partial<Customer>) => void;
   markOnboardingDone: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   onboardingDone:  false,
-  user:            null,
+  customer:        null,
 
-  setSession(user) {
-    set({ isAuthenticated: true, onboardingDone: user.onboardingDone, user });
+  setSession(customer) {
+    set({ isAuthenticated: true, onboardingDone: customer.onboardingDone, customer });
   },
 
   clearSession() {
-    set({ isAuthenticated: false, onboardingDone: false, user: null });
+    set({ isAuthenticated: false, onboardingDone: false, customer: null });
   },
 
-  updateUser(patch) {
+  updateCustomer(patch) {
     set((state) => ({
-      user: state.user ? { ...state.user, ...patch } : null,
+      customer: state.customer ? { ...state.customer, ...patch } : null,
     }));
   },
 
   markOnboardingDone() {
     set((state) => ({
       onboardingDone: true,
-      user: state.user ? { ...state.user, onboardingDone: true } : null,
+      customer: state.customer ? { ...state.customer, onboardingDone: true } : null,
     }));
   },
 }));

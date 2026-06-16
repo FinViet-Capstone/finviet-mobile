@@ -1,30 +1,30 @@
 /**
- * useUser -- reads & mutates the current session user.
+ * useCustomer -- reads & mutates the current session customer.
  *
  * The mock source of truth is the Zustand auth store. Wrapping it in useQuery
  * preserves the standard `{ data, isLoading, error }` shape and makes any
- * session change (login / logout / updateUser / OAuth) auto-rotate the cache
+ * session change (login / logout / updateCustomer / OAuth) auto-rotate the cache
  * via the queryKey.
  *
- * On real-API day, queryFn becomes `api.get('/users/me')` and the mutations
- * call `PATCH /users/me` -- screens stay untouched.
+ * On real-API day, queryFn becomes `api.get('/customers/me')` and the mutations
+ * call `PATCH /customers/me` -- screens stay untouched.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
-import type { User } from '@/types';
+import type { Customer } from '@/types';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export const useUser = () => {
-  const sessionUser = useAuthStore((s) => s.user);
-  return useQuery<User | null>({
-    queryKey: queryKeys.user.session(sessionUser?.id ?? null, sessionUser?.email ?? null),
-    queryFn: async () => sessionUser ?? null,
-    staleTime: Infinity, // session is derived from the auth store, never refetched
+export const useCustomer = () => {
+  const sessionCustomer = useAuthStore((s) => s.customer);
+  return useQuery<Customer | null>({
+    queryKey: queryKeys.user.session(sessionCustomer?.id ?? null, sessionCustomer?.email ?? null),
+    queryFn: async () => sessionCustomer ?? null,
+    staleTime: Infinity,
   });
 };
 
@@ -38,11 +38,11 @@ export interface UpdateProfileInput {
 
 export const useUpdateProfile = () => {
   const qc = useQueryClient();
-  const updateUser = useAuthStore((s) => s.updateUser);
+  const updateCustomer = useAuthStore((s) => s.updateCustomer);
   return useMutation({
     mutationFn: async (patch: UpdateProfileInput) => {
       await delay();
-      updateUser({
+      updateCustomer({
         ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
         ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),
         ...(patch.monthlyIncome !== undefined
@@ -58,35 +58,27 @@ export const useUpdateProfile = () => {
 export interface UpdatePreferencesInput {
   language?: 'vi' | 'en';
   theme?: 'light' | 'dark' | 'system';
-  defaultWalletId?: string | null;
   defaultCurrency?: string;
-  dailySpendLimit?: number | null;
   notifications?: Partial<{ budget: boolean; report: boolean; goals: boolean }>;
 }
 
 export const useUpdatePreferences = () => {
   const qc = useQueryClient();
-  const updateUser = useAuthStore((s) => s.updateUser);
-  const currentUser = useAuthStore((s) => s.user);
+  const updateCustomer = useAuthStore((s) => s.updateCustomer);
+  const currentCustomer = useAuthStore((s) => s.customer);
   return useMutation({
     mutationFn: async (patch: UpdatePreferencesInput) => {
       await delay();
-      updateUser({
+      updateCustomer({
         ...(patch.language !== undefined ? { language: patch.language } : {}),
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
-        ...(patch.defaultWalletId !== undefined
-          ? { defaultWalletId: patch.defaultWalletId }
-          : {}),
         ...(patch.defaultCurrency !== undefined
           ? { defaultCurrency: patch.defaultCurrency }
           : {}),
-        ...(patch.dailySpendLimit !== undefined
-          ? { dailySpendLimit: patch.dailySpendLimit }
-          : {}),
-        ...(patch.notifications !== undefined && currentUser
+        ...(patch.notifications !== undefined && currentCustomer
           ? {
               notifications: {
-                ...currentUser.notifications,
+                ...currentCustomer.notifications,
                 ...patch.notifications,
               },
             }

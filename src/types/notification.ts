@@ -25,7 +25,7 @@ export type NotificationType =
 
 export interface AppNotification {
   id: string;
-  userId: string;
+  customerId: string;
   type: NotificationType;
   /** Short heading shown in push banner and Notification Center list */
   title: string | null;

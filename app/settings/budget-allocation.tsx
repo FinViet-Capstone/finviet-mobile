@@ -13,7 +13,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
-import { useUser, useUpdatePreferences, useUpdateProfile } from '@/hooks/useUser';
+import { useCustomer, useUpdatePreferences, useUpdateProfile } from '@/hooks/useCustomer';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ function BucketCard({
 
 export default function BudgetAllocationScreen() {
   const router = useRouter();
-  const { data: user, isLoading } = useUser();
+  const { data: user, isLoading } = useCustomer();
   const updatePrefs = useUpdatePreferences();
   const updateProfile = useUpdateProfile();
 

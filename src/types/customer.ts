@@ -27,23 +27,20 @@ export interface NotificationSettings {
 
 export type AppLanguage = 'vi' | 'en';
 export type AppTheme = 'light' | 'dark' | 'system';
+export type Gender = 'male' | 'female' | 'other';
 
-export interface UserPreferences {
+export interface CustomerPreferences {
   language: AppLanguage;
-  /** UUID of the wallet pre-selected when logging a transaction */
-  defaultWalletId: string | null;
   /** ISO 4217 currency code -- default "VND" */
   defaultCurrency: string;
   theme: AppTheme;
-  /** Optional per-day spend ceiling (whole VND); null = not set. Calendar's red-day fallback when no monthly category budget is configured. */
-  dailySpendLimit: number | null;
 }
 
 // -------------------------------------------------------------------------
 // User
 // -------------------------------------------------------------------------
 
-export interface User {
+export interface Customer {
   id: string;
   email: string;
   /** Null when the account was created via Google OAuth only */
@@ -52,18 +49,19 @@ export interface User {
   googleId: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Customer gender; null until onboarding. Drives the persona category seed. */
+  gender: Gender | null;
+  /** Date of birth "YYYY-MM-DD"; null until onboarding. Age → persona. */
+  dateOfBirth: string | null;
   /** Estimated monthly income in whole VND; null until set during onboarding */
   monthlyIncome: number | null;
   /** Bucket allocation percentages (must sum to 100). Default 50/30/20. */
   needsPct: number;
   wantsPct: number;
   savingsPct: number;
-  defaultWalletId: string | null;
   defaultCurrency: string;
   language: AppLanguage;
   theme: AppTheme;
-  /** Optional per-day spend ceiling (whole VND); null = not set. Calendar's red-day fallback when no monthly category budget is configured. */
-  dailySpendLimit: number | null;
   isActive: boolean;
   /** False until the user clicks the verification link in their inbox. Soft gate -- onboarding still runs. */
   emailVerified: boolean;
@@ -133,8 +131,6 @@ export interface UpdateProfilePayload {
 export interface UpdatePreferencesPayload {
   language?: AppLanguage;
   theme?: AppTheme;
-  defaultWalletId?: string | null;
   defaultCurrency?: string;
-  dailySpendLimit?: number | null;
   notifications?: Partial<NotificationSettings>;
 }

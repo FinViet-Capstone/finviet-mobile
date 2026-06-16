@@ -51,7 +51,7 @@ function recomputeProgress(
 let GOALS: SavingsGoalWithProgress[] = [
   {
     id: 'goal_iphone_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     name: 'Mua iPhone 16 Pro Max',
     targetAmount: 35_000_000,
     currentAmount: 12_500_000,
@@ -68,7 +68,7 @@ let GOALS: SavingsGoalWithProgress[] = [
   },
   {
     id: 'goal_danang_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     name: 'Du lịch Đà Nẵng hè 2026',
     targetAmount: 8_000_000,
     currentAmount: 5_600_000,
@@ -85,7 +85,7 @@ let GOALS: SavingsGoalWithProgress[] = [
   },
   {
     id: 'goal_emergency_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     name: 'Quỹ khẩn cấp',
     targetAmount: 20_000_000,
     currentAmount: 18_500_000,
@@ -130,7 +130,7 @@ export async function createGoal(
   const initial = input.initialAmount ?? 0;
   const base = {
     id: genId(),
-    userId: USER_ID,
+    customerId: USER_ID,
     name: input.name.trim(),
     iconEmoji: input.iconEmoji,
     targetAmount: input.targetAmount,

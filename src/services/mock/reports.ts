@@ -6,7 +6,7 @@ import { USER_ID } from './wallets';
 
 const MOCK_SPENDING_SCORE_WEEKLY: SpendingScore = {
   id: 'score_2026w21_01',
-  userId: USER_ID,
+  customerId: USER_ID,
   view: 'weekly',
   score: 72,
   color: 'green',
@@ -26,7 +26,7 @@ const MOCK_SPENDING_SCORE_WEEKLY: SpendingScore = {
 // Month of May 2026. Score = 54 → amber (40–69).
 const MOCK_SPENDING_SCORE_MONTHLY: SpendingScore = {
   id: 'score_2026m05_01',
-  userId: USER_ID,
+  customerId: USER_ID,
   view: 'monthly',
   score: 54,
   color: 'amber',
@@ -48,7 +48,7 @@ const MOCK_SPENDING_SCORE_MONTHLY: SpendingScore = {
 
 const MOCK_WEEKLY_REPORT: WeeklyReport = {
   id: 'report_2026w20_01',
-  userId: USER_ID,
+  customerId: USER_ID,
   reportTextVi:
     'Tuần vừa qua (11–17/05/2026), tổng chi tiêu của bạn đạt 2.154.000đ, tăng nhẹ so với ' +
     'tuần trước (1.890.000đ). Danh mục tốn nhiều nhất là Mua sắm với 628.000đ, đến từ Uniqlo ' +
@@ -72,7 +72,7 @@ const MOCK_WEEKLY_REPORT: WeeklyReport = {
 const MOCK_CHAT_HISTORY: ChatMessage[] = [
   {
     id: 'msg_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'user',
     content: 'Tháng này tôi tiêu nhiều nhất vào đâu?',
     sessionId: 'session_demo_01',
@@ -80,7 +80,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
   },
   {
     id: 'msg_02',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'assistant',
     content:
       'Tháng 5/2026 (tính đến hôm nay 21/05), bạn chi nhiều nhất vào danh mục **Mua sắm** ' +
@@ -94,7 +94,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
   },
   {
     id: 'msg_03',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'user',
     content: 'Tôi cần tiết kiệm thêm bao nhiêu để đạt mục tiêu du lịch Đà Nẵng?',
     sessionId: 'session_demo_01',
@@ -102,7 +102,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
   },
   {
     id: 'msg_04',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'assistant',
     content:
       'Mục tiêu "Du lịch Đà Nẵng hè 2026" của bạn hiện ở mức **70%** — bạn đã tích lũy được ' +
@@ -116,7 +116,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
   },
   {
     id: 'msg_05',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'user',
     content: 'So sánh chi tiêu tháng này với tháng trước?',
     sessionId: 'session_demo_01',
@@ -124,7 +124,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
   },
   {
     id: 'msg_06',
-    userId: USER_ID,
+    customerId: USER_ID,
     role: 'assistant',
     content:
       'Tháng 4/2026 bạn chi tổng **7.820.000đ** (đã trừ chuyển khoản nội bộ). Tháng 5/2026 ' +
@@ -157,21 +157,21 @@ export function getChatHistory(): ChatMessage[] {
 const MOCK_CHAT_SESSIONS: ChatSession[] = [
   {
     sessionId: 'session_demo_01',
-    userId: USER_ID,
+    customerId: USER_ID,
     previewText: 'Tháng này tôi tiêu nhiều nhất vào đâu?',
     lastMessageAt: '2026-05-21T09:02:10.000Z',
     messageCount: 6,
   },
   {
     sessionId: 'session_demo_02',
-    userId: USER_ID,
+    customerId: USER_ID,
     previewText: 'Tôi có đang chi tiêu quá mức không?',
     lastMessageAt: '2026-05-15T14:30:00.000Z',
     messageCount: 4,
   },
   {
     sessionId: 'session_demo_03',
-    userId: USER_ID,
+    customerId: USER_ID,
     previewText: 'Gợi ý cách tiết kiệm cho tháng tới?',
     lastMessageAt: '2026-05-10T10:00:00.000Z',
     messageCount: 3,
@@ -180,12 +180,12 @@ const MOCK_CHAT_SESSIONS: ChatSession[] = [
 
 const MOCK_SESSION_02: ChatMessage[] = [
   {
-    id: 'msg_s2_01', userId: USER_ID, role: 'user',
+    id: 'msg_s2_01', customerId: USER_ID, role: 'user',
     content: 'Tôi có đang chi tiêu quá mức không?',
     sessionId: 'session_demo_02', createdAt: '2026-05-15T14:30:00.000Z',
   },
   {
-    id: 'msg_s2_02', userId: USER_ID, role: 'assistant',
+    id: 'msg_s2_02', customerId: USER_ID, role: 'assistant',
     content: 'Tháng 5 đến ngày 15/05, bạn đã chi 6.120.000đ — tương đương 51% thu nhập. Với 16 ngày còn lại, nếu duy trì tốc độ này bạn sẽ kết thúc tháng ở mức ~12.5M, vượt thu nhập 12M. Danh mục cần chú ý nhất là Mua sắm (đã vượt ngân sách 89%).',
     sessionId: 'session_demo_02', createdAt: '2026-05-15T14:30:08.000Z',
   },
@@ -193,12 +193,12 @@ const MOCK_SESSION_02: ChatMessage[] = [
 
 const MOCK_SESSION_03: ChatMessage[] = [
   {
-    id: 'msg_s3_01', userId: USER_ID, role: 'user',
+    id: 'msg_s3_01', customerId: USER_ID, role: 'user',
     content: 'Gợi ý cách tiết kiệm cho tháng tới?',
     sessionId: 'session_demo_03', createdAt: '2026-05-10T10:00:00.000Z',
   },
   {
-    id: 'msg_s3_02', userId: USER_ID, role: 'assistant',
+    id: 'msg_s3_02', customerId: USER_ID, role: 'assistant',
     content: 'Dựa trên chi tiêu tháng 5, tôi có 3 gợi ý: 1) Đặt giới hạn Mua sắm 700.000đ (giảm 30%), 2) Đặt 500.000đ vào tiết kiệm ngay đầu tháng, 3) Bật nhắc nhở ngân sách khi đạt 80% hạn mức.',
     sessionId: 'session_demo_03', createdAt: '2026-05-10T10:00:10.000Z',
   },

@@ -386,7 +386,7 @@ export default function PhotoConfirmScreen() {
 
   const handleConfirmAll = useCallback(async () => {
     const wallets = walletsData?.wallets ?? [];
-    const primary = wallets.find((w) => w.isPrimary) ?? wallets[0];
+    const primary = wallets[0];
     if (!primary) {
       Alert.alert(S.noWallet, S.noWalletMsg);
       return;
@@ -411,10 +411,7 @@ export default function PhotoConfirmScreen() {
           description: row.merchant.trim() || null,
           merchant: row.merchant.trim() || null,
           transactionDate: row.dateIso,
-          aiSuggestedCategoryId: row.categoryId,
-          aiOverridden: false,
           entryMethod: "photo",
-          imageUrl: row.uri,
         });
       }
       Alert.alert("", S.savedMsg(toSave.length), [

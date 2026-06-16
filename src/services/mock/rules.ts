@@ -49,7 +49,7 @@ export async function createRule(
   await delay();
   const rule: Rule = {
     id: genRuleId(),
-    userId: USER_ID,
+    customerId: USER_ID,
     merchantKeyword: input.merchantKeyword.trim(),
     categoryId: input.categoryId,
     createdAt: nowIso(),

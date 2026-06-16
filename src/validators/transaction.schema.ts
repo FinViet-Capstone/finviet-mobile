@@ -20,7 +20,6 @@ export const photoConfirmSchema = z.object({
   transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ'),
   categoryId: z.string().uuid().optional(),
   walletId: z.string().uuid('Vui lòng chọn ví'),
-  imageUrl: z.string().url(),
 });
 
 export const walletTransferSchema = z.object({

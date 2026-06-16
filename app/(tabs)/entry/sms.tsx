@@ -110,7 +110,7 @@ export default function SMSEntryScreen() {
   useEffect(() => {
     if (walletData?.wallets && walletId === null) {
       const primary =
-        walletData.wallets.find((w) => w.isPrimary) ?? walletData.wallets[0];
+        walletData.wallets[0];
       setWalletId(primary?.id ?? null);
     }
   }, [walletData, walletId]);
@@ -188,8 +188,6 @@ export default function SMSEntryScreen() {
         description: merchant.trim() || null,
         merchant: merchant.trim() || null,
         transactionDate: dateIso,
-        aiSuggestedCategoryId: categoryId,
-        aiOverridden: false,
         entryMethod: "sms_paste",
       },
       {

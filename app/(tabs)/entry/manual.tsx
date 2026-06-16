@@ -108,7 +108,7 @@ export default function ManualEntryScreen() {
   useEffect(() => {
     if (walletData?.wallets && selectedWalletId === null) {
       const primary =
-        walletData.wallets.find((w) => w.isPrimary) ?? walletData.wallets[0];
+        walletData.wallets[0];
       setSelectedWalletId(primary?.id ?? null);
     }
   }, [walletData, selectedWalletId]);
@@ -157,8 +157,6 @@ export default function ManualEntryScreen() {
         description: note.trim() || null,
         merchant: payee.trim() || null,
         transactionDate: dateIso,
-        aiSuggestedCategoryId: null,
-        aiOverridden: false,
         entryMethod: "manual",
       },
       {

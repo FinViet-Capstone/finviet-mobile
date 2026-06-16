@@ -25,7 +25,7 @@ import {
   useSpendingScore,
   useBucketSpend,
   useGoals,
-  useUser,
+  useCustomer,
 } from '@/hooks';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -60,7 +60,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
 
-  const { data: user } = useUser();
+  const { data: user } = useCustomer();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
   const { data: score } = useSpendingScore(scoreView);
   const { data: goals } = useGoals();

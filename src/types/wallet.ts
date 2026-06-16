@@ -12,11 +12,10 @@ export interface LinkedWalletMetadata {
 
 export interface Wallet {
   id: string;
-  userId: string;
+  customerId: string;
   name: string;
   type: WalletType;
   balance: number;
-  isPrimary: boolean;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -57,10 +56,8 @@ export interface CreateWalletPayload {
   name: string;
   type: WalletType;
   initialBalance: number;
-  isPrimary?: boolean;
 }
 
 export interface UpdateWalletPayload {
   name?: string;
-  isPrimary?: boolean;
 }

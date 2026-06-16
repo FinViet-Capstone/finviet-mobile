@@ -20,8 +20,8 @@ export const USE_MOCK =
 /** Base URL of the .NET 8 Web API, read from the active .env file. */
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
-// User
-export { getUser } from './mock/user';
+// Customer
+export { getCustomer } from './mock/user';
 
 // Wallets
 export {
