@@ -26,6 +26,8 @@ export interface GoalContribution {
   amount: number;
   contributedAt: string;
   note?: string;
+  /** Links to the expense transaction created when fundingWalletId is set */
+  transactionId?: string;
 }
 
 export interface CreateGoalPayload {

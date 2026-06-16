@@ -52,15 +52,32 @@ function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
 export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
   const isIncome = tx.type === 'income';
+  const isGoalContrib = tx.categoryId === 'cat_savings_goal';
   const category = !isTransfer && tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
   // Transfer legs carry categoryId === null but are NOT uncategorized spend —
   // they get their own swap styling, never the amber "classify now" treatment.
   const isUncategorized = !isTransfer && !tx.categoryId;
   const catColor = category?.color ?? COLORS.outlineVariant;
 
-  const iconName = isTransfer ? 'swap_horiz' : isUncategorized ? 'help_outline' : getCategoryIcon(category?.icon);
-  const iconColor = isTransfer ? COLORS.onSurfaceVariant : isUncategorized ? COLORS.secondary : catColor;
-  const iconBg = isTransfer ? `${COLORS.onSurfaceVariant}26` : `${catColor}26`;
+  const iconName = isTransfer
+    ? 'swap_horiz'
+    : isGoalContrib
+    ? 'savings'
+    : isUncategorized
+    ? 'help_outline'
+    : getCategoryIcon(category?.icon);
+  const iconColor = isTransfer
+    ? COLORS.onSurfaceVariant
+    : isGoalContrib
+    ? COLORS.tertiary
+    : isUncategorized
+    ? COLORS.secondary
+    : catColor;
+  const iconBg = isTransfer
+    ? `${COLORS.onSurfaceVariant}26`
+    : isGoalContrib
+    ? `${COLORS.tertiary}26`
+    : `${catColor}26`;
 
   // Income / transfer-in are credits (+, green); transfer-out is a debit (−, neutral);
   // expenses stay unsigned per the Transactions design.
@@ -72,12 +89,23 @@ export function TransactionCard({ transaction: tx, walletName = '', onPress }: T
     ? COLORS.onSurfaceVariant
     : COLORS.onSurface;
 
+  // Goal-contribution title: "Nạp mục tiêu: {name from description}"
+  const goalName = isGoalContrib && tx.description
+    ? tx.description.replace(/^Nạp mục tiêu:\s*/i, '')
+    : null;
+
   const title = isTransfer
     ? tx.description || 'Chuyển quỹ'
+    : isGoalContrib
+    ? `Nạp mục tiêu: ${goalName ?? ''}`
     : tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch');
   const subtitle = isTransfer
     ? tx.type === 'transfer_out' ? 'Chuyển đi' : 'Nhận về'
-    : isUncategorized ? 'Phân loại ngay →' : (category?.nameVi ?? walletName);
+    : isGoalContrib
+    ? 'Tiết kiệm mục tiêu'
+    : isUncategorized
+    ? 'Phân loại ngay →'
+    : (category?.nameVi ?? walletName);
 
   return (
     <TouchableOpacity

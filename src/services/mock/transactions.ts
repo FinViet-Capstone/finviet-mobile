@@ -14,6 +14,12 @@ export interface TransactionFilters {
   endDate?: string;
   /** When true, returns only transactions with categoryId === null */
   uncategorizedOnly?: boolean;
+  /**
+   * When true, filters out cat_savings_goal expense transactions.
+   * Use for "pure spend" views (Budgets bucket spend, spending reports).
+   * Default false — goal contributions appear in the full transaction history.
+   */
+  hideGoalContributions?: boolean;
 }
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
@@ -1210,6 +1216,9 @@ export function getTransactions(filters?: TransactionFilters): Transaction[] {
   if (filters?.endDate !== undefined) {
     result = result.filter((t) => t.transactionDate <= filters.endDate!);
   }
+  if (filters?.hideGoalContributions === true) {
+    result = result.filter((t) => t.categoryId !== 'cat_savings_goal');
+  }
 
   return result.sort((a, b) => {
     const dateDiff = b.transactionDate.localeCompare(a.transactionDate);
@@ -1417,4 +1426,45 @@ export async function createTransfer(
   adjustWalletBalance(outTx.walletId, balanceDelta(outTx));
   adjustWalletBalance(inTx.walletId, balanceDelta(inTx));
   return { outTx, inTx };
+}
+
+// ─── Sync helpers (for goals.ts — avoid async circular dependency) ─────────────
+
+/**
+ * Synchronous version of createTransaction.
+ * Used internally by goals.ts when creating goal-contribution expense records.
+ * Wallet balance is adjusted immediately (same as the async version).
+ */
+export function createTransactionSync(input: CreateTransactionInput): Transaction {
+  const tx: Transaction = {
+    id: genTxId(),
+    customerId: USER_ID,
+    walletId: input.walletId,
+    categoryId: input.categoryId,
+    amount: input.amount,
+    type: input.type,
+    description: input.description,
+    merchant: input.merchant,
+    transactionDate: input.transactionDate,
+    entryMethod: input.entryMethod,
+    transferPairId: null,
+    externalId: input.externalId ?? null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  TRANSACTIONS = [...TRANSACTIONS, tx];
+  adjustWalletBalance(tx.walletId, balanceDelta(tx));
+  return tx;
+}
+
+/**
+ * Synchronous version of deleteTransaction.
+ * Used internally by goals.ts when reversing goal-contribution expense records.
+ * Wallet balance is restored immediately.
+ */
+export function deleteTransactionSync(id: string): void {
+  const target = TRANSACTIONS.find((t) => t.id === id);
+  if (!target) return;
+  adjustWalletBalance(target.walletId, -balanceDelta(target));
+  TRANSACTIONS = TRANSACTIONS.filter((t) => t.id !== id);
 }
