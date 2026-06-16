@@ -28,6 +28,8 @@ export interface CategoryBucket {
 interface Props {
   bucket: CategoryBucket;
   onAddSubCategory?: (bucketId: BucketId) => void;
+  /** Move a sub-category to the other jar (Needs↔Wants; savings is locked). */
+  onMoveSubCategory?: (subId: string, fromBucket: BucketId) => void;
 }
 
 const BUCKET_COLORS: Record<BucketId, string> = {
@@ -46,7 +48,7 @@ function formatVND(amount: number): string {
   return `₫ ${amount.toLocaleString('vi-VN')}`;
 }
 
-export function CategoryBucketCard({ bucket, onAddSubCategory }: Props) {
+export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory }: Props) {
   const [expanded, setExpanded] = useState(bucket.id === 'needs');
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set(['housing']));
 
@@ -99,23 +101,36 @@ export function CategoryBucketCard({ bucket, onAddSubCategory }: Props) {
             const isSubExpanded = expandedSubs.has(sub.id);
             return (
               <View key={sub.id} style={styles.subCategoryBlock}>
-                <TouchableOpacity
-                  style={styles.subRow}
-                  onPress={() => toggleSub(sub.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.subLeft}>
+                <View style={styles.subRow}>
+                  <TouchableOpacity
+                    style={styles.subLeft}
+                    onPress={() => toggleSub(sub.id)}
+                    activeOpacity={0.7}
+                  >
                     <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
                     <Text style={styles.subName}>{sub.name}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.subRight}>
+                    {onMoveSubCategory && bucket.id !== 'savings' && (
+                      <TouchableOpacity
+                        onPress={() => onMoveSubCategory(sub.id, bucket.id)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <MaterialIcon name="swap_horiz" size={16} color={accentColor} />
+                      </TouchableOpacity>
+                    )}
+                    {sub.items && sub.items.length > 0 && (
+                      <TouchableOpacity onPress={() => toggleSub(sub.id)} activeOpacity={0.7}>
+                        <MaterialIcon
+                          name={isSubExpanded ? 'expand_less' : 'expand_more'}
+                          size={16}
+                          color={COLORS.onSurfaceVariant}
+                        />
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  {sub.items && sub.items.length > 0 && (
-                    <MaterialIcon
-                      name={isSubExpanded ? 'expand_less' : 'expand_more'}
-                      size={16}
-                      color={COLORS.onSurfaceVariant}
-                    />
-                  )}
-                </TouchableOpacity>
+                </View>
 
                 {/* Nested items */}
                 {isSubExpanded && sub.items && (
@@ -222,9 +237,15 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[2],
   },
   subLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
+  },
+  subRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
   },
   subName: {
     fontSize: FONT_SIZE.sm,

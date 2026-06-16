@@ -29,7 +29,7 @@ import {
   FONT_WEIGHT,
   SPACING,
 } from "@/constants/theme";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, getCategories } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -225,7 +225,7 @@ export default function ManualEntryScreen() {
                     ? styles.typeExpenseActive
                     : styles.typeIncomeActive),
               ]}
-              onPress={() => setEntryType(t)}
+              onPress={() => { setEntryType(t); setSelectedCategoryId(null); }}
             >
               <Text
                 style={[
@@ -428,7 +428,7 @@ export default function ManualEntryScreen() {
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>{S.sheetCategory}</Text>
           <FlatList
-            data={[...CATEGORIES]}
+            data={[...getCategories(entryType)]}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (

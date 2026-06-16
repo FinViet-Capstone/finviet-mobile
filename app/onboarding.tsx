@@ -10,9 +10,10 @@ import { useRouter } from 'expo-router';
 
 import { OnboardingIncome } from '@/components/onboarding/OnboardingIncome';
 import { OnboardingAllocation } from '@/components/onboarding/OnboardingAllocation';
-import { OnboardingCategories } from '@/components/onboarding/OnboardingCategories';
+import { OnboardingPersona } from '@/components/onboarding/OnboardingPersona';
 import { OnboardingWallet } from '@/components/onboarding/OnboardingWallet';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
+import { useSeedCategories } from '@/hooks/useCustomerCategories';
 import { useAuthStore } from '@/stores/authStore';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS } from '@/data/onboardingData';
@@ -20,6 +21,7 @@ import { ONBOARDING_STRINGS } from '@/data/onboardingData';
 export default function OnboardingScreen() {
   const router = useRouter();
   const markOnboardingDone = useAuthStore((s) => s.markOnboardingDone);
+  const seedCategories = useSeedCategories();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -29,9 +31,9 @@ export default function OnboardingScreen() {
     updateMonthlyIncome,
     updateAllocation,
     resetToDefaultAllocation,
-    addCategory,
-    removeCategory,
-    reorderCategories,
+    updateDisplayName,
+    updateGender,
+    updateDateOfBirth,
     updateWalletType,
     updateWalletName,
     updateWalletBalance,
@@ -44,6 +46,8 @@ export default function OnboardingScreen() {
     if (!canFinish()) return;
 
     setLoading(true);
+    // Seed the per-customer category set from the persona (gender + DOB) collected in step 3.
+    seedCategories.mutate({ gender: state.gender, dateOfBirth: state.dateOfBirth });
     setTimeout(() => {
       setLoading(false);
       markOnboardingDone();
@@ -73,12 +77,13 @@ export default function OnboardingScreen() {
         );
       case 3:
         return (
-          <OnboardingCategories
-            categories={state.categories}
-            onAddCategory={addCategory}
-            onRemoveCategory={removeCategory}
-            onReorderCategories={reorderCategories}
-            onSkip={goToNextStep}
+          <OnboardingPersona
+            displayName={state.displayName}
+            gender={state.gender}
+            dateOfBirth={state.dateOfBirth}
+            onChangeDisplayName={updateDisplayName}
+            onChangeGender={updateGender}
+            onChangeDateOfBirth={updateDateOfBirth}
             onNext={goToNextStep}
           />
         );

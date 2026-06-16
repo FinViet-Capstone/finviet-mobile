@@ -119,7 +119,7 @@ export function seedFromPersona(
     customerId,
     categoryId: pc.categoryId,
     bucketId: pc.bucketId,
-    source: 'system_seed' as const,
+    source: 'persona' as const,
     isActive: true,
     createdAt: now,
     updatedAt: now,
@@ -133,7 +133,14 @@ export function seedFromPersona(
 
 export async function getCustomerCategories(customerId: string): Promise<CustomerCategory[]> {
   await delay();
-  return _store.filter((c) => c.customerId === customerId && c.isActive);
+  let rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+  // Lazy default-seed so an already-onboarded (or demo) customer never has an empty set.
+  // Real onboarding calls seedFromPersona(gender, dob) up front; this only fires as a fallback.
+  if (rows.length === 0) {
+    seedFromPersona(customerId, null, null);
+    rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+  }
+  return rows;
 }
 
 export interface MoveBucketPayload {
@@ -144,10 +151,13 @@ export interface MoveBucketPayload {
 export async function moveBucket(payload: MoveBucketPayload): Promise<CustomerCategory> {
   await delay();
   if (payload.targetBucket === 'savings') {
-    throw new Error('savings_locked');
+    throw new Error('savings_locked'); // cannot move INTO savings
   }
   const entry = _store.find((c) => c.id === payload.customerCategoryId);
   if (!entry) throw new Error('not_found');
+  if (entry.bucketId === 'savings') {
+    throw new Error('savings_locked'); // cannot move OUT of savings either (locked both ways)
+  }
   entry.bucketId = payload.targetBucket;
   entry.updatedAt = new Date().toISOString();
   return { ...entry };

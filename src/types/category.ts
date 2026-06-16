@@ -13,7 +13,7 @@ import type { BucketType } from '@/constants/categories';
 // Mirrors the customer_categories DB table (v2 schema).
 // -------------------------------------------------------------------------
 
-export type CategorySource = 'system_seed' | 'customer_request';
+export type CategorySource = 'persona' | 'manual' | 'system';
 
 export interface CustomerCategory {
   id: string;

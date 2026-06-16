@@ -17,7 +17,8 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
 import { useCustomer } from '@/hooks/useCustomer';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
-import { EXPENSE_CATEGORIES, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
+import { useCustomerCategories } from '@/hooks/useCustomerCategories';
+import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
 import type { BucketType } from '@/constants/categories';
@@ -260,6 +261,22 @@ export default function BudgetsScreen() {
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
   const { data: user } = useCustomer();
+  const { data: customerCats = [] } = useCustomerCategories();
+
+  // Per-customer category set grouped by the customer's (possibly overridden) bucket.
+  // Replaces the global EXPENSE_CATEGORIES-by-defaultBucket grouping so jar moves stick.
+  const categoriesByBucket = useMemo(() => {
+    const result: Record<BucketType, { id: string; nameVi: string; icon: string }[]> = {
+      needs: [], wants: [], savings: [],
+    };
+    for (const cc of customerCats) {
+      const cat = getCategoryById(cc.categoryId);
+      if (!cat) continue;
+      const b = cc.bucketId as BucketType;
+      if (result[b]) result[b].push({ id: cat.id, nameVi: cat.nameVi, icon: cat.icon });
+    }
+    return result;
+  }, [customerCats]);
 
   const income = user?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {
@@ -282,7 +299,7 @@ export default function BudgetsScreen() {
   const bucketSummaries = useMemo((): BucketSummary[] => {
     const bucketTypes: BucketType[] = ['needs', 'wants', 'savings'];
     return bucketTypes.map((bucket) => {
-      const cats = EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === bucket);
+      const cats = categoriesByBucket[bucket];
       // Spend = ALL expense in the bucket (incl. unbudgeted categories), shared
       // with Home via useBucketSpend — not just the budgeted categories' spend.
       const spent = bucketSpend[bucket];
@@ -291,7 +308,7 @@ export default function BudgetsScreen() {
       const percentage = cap > 0 ? (spent / cap) * 100 : 0;
       return { bucket, spent, monthlyLimit, allocationCap: cap, percentage };
     });
-  }, [bucketSpend, budgetMap, income, bucketPct]);
+  }, [bucketSpend, budgetMap, income, bucketPct, categoriesByBucket]);
 
   const handlePrevMonth = useCallback(() => {
     if (month === 0) { setYear((y) => y - 1); setMonth(11); }
@@ -408,7 +425,7 @@ export default function BudgetsScreen() {
 
         {/* Category groups — Reddit thread style */}
         {buckets.map((bucket) => {
-          const cats = EXPENSE_CATEGORIES.filter((c) => c.defaultBucket === bucket);
+          const cats = categoriesByBucket[bucket];
           const isCollapsed = collapsedBuckets.has(bucket);
           const color = getBucketColor(bucket);
           return (

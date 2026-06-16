@@ -9,11 +9,9 @@ export interface OnboardingState {
     wants: number;
     savings: number;
   };
-  categories: {
-    essential: string[];
-    wants: string[];
-    savings: string[];
-  };
+  displayName: string;
+  gender: 'male' | 'female' | 'other' | null;
+  dateOfBirth: string | null;   // 'DD/MM/YYYY' free text for now
   walletType: 'basic' | 'linked';
   walletName: string;
   walletBalance: string;
@@ -29,11 +27,9 @@ export const useOnboardingFlow = () => {
       wants: ALLOCATION_PRESETS[1].defaultPercentage,
       savings: ALLOCATION_PRESETS[2].defaultPercentage,
     },
-    categories: {
-      essential: [],
-      wants: [],
-      savings: [],
-    },
+    displayName: '',
+    gender: null,
+    dateOfBirth: null,
     walletType: 'basic',
     walletName: '',
     walletBalance: '0',
@@ -80,34 +76,16 @@ export const useOnboardingFlow = () => {
     }));
   };
 
-  const addCategory = (group: keyof OnboardingState['categories'], category: string) => {
-    setState(prev => ({
-      ...prev,
-      categories: {
-        ...prev.categories,
-        [group]: [...prev.categories[group], category],
-      },
-    }));
+  const updateDisplayName = (displayName: string) => {
+    setState(prev => ({ ...prev, displayName }));
   };
 
-  const removeCategory = (group: keyof OnboardingState['categories'], category: string) => {
-    setState(prev => ({
-      ...prev,
-      categories: {
-        ...prev.categories,
-        [group]: prev.categories[group].filter(c => c !== category),
-      },
-    }));
+  const updateGender = (gender: OnboardingState['gender']) => {
+    setState(prev => ({ ...prev, gender }));
   };
 
-  const reorderCategories = (group: keyof OnboardingState['categories'], newOrder: string[]) => {
-    setState(prev => ({
-      ...prev,
-      categories: {
-        ...prev.categories,
-        [group]: newOrder,
-      },
-    }));
+  const updateDateOfBirth = (dateOfBirth: string) => {
+    setState(prev => ({ ...prev, dateOfBirth }));
   };
 
   const updateWalletType = (type: 'basic' | 'linked') => {
@@ -143,9 +121,9 @@ export const useOnboardingFlow = () => {
     updateMonthlyIncome,
     updateAllocation,
     resetToDefaultAllocation,
-    addCategory,
-    removeCategory,
-    reorderCategories,
+    updateDisplayName,
+    updateGender,
+    updateDateOfBirth,
     updateWalletType,
     updateWalletName,
     updateWalletBalance,
