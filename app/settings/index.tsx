@@ -44,6 +44,8 @@ const S = {
     biometric: 'Bảo mật (Face ID)',
     password: 'Đổi mật khẩu',
     export: 'Xuất dữ liệu',
+    subscription: 'Gói dịch vụ',
+    categoryRequests: 'Yêu cầu danh mục',
     logout: 'Đăng xuất',
     deleteAccount: 'Xóa tài khoản',
   },
@@ -223,6 +225,10 @@ export default function SettingsScreen() {
             <SettingsRow icon="category" iconColor={COLORS.primary}
               label={S.rows.categories}
               onPress={() => router.push({ pathname: '/settings/categories' })} />
+            <Divider />
+            <SettingsRow icon="playlist_add" iconColor={COLORS.secondary}
+              label={S.rows.categoryRequests}
+              onPress={() => router.push({ pathname: '/settings/category-requests' })} />
           </SectionCard>
         </View>
 
@@ -274,16 +280,22 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.account}</Text>
           <SectionCard>
+            <SettingsRow icon="workspace_premium" iconColor={COLORS.primary}
+              label={S.rows.subscription}
+              onPress={() => router.push({ pathname: '/settings/subscription' })} />
+            <Divider />
             <SettingsRow icon="key" label={S.rows.password} onPress={() => {}} />
             <Divider />
             <SettingsRow icon="download" label={S.rows.export}
-              value={S.values.exportCsv} onPress={() => {}} />
+              value={S.values.exportCsv}
+              onPress={() => router.push({ pathname: '/settings/export' })} />
             <Divider />
             <SettingsRow icon="logout" label={S.rows.logout}
               danger onPress={() => setLogoutVisible(true)} />
             <Divider />
             <SettingsRow icon="delete_forever" label={S.rows.deleteAccount}
-              danger iconColor={COLORS.danger} onPress={() => {}} />
+              danger iconColor={COLORS.danger}
+              onPress={() => router.push({ pathname: '/settings/delete-account' })} />
           </SectionCard>
         </View>
 

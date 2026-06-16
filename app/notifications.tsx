@@ -85,19 +85,19 @@ function notifIconBg(type: NotificationType): string {
   }
 }
 
-function notifDeepLinkRoute(deepLink: string | null): string | null {
-  if (!deepLink) return null;
-  // Seeded deep links use legacy (pre-revamp) paths — map them to current routes.
-  // Use `includes` (the legacy paths are prefixed, e.g. '/more/budget/...') and
-  // check goals first: '/wallet/goals/<id>' contains both 'wallet' and 'goal'.
-  if (deepLink.includes('/goals/')) {
-    const id = deepLink.split('/goals/')[1]?.split('/')[0];
-    return id ? `/(tabs)/budgets/goals/${id}` : '/(tabs)/budgets/goals';
+function notifEntityRoute(
+  entityType: AppNotification['entityType'],
+  entityId: string | null,
+): string | null {
+  // FE derives the route from the typed entity link (robust to route renames).
+  switch (entityType) {
+    case 'goal':   return entityId ? `/(tabs)/budgets/goals/${entityId}` : '/(tabs)/budgets/goals';
+    case 'budget': return '/(tabs)/budgets';
+    case 'report': return '/(tabs)/home/weekly';
+    case 'wallet': return entityId ? `/(tabs)/wallets/${entityId}` : '/(tabs)/wallets';
+    case 'system': return null;
+    default:       return null;
   }
-  if (deepLink.includes('/budget')) return '/(tabs)/budgets';
-  if (deepLink.includes('/report')) return '/(tabs)/home/weekly';
-  if (deepLink.includes('/wallet')) return '/(tabs)/wallets';
-  return null;
 }
 
 // ─── Notification row ─────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export default function NotificationsScreen() {
 
   const handlePress = useCallback((item: AppNotification) => {
     if (!item.isRead) markRead.mutate(item.id);
-    const route = notifDeepLinkRoute(item.deepLink);
+    const route = notifEntityRoute(item.entityType, item.entityId);
     if (route) router.push(route as any);
   }, [markRead, router]);
 
