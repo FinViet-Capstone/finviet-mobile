@@ -15,7 +15,7 @@
 
 import { useEffect } from 'react';
 import { getProfile } from '@/services';
-import { getAccessToken } from '@/lib/mmkv';
+import { getAccessToken, hydrateTokenCache } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
 
 export function useBootstrapSession() {
@@ -26,6 +26,7 @@ export function useBootstrapSession() {
     let cancelled = false;
 
     (async () => {
+      await hydrateTokenCache();
       const token = getAccessToken();
       if (!token) {
         if (!cancelled) setHydrated(true);

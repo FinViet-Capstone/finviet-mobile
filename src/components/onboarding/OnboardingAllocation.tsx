@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
+import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, ALLOCATION_PRESETS } from '@/data/onboardingData';
 
@@ -127,7 +127,7 @@ export function OnboardingAllocation({
                   </View>
 
                   {/* Interactive Slider */}
-                  <Slider
+                  <CustomSlider
                     style={styles.slider}
                     minimumValue={0}
                     maximumValue={100}

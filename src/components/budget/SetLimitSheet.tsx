@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
+import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
@@ -179,7 +179,7 @@ export default function SetLimitSheet({
 
         {/* Slider track with remainingCap marker */}
         <View style={styles.sliderWrap}>
-          <Slider
+          <CustomSlider
             style={styles.slider}
             minimumValue={0}
             maximumValue={sliderMax}

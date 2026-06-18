@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Slider from '@react-native-community/slider';
+import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -75,13 +75,13 @@ function BucketCard({
           <Text style={styles.bucketAmount}>{formatVND(amount)}</Text>
         </View>
       </View>
-      <Slider
+      <CustomSlider
         style={styles.slider}
         minimumValue={0}
         maximumValue={100}
         step={1}
         value={pct}
-        onValueChange={(v) => onChangePct(Math.round(v))}
+        onValueChange={(v: number) => onChangePct(Math.round(v))}
         minimumTrackTintColor={color}
         maximumTrackTintColor={COLORS.surfaceVariant}
         thumbTintColor={color}
