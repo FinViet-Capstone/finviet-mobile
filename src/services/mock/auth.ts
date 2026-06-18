@@ -122,6 +122,17 @@ export async function forgotPassword(email: string): Promise<void> {
   if (e === 'notfound@test.com') throw new AuthError('user_not_found');
 }
 
+// ─── verify email (6-char code) ───────────────────────────────────────────────
+
+/** Mock: any 6-char code succeeds; the magic code "BADCOD" fails. */
+export async function verifyEmail(code: string): Promise<void> {
+  await delay();
+  const c = code.trim().toUpperCase();
+  if (c === 'BADCOD' || c.length !== 6) {
+    throw new AuthError('verification_failed');
+  }
+}
+
 // ─── resend verification ────────────────────────────────────────────────────
 
 export async function resendVerification(email: string): Promise<void> {
@@ -149,4 +160,20 @@ export async function changePassword(
     // would reject too. Surface the same code path.
     throw new AuthError('weak_password');
   }
+}
+
+// ─── logout ───────────────────────────────────────────────────────────────────
+
+/** No-op in mock mode — session is cleared locally by the auth store. */
+export async function logout(_refreshToken: string): Promise<void> {
+  await delay(150);
+}
+
+// ─── profile (session rehydrate) ──────────────────────────────────────────────
+
+/** Mock rehydrate — returns the demo customer. Bootstrap only calls this when a
+ *  token is present, which never happens in mock mode, so it's effectively unused. */
+export async function getProfile(): Promise<Customer> {
+  await delay(150);
+  return getCustomer();
 }

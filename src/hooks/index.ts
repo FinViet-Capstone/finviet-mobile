@@ -46,8 +46,11 @@ export {
   useGoogleOAuth,
   useForgotPassword,
   useResendVerification,
+  useVerifyEmail,
   useChangePassword,
+  useLogout,
 } from './useAuth';
+export { useBootstrapSession } from './useBootstrapSession';
 export {
   useInstitutions,
   useLinkedAccounts,

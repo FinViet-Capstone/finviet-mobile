@@ -11,17 +11,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Button } from '@/components/common/Button';
+import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
-import { useResendVerification } from '@/hooks';
+import { useResendVerification, useVerifyEmail } from '@/hooks';
 import {
   COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
-  SHADOW,
 } from '@/constants/theme';
 
+const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,8 @@ export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email?: string }>();
   const resendMutation = useResendVerification();
+  const verifyMutation = useVerifyEmail();
+  const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [resentOnce, setResentOnce] = useState(false);
 
@@ -43,9 +46,23 @@ export default function VerifyEmailScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleContinue = () => {
-    // Soft gate -- proceed to onboarding regardless of verification state.
-    router.replace('/onboarding');
+  // Keep only A–Z / 0–9, force uppercase, cap at the code length.
+  const handleCodeChange = (text: string) => {
+    setCode(text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH));
+  };
+
+  const handleVerify = () => {
+    if (code.length !== CODE_LENGTH) return;
+    verifyMutation.mutate(code, {
+      // Verify-first: after success the user logs in (register issued no tokens).
+      onSuccess: () => {
+        Alert.alert(
+          'Xác minh thành công',
+          'Email của bạn đã được xác minh. Hãy đăng nhập để tiếp tục.',
+          [{ text: 'Đăng nhập', onPress: () => router.replace('/(auth)') }],
+        );
+      },
+    });
   };
 
   const handleResend = () => {
@@ -73,7 +90,7 @@ export default function VerifyEmailScreen() {
       ? `Gửi lại sau ${cooldown}s`
       : resendMutation.isPending
         ? 'Đang gửi...'
-        : 'Gửi lại email';
+        : 'Gửi lại mã';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -88,37 +105,48 @@ export default function VerifyEmailScreen() {
           </View>
           <Text style={styles.title}>Xác minh email của bạn</Text>
           <Text style={styles.subtitle}>
-            Chúng tôi đã gửi một liên kết xác minh tới
+            Chúng tôi đã gửi mã xác minh tới
           </Text>
           {email ? <Text style={styles.email}>{email}</Text> : null}
         </View>
 
         {/* ── Card ────────────────────────────────────────────────────── */}
         <View style={styles.card}>
-          <AuthErrorBanner error={resendMutation.error} />
+          <AuthErrorBanner error={verifyMutation.error ?? resendMutation.error} />
 
           {resentOnce && !resendMutation.isPending && cooldown > 0 ? (
             <View style={styles.successPill}>
               <Text style={styles.successText}>
-                Đã gửi lại email. Hãy kiểm tra hộp thư.
+                Đã gửi lại mã. Hãy kiểm tra hộp thư.
               </Text>
             </View>
           ) : null}
 
           <Text style={styles.body}>
-            Mở email và nhấn vào liên kết để xác minh tài khoản. Link sẽ hết hạn
-            sau{' '}
-            <Text style={styles.bodyBold}>30 phút</Text>.
+            Nhập mã <Text style={styles.bodyBold}>{CODE_LENGTH} ký tự</Text> trong
+            email để xác minh tài khoản. Mã sẽ hết hạn sau{' '}
+            <Text style={styles.bodyBold}>24 giờ</Text>.
           </Text>
 
-          <Text style={styles.helperNote}>
-            Bạn có thể tiếp tục sử dụng ứng dụng ngay bây giờ. Một số tính năng
-            sẽ chỉ mở sau khi xác minh email.
-          </Text>
+          <TextInput
+            label="Mã xác minh"
+            placeholder="VD: A1B2C3"
+            value={code}
+            onChangeText={handleCodeChange}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={CODE_LENGTH}
+            returnKeyType="done"
+            onSubmitEditing={handleVerify}
+            editable={!verifyMutation.isPending}
+            containerStyle={styles.codeField}
+          />
 
           <Button
-            title="Tiếp tục"
-            onPress={handleContinue}
+            title="Xác minh"
+            onPress={handleVerify}
+            loading={verifyMutation.isPending}
+            disabled={code.length !== CODE_LENGTH || verifyMutation.isPending}
             style={styles.primaryAction}
           />
 
@@ -223,6 +251,9 @@ const styles = StyleSheet.create({
   bodyBold: {
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onBackground,
+  },
+  codeField: {
+    marginBottom: SPACING[5],
   },
   helperNote: {
     fontSize: FONT_SIZE.xs,

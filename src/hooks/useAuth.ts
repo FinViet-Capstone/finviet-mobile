@@ -16,11 +16,14 @@ import {
   googleOAuth,
   forgotPassword,
   resendVerification,
+  verifyEmail,
   changePassword,
+  logout,
   type MockLoginInput,
   type MockRegisterInput,
   type MockChangePasswordInput,
 } from '@/services';
+import { getRefreshToken } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
 import type { Customer } from '@/types';
 
@@ -32,13 +35,12 @@ export const useLogin = () => {
   });
 };
 
-export const useRegister = () => {
-  const setSession = useAuthStore((s) => s.setSession);
-  return useMutation<Customer, Error, MockRegisterInput>({
+export const useRegister = () =>
+  // Register issues no tokens (verify-email-first) — do NOT open a session here.
+  // The screen routes to verify-email using the returned customer's email.
+  useMutation<Customer, Error, MockRegisterInput>({
     mutationFn: (input) => register(input),
-    onSuccess: (user) => setSession(user),
   });
-};
 
 export const useGoogleOAuth = (mode: 'login' | 'register') => {
   const setSession = useAuthStore((s) => s.setSession);
@@ -58,7 +60,23 @@ export const useResendVerification = () =>
     mutationFn: (email) => resendVerification(email),
   });
 
+export const useVerifyEmail = () =>
+  useMutation<void, Error, string>({
+    mutationFn: (code) => verifyEmail(code),
+  });
+
 export const useChangePassword = () =>
   useMutation<void, Error, MockChangePasswordInput>({
     mutationFn: (input) => changePassword(input),
   });
+
+export const useLogout = () => {
+  const clearSession = useAuthStore((s) => s.clearSession);
+  return useMutation<void, Error, void>({
+    // Best-effort server-side revoke, then always clear the local session.
+    mutationFn: async () => {
+      await logout(getRefreshToken() ?? '');
+    },
+    onSettled: () => clearSession(),
+  });
+};

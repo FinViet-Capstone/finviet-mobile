@@ -15,7 +15,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
-import { useAuthStore } from '@/stores/authStore';
+import { useLogout } from '@/hooks';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useCustomer();
   const updatePrefs = useUpdatePreferences();
-  const clearSession = useAuthStore((s) => s.clearSession);
+  const logoutMutation = useLogout();
   const [logoutVisible, setLogoutVisible] = useState(false);
 
   const notifBudget = user?.notifications?.budget ?? true;
@@ -162,9 +162,11 @@ export default function SettingsScreen() {
 
   const handleLogout = useCallback(() => {
     setLogoutVisible(false);
-    clearSession();
+    // Best-effort server-side revoke; the mutation clears the local session
+    // in onSettled regardless of the network result.
+    logoutMutation.mutate();
     router.replace('/');
-  }, [clearSession, router]);
+  }, [logoutMutation, router]);
 
   const formatIncome = useCallback((income?: number | null) => {
     if (!income) return '—';
