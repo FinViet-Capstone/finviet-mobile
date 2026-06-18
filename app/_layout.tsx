@@ -9,6 +9,8 @@ import { useFonts } from 'expo-font';
 import { MaterialSymbolsOutlined_400Regular } from '@expo-google-fonts/material-symbols-outlined';
 import { setupNotifications } from '@/lib/notifications';
 import { queryClient } from '@/lib/queryClient';
+import { useBootstrapSession } from '@/hooks';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function RootLayout() {
   // Registered under the exact family name MaterialIcon expects, so the
@@ -17,13 +19,18 @@ export default function RootLayout() {
     'Material Symbols Outlined': MaterialSymbolsOutlined_400Regular,
   });
 
+  // Restore the auth session from a persisted token before the gate renders,
+  // so a reload doesn't flash the login screen.
+  useBootstrapSession();
+  const hydrated = useAuthStore((s) => s.hydrated);
+
   useEffect(() => {
     setupNotifications().catch(console.warn);
   }, []);
 
-  // Hold on the native splash until the icon font is ready (or has errored,
-  // in which case we fall through rather than blocking the app forever).
-  if (!fontsLoaded && !fontError) {
+  // Hold on the native splash until the icon font is ready (or has errored, in
+  // which case we fall through) AND the session has been rehydrated.
+  if ((!fontsLoaded && !fontError) || !hydrated) {
     return null;
   }
 

@@ -20,6 +20,7 @@ import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useRegister, useGoogleOAuth } from '@/hooks';
+import { isAuthError } from '@/types/auth';
 import {
   COLORS,
   SPACING,
@@ -56,7 +57,9 @@ const registerSchema = z
     password: z
       .string()
       .min(1, 'Mật khẩu không được để trống')
-      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự'),
+      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+      .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ in hoa')
+      .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 chữ số'),
     confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -85,7 +88,7 @@ export default function AuthScreen() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: 'test@finviet.com',
-      password: 'password123'
+      password: 'Password123'
     },
   });
 
@@ -94,8 +97,8 @@ export default function AuthScreen() {
     defaultValues: {
       displayName: 'Nguyễn Văn A',
       email: 'newuser@finviet.com',
-      password: 'password123',
-      confirmPassword: 'password123',
+      password: 'Password123',
+      confirmPassword: 'Password123',
     },
   });
 
@@ -105,6 +108,16 @@ export default function AuthScreen() {
     loginMutation.mutate(data, {
       onSuccess: (user) =>
         router.replace(user.onboardingDone ? '/(tabs)/home' : '/onboarding'),
+      // Unverified account → send them to the verify screen (enter / resend code)
+      // instead of dead-ending on the "email not verified" banner.
+      onError: (err) => {
+        if (isAuthError(err) && err.code === 'email_not_verified') {
+          router.push({
+            pathname: '/(auth)/verify-email',
+            params: { email: data.email },
+          });
+        }
+      },
     });
   };
 

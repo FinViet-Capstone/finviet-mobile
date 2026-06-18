@@ -21,6 +21,7 @@ export type AuthErrorCode =
   | 'oauth_failed'
   | 'weak_password'
   | 'wrong_current_password'
+  | 'verification_failed'
   | 'unknown';
 
 export class AuthError extends Error {
@@ -55,8 +56,10 @@ export const AUTH_ERROR_MESSAGES_VI: Record<AuthErrorCode, string> = {
   oauth_cancelled: 'Bạn đã huỷ đăng nhập với Google',
   oauth_failed: 'Đăng nhập với Google không thành công. Hãy thử lại.',
   weak_password:
-    'Mật khẩu quá yếu. Hãy chọn mật khẩu có ít nhất 8 ký tự và khó đoán hơn.',
+    'Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ in hoa và 1 chữ số.',
   wrong_current_password: 'Mật khẩu hiện tại không chính xác',
+  verification_failed:
+    'Mã xác minh không đúng hoặc đã hết hạn. Hãy kiểm tra lại hoặc gửi lại mã.',
   unknown: 'Đã có lỗi xảy ra. Hãy thử lại sau.',
 };
 

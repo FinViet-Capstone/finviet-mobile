@@ -8,17 +8,15 @@
  * the real service modules — screen code needs zero changes.
  */
 
-/**
- * USE_MOCK — single switch between the mock and (future) real API service
- * modules. Reads EXPO_PUBLIC_USE_MOCK; defaults to mock until the .NET API
- * ships. On integration day, branch the re-exports below on this flag — no
- * screen or hook file changes.
- */
-export const USE_MOCK =
-  (process.env.EXPO_PUBLIC_USE_MOCK ?? 'true').toLowerCase() !== 'false';
+import { USE_MOCK } from '@/lib/env';
+import * as mockAuth from './mock/auth';
+import * as realAuth from './real/auth';
 
-/** Base URL of the .NET 8 Web API, read from the active .env file. */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+/**
+ * USE_MOCK / API_BASE_URL live in @/lib/env (dependency-free) to avoid an import
+ * cycle with the Axios layer. Re-exported here for backward compatibility.
+ */
+export { USE_MOCK, API_BASE_URL } from '@/lib/env';
 
 // Customer
 export { getCustomer } from './mock/user';
@@ -100,15 +98,20 @@ export { extractFromPhoto, extractFromSMS } from './mock/extraction';
 export { getRules, createRule, deleteRule } from './mock/rules';
 export type { CreateRuleInput, CreateRuleResult } from './mock/rules';
 
-// Auth
-export {
-  login,
-  register,
-  googleOAuth,
-  forgotPassword,
-  resendVerification,
-  changePassword,
-} from './mock/auth';
+// Auth — branch the implementation on USE_MOCK. Input types always come from the
+// mock module (plain shapes shared by both implementations).
+const authImpl = USE_MOCK ? mockAuth : realAuth;
+
+export const login = authImpl.login;
+export const register = authImpl.register;
+export const googleOAuth = authImpl.googleOAuth;
+export const forgotPassword = authImpl.forgotPassword;
+export const resendVerification = authImpl.resendVerification;
+export const verifyEmail = authImpl.verifyEmail;
+export const changePassword = authImpl.changePassword;
+export const logout = authImpl.logout;
+export const getProfile = authImpl.getProfile;
+
 export type {
   MockLoginInput,
   MockRegisterInput,
