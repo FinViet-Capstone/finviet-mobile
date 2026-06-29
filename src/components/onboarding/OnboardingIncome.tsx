@@ -121,8 +121,11 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flex: 1,
-    justifyContent: 'center',
+    // Anchor near the top (not vertically centred) so the amount card always
+    // stays above the numeric keypad overlay instead of sliding behind it.
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: SPACING[6],
     position: 'relative',
   },
   glowBackground: {

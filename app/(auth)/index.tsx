@@ -20,6 +20,7 @@ import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useRegister, useGoogleOAuth } from '@/hooks';
+import { USE_MOCK } from '@/lib/env';
 import { isAuthError } from '@/types/auth';
 import {
   COLORS,
@@ -46,10 +47,6 @@ const loginSchema = z.object({
 
 const registerSchema = z
   .object({
-    displayName: z
-      .string()
-      .min(1, 'Tên không được để trống')
-      .min(2, 'Tên phải có ít nhất 2 ký tự'),
     email: z
       .string()
       .min(1, 'Email không được để trống')
@@ -87,15 +84,15 @@ export default function AuthScreen() {
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'test@finviet.com',
-      password: 'Password123'
+      // Seeded demo customer (DbInitializer) — works against the real backend.
+      email: 'demo@finviet.local',
+      password: 'Demo@1234',
     },
   });
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      displayName: 'Nguyễn Văn A',
       email: 'newuser@finviet.com',
       password: 'Password123',
       confirmPassword: 'Password123',
@@ -124,15 +121,19 @@ export default function AuthScreen() {
   const onRegisterSubmit = (data: RegisterFormValues) => {
     registerMutation.mutate(
       {
-        displayName: data.displayName,
+        // Name is collected later in onboarding step 3; send a placeholder derived
+        // from the email so the backend's required FullName is satisfied.
+        displayName: data.email.split('@')[0],
         email: data.email,
         password: data.password,
       },
       {
+        // Pass the password forward so verify-email can auto-login after the code
+        // is confirmed (register itself issues no tokens — verify-first).
         onSuccess: (user) =>
           router.replace({
             pathname: '/(auth)/verify-email',
-            params: { email: user.email },
+            params: { email: user.email, password: data.password },
           }),
       },
     );
@@ -296,26 +297,6 @@ export default function AuthScreen() {
               <View style={styles.form}>
                 <Controller
                   control={registerForm.control}
-                  name="displayName"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                      label="Họ và tên"
-                      placeholder="Nguyễn Văn A"
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                      returnKeyType="next"
-                      value={value}
-                      onChangeText={onChange}
-                      onBlur={onBlur}
-                      error={registerForm.formState.errors.displayName?.message}
-                      containerStyle={styles.fieldSpacing}
-                      editable={!isBusy}
-                    />
-                  )}
-                />
-
-                <Controller
-                  control={registerForm.control}
                   name="email"
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
@@ -421,25 +402,31 @@ export default function AuthScreen() {
             )}
 
             {/* ── Divider & Google Auth ───────────────────────────────── */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>hoặc</Text>
-              <View style={styles.dividerLine} />
-            </View>
+            {/* Google sign-in needs Firebase + a dev build, so it cannot run against
+                the real backend inside Expo Go. Show it only in mock mode. */}
+            {USE_MOCK && (
+              <>
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>hoặc</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
-            <Button
-              title={
-                googleMutation.isPending
-                  ? 'Đang kết nối Google...'
-                  : activeTab === 'login'
-                  ? 'Đăng nhập với Google'
-                  : 'Đăng ký với Google'
-              }
-              onPress={handleGoogleAuth}
-              variant="secondary"
-              loading={googleMutation.isPending}
-              disabled={isBusy}
-            />
+                <Button
+                  title={
+                    googleMutation.isPending
+                      ? 'Đang kết nối Google...'
+                      : activeTab === 'login'
+                      ? 'Đăng nhập với Google'
+                      : 'Đăng ký với Google'
+                  }
+                  onPress={handleGoogleAuth}
+                  variant="secondary"
+                  loading={googleMutation.isPending}
+                  disabled={isBusy}
+                />
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

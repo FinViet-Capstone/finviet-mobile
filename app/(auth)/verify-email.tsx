@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
-import { useResendVerification, useVerifyEmail } from '@/hooks';
+import { useLogin, useResendVerification, useVerifyEmail } from '@/hooks';
 import {
   COLORS,
   SPACING,
@@ -31,9 +31,12 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
-  const { email } = useLocalSearchParams<{ email?: string }>();
+  // `password` is forwarded from the register screen so we can auto-login after
+  // a successful verification (register itself issues no tokens).
+  const { email, password } = useLocalSearchParams<{ email?: string; password?: string }>();
   const resendMutation = useResendVerification();
   const verifyMutation = useVerifyEmail();
+  const loginMutation = useLogin();
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [resentOnce, setResentOnce] = useState(false);
@@ -54,13 +57,22 @@ export default function VerifyEmailScreen() {
   const handleVerify = () => {
     if (code.length !== CODE_LENGTH) return;
     verifyMutation.mutate(code, {
-      // Verify-first: after success the user logs in (register issued no tokens).
+      // Verify-first: after success, log the user in automatically with the
+      // credentials carried over from registration, then route by onboarding state.
       onSuccess: () => {
-        Alert.alert(
-          'Xác minh thành công',
-          'Email của bạn đã được xác minh. Hãy đăng nhập để tiếp tục.',
-          [{ text: 'Đăng nhập', onPress: () => router.replace('/(auth)') }],
-        );
+        if (email && password) {
+          loginMutation.mutate(
+            { email, password },
+            {
+              onSuccess: (user) =>
+                router.replace(user.onboardingDone ? '/(tabs)/home' : '/onboarding'),
+              // Auto-login failed (e.g. password not carried over) → manual login.
+              onError: () => router.replace('/(auth)'),
+            },
+          );
+        } else {
+          router.replace('/(auth)');
+        }
       },
     });
   };
@@ -112,7 +124,9 @@ export default function VerifyEmailScreen() {
 
         {/* ── Card ────────────────────────────────────────────────────── */}
         <View style={styles.card}>
-          <AuthErrorBanner error={verifyMutation.error ?? resendMutation.error} />
+          <AuthErrorBanner
+            error={verifyMutation.error ?? loginMutation.error ?? resendMutation.error}
+          />
 
           {resentOnce && !resendMutation.isPending && cooldown > 0 ? (
             <View style={styles.successPill}>
@@ -145,8 +159,12 @@ export default function VerifyEmailScreen() {
           <Button
             title="Xác minh"
             onPress={handleVerify}
-            loading={verifyMutation.isPending}
-            disabled={code.length !== CODE_LENGTH || verifyMutation.isPending}
+            loading={verifyMutation.isPending || loginMutation.isPending}
+            disabled={
+              code.length !== CODE_LENGTH ||
+              verifyMutation.isPending ||
+              loginMutation.isPending
+            }
             style={styles.primaryAction}
           />
 

@@ -40,6 +40,53 @@ export const NUMPAD_HEIGHT = Math.round(SPACING[5] + 4 * KEY_W + 3 * GAP + SPACI
 // Grid uses a fixed gap and percentage widths aren't reliable in RN flex-wrap,
 // so we lay out rows manually for precise control.
 
+// Keys are defined at module scope (not inside NumericKeypad's render) so their
+// component identity is stable — defining them inline would remount every key
+// on each render, restarting press animations and hurting performance.
+function NumKey({
+  label,
+  wide,
+  onPress,
+}: {
+  label: string;
+  wide?: boolean;
+  onPress: (num: string) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.key, wide && styles.keyWide, pressed && styles.keyPressed]}
+      onPress={() => onPress(label)}
+    >
+      <Text style={styles.keyText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function OpKey({
+  op,
+  symbol,
+  active,
+  onPress,
+}: {
+  op: Operator;
+  symbol: string;
+  active: boolean;
+  onPress?: (op: Operator) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.key,
+        active ? styles.keyOpActive : styles.keyOp,
+        pressed && styles.keyPressed,
+      ]}
+      onPress={() => onPress?.(op)}
+    >
+      <Text style={[styles.keyText, active ? styles.opTextActive : styles.opText]}>{symbol}</Text>
+    </Pressable>
+  );
+}
+
 export function NumericKeypad({
   visible,
   onClose,
@@ -90,33 +137,6 @@ export function NumericKeypad({
 
   const isOpActive = (op: Operator) => activeOperator === op;
 
-  const NumKey = ({ label, wide }: { label: string; wide?: boolean }) => (
-    <Pressable
-      style={({ pressed }) => [styles.key, wide && styles.keyWide, pressed && styles.keyPressed]}
-      onPress={() => onNumberPress(label)}
-    >
-      <Text style={styles.keyText}>{label}</Text>
-    </Pressable>
-  );
-
-  const OpKey = ({ op, symbol }: { op: Operator; symbol: string }) => {
-    const active = isOpActive(op);
-    return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.key,
-          active ? styles.keyOpActive : styles.keyOp,
-          pressed && styles.keyPressed,
-        ]}
-        onPress={() => onOperatorPress?.(op)}
-      >
-        <Text style={[styles.keyText, active ? styles.opTextActive : styles.opText]}>
-          {symbol}
-        </Text>
-      </Pressable>
-    );
-  };
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Tap-outside backdrop */}
@@ -141,10 +161,10 @@ export function NumericKeypad({
           <View style={styles.grid}>
             {/* Row 1: 7 8 9 ÷ C */}
             <View style={styles.row}>
-              <NumKey label="7" />
-              <NumKey label="8" />
-              <NumKey label="9" />
-              <OpKey op="÷" symbol="÷" />
+              <NumKey label="7" onPress={onNumberPress} />
+              <NumKey label="8" onPress={onNumberPress} />
+              <NumKey label="9" onPress={onNumberPress} />
+              <OpKey op="÷" symbol="÷" active={isOpActive('÷')} onPress={onOperatorPress} />
               <Pressable
                 style={({ pressed }) => [styles.key, styles.clearKey, pressed && styles.keyPressed]}
                 onPress={onClear}
@@ -155,10 +175,10 @@ export function NumericKeypad({
 
             {/* Row 2: 4 5 6 × ⌫ */}
             <View style={styles.row}>
-              <NumKey label="4" />
-              <NumKey label="5" />
-              <NumKey label="6" />
-              <OpKey op="×" symbol="×" />
+              <NumKey label="4" onPress={onNumberPress} />
+              <NumKey label="5" onPress={onNumberPress} />
+              <NumKey label="6" onPress={onNumberPress} />
+              <OpKey op="×" symbol="×" active={isOpActive('×')} onPress={onOperatorPress} />
               <Pressable
                 style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
                 onPress={onBackspace}
@@ -172,16 +192,16 @@ export function NumericKeypad({
               <View style={styles.rowsDoubleLeft}>
                 {/* Row 3 left */}
                 <View style={styles.row}>
-                  <NumKey label="1" />
-                  <NumKey label="2" />
-                  <NumKey label="3" />
-                  <OpKey op="-" symbol="−" />
+                  <NumKey label="1" onPress={onNumberPress} />
+                  <NumKey label="2" onPress={onNumberPress} />
+                  <NumKey label="3" onPress={onNumberPress} />
+                  <OpKey op="-" symbol="−" active={isOpActive('-')} onPress={onOperatorPress} />
                 </View>
                 {/* Row 4 left */}
                 <View style={styles.row}>
-                  <NumKey label="0" />
-                  <NumKey label="000" wide />
-                  <OpKey op="+" symbol="+" />
+                  <NumKey label="0" onPress={onNumberPress} />
+                  <NumKey label="000" wide onPress={onNumberPress} />
+                  <OpKey op="+" symbol="+" active={isOpActive('+')} onPress={onOperatorPress} />
                 </View>
               </View>
 

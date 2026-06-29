@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -39,6 +39,7 @@ const S = {
 
 export default function PhotoEntryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +58,7 @@ export default function PhotoEntryScreen() {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') { setPermError(S.cameraPermErr); return; }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.85,
       });
       if (result.canceled) return;
@@ -74,7 +75,7 @@ export default function PhotoEntryScreen() {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') { setPermError(S.galleryPermErr); return; }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.85,
         allowsMultipleSelection: true,
         selectionLimit: 5,
@@ -89,7 +90,7 @@ export default function PhotoEntryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       {/* Top navigation */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <TouchableOpacity activeOpacity={0.7} style={styles.topBtn} onPress={() => router.back()}>
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onBackground} />
         </TouchableOpacity>

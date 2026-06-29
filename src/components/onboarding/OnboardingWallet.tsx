@@ -10,7 +10,7 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency } from '@/data/onboardingData';
 
@@ -69,7 +69,15 @@ export function OnboardingWallet({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TouchableWithoutFeedback onPress={handleDismissKeypad}>
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[
+            styles.contentContainer,
+            // Extra bottom space so the balance field can scroll above the keypad.
+            isBalanceFocused && { paddingBottom: NUMPAD_HEIGHT },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>{ONBOARDING_STRINGS.wallet.title}</Text>
@@ -162,6 +170,25 @@ export function OnboardingWallet({
                 </TouchableOpacity>
                 <Text style={styles.inputHint}>{ONBOARDING_STRINGS.wallet.balanceHint}</Text>
               </View>
+            </View>
+          )}
+
+          {/* Linked bank (SePay) — connect flow not built yet */}
+          {walletType === 'linked' && (
+            <View style={styles.comingSoonCard}>
+              <Text style={styles.comingSoonIcon}>🏦</Text>
+              <Text style={styles.comingSoonTitle}>Liên kết ngân hàng sắp ra mắt</Text>
+              <Text style={styles.comingSoonText}>
+                Tính năng đồng bộ giao dịch qua SePay đang được hoàn thiện. Hãy tạo
+                một ví cơ bản trước — bạn có thể liên kết ngân hàng sau trong phần Ví.
+              </Text>
+              <TouchableOpacity
+                style={styles.comingSoonAction}
+                onPress={() => onChangeWalletType('basic')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.comingSoonActionText}>Tạo ví cơ bản</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -372,6 +399,43 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: `${COLORS.onSurfaceVariant}B3`,
     marginTop: 4,
+  },
+  comingSoonCard: {
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING[5],
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  comingSoonIcon: {
+    fontSize: 36,
+    marginBottom: SPACING[1],
+  },
+  comingSoonTitle: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onBackground,
+    textAlign: 'center',
+  },
+  comingSoonText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  comingSoonAction: {
+    marginTop: SPACING[3],
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[3],
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.primaryContainer,
+  },
+  comingSoonActionText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onPrimaryContainer,
   },
   buttonContainer: {
     marginTop: SPACING[8],

@@ -20,10 +20,27 @@ import type { Customer } from '@/types';
 import type {
   MockLoginInput,
   MockRegisterInput,
+  UpdateProfileInput,
 } from '@/services/mock/auth';
 
-// changePassword + googleOAuth have no .NET endpoint yet — keep them on the mock.
-export { googleOAuth, changePassword } from '@/services/mock/auth';
+// changePassword has no .NET endpoint yet — keep it on the mock.
+export { changePassword } from '@/services/mock/auth';
+
+/**
+ * Google sign-in is NOT mocked in real mode. The backend (`POST /auth/google-login`)
+ * verifies a **Firebase ID token** via Firebase Admin — obtaining one needs Firebase +
+ * Google OAuth client config and a custom dev build (it cannot run inside Expo Go).
+ *
+ * Until that's wired we fail loudly here instead of minting a tokenless "demo" session,
+ * which is what caused every protected screen (wallets/budgets/entry) to 401. Use
+ * email/password against the real backend instead (e.g. the seeded demo@finviet.local).
+ */
+export async function googleOAuth(_mode: 'login' | 'register'): Promise<never> {
+  throw new AuthError(
+    'unknown',
+    'Đăng nhập Google chưa khả dụng ở bản kết nối backend. Vui lòng dùng email và mật khẩu.',
+  );
+}
 
 // ─── error mapping ────────────────────────────────────────────────────────────
 
@@ -115,6 +132,25 @@ export async function getProfile(): Promise<Customer> {
   return toCustomer(unwrap<AuthResponsePayload['profile']>(res));
 }
 
+// ─── update profile (onboarding / settings) ───────────────────────────────────
+
+// Backend Gender enum is serialized as an integer (0 Male, 1 Female, 2 Other).
+const GENDER_TO_INT: Record<'male' | 'female' | 'other', number> = {
+  male: 0,
+  female: 1,
+  other: 2,
+};
+
+/** PUT /api/profile — persist name, expected income, gender and date of birth. */
+export async function updateProfile(input: UpdateProfileInput): Promise<void> {
+  await api.put('/profile', {
+    fullName: input.fullName,
+    monthlyIncomeExpected: input.monthlyIncomeExpected ?? null,
+    gender: input.gender ? GENDER_TO_INT[input.gender] : null,
+    dateOfBirth: input.dateOfBirth ?? null,
+  });
+}
+
 // ─── login ────────────────────────────────────────────────────────────────────
 
 export async function login(input: MockLoginInput): Promise<Customer> {
@@ -149,11 +185,21 @@ export async function login(input: MockLoginInput): Promise<Customer> {
  */
 export async function register(input: MockRegisterInput): Promise<Customer> {
   try {
-    await api.post('/auth/register', {
+    const res = await api.post('/auth/register', {
       fullName: input.displayName,
       email: input.email,
       password: input.password,
     });
+    // The backend returns 200 even when the verification email failed to send
+    // (e.g. SendGrid sender not verified). Don't swallow that — surface it so the
+    // user isn't stranded on the verify screen waiting for a code that never comes.
+    const message = (res.data?.data ?? res.data?.message ?? '') as string;
+    if (/could not be sent|failed to send|not be sent/i.test(message)) {
+      throw new AuthError(
+        'unknown',
+        'Đăng ký thành công nhưng không gửi được email xác minh. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      );
+    }
     return toCustomer({
       customerId: '',
       fullName: input.displayName,
@@ -165,6 +211,9 @@ export async function register(input: MockRegisterInput): Promise<Customer> {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
+    // Preserve the email-send-failure AuthError thrown above (toAuthError would
+    // collapse it to a generic message and drop the detail).
+    if (err instanceof AuthError) throw err;
     throw toAuthError(err, (status, message) => {
       if (status === 409) return 'email_in_use';
       if (status === 400 && message.includes('password')) return 'weak_password';

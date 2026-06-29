@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -8,10 +8,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BORDER_RADIUS, COLORS, SPACING } from '@/constants/theme';
 
 const DISMISS_THRESHOLD = 120;
 const SPRING_CONFIG = { damping: 20, stiffness: 200 };
+// Cap the sheet so tall content scrolls inside it instead of growing past the
+// top of the screen (which left the title off-screen and un-scrollable).
+const MAX_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.85);
 
 interface Props {
   visible: boolean;
@@ -20,6 +24,7 @@ interface Props {
 }
 
 export function DraggableSheet({ visible, onClose, children }: Props) {
+  const insets = useSafeAreaInsets();
   const translateY = useSharedValue(0);
   const backdropOpacity = useSharedValue(0);
 
@@ -71,7 +76,14 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
 
       {/* Sheet */}
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.sheet, sheetStyle]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            // Clear the home indicator / gesture bar so the last row isn't clipped.
+            { maxHeight: MAX_SHEET_HEIGHT, paddingBottom: insets.bottom + SPACING[2] },
+            sheetStyle,
+          ]}
+        >
           {/* Drag handle */}
           <View style={styles.handle} />
           {children}

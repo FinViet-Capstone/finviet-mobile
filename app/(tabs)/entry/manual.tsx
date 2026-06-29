@@ -430,6 +430,7 @@ export default function ManualEntryScreen() {
           <FlatList
             data={[...getCategories(entryType)]}
             keyExtractor={(item) => item.id}
+            style={styles.sheetList}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -466,7 +467,13 @@ export default function ManualEntryScreen() {
           <FlatList
             data={wallets}
             keyExtractor={(item) => item.id}
+            style={styles.sheetList}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <Text style={styles.sheetEmpty}>
+                Chưa có ví nào. Hãy tạo ví ở tab Ví trước khi thêm giao dịch.
+              </Text>
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[
@@ -627,8 +634,16 @@ const styles = StyleSheet.create({
   sheet: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
-    paddingBottom: SPACING[8],
-    maxHeight: "70%",
+  },
+  // Bounded so the list scrolls inside the sheet instead of growing past the top.
+  sheetList: {
+    maxHeight: 380,
+  },
+  sheetEmpty: {
+    paddingVertical: SPACING[6],
+    textAlign: "center",
+    color: COLORS.onSurfaceVariant,
+    fontSize: FONT_SIZE.sm,
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,

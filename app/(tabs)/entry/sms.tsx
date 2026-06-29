@@ -67,6 +67,7 @@ const S = {
   sheetCategory: "Chọn danh mục",
   sheetWallet: "Chọn ví",
   tooShort: "Tin nhắn quá ngắn. Vui lòng dán toàn bộ tin nhắn ngân hàng.",
+  tooShortHint: "Cần ít nhất 10 ký tự — hãy dán đủ nội dung tin nhắn ngân hàng.",
   saveOk: "Đã lưu giao dịch.",
   saveErr: "Không lưu được. Hãy thử lại.",
   expense: "Chi tiêu",
@@ -577,6 +578,9 @@ export default function SMSEntryScreen() {
 
       {/* Bottom action area */}
       <View style={styles.bottomArea}>
+        {smsText.trim().length > 0 && smsText.trim().length < 10 && (
+          <Text style={styles.shortHint}>{S.tooShortHint}</Text>
+        )}
         <View style={styles.aiBadge}>
           <MaterialIcon name="auto_awesome" size={13} color={COLORS.primary} />
           <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
@@ -817,7 +821,12 @@ const styles = StyleSheet.create({
   processBtnText: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
+    color: COLORS.onSurface,
+  },
+  shortHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.warning,
+    textAlign: "center",
   },
 
   // Review phase
@@ -924,7 +933,7 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onPrimary,
+    color: COLORS.onSurface,
   },
 
   disabled: { opacity: 0.45 },

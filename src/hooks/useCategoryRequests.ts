@@ -13,7 +13,7 @@ import {
   getCategoryRequests,
   createCategoryRequest,
   type CreateCategoryRequestPayload,
-} from '@/services/mock/categoryRequests';
+} from '@/services';
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 

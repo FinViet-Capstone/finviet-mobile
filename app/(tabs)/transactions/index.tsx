@@ -108,6 +108,13 @@ export default function TransactionsScreen() {
     setSelectedISO("");
   };
 
+  const handleJumpCurrent = () => {
+    const today = new Date();
+    setYear(today.getFullYear());
+    setMonthIdx(today.getMonth());
+    setSelectedISO("");
+  };
+
   const handleDayPress = useCallback(
     (cell: DayCell) => {
       const at = Date.now();
@@ -308,6 +315,7 @@ export default function TransactionsScreen() {
           year={year}
           onPrev={handlePrevMonth}
           onNext={handleNextMonth}
+          onJumpCurrent={handleJumpCurrent}
         />
         <TransactionSummaryBanner
           income={income}

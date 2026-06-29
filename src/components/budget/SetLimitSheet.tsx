@@ -101,7 +101,7 @@ export default function SetLimitSheet({
   }, [sliderValue, categoryId, createBudget, onClose]);
 
   const handleSave = useCallback(() => {
-    if (!sliderValue) return;
+    // 0đ là giá trị hợp lệ (đặt hạn mức = 0) — không chặn.
     if (isOverRemaining) {
       Alert.alert(
         S.overWarningTitle,
@@ -225,10 +225,10 @@ export default function SetLimitSheet({
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[styles.saveBtn, (!sliderValue || createBudget.isPending) && styles.saveBtnDisabled,
+            style={[styles.saveBtn, createBudget.isPending && styles.saveBtnDisabled,
               isOverRemaining && styles.saveBtnWarning]}
             onPress={handleSave}
-            disabled={!sliderValue || createBudget.isPending}
+            disabled={createBudget.isPending}
           >
             {createBudget.isPending
               ? <ActivityIndicator size="small" color={COLORS.onPrimary} />

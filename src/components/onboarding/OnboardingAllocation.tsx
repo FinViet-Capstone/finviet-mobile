@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
@@ -69,7 +70,11 @@ export function OnboardingAllocation({
   const isValid = allocations.essential + allocations.wants + allocations.savings === 100;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>{ONBOARDING_STRINGS.allocation.title}</Text>
@@ -166,7 +171,7 @@ export function OnboardingAllocation({
           <Text style={styles.buttonText}>{ONBOARDING_STRINGS.allocation.button}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -182,8 +187,11 @@ const getIconForType = (iconName: string): string => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[4],
+    paddingBottom: SPACING[6],
   },
   header: {
     marginBottom: SPACING[8],

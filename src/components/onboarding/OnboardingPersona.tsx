@@ -33,7 +33,6 @@ const GENDERS: { id: Gender; label: string }[] = [
 const S = {
   title: 'Cho chúng tôi biết về bạn',
   subtitle: 'Thông tin này giúp chúng tôi cá nhân hóa các gợi ý tài chính cho riêng bạn.',
-  aiHint: 'Dựa trên độ tuổi & giới tính, FinViet sẽ đề xuất các danh mục phù hợp — bạn có thể đổi sau.',
   nameLabel: 'Tên hiển thị',
   namePlaceholder: 'Nhập tên của bạn',
   genderLabel: 'Giới tính',
@@ -51,6 +50,18 @@ export function OnboardingPersona({
   onChangeDateOfBirth,
   onNext,
 }: OnboardingPersonaProps) {
+  // Auto-format DOB as the user types: digits → DD/MM/YYYY (slashes inserted).
+  const handleDobChange = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 8); // DDMMYYYY
+    let formatted = digits;
+    if (digits.length > 4) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    } else if (digits.length > 2) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    }
+    onChangeDateOfBirth(formatted);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -65,12 +76,6 @@ export function OnboardingPersona({
         <View style={styles.headerSection}>
           <Text style={styles.title}>{S.title}</Text>
           <Text style={styles.subtitle}>{S.subtitle}</Text>
-        </View>
-
-        {/* AI highlight */}
-        <View style={styles.aiBox}>
-          <MaterialIcon name="auto_awesome" size={22} color={COLORS.primary} filled />
-          <Text style={styles.aiText}>{S.aiHint}</Text>
         </View>
 
         {/* Name */}
@@ -115,9 +120,11 @@ export function OnboardingPersona({
             <TextInput
               style={styles.inputFlex}
               value={dateOfBirth ?? ''}
-              onChangeText={onChangeDateOfBirth}
+              onChangeText={handleDobChange}
               placeholder={S.dobPlaceholder}
               placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
+              keyboardType="number-pad"
+              maxLength={10}
             />
           </View>
         </View>
@@ -152,22 +159,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     color: COLORS.onSurfaceVariant,
     lineHeight: 24,
-  },
-  aiBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING[3],
-    backgroundColor: `${COLORS.primary}1A`,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}4D`,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-  },
-  aiText: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 20,
   },
   field: { gap: SPACING[2] },
   label: {

@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
+  View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, TextInput,
   Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ const S = {
   selectWallet: 'Chọn ví',
   balance: (n: number) => `Số dư: ${n.toLocaleString('vi-VN')}đ`,
   sameWalletError: 'Không thể chuyển cùng một ví',
+  insufficient: 'Số tiền vượt quá số dư ví nguồn',
 };
 
 export default function TransferScreen() {
@@ -46,7 +47,8 @@ export default function TransferScreen() {
 
   const parsedAmount = parseInt(amountRaw || '0', 10);
   const amountDisplay = parsedAmount > 0 ? parsedAmount.toLocaleString('vi-VN') + 'đ' : '';
-  const isValid = fromId && toId && fromId !== toId && parsedAmount > 0;
+  const exceedsBalance = !!fromWallet && parsedAmount > fromWallet.balance;
+  const isValid = !!fromId && !!toId && fromId !== toId && parsedAmount > 0 && !exceedsBalance;
 
   const handleNumberPress = useCallback((key: string) => {
     setAmountRaw((prev) => {
@@ -64,7 +66,7 @@ export default function TransferScreen() {
   }, []);
 
   const handleConfirm = useCallback(async () => {
-    if (!fromId || !toId || !parsedAmount) return;
+    if (!fromId || !toId || !parsedAmount || exceedsBalance) return;
     await createTransfer.mutateAsync({
       fromWalletId: fromId,
       toWalletId: toId,
@@ -72,7 +74,7 @@ export default function TransferScreen() {
       note: note.trim() || undefined,
     });
     router.back();
-  }, [fromId, toId, parsedAmount, note, createTransfer, router]);
+  }, [fromId, toId, parsedAmount, exceedsBalance, note, createTransfer, router]);
 
   if (isLoading) return <LoadingSpinner />;
   if (isError) return <ErrorState message={(error as Error)?.message} onRetry={refetch} />;
@@ -146,18 +148,19 @@ export default function TransferScreen() {
           </Text>
           <MaterialIcon name="dialpad" size={18} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
+        {exceedsBalance && <Text style={styles.errorText}>{S.insufficient}</Text>}
 
         {/* Note */}
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
-        <TouchableOpacity
-          activeOpacity={1}
-          style={styles.noteInput}
-          onPress={() => setAmountFocused(false)}
-        >
-          <Text style={[styles.noteText, !note && styles.amountPlaceholder]}>
-            {note || S.notePlaceholder}
-          </Text>
-        </TouchableOpacity>
+        <TextInput
+          style={styles.noteInputField}
+          value={note}
+          onChangeText={setNote}
+          placeholder={S.notePlaceholder}
+          placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setAmountFocused(false)}
+          returnKeyType="done"
+        />
 
         <View style={styles.actions}>
           <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
@@ -206,7 +209,9 @@ const styles = StyleSheet.create({
   amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
   amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
   noteInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center' },
+  noteInputField: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
+  errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: -SPACING[2] },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
   cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, alignItems: 'center', justifyContent: 'center' },
   cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },

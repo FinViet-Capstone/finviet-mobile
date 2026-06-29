@@ -165,7 +165,10 @@ export default function SettingsScreen() {
     // Best-effort server-side revoke; the mutation clears the local session
     // in onSettled regardless of the network result.
     logoutMutation.mutate();
-    router.replace('/');
+    // Go straight to the auth stack. Routing through '/' would re-evaluate the
+    // gate while clearSession() is still pending in the mutation's onSettled,
+    // so isAuthenticated is briefly still true → it would bounce back to Home.
+    router.replace('/(auth)');
   }, [logoutMutation, router]);
 
   const formatIncome = useCallback((income?: number | null) => {

@@ -15,7 +15,7 @@ import {
   moveBucket,
   seedFromPersona,
   type MoveBucketPayload,
-} from '@/services/mock/customerCategories';
+} from '@/services';
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 

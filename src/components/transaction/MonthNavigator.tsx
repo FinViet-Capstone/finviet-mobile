@@ -15,18 +15,44 @@ export interface MonthNavigatorProps {
   year: number;
   onPrev: () => void;
   onNext: () => void;
+  /** Jump back to the current calendar month. */
+  onJumpCurrent?: () => void;
 }
 
-export function MonthNavigator({ monthIdx, year, onPrev, onNext }: MonthNavigatorProps) {
+export function MonthNavigator({
+  monthIdx,
+  year,
+  onPrev,
+  onNext,
+  onJumpCurrent,
+}: MonthNavigatorProps) {
+  const today = new Date();
+  const isCurrentMonth = year === today.getFullYear() && monthIdx === today.getMonth();
   return (
     <View style={styles.monthNav}>
       <TouchableOpacity onPress={onPrev} activeOpacity={0.75} style={styles.navBtn}>
         <MaterialIcon name="chevron_left" size={22} color={COLORS.onSurface} />
       </TouchableOpacity>
       <Text style={styles.monthLabel}>{VI_MONTHS[monthIdx]}, {year}</Text>
-      <TouchableOpacity onPress={onNext} activeOpacity={0.75} style={styles.navBtn}>
-        <MaterialIcon name="chevron_right" size={22} color={COLORS.onSurface} />
-      </TouchableOpacity>
+      <View style={styles.navRight}>
+        <TouchableOpacity onPress={onNext} activeOpacity={0.75} style={styles.navBtn}>
+          <MaterialIcon name="chevron_right" size={22} color={COLORS.onSurface} />
+        </TouchableOpacity>
+        {onJumpCurrent && !isCurrentMonth ? (
+          <TouchableOpacity
+            onPress={onJumpCurrent}
+            activeOpacity={0.75}
+            style={styles.navBtn}
+            accessibilityLabel="Về tháng hiện tại"
+          >
+            <MaterialIcon
+              name="keyboard_double_arrow_right"
+              size={22}
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -39,6 +65,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[4],
     backgroundColor: COLORS.surfaceContainerLow,
+  },
+  navRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
   },
   navBtn: {
     width: 36,

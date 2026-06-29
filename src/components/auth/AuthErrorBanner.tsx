@@ -32,7 +32,14 @@ export function AuthErrorBanner({ error }: AuthErrorBannerProps) {
   if (!error) return null;
 
   const code: AuthErrorCode = isAuthError(error) ? error.code : 'unknown';
-  const message = AUTH_ERROR_MESSAGES_VI[code];
+  // For generic 'unknown' errors, prefer a custom message carried on the error
+  // (e.g. a specific backend reason) over the catch-all copy. Known codes keep
+  // their curated Vietnamese copy.
+  const custom =
+    isAuthError(error) && code === 'unknown' && error.message && error.message !== 'unknown'
+      ? error.message
+      : null;
+  const message = custom ?? AUTH_ERROR_MESSAGES_VI[code];
 
   return (
     <View style={styles.banner}>

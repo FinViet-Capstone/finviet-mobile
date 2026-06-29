@@ -162,6 +162,21 @@ export async function changePassword(
   }
 }
 
+// ─── update profile (onboarding / settings) ───────────────────────────────────
+
+export interface UpdateProfileInput {
+  fullName: string;
+  monthlyIncomeExpected?: number | null;
+  gender?: 'male' | 'female' | 'other' | null;
+  /** 'YYYY-MM-DD' */
+  dateOfBirth?: string | null;
+}
+
+/** Mock: no-op (in-memory customer is updated by the store, not here). */
+export async function updateProfile(_input: UpdateProfileInput): Promise<void> {
+  await delay(150);
+}
+
 // ─── logout ───────────────────────────────────────────────────────────────────
 
 /** No-op in mock mode — session is cleared locally by the auth store. */

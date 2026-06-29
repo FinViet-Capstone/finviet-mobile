@@ -21,6 +21,18 @@ export function TransactionCalendar({
   leadingBlanks,
   onDayPress,
 }: TransactionCalendarProps) {
+  // Leading days (tháng trước) + trailing days (tháng sau) — chỉ hiển thị, mờ.
+  const first = dayCells[0];
+  let leadNums: number[] = [];
+  let trailNums: number[] = [];
+  if (first) {
+    const [y, m] = first.iso.split('-').map(Number); // m = tháng 1-based
+    const prevLast = new Date(y, m - 1, 0).getDate();
+    leadNums = Array.from({ length: leadingBlanks }, (_, i) => prevLast - leadingBlanks + 1 + i);
+    const trailing = (7 - ((leadingBlanks + dayCells.length) % 7)) % 7;
+    trailNums = Array.from({ length: trailing }, (_, i) => i + 1);
+  }
+
   return (
     <View style={styles.calendarCard}>
       {/* Day-of-week header */}
@@ -34,8 +46,12 @@ export function TransactionCalendar({
 
       {/* Day grid */}
       <View style={styles.grid}>
-        {Array.from({ length: leadingBlanks }).map((_, i) => (
-          <View key={`b${i}`} style={styles.cell} />
+        {leadNums.map((n, i) => (
+          <View key={`lead${i}`} style={styles.cell}>
+            <View style={styles.dayCircle}>
+              <Text style={[styles.dayNumber, styles.adjacentDay]}>{n}</Text>
+            </View>
+          </View>
         ))}
         {dayCells.map((cell) => {
           const isSelected = cell.iso === selectedISO;
@@ -69,6 +85,13 @@ export function TransactionCalendar({
             </TouchableOpacity>
           );
         })}
+        {trailNums.map((n, i) => (
+          <View key={`trail${i}`} style={styles.cell}>
+            <View style={styles.dayCircle}>
+              <Text style={[styles.dayNumber, styles.adjacentDay]}>{n}</Text>
+            </View>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -120,6 +143,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.medium,
     color: COLORS.onSurface,
+  },
+  adjacentDay: {
+    color: COLORS.onSurfaceVariant,
+    opacity: 0.4,
   },
   uncatDot: {
     position: 'absolute',
