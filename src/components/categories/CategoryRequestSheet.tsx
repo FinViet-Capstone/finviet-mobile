@@ -58,6 +58,7 @@ export function CategoryRequestSheet({ visible, onClose, onSubmit, loading }: Pr
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}

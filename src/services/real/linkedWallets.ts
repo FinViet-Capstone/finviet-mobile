@@ -145,3 +145,24 @@ export async function linkWallet(
   const data = unwrap<LinkWalletDto>(res);
   return { connection_id: data.walletId, account_id: data.sepayAccountId ?? '' };
 }
+
+interface LinkedWalletDto {
+  walletId: string;
+  walletName: string;
+}
+
+/**
+ * One-step: create a sepay_linked wallet for the chosen account and bind the token.
+ * Returns the new wallet id so the caller can sync it immediately.
+ */
+export async function linkAccount(
+  accessToken: string,
+  sepayAccountId?: string,
+): Promise<{ walletId: string; walletName: string }> {
+  const res = await api.post('/linked-wallets/link-account', {
+    accessToken,
+    sepayAccountId: sepayAccountId ?? null,
+  });
+  const data = unwrap<LinkedWalletDto>(res);
+  return { walletId: data.walletId, walletName: data.walletName };
+}

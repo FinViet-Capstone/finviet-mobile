@@ -8,6 +8,7 @@ import {
   RefreshControl,
   TextInput,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -100,6 +101,15 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   const handleBackspace = useCallback(() => setTargetRaw((prev) => prev.slice(0, -1)), []);
   const handleClear = useCallback(() => setTargetRaw(''), []);
 
+  // Auto-format the deadline as the user types: digits → YYYY-MM-DD.
+  const handleDeadlineChange = useCallback((text: string) => {
+    const d = text.replace(/\D/g, '').slice(0, 8); // YYYYMMDD
+    let out = d;
+    if (d.length > 6) out = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`;
+    else if (d.length > 4) out = `${d.slice(0, 4)}-${d.slice(4)}`;
+    setDeadline(out);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!name.trim() || !parsedTarget || !deadline.match(/^\d{4}-\d{2}-\d{2}$/)) return;
     await createGoal.mutateAsync({
@@ -117,7 +127,13 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}>
+      <ScrollView
+        style={styles.sheetScroll}
+        contentContainerStyle={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
@@ -138,8 +154,9 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
         </TouchableOpacity>
 
         <Text style={styles.fieldLabel}>{S.deadlineLabel}</Text>
-        <TextInput style={styles.fieldInput} value={deadline} onChangeText={setDeadline}
+        <TextInput style={styles.fieldInput} value={deadline} onChangeText={handleDeadlineChange}
           placeholder={S.deadlinePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+          keyboardType="number-pad" maxLength={10}
           onFocus={() => setTargetFocused(false)} />
 
         <Text style={styles.fieldLabel}>{S.emojiLabel}</Text>
@@ -159,7 +176,7 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </DraggableSheet>
     <NumericKeypad
       visible={visible && targetFocused}
@@ -390,7 +407,10 @@ const styles = StyleSheet.create({
   barTrack: { height: 4, backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   // Sheet
-  // Sheet
+  sheetScroll: {
+    // Bounded so the form scrolls inside the sheet and the Save button is always reachable.
+    maxHeight: Dimensions.get('window').height * 0.7,
+  },
   sheet: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],

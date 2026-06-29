@@ -45,6 +45,7 @@ export {
   useRegister,
   useGoogleOAuth,
   useForgotPassword,
+  useResetPassword,
   useResendVerification,
   useVerifyEmail,
   useChangePassword,

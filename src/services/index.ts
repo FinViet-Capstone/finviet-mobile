@@ -139,6 +139,7 @@ export const login = authImpl.login;
 export const register = authImpl.register;
 export const googleOAuth = authImpl.googleOAuth;
 export const forgotPassword = authImpl.forgotPassword;
+export const resetPassword = authImpl.resetPassword;
 export const resendVerification = authImpl.resendVerification;
 export const verifyEmail = authImpl.verifyEmail;
 export const changePassword = authImpl.changePassword;
@@ -151,6 +152,7 @@ export type {
   MockRegisterInput,
   MockChangePasswordInput,
   UpdateProfileInput,
+  ResetPasswordInput,
 } from './mock/auth';
 
 // ─── Linked Wallet Sync (SePay) ───────────────────────────────────────────────

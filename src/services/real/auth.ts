@@ -21,6 +21,7 @@ import type {
   MockLoginInput,
   MockRegisterInput,
   UpdateProfileInput,
+  ResetPasswordInput,
 } from '@/services/mock/auth';
 
 // changePassword has no .NET endpoint yet — keep it on the mock.
@@ -230,6 +231,28 @@ export async function forgotPassword(email: string): Promise<void> {
     await api.post('/auth/forgot-password', { email });
   } catch (err) {
     throw toAuthError(err);
+  }
+}
+
+// ─── reset password (code + new password) ─────────────────────────────────────
+
+/**
+ * POST /auth/reset-password — confirm the 6-char code from the reset email and
+ * set a new password. Backend body: { token, newPassword, confirmPassword }.
+ */
+export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+  try {
+    await api.post('/auth/reset-password', {
+      token: input.token.trim(),
+      newPassword: input.newPassword,
+      confirmPassword: input.confirmPassword,
+    });
+  } catch (err) {
+    throw toAuthError(err, (status) => {
+      // 400 (used/expired/mismatch) and 404 (code not found) → one "bad code" message.
+      if (status === 400 || status === 404) return 'verification_failed';
+      return undefined;
+    });
   }
 }
 

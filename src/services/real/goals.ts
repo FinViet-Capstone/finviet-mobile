@@ -13,6 +13,7 @@
  */
 
 import { api, unwrap } from '@/lib/api';
+import { idempotentConfig } from '@/lib/idempotency';
 import type { SavingsGoalWithProgress } from '@/types';
 import type {
   CreateGoalInput,
@@ -85,7 +86,7 @@ export async function createGoal(
     deadline: input.deadline || null,
     initialAmount: input.initialAmount ?? null,
     fundingWalletId: input.fundingWalletId ?? null,
-  });
+  }, idempotentConfig());
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
@@ -111,6 +112,6 @@ export async function addGoalContribution(
 ): Promise<SavingsGoalWithProgress> {
   const res = await api.post(`/saving-goals/${goalId}/contribute`, {
     amount: input.amount,
-  });
+  }, idempotentConfig());
   return toGoal(unwrap<SavingGoalDto>(res));
 }

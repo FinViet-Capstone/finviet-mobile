@@ -71,6 +71,7 @@ export function OnboardingPersona({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         {/* Heading */}
         <View style={styles.headerSection}>

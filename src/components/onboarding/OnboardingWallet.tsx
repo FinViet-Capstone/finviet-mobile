@@ -23,6 +23,7 @@ export interface OnboardingWalletProps {
   readonly onChangeWalletName: (name: string) => void;
   readonly onChangeWalletBalance: (balance: string) => void;
   readonly onFinish: () => void;
+  readonly onLinkBank: () => void;
 }
 
 export function OnboardingWallet({
@@ -34,6 +35,7 @@ export function OnboardingWallet({
   onChangeWalletName,
   onChangeWalletBalance,
   onFinish,
+  onLinkBank,
 }: OnboardingWalletProps) {
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
 
@@ -173,21 +175,24 @@ export function OnboardingWallet({
             </View>
           )}
 
-          {/* Linked bank (SePay) — connect flow not built yet */}
+          {/* Linked bank — Finverse hosted login (consumer aggregation) */}
           {walletType === 'linked' && (
             <View style={styles.comingSoonCard}>
               <Text style={styles.comingSoonIcon}>🏦</Text>
-              <Text style={styles.comingSoonTitle}>Liên kết ngân hàng sắp ra mắt</Text>
+              <Text style={styles.comingSoonTitle}>Liên kết ngân hàng qua Finverse</Text>
               <Text style={styles.comingSoonText}>
-                Tính năng đồng bộ giao dịch qua SePay đang được hoàn thiện. Hãy tạo
-                một ví cơ bản trước — bạn có thể liên kết ngân hàng sau trong phần Ví.
+                Đăng nhập ngân hàng của bạn một cách an toàn (FinViet không thấy mật khẩu)
+                và tự động nhập giao dịch + số dư.
               </Text>
               <TouchableOpacity
-                style={styles.comingSoonAction}
-                onPress={() => onChangeWalletType('basic')}
-                activeOpacity={0.8}
+                style={styles.linkBankAction}
+                onPress={onLinkBank}
+                activeOpacity={0.85}
               >
-                <Text style={styles.comingSoonActionText}>Tạo ví cơ bản</Text>
+                <Text style={styles.linkBankActionText}>Liên kết ngân hàng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onChangeWalletType('basic')} activeOpacity={0.7}>
+                <Text style={styles.linkBankSecondary}>Hoặc tạo ví cơ bản</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -425,17 +430,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  comingSoonAction: {
+  linkBankAction: {
     marginTop: SPACING[3],
-    paddingHorizontal: SPACING[5],
+    paddingHorizontal: SPACING[6],
     paddingVertical: SPACING[3],
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: COLORS.primary,
   },
-  comingSoonActionText: {
-    fontSize: FONT_SIZE.sm,
+  linkBankActionText: {
+    fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimaryContainer,
+    color: COLORS.onPrimary,
+  },
+  linkBankSecondary: {
+    marginTop: SPACING[2],
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHT.medium,
   },
   buttonContainer: {
     marginTop: SPACING[8],

@@ -143,6 +143,7 @@ export function ChangePasswordSheet({ visible, onClose }: ChangePasswordSheetPro
 
             <ScrollView
               keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets
               showsVerticalScrollIndicator={false}
             >
               <Text style={styles.subtitle}>

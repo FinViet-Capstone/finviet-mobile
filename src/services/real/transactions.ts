@@ -17,6 +17,7 @@
  */
 
 import { api } from '@/lib/api';
+import { idempotentConfig } from '@/lib/idempotency';
 import type { Transaction, TransactionType, EntryMethod } from '@/types';
 import type {
   TransactionFilters,
@@ -189,7 +190,7 @@ export async function createTransaction(
     description: input.description ?? null,
     merchant: input.merchant ?? null,
     entryMethod: input.entryMethod,
-  });
+  }, idempotentConfig());
   return toTransaction(res.data as TransactionDto);
 }
 
@@ -224,7 +225,7 @@ export async function createTransfer(
     toWalletId: input.toWalletId,
     amount: input.amount,
     description: input.note ?? null,
-  });
+  }, idempotentConfig());
   const data = unwrapEnvelope<TransferDto>(res.data);
   const date = (input.transactionDate ?? new Date().toISOString()).slice(0, 10);
 

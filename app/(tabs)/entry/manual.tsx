@@ -267,6 +267,7 @@ export default function ManualEntryScreen() {
           contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           {/* Wallet */}
           <TouchableOpacity

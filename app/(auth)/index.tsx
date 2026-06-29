@@ -166,6 +166,7 @@ export default function AuthScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header ───────────────────────────────────────────────── */}

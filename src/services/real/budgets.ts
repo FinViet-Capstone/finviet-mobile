@@ -41,11 +41,18 @@ interface BudgetDto {
 // ─── Mapper ─────────────────────────────────────────────────────────────────
 
 /**
- * Derive the FE status enum from percentage with the FE thresholds (safe <60,
- * warning 60-80, danger >80). The backend's GREEN/YELLOW/RED uses different
- * cut-offs, so we recompute to keep the progress-bar colours consistent.
+ * Derive the FE status enum from percentage.
+ *
+ * Savings is a TARGET, not a spending cap (BUSINESS_LOGIC §11.3): meeting or
+ * exceeding it is GOOD (green/safe), staying under is "not there yet" (amber/
+ * warning) — never red. Needs/Wants keep the cap thresholds (safe <60, warning
+ * 60-80, danger >80). The backend still returns generic RED/YELLOW/GREEN for all
+ * buckets, so we recompute here until /budgets treats savings correctly.
  */
-function toStatus(percentage: number): BudgetStatus {
+function toStatus(percentage: number, bucket: string): BudgetStatus {
+  if (bucket === 'savings') {
+    return percentage >= 100 ? 'safe' : 'warning';
+  }
   if (percentage > 80) return 'danger';
   if (percentage >= 60) return 'warning';
   return 'safe';
@@ -67,7 +74,7 @@ function toBudget(dto: BudgetDto): BudgetWithSpend {
     spent: dto.spent,
     remaining: dto.remaining,
     percentage: dto.percentage,
-    status: toStatus(dto.percentage),
+    status: toStatus(dto.percentage, dto.bucket),
   };
 }
 

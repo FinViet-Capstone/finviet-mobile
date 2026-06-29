@@ -141,6 +141,24 @@ export async function resendVerification(email: string): Promise<void> {
   // Otherwise: success (no return value -- screen shows toast/alert)
 }
 
+// ─── reset password (code + new password) ─────────────────────────────────────
+
+export interface ResetPasswordInput {
+  /** 6-char code from the reset email. */
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+/** Mock: any 6-char code succeeds; "BADCOD" (or wrong length) fails. */
+export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+  await delay();
+  const c = input.token.trim().toUpperCase();
+  if (c === 'BADCOD' || c.length !== 6) {
+    throw new AuthError('verification_failed');
+  }
+}
+
 // ─── change password ────────────────────────────────────────────────────────
 
 export interface MockChangePasswordInput {

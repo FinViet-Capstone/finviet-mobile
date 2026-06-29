@@ -7,6 +7,7 @@ import {
   Animated,
   TouchableWithoutFeedback,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
@@ -104,6 +105,9 @@ export function NumericKeypad({
   useEffect(() => {
     if (visible) {
       mounted.current = true;
+      // Mutual exclusion: the custom numpad and the system keyboard must never be
+      // open at once. Dismiss the system keyboard whenever the numpad opens.
+      Keyboard.dismiss();
       Animated.parallel([
         Animated.spring(translateY, {
           toValue: 0,

@@ -18,33 +18,59 @@ import { getProfile } from '@/services';
 import { getAccessToken, hydrateTokenCache } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
 
+// Max time the splash waits on the profile fetch before showing the login gate.
+// Bounds the white screen when the backend is slow/unreachable (the profile call
+// itself can hang until the 20s Axios timeout).
+const BOOTSTRAP_TIMEOUT_MS = 4000;
+
 export function useBootstrapSession() {
   const setSession = useAuthStore((s) => s.setSession);
   const setHydrated = useAuthStore((s) => s.setHydrated);
 
   useEffect(() => {
     let cancelled = false;
+    let settled = false;
+
+    // If the profile fetch is slow/unreachable, flip the gate anyway so the app
+    // shows login instead of a long white screen. The stored token is kept, so a
+    // later launch with the backend reachable restores the session.
+    const timer = setTimeout(() => {
+      if (!cancelled && !settled) {
+        settled = true;
+        setHydrated(true);
+      }
+    }, BOOTSTRAP_TIMEOUT_MS);
 
     (async () => {
       await hydrateTokenCache();
       const token = getAccessToken();
       if (!token) {
-        if (!cancelled) setHydrated(true);
+        clearTimeout(timer);
+        if (!cancelled && !settled) {
+          settled = true;
+          setHydrated(true);
+        }
         return;
       }
       try {
         const customer = await getProfile();
-        if (!cancelled) setSession(customer);
+        if (!cancelled && !settled) setSession(customer);
       } catch {
         // Token invalid / refresh failed — clear and fall back to login.
-        useAuthStore.getState().clearSession();
+        // (A timeout already showed login; a real auth failure clears the token.)
+        if (!cancelled && !settled) useAuthStore.getState().clearSession();
       } finally {
-        if (!cancelled) setHydrated(true);
+        clearTimeout(timer);
+        if (!cancelled && !settled) {
+          settled = true;
+          setHydrated(true);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [setSession, setHydrated]);
 }

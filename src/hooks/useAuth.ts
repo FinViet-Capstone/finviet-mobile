@@ -15,6 +15,7 @@ import {
   register,
   googleOAuth,
   forgotPassword,
+  resetPassword,
   resendVerification,
   verifyEmail,
   changePassword,
@@ -22,6 +23,7 @@ import {
   type MockLoginInput,
   type MockRegisterInput,
   type MockChangePasswordInput,
+  type ResetPasswordInput,
 } from '@/services';
 import { getRefreshToken } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
@@ -53,6 +55,11 @@ export const useGoogleOAuth = (mode: 'login' | 'register') => {
 export const useForgotPassword = () =>
   useMutation<void, Error, string>({
     mutationFn: (email) => forgotPassword(email),
+  });
+
+export const useResetPassword = () =>
+  useMutation<void, Error, ResetPasswordInput>({
+    mutationFn: (input) => resetPassword(input),
   });
 
 export const useResendVerification = () =>

@@ -89,7 +89,7 @@ export default function TransferScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
 
         {/* From wallet */}
         <Text style={styles.fieldLabel}>{S.fromLabel}</Text>

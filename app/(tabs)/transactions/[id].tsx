@@ -249,6 +249,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         <ScrollView
           contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* Category */}

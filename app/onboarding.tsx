@@ -101,6 +101,35 @@ export default function OnboardingScreen() {
     }
   };
 
+  // Step 4 "Liên kết ngân hàng": persist the profile (income/name/…) first so
+  // onboarding data isn't lost, then open the Finverse link flow. The linked wallet
+  // it creates satisfies the "first wallet" requirement; link-bank marks onboarding done.
+  const handleLinkBank = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const fullName =
+        state.displayName.trim() ||
+        (customerEmail ? customerEmail.split('@')[0] : 'Người dùng');
+      const income = Number(state.monthlyIncome.replace(/\D/g, '')) || null;
+      await updateProfile({
+        fullName,
+        monthlyIncomeExpected: income,
+        gender: state.gender,
+        dateOfBirth: toIsoDate(state.dateOfBirth),
+      });
+      updateCustomer({ displayName: fullName, monthlyIncome: income });
+      router.push('/link-bank');
+    } catch {
+      Alert.alert(
+        'Không thể tiếp tục',
+        'Đã xảy ra lỗi khi lưu thông tin. Vui lòng kiểm tra kết nối và thử lại.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderStepContent = () => {
     switch (state.currentStep) {
       case 1:
@@ -144,6 +173,7 @@ export default function OnboardingScreen() {
             onChangeWalletName={updateWalletName}
             onChangeWalletBalance={updateWalletBalance}
             onFinish={handleFinish}
+            onLinkBank={handleLinkBank}
           />
         );
       default:

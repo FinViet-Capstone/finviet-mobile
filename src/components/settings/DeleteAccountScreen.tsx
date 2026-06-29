@@ -57,6 +57,7 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {/* Warning hero */}

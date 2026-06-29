@@ -233,6 +233,7 @@ export default function SMSEntryScreen() {
           <ScrollView
             contentContainerStyle={styles.reviewContent}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
             {/* Uncertain notice */}
@@ -508,6 +509,7 @@ export default function SMSEntryScreen() {
         <ScrollView
           contentContainerStyle={styles.pasteContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* Instruction */}
