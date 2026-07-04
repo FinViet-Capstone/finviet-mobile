@@ -19,7 +19,7 @@
 
 import { AuthError } from '@/types/auth';
 import type { Customer } from '@/types';
-import { getCustomer } from './user';
+import { getCustomer, updateMockCustomer } from './user';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -190,9 +190,16 @@ export interface UpdateProfileInput {
   dateOfBirth?: string | null;
 }
 
-/** Mock: no-op (in-memory customer is updated by the store, not here). */
-export async function updateProfile(_input: UpdateProfileInput): Promise<void> {
+/** Mock: updates the in-memory customer so it persists across mock logins. */
+export async function updateProfile(input: UpdateProfileInput): Promise<void> {
   await delay(150);
+  updateMockCustomer({
+    displayName: input.fullName,
+    ...(input.monthlyIncomeExpected !== undefined ? { monthlyIncome: input.monthlyIncomeExpected } : {}),
+    ...(input.gender !== undefined ? { gender: input.gender } : {}),
+    ...(input.dateOfBirth !== undefined ? { dateOfBirth: input.dateOfBirth } : {}),
+    onboardingDone: input.monthlyIncomeExpected != null,
+  });
 }
 
 /** Mock avatar upload — echoes back the picked local URI as the "hosted" URL. */

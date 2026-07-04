@@ -55,7 +55,8 @@ const EMPTY_RESULT: PhotoExtractionResult = {
 function toExtractionResult(row: ExtractedRowDto): PhotoExtractionResult {
   return {
     amount: row.amount ?? null,
-    merchant: row.merchant ?? null,
+    type: (row.type ?? '').toUpperCase() === 'INCOME' ? 'income' : 'expense',
+    merchant: row.merchant ?? row.description ?? null,
     transactionDate: (row.transactionDate ?? '').slice(0, 10),
     categoryId: row.categoryId ?? null,
     confidence: {

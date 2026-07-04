@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 
 type Gender = 'male' | 'female' | 'other';
@@ -50,17 +51,10 @@ export function OnboardingPersona({
   onChangeDateOfBirth,
   onNext,
 }: OnboardingPersonaProps) {
-  // Auto-format DOB as the user types: digits → DD/MM/YYYY (slashes inserted).
-  const handleDobChange = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 8); // DDMMYYYY
-    let formatted = digits;
-    if (digits.length > 4) {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    } else if (digits.length > 2) {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    }
-    onChangeDateOfBirth(formatted);
-  };
+  // Helper to display YYYY-MM-DD as DD/MM/YYYY
+  const displayDob = dateOfBirth 
+    ? `${dateOfBirth.split('-')[2]}/${dateOfBirth.split('-')[1]}/${dateOfBirth.split('-')[0]}`
+    : '';
 
   return (
     <KeyboardAvoidingView
@@ -116,18 +110,27 @@ export function OnboardingPersona({
         {/* Date of birth */}
         <View style={styles.field}>
           <Text style={styles.label}>{S.dobLabel}</Text>
-          <View style={styles.inputRow}>
-            <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
-            <TextInput
-              style={styles.inputFlex}
-              value={dateOfBirth ?? ''}
-              onChangeText={handleDobChange}
-              placeholder={S.dobPlaceholder}
-              placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-          </View>
+          <DatePickerField
+            value={dateOfBirth ?? ''}
+            onChange={onChangeDateOfBirth}
+            customTrigger={(openPicker) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.inputRow}
+                onPress={openPicker}
+              >
+                <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+                <Text
+                  style={[
+                    styles.inputFlex,
+                    !dateOfBirth && { color: `${COLORS.onSurfaceVariant}80` }
+                  ]}
+                >
+                  {displayDob || S.dobPlaceholder}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       </ScrollView>
 

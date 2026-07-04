@@ -30,6 +30,7 @@ import { useExtractFromSMS, useWallets, useCreateTransaction } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { formatVND } from "@/utils/formatters";
 import { todayISO } from "@/utils/date";
+import { getApiErrorMessage } from "@/utils/errors";
 import type { Wallet } from "@/types/wallet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,18 +108,20 @@ export default function SMSEntryScreen() {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
 
+  // SMS entries can only target basic wallets — bank-linked wallets are read-only.
+  const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== "linked");
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    if (walletData?.wallets && walletId === null) {
-      const primary =
-        walletData.wallets[0];
-      setWalletId(primary?.id ?? null);
+    if (basicWallets.length > 0 && walletId === null) {
+      setWalletId(basicWallets[0].id);
     }
-  }, [walletData, walletId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basicWallets.length]);
 
   if (walletsLoading || !walletData) return <LoadingSpinner />;
 
-  const wallets: Wallet[] = walletData.wallets;
+  const wallets: Wallet[] = basicWallets;
   const selectedCategory: Category | null = categoryId
     ? (CATEGORIES.find((c) => c.id === categoryId) ?? null)
     : null;
@@ -137,6 +140,7 @@ export default function SMSEntryScreen() {
     extract.mutate(trimmed, {
       onSuccess: (result) => {
         if (result.amount !== null) setAmountRaw(String(result.amount));
+        if (result.type) setEntryType(result.type);
         if (result.merchant !== null) setMerchant(result.merchant);
         setDateIso(result.transactionDate);
         setCategoryId(result.categoryId);
@@ -196,7 +200,7 @@ export default function SMSEntryScreen() {
           Alert.alert("", S.saveOk, [
             { text: "OK", onPress: () => router.back() },
           ]),
-        onError: () => Alert.alert("", S.saveErr),
+        onError: (err) => Alert.alert("", getApiErrorMessage(err, S.saveErr)),
       },
     );
   };

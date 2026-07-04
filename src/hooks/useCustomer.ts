@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Customer } from '@/types';
+import { updateProfile } from '@/services';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -41,7 +42,19 @@ export const useUpdateProfile = () => {
   const updateCustomer = useAuthStore((s) => s.updateCustomer);
   return useMutation({
     mutationFn: async (patch: UpdateProfileInput) => {
-      await delay();
+      const currentCustomer = useAuthStore.getState().customer;
+      if (currentCustomer) {
+        // Fallback to existing values if not specified in patch
+        await updateProfile({
+          fullName: patch.displayName ?? currentCustomer.displayName,
+          monthlyIncomeExpected: patch.monthlyIncome !== undefined ? patch.monthlyIncome : currentCustomer.monthlyIncome,
+          gender: currentCustomer.gender,
+          dateOfBirth: currentCustomer.dateOfBirth,
+        });
+      } else {
+        await delay();
+      }
+
       updateCustomer({
         ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
         ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),

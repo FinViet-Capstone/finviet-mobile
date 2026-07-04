@@ -21,14 +21,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS } from '@/data/onboardingData';
 
-/** "DD/MM/YYYY" free text → "YYYY-MM-DD" (or null if incomplete/invalid). */
-function toIsoDate(dob: string | null): string | null {
-  if (!dob) return null;
-  const m = dob.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return `${yyyy}-${mm}-${dd}`;
-}
+
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -75,7 +68,7 @@ export default function OnboardingScreen() {
         fullName,
         monthlyIncomeExpected: income,
         gender: state.gender,
-        dateOfBirth: toIsoDate(state.dateOfBirth),
+        dateOfBirth: state.dateOfBirth,
       });
 
       // Create the first wallet for real (this was previously never sent anywhere).
@@ -116,7 +109,7 @@ export default function OnboardingScreen() {
         fullName,
         monthlyIncomeExpected: income,
         gender: state.gender,
-        dateOfBirth: toIsoDate(state.dateOfBirth),
+        dateOfBirth: state.dateOfBirth,
       });
       updateCustomer({ displayName: fullName, monthlyIncome: income });
       router.push('/link-bank');

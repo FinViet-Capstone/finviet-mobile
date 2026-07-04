@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useCreateTransaction } from '@/hooks/useTransactions';
 import { getCategoryById, CATEGORIES } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import type { Wallet } from '@/types/wallet';
+import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ const S = {
   successMsg: (n: number) => `Đã nhập ${n} giao dịch thành công`,
   noWallets: 'Không có ví nào',
   selectWalletFirst: 'Vui lòng chọn ví trước',
+  importError: 'Không thể nhập giao dịch.',
   startBtn: 'Chọn file & phân tích',
   step2Title: 'Chọn ví',
   step2Hint: 'Giao dịch sẽ được nhập vào ví này',
@@ -153,6 +155,18 @@ export default function CsvImportScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
+  // Only basic wallets can receive imported rows — bank-linked wallets are read-only
+  // (their transactions come from provider sync).
+  const importableWallets = wallets.filter((w: Wallet) => w.type !== 'linked');
+
+  // Auto-select the first importable wallet so the "Accept" button isn't stuck disabled.
+  useEffect(() => {
+    if (!selectedWalletId && importableWallets.length > 0) {
+      setSelectedWalletId(importableWallets[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importableWallets.length]);
+
   const handleParse = useCallback(() => {
     setIsParsing(true);
     setTimeout(() => { setRows(mockParseCsv()); setIsParsing(false); }, 800);
@@ -176,11 +190,16 @@ export default function CsvImportScreen() {
     const toImport = rows.filter((r) => r.selected);
     if (!toImport.length) return;
     setIsImporting(true);
+    let imported = 0;
     try {
       for (const row of toImport) {
         await createTx.mutateAsync({ walletId: selectedWalletId, categoryId: row.suggestedCategoryId, amount: row.amount, type: row.type, description: null, merchant: row.merchant, transactionDate: row.date, entryMethod: 'csv_import' });
+        imported++;
       }
       Alert.alert('', S.successMsg(toImport.length), [{ text: 'OK', onPress: () => router.back() }]);
+    } catch (err) {
+      // Surface the backend reason (e.g. insufficient balance) and report partial progress.
+      Alert.alert('', `${getApiErrorMessage(err, S.importError)} (${imported}/${toImport.length})`);
     } finally { setIsImporting(false); }
   }, [selectedWalletId, rows, createTx, router]);
 
@@ -228,11 +247,11 @@ export default function CsvImportScreen() {
           <View style={styles.section}>
             <Text style={styles.stepTitle}>{S.step2Title}</Text>
             <Text style={styles.stepHint}>{S.step2Hint}</Text>
-            {wallets.length === 0
+            {importableWallets.length === 0
               ? <Text style={styles.emptyText}>{S.noWallets}</Text>
               : (
                 <View style={styles.walletList}>
-                  {wallets.map((w: Wallet) => (
+                  {importableWallets.map((w: Wallet) => (
                     <WalletCard key={w.id} wallet={w} selected={selectedWalletId === w.id} onPress={() => setSelectedWalletId(w.id)} />
                   ))}
                 </View>
