@@ -353,16 +353,19 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
                 : <Text style={styles.saveBtnText}>{S.save}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[styles.deleteBtn, deleteMutation.isPending && styles.btnDisabled]}
-              onPress={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending
-                ? <ActivityIndicator size="small" color={COLORS.error} />
-                : <Text style={styles.deleteBtnText}>{S.delete}</Text>}
-            </TouchableOpacity>
+            {/* Bank-synced (linked-wallet) transactions are read-only and cannot be deleted. */}
+            {selectedWallet?.type !== 'linked' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[styles.deleteBtn, deleteMutation.isPending && styles.btnDisabled]}
+                onPress={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending
+                  ? <ActivityIndicator size="small" color={COLORS.error} />
+                  : <Text style={styles.deleteBtnText}>{S.delete}</Text>}
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

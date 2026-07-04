@@ -195,6 +195,17 @@ export async function updateProfile(_input: UpdateProfileInput): Promise<void> {
   await delay(150);
 }
 
+/** Mock avatar upload — echoes back the picked local URI as the "hosted" URL. */
+export async function uploadAvatar(uri: string): Promise<string> {
+  await delay(400);
+  return uri;
+}
+
+/** Mock account deletion — succeeds silently; the store clears the session. */
+export async function deleteAccount(): Promise<void> {
+  await delay(300);
+}
+
 // ─── logout ───────────────────────────────────────────────────────────────────
 
 /** No-op in mock mode — session is cleared locally by the auth store. */

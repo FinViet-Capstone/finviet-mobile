@@ -27,6 +27,7 @@ interface SavingGoalDto {
   goalId: string;
   customerId: string;
   goalName: string;
+  iconEmoji: string | null;
   targetAmount: number;
   currentAmount: number;
   deadline: string | null;
@@ -46,6 +47,7 @@ function toGoal(dto: SavingGoalDto): SavingsGoalWithProgress {
     id: dto.goalId,
     customerId: dto.customerId,
     name: dto.goalName,
+    iconEmoji: dto.iconEmoji ?? undefined,
     targetAmount: dto.targetAmount,
     currentAmount: dto.currentAmount,
     deadline: dto.deadline ?? '',
@@ -82,6 +84,7 @@ export async function createGoal(
 ): Promise<SavingsGoalWithProgress> {
   const res = await api.post('/saving-goals', {
     goalName: input.name.trim(),
+    iconEmoji: input.iconEmoji ?? null,
     targetAmount: input.targetAmount,
     deadline: input.deadline || null,
     initialAmount: input.initialAmount ?? null,
@@ -112,6 +115,7 @@ export async function addGoalContribution(
 ): Promise<SavingsGoalWithProgress> {
   const res = await api.post(`/saving-goals/${goalId}/contribute`, {
     amount: input.amount,
+    fundingWalletId: input.fundingWalletId ?? null,
   }, idempotentConfig());
   return toGoal(unwrap<SavingGoalDto>(res));
 }

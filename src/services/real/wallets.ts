@@ -11,8 +11,16 @@
  */
 
 import { api, unwrap } from '@/lib/api';
+import { idempotentConfig } from '@/lib/idempotency';
 import type { Wallet, WalletSummary, WalletType } from '@/types';
-import type { CreateWalletInput, UpdateWalletInput } from '@/services/mock/wallets';
+import type {
+  CreateWalletInput,
+  UpdateWalletInput,
+  WithdrawInput,
+  WithdrawResult,
+  WalletLedgerQuery,
+  WalletLedgerPage,
+} from '@/services/mock/wallets';
 
 // ─── Backend DTO shapes (camelCase over the wire) ─────────────────────────────
 
@@ -92,4 +100,78 @@ export async function updateWallet(
 
 export async function deleteWallet(id: string): Promise<void> {
   await api.delete(`/wallets/${id}`);
+}
+
+// ─── Withdraw ────────────────────────────────────────────────────────────────
+
+interface WithdrawWalletResponse {
+  fromWalletId: string;
+  fromWalletBalance: number;
+  toWalletId?: string;
+  toWalletBalance?: number;
+}
+
+export async function withdrawFromWallet(
+  input: WithdrawInput,
+): Promise<WithdrawResult> {
+  const res = await api.post('/wallets/withdraw', {
+    fromWalletId: input.fromWalletId,
+    toWalletId: input.toWalletId ?? null,
+    amount: input.amount,
+    description: input.description ?? null,
+  }, idempotentConfig());
+  return unwrap<WithdrawWalletResponse>(res);
+}
+
+// ─── Per-wallet ledger ───────────────────────────────────────────────────────
+
+interface WalletTransactionDto {
+  transactionId: string;
+  walletId: string;
+  categoryId: string | null;
+  transactionType: string;
+  amount: number;
+  transactionDate: string;
+  note: string | null;
+}
+
+interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export async function getWalletTransactions(
+  walletId: string,
+  query?: WalletLedgerQuery,
+): Promise<WalletLedgerPage> {
+  const params: Record<string, string | number> = {};
+  if (query?.page) params.page = query.page;
+  if (query?.pageSize) params.pageSize = query.pageSize;
+  if (query?.fromDate) params.fromDate = query.fromDate;
+  if (query?.toDate) params.toDate = query.toDate;
+  if (query?.categoryId) params.categoryId = query.categoryId;
+  if (query?.transactionType) params.transactionType = query.transactionType;
+  if (query?.sortOrder) params.sortOrder = query.sortOrder;
+
+  const res = await api.get(`/wallets/${walletId}/transactions`, { params });
+  const data = unwrap<PagedResult<WalletTransactionDto>>(res);
+
+  return {
+    items: data.items.map((t) => ({
+      transactionId: t.transactionId,
+      walletId: t.walletId,
+      categoryId: t.categoryId,
+      transactionType: t.transactionType,
+      amount: t.amount,
+      transactionDate: t.transactionDate,
+      note: t.note,
+    })),
+    page: data.page,
+    pageSize: data.pageSize,
+    totalItems: data.totalItems,
+    totalPages: data.totalPages,
+  };
 }

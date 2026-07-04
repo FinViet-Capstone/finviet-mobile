@@ -8,7 +8,9 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
-} from 'react-native';import { SafeAreaView } from 'react-native-safe-area-context';
+  TextInput,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
@@ -16,6 +18,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { WalletPickerSheet } from '@/components/transaction/WalletPickerSheet';
 import { useGoalById, useAddContribution, useDeleteGoal } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
 import type { SavingsGoalWithProgress } from '@/types/goal';
@@ -40,6 +43,9 @@ const S = {
   amountPlaceholder: 'Nhập số tiền',
   noteLabel: 'Ghi chú (tuỳ chọn)',
   notePlaceholder: 'VD: Lương tháng 6',
+  sourceLabel: 'Nguồn tiền (ví)',
+  sourcePlaceholder: 'Chọn ví để trích tiền',
+  noBasicWallet: 'Bạn chưa có ví cơ bản nào để trích tiền.',
   save: 'Lưu',
   cancel: 'Huỷ',
   available: (s: string) => `Số dư khả dụng: ${s}`,
@@ -88,15 +94,32 @@ function ContributionSheet({
   const { data: walletData } = useWallets();
   const [amountRaw, setAmountRaw] = useState('');
   const [note, setNote] = useState('');
+  const [walletPickerVisible, setWalletPickerVisible] = useState(false);
   // Numpad is a screen-level modal overlay (NOT a child of the sheet — that would
   // clip its absolute-fill). Auto-open when the sheet opens; Done/outside dismisses.
   const [amountFocused, setAmountFocused] = useState(true);
   useEffect(() => { if (visible) setAmountFocused(true); }, [visible]);
 
-  // The funding wallet is the source the contribution is deducted from. Its
-  // balance is a hard ceiling — you can't contribute money the wallet doesn't hold.
-  const fundingWallet = goal.fundingWalletId
-    ? walletData?.wallets.find((w) => w.id === goal.fundingWalletId)
+  // Only basic wallets can fund a contribution — deducting from a bank-linked wallet
+  // would desync it from the real account, so those are excluded as sources.
+  const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== 'linked');
+  const totalBasicBalance = basicWallets.reduce((s, w) => s + w.balance, 0);
+
+  // The chosen source wallet. Default to the goal's funding wallet if it's basic,
+  // otherwise the first available basic wallet.
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible) return;
+    const preferred = goal.fundingWalletId
+      && basicWallets.some((w) => w.id === goal.fundingWalletId)
+      ? goal.fundingWalletId
+      : basicWallets[0]?.id ?? null;
+    setSelectedWalletId(preferred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const fundingWallet = selectedWalletId
+    ? basicWallets.find((w) => w.id === selectedWalletId)
     : undefined;
   const walletBalance = fundingWallet ? fundingWallet.balance : null;
   const zeroBalance = walletBalance !== null && walletBalance <= 0;
@@ -108,7 +131,8 @@ function ContributionSheet({
   const overRemaining = !overBalance && parsedAmount > goal.remainingAmount;
   const hasError = parsedAmount > 0 && (overBalance || overRemaining);
   const canSave =
-    !!amountRaw && parsedAmount > 0 && !hasError && !zeroBalance && !addContrib.isPending;
+    !!amountRaw && parsedAmount > 0 && !hasError && !zeroBalance
+    && !!selectedWalletId && !addContrib.isPending;
 
   const handleNumberPress = useCallback(
     (key: string) => {
@@ -128,17 +152,45 @@ function ContributionSheet({
     if (!canSave) return;
     await addContrib.mutateAsync({
       goalId: goal.id,
-      input: { amount: parsedAmount, note: note.trim() || undefined },
+      input: {
+        amount: parsedAmount,
+        note: note.trim() || undefined,
+        fundingWalletId: selectedWalletId ?? undefined,
+      },
     });
     setAmountRaw(''); setNote('');
     onClose();
-  }, [canSave, parsedAmount, note, goal.id, addContrib, onClose]);
+  }, [canSave, parsedAmount, note, selectedWalletId, goal.id, addContrib, onClose]);
 
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={[styles.sheet, amountFocused && !zeroBalance && { paddingBottom: NUMPAD_HEIGHT }]}>
         <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
+
+        {/* Source wallet — the money is deducted from here */}
+        <Text style={styles.fieldLabel}>{S.sourceLabel}</Text>
+        {basicWallets.length === 0 ? (
+          <View style={styles.zeroBalanceBox}>
+            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <Text style={styles.zeroBalanceText}>{S.noBasicWallet}</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.walletSelectRow}
+            onPress={() => { setAmountFocused(false); setWalletPickerVisible(true); }}
+          >
+            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.primary} />
+            <Text style={[styles.walletSelectText, !fundingWallet && styles.amountPlaceholder]}>
+              {fundingWallet ? fundingWallet.name : S.sourcePlaceholder}
+            </Text>
+            {fundingWallet ? (
+              <Text style={styles.walletSelectBalance}>{formatFull(fundingWallet.balance)}</Text>
+            ) : null}
+            <MaterialIcon name="expand_more" size={20} color={COLORS.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
 
         {zeroBalance ? (
           <View style={styles.zeroBalanceBox}>
@@ -170,11 +222,15 @@ function ContributionSheet({
         )}
 
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
-        <View style={styles.noteDisplay}>
-          <Text style={[styles.noteText, !note && styles.amountPlaceholder]}>
-            {note || S.notePlaceholder}
-          </Text>
-        </View>
+        <TextInput
+          style={styles.noteInput}
+          value={note}
+          onChangeText={setNote}
+          placeholder={S.notePlaceholder}
+          placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setAmountFocused(false)}
+          returnKeyType="done"
+        />
 
         <View style={styles.sheetActions}>
           <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
@@ -197,6 +253,14 @@ function ContributionSheet({
       onBackspace={handleBackspace}
       onClear={handleClear}
       onDone={() => setAmountFocused(false)}
+    />
+    <WalletPickerSheet
+      visible={walletPickerVisible}
+      wallets={basicWallets}
+      selectedWalletId={selectedWalletId}
+      totalBalance={totalBasicBalance}
+      onSelect={(id) => { setSelectedWalletId(id); setWalletPickerVisible(false); }}
+      onClose={() => setWalletPickerVisible(false)}
     />
     </>
   );
@@ -424,6 +488,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
   },
   noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
+  noteInput: {
+    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface,
+  },
+  walletSelectRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    paddingHorizontal: SPACING[4], height: 48,
+  },
+  walletSelectText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
+  walletSelectBalance: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
   sheetHandle: {
     width: 40, height: 4, borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.outlineVariant, alignSelf: 'center', marginBottom: SPACING[4],

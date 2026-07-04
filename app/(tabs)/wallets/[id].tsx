@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,7 +10,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useWalletById } from '@/hooks/useWallets';
+import { useWalletById, useSyncSepayWallet, useSyncFinverseWallet } from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import type { Transaction } from '@/types';
@@ -25,6 +26,8 @@ const S = {
   syncOk: 'Đã đồng bộ',
   syncError: 'Lỗi kết nối',
   syncing: 'Đang đồng bộ',
+  syncBtn: 'Đồng bộ ngay',
+  syncSuccess: 'Đồng bộ thành công',
 };
 
 function formatVND(n: number): string {
@@ -35,6 +38,8 @@ export default function WalletDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
+  const sepaySyncMutation = useSyncSepayWallet();
+  const finverseSyncMutation = useSyncFinverseWallet();
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -47,6 +52,41 @@ export default function WalletDetailScreen() {
     const mode = wallet?.type === 'basic' ? 'full' : 'category';
     router.push({ pathname: '/(tabs)/transactions/[id]', params: { id: tx.id, mode } });
   }, [wallet, router]);
+
+  const isSyncing = sepaySyncMutation.isPending || finverseSyncMutation.isPending;
+
+  const handleSync = useCallback(() => {
+    if (!id || isSyncing) return;
+    // Determine wallet provider from name or type metadata.
+    const walletName = wallet?.name?.toLowerCase() ?? '';
+    const isSepay = walletName.includes('sepay');
+
+    if (isSepay) {
+      sepaySyncMutation.mutate(id, {
+        onSuccess: (data) => {
+          Alert.alert(
+            S.syncSuccess,
+            `Đã thêm ${data.transactionsCreated} giao dịch mới, cập nhật ${data.transactionsUpdated} giao dịch.`,
+          );
+          refetch();
+          refetchTx();
+        },
+        onError: (err: any) => {
+          Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
+        },
+      });
+    } else {
+      finverseSyncMutation.mutate(id, {
+        onSuccess: () => {
+          refetch();
+          refetchTx();
+        },
+        onError: (err: any) => {
+          Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
+        },
+      });
+    }
+  }, [id, isSyncing, wallet, sepaySyncMutation, finverseSyncMutation, refetch, refetchTx]);
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !wallet) return <ErrorState message={(error as Error)?.message ?? 'Không tìm thấy ví'} onRetry={refetch} />;
@@ -90,6 +130,25 @@ export default function WalletDetailScreen() {
           </View>
         </View>
 
+        {/* Sync button for linked wallets */}
+        {wallet.type === 'linked' && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.syncBtn, isSyncing && styles.syncBtnDisabled]}
+            onPress={handleSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <ActivityIndicator size="small" color={COLORS.onPrimary} />
+            ) : (
+              <MaterialIcon name="sync" size={18} color={COLORS.onPrimary} />
+            )}
+            <Text style={styles.syncBtnText}>
+              {isSyncing ? S.syncing : S.syncBtn}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Transaction history */}
         <Text style={styles.sectionLabel}>{S.history}</Text>
         {txLoading ? (
@@ -129,5 +188,12 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
   typeText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
   syncText: { fontSize: FONT_SIZE.xs },
+  syncBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING[2], backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING[3], paddingHorizontal: SPACING[5],
+  },
+  syncBtnDisabled: { opacity: 0.6 },
+  syncBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
   sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
 });

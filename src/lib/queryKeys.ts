@@ -25,6 +25,8 @@ export const queryKeys = {
   wallets: {
     all: () => ['wallets'] as const,
     detail: (id: string | undefined) => [...queryKeys.wallets.all(), id] as const,
+    transactions: (walletId: string, query: Record<string, unknown> | null) =>
+      [...queryKeys.wallets.all(), walletId, 'transactions', query] as const,
   },
   transactions: {
     all: () => ['transactions'] as const,
@@ -33,6 +35,8 @@ export const queryKeys = {
     detail: (id: string | undefined) =>
       [...queryKeys.transactions.all(), 'byId', id] as const,
     recent: (n: number) => [...queryKeys.transactions.all(), 'recent', n] as const,
+    summary: (year: number, month: number) =>
+      [...queryKeys.transactions.all(), 'summary', year, month] as const,
   },
   budgets: {
     all: () => ['budgets'] as const,
@@ -40,6 +44,8 @@ export const queryKeys = {
     list: (range: { startDate: string; endDate: string } | null) =>
       [...queryKeys.budgets.all(), 'list', range] as const,
     detail: (id: string | undefined) => [...queryKeys.budgets.all(), id] as const,
+    buckets: (range: { startDate: string; endDate: string } | null) =>
+      [...queryKeys.budgets.all(), 'buckets', range] as const,
   },
   goals: {
     all: () => ['goals'] as const,
@@ -57,11 +63,6 @@ export const queryKeys = {
   },
   rules: {
     all: () => ['rules'] as const,
-  },
-  linkedWallet: {
-    institutions: (country: string) => ['institutions', country] as const,
-    accounts: (accessToken: string | undefined) =>
-      ['linked-accounts', accessToken] as const,
   },
   customerCategories: (customerId: string | null) =>
     ['customer-categories', customerId] as const,

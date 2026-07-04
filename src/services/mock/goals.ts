@@ -255,6 +255,7 @@ export async function deleteGoal(id: string): Promise<void> {
 export interface AddContributionInput {
   amount: number;
   note?: string;
+  fundingWalletId?: string;
 }
 
 /**

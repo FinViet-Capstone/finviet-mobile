@@ -8,9 +8,11 @@
  * so the swap needs zero hook/screen changes.
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), category-requests, and SePay linked
- * wallets. Still mock: customer profile, reports/AI, notifications, rules,
- * extraction, subscriptions.
+ * categories (customer category buckets), category-requests, reports/AI (spending
+ * score, weekly report, chat history), notifications, rules, SMS extraction, and
+ * Finverse bank-linking (see real/finverse.ts + app/link-bank.tsx). Still mock:
+ * subscriptions (no backend), and photo/receipt OCR extraction (no backend — only
+ * SMS + CSV parsing exist server-side).
  */
 
 import { USE_MOCK } from '@/lib/env';
@@ -29,8 +31,14 @@ import * as mockCustomerCategories from './mock/customerCategories';
 import * as realCustomerCategories from './real/categories';
 import * as mockCategoryRequests from './mock/categoryRequests';
 import * as realCategoryRequests from './real/categoryRequests';
-import * as mockLinkedWallets from './linkedWalletSync';
-import * as realLinkedWallets from './real/linkedWallets';
+import * as mockReports from './mock/reports';
+import * as realReports from './real/reports';
+import * as mockNotifications from './mock/notifications';
+import * as realNotifications from './real/notifications';
+import * as mockExtraction from './mock/extraction';
+import * as realExtraction from './real/extraction';
+import * as mockRules from './mock/rules';
+import * as realRules from './real/rules';
 
 /**
  * USE_MOCK / API_BASE_URL live in @/lib/env (dependency-free) to avoid an import
@@ -48,15 +56,27 @@ export const getWalletById = walletsImpl.getWalletById;
 export const createWallet = walletsImpl.createWallet;
 export const updateWallet = walletsImpl.updateWallet;
 export const deleteWallet = walletsImpl.deleteWallet;
-export type { CreateWalletInput, UpdateWalletInput } from './mock/wallets';
+export const withdrawFromWallet = walletsImpl.withdrawFromWallet;
+export const getWalletTransactions = walletsImpl.getWalletTransactions;
+export type {
+  CreateWalletInput,
+  UpdateWalletInput,
+  WithdrawInput,
+  WithdrawResult,
+  WalletLedgerQuery,
+  WalletLedgerEntry,
+  WalletLedgerPage,
+} from './mock/wallets';
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 const transactionsImpl = USE_MOCK ? mockTransactions : realTransactions;
 export const getTransactions = transactionsImpl.getTransactions;
 export const getTransactionById = transactionsImpl.getTransactionById;
 export const getRecentTransactions = transactionsImpl.getRecentTransactions;
+export const getTransactionSummary = transactionsImpl.getTransactionSummary;
 export const createTransaction = transactionsImpl.createTransaction;
 export const updateTransaction = transactionsImpl.updateTransaction;
+export const classifyTransaction = transactionsImpl.classifyTransaction;
 export const deleteTransaction = transactionsImpl.deleteTransaction;
 export const createTransfer = transactionsImpl.createTransfer;
 export type {
@@ -65,16 +85,27 @@ export type {
   UpdateTransactionInput,
   CreateTransferInput,
   CreateTransferResult,
+  TransactionSummary,
+  TransactionSummaryCategory,
+  TransactionSummaryDay,
+  TransactionSummaryBeneficiary,
 } from './mock/transactions';
 
 // ─── Budgets ────────────────────────────────────────────────────────────────
 const budgetsImpl = USE_MOCK ? mockBudgets : realBudgets;
 export const getBudgets = budgetsImpl.getBudgets;
 export const getBudgetById = budgetsImpl.getBudgetById;
+export const getBudgetBuckets = budgetsImpl.getBudgetBuckets;
 export const createBudget = budgetsImpl.createBudget;
 export const updateBudget = budgetsImpl.updateBudget;
 export const deleteBudget = budgetsImpl.deleteBudget;
-export type { CreateBudgetInput, UpdateBudgetInput, MonthRange } from './mock/budgets';
+export type {
+  CreateBudgetInput,
+  UpdateBudgetInput,
+  MonthRange,
+  BucketSummary,
+  BucketSummaryList,
+} from './mock/budgets';
 
 // ─── Goals ──────────────────────────────────────────────────────────────────
 const goalsImpl = USE_MOCK ? mockGoals : realGoals;
@@ -107,28 +138,37 @@ export const createCategoryRequest = categoryRequestsImpl.createCategoryRequest;
 export const getCategoryRequests = categoryRequestsImpl.getCategoryRequests;
 export type { CreateCategoryRequestPayload } from './mock/categoryRequests';
 
-// Reports & AI
-export {
-  getSpendingScore,
-  getWeeklyReport,
-  getChatHistory,
-  getChatSessions,
-  getChatSessionMessages,
-} from './mock/reports';
+// ─── Reports & AI ─────────────────────────────────────────────────────────────
+const reportsImpl = USE_MOCK ? mockReports : realReports;
+export const getSpendingScore = reportsImpl.getSpendingScore;
+export const getWeeklyReport = reportsImpl.getWeeklyReport;
+export const getChatHistory = reportsImpl.getChatHistory;
+export const getChatSessions = reportsImpl.getChatSessions;
+export const getChatSessionMessages = reportsImpl.getChatSessionMessages;
+export const sendChatMessage = reportsImpl.sendChatMessage;
+export const generateWeeklyReport = reportsImpl.generateWeeklyReport;
+export const previewCategorization = reportsImpl.previewCategorization;
+export const categorizeTransaction = reportsImpl.categorizeTransaction;
+export const overrideCategorization = reportsImpl.overrideCategorization;
 
-// Notifications
-export {
-  getNotifications,
-  getUnreadNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-} from './mock/notifications';
+// ─── Notifications ────────────────────────────────────────────────────────────
+const notificationsImpl = USE_MOCK ? mockNotifications : realNotifications;
+export const getNotifications = notificationsImpl.getNotifications;
+export const getUnreadNotifications = notificationsImpl.getUnreadNotifications;
+export const markNotificationRead = notificationsImpl.markNotificationRead;
+export const markAllNotificationsRead = notificationsImpl.markAllNotificationsRead;
 
-// Photo / SMS Extraction (mock — frozen contract; see types/extraction.ts and constants/extraction.ts)
-export { extractFromPhoto, extractFromSMS } from './mock/extraction';
+// ─── Photo / SMS Extraction ─────────────────────────────────────────────────────
+// SMS → real /extract/sms; photo/receipt OCR has no backend, so real re-exports the mock.
+const extractionImpl = USE_MOCK ? mockExtraction : realExtraction;
+export const extractFromPhoto = extractionImpl.extractFromPhoto;
+export const extractFromSMS = extractionImpl.extractFromSMS;
 
-// Rules (merchant → category auto-classification)
-export { getRules, createRule, deleteRule } from './mock/rules';
+// ─── Rules (merchant → category auto-classification) ────────────────────────────
+const rulesImpl = USE_MOCK ? mockRules : realRules;
+export const getRules = rulesImpl.getRules;
+export const createRule = rulesImpl.createRule;
+export const deleteRule = rulesImpl.deleteRule;
 export type { CreateRuleInput, CreateRuleResult } from './mock/rules';
 
 // Auth — branch the implementation on USE_MOCK. Input types always come from the
@@ -146,6 +186,8 @@ export const changePassword = authImpl.changePassword;
 export const logout = authImpl.logout;
 export const getProfile = authImpl.getProfile;
 export const updateProfile = authImpl.updateProfile;
+export const uploadAvatar = authImpl.uploadAvatar;
+export const deleteAccount = authImpl.deleteAccount;
 
 export type {
   MockLoginInput,
@@ -154,13 +196,3 @@ export type {
   UpdateProfileInput,
   ResetPasswordInput,
 } from './mock/auth';
-
-// ─── Linked Wallet Sync (SePay) ───────────────────────────────────────────────
-const linkedWalletsImpl = USE_MOCK ? mockLinkedWallets : realLinkedWallets;
-export const syncLinkedWalletTransactions =
-  linkedWalletsImpl.syncLinkedWalletTransactions;
-export const getLinkedAccounts = linkedWalletsImpl.getLinkedAccounts;
-export const getInstitutions = linkedWalletsImpl.getInstitutions;
-export const createConnectToken = linkedWalletsImpl.createConnectToken;
-export const exchangeConnection = linkedWalletsImpl.exchangeConnection;
-export type { SyncResult } from './linkedWalletSync';

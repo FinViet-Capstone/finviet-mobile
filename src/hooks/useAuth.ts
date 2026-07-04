@@ -20,6 +20,8 @@ import {
   verifyEmail,
   changePassword,
   logout,
+  uploadAvatar,
+  deleteAccount,
   type MockLoginInput,
   type MockRegisterInput,
   type MockChangePasswordInput,
@@ -87,3 +89,18 @@ export const useLogout = () => {
     onSettled: () => clearSession(),
   });
 };
+
+/** Upload a new avatar image; on success patches the avatarUrl in the store. */
+export const useUploadAvatar = () => {
+  const updateCustomer = useAuthStore((s) => s.updateCustomer);
+  return useMutation<string, Error, string>({
+    mutationFn: (uri) => uploadAvatar(uri),
+    onSuccess: (url) => updateCustomer({ avatarUrl: url }),
+  });
+};
+
+/** Self-delete the account (soft). The caller clears the session on success. */
+export const useDeleteAccount = () =>
+  useMutation<void, Error, void>({
+    mutationFn: () => deleteAccount(),
+  });

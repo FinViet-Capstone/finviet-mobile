@@ -25,6 +25,7 @@ import type {
   UpdateTransactionInput,
   CreateTransferInput,
   CreateTransferResult,
+  TransactionSummary,
 } from '@/services/mock/transactions';
 
 // A page big enough that the client-side refinements below see the full set the
@@ -162,6 +163,43 @@ export async function getTransactionById(id: string): Promise<Transaction | unde
   return toTransaction(res.data as TransactionDto);
 }
 
+/**
+ * GET /transactions/summary?year&month — monthly income/expense/net plus category,
+ * day and beneficiary breakdowns. Like the rest of this controller the payload is
+ * raw (NOT wrapped in ApiResponse), so read res.data directly.
+ */
+export async function getTransactionSummary(
+  year: number,
+  month: number,
+): Promise<TransactionSummary> {
+  const res = await api.get('/transactions/summary', { params: { year, month } });
+  const d = res.data as {
+    income: number;
+    expense: number;
+    net: number;
+    byCategory?: { categoryId?: string | null; categoryName?: string | null; total: number }[];
+    byDay?: { date: string; income: number; expense: number; net: number }[];
+    topBeneficiaries?: { beneficiary: string; total: number }[];
+  };
+  return {
+    income: d.income ?? 0,
+    expense: d.expense ?? 0,
+    net: d.net ?? 0,
+    byCategory: (d.byCategory ?? []).map((c) => ({
+      categoryId: c.categoryId ?? null,
+      categoryName: c.categoryName ?? null,
+      total: c.total,
+    })),
+    byDay: (d.byDay ?? []).map((x) => ({
+      date: String(x.date).slice(0, 10),
+      income: x.income,
+      expense: x.expense,
+      net: x.net,
+    })),
+    topBeneficiaries: d.topBeneficiaries ?? [],
+  };
+}
+
 export async function getRecentTransactions(n: number = 10): Promise<Transaction[]> {
   const res = await api.get('/transactions', { params: { page: 1, pageSize: n } });
   const paged = res.data as PagedDto<TransactionDto>;
@@ -201,6 +239,21 @@ export async function updateTransaction(
   // Backend only supports recategorization (PUT body = { categoryId }).
   const res = await api.put(`/transactions/${id}`, {
     categoryId: patch.categoryId ?? null,
+  });
+  return toTransaction(res.data as TransactionDto);
+}
+
+/**
+ * PATCH /transactions/{id}/classify — recategorize a transaction. Distinct from
+ * PUT (which the backend also limits to categoryId); classify is the intent-named
+ * endpoint used by the recategorize UX.
+ */
+export async function classifyTransaction(
+  id: string,
+  categoryId: string | null,
+): Promise<Transaction> {
+  const res = await api.patch(`/transactions/${id}/classify`, {
+    categoryId: categoryId ?? null,
   });
   return toTransaction(res.data as TransactionDto);
 }

@@ -22,6 +22,36 @@ export interface TransactionFilters {
   hideGoalContributions?: boolean;
 }
 
+// ─── Monthly summary (GET /transactions/summary) ────────────────────────────────
+
+export interface TransactionSummaryCategory {
+  categoryId: string | null;
+  categoryName: string | null;
+  total: number;
+}
+
+export interface TransactionSummaryDay {
+  /** 'YYYY-MM-DD' */
+  date: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface TransactionSummaryBeneficiary {
+  beneficiary: string;
+  total: number;
+}
+
+export interface TransactionSummary {
+  income: number;
+  expense: number;
+  net: number;
+  byCategory: TransactionSummaryCategory[];
+  byDay: TransactionSummaryDay[];
+  topBeneficiaries: TransactionSummaryBeneficiary[];
+}
+
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 // `let` not `const` -- mutation services rewrite this in place.
 
@@ -1258,6 +1288,72 @@ export function getRecentTransactions(n: number = 10): Transaction[] {
   return getTransactions().slice(0, n);
 }
 
+/**
+ * Monthly income/expense/net rollup with per-category, per-day and top-beneficiary
+ * breakdowns. Mirrors the backend GET /transactions/summary. Transfer legs are
+ * excluded (they net to zero and aren't real income/expense).
+ */
+export function getTransactionSummary(
+  year: number,
+  month: number,
+): TransactionSummary {
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  const rows = TRANSACTIONS.filter(
+    (t) =>
+      t.transactionDate.startsWith(prefix) &&
+      t.type !== 'transfer_in' &&
+      t.type !== 'transfer_out',
+  );
+
+  let income = 0;
+  let expense = 0;
+  const catMap = new Map<string, TransactionSummaryCategory>();
+  const dayMap = new Map<string, TransactionSummaryDay>();
+  const benMap = new Map<string, number>();
+
+  for (const t of rows) {
+    const isIncome = t.type === 'income';
+    if (isIncome) income += t.amount;
+    else expense += t.amount;
+
+    const catKey = t.categoryId ?? '__none__';
+    const cat = catMap.get(catKey) ?? {
+      categoryId: t.categoryId ?? null,
+      categoryName: null,
+      total: 0,
+    };
+    cat.total += t.amount;
+    catMap.set(catKey, cat);
+
+    const day = dayMap.get(t.transactionDate) ?? {
+      date: t.transactionDate,
+      income: 0,
+      expense: 0,
+      net: 0,
+    };
+    if (isIncome) day.income += t.amount;
+    else day.expense += t.amount;
+    day.net = day.income - day.expense;
+    dayMap.set(t.transactionDate, day);
+
+    if (!isIncome && t.merchant) {
+      benMap.set(t.merchant, (benMap.get(t.merchant) ?? 0) + t.amount);
+    }
+  }
+
+  return {
+    income,
+    expense,
+    net: income - expense,
+    byCategory: [...catMap.values()].sort((a, b) => b.total - a.total),
+    byDay: [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    topBeneficiaries: [...benMap.entries()]
+      .map(([beneficiary, total]) => ({ beneficiary, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5),
+  };
+}
+
 // ─── Writes ────────────────────────────────────────────────────────────────────
 
 export interface CreateTransactionInput {
@@ -1342,6 +1438,23 @@ export async function updateTransaction(
   adjustWalletBalance(before.walletId, -balanceDelta(before));
   adjustWalletBalance(after.walletId, balanceDelta(after));
 
+  TRANSACTIONS = TRANSACTIONS.map((t) => (t.id === id ? after : t));
+  return after;
+}
+
+/**
+ * Recategorize a transaction (category-only; mirrors PATCH /{id}/classify).
+ * Distinct from updateTransaction only in intent — the category change carries no
+ * wallet-balance effect, so no balance adjustment is needed.
+ */
+export async function classifyTransaction(
+  id: string,
+  categoryId: string | null,
+): Promise<Transaction> {
+  await delay();
+  const before = TRANSACTIONS.find((t) => t.id === id);
+  if (!before) throw new Error('Transaction not found');
+  const after: Transaction = { ...before, categoryId, updatedAt: nowIso() };
   TRANSACTIONS = TRANSACTIONS.map((t) => (t.id === id ? after : t));
   return after;
 }

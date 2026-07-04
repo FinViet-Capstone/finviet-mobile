@@ -82,6 +82,33 @@ export interface ChatSession {
 }
 
 // -------------------------------------------------------------------------
+// AI Categorization (auto-classify a transaction to a category)
+// -------------------------------------------------------------------------
+
+/** Where a category assignment came from. */
+export type CategorizationSource = 'RULE' | 'AI' | 'FALLBACK';
+
+/** Preview of what the AI would classify a free-text description as. */
+export interface AiClassificationResult {
+  /** Predicted category name (may be undefined when the model abstains). */
+  categoryName?: string;
+  /** Model confidence, 0–1. */
+  confidence: number;
+}
+
+/** Outcome of applying (or overriding) a categorization to a transaction. */
+export interface CategorizationOutcome {
+  transactionId: string;
+  categoryId?: string;
+  categoryName?: string;
+  confidence?: number;
+  isAiClassified: boolean;
+  /** True when the work was queued asynchronously rather than resolved inline. */
+  queued: boolean;
+  source: CategorizationSource;
+}
+
+// -------------------------------------------------------------------------
 // Suggested prompt chips shown when the AI Advisor opens (SPEC requirement)
 // -------------------------------------------------------------------------
 

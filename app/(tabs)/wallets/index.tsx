@@ -34,6 +34,8 @@ const S = {
   addSheetHint: 'Chọn loại ví bạn muốn thêm để theo dõi thu chi hiệu quả hơn.',
   optionBasic: 'Ví cơ bản',
   optionLinked: 'Liên kết ngân hàng',
+  optionSepay: 'SePay',
+  optionFinverse: 'Finverse (BankHub)',
   comingSoon: 'Sắp ra mắt',
 };
 
@@ -73,12 +75,14 @@ function AddWalletSheet({
   visible,
   onClose,
   onSelectBasic,
-  onSelectLinked,
+  onSelectSepay,
+  onSelectFinverse,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelectBasic: () => void;
-  onSelectLinked: () => void;
+  onSelectSepay: () => void;
+  onSelectFinverse: () => void;
 }) {
   return (
     <DraggableSheet visible={visible} onClose={onClose}>
@@ -93,9 +97,13 @@ function AddWalletSheet({
           <MaterialIcon name="account_balance_wallet" size={32} color={COLORS.primary} />
           <Text style={styles.optionLabelActive}>{S.optionBasic}</Text>
         </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectLinked}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectSepay}>
           <MaterialIcon name="account_balance" size={32} color={COLORS.primary} />
-          <Text style={styles.optionLabelActive}>{S.optionLinked}</Text>
+          <Text style={styles.optionLabelActive}>{S.optionSepay}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectFinverse}>
+          <MaterialIcon name="link" size={32} color={COLORS.primary} />
+          <Text style={styles.optionLabelActive}>{S.optionFinverse}</Text>
         </TouchableOpacity>
       </View>
       <Text style={styles.sheetHint}>{S.addSheetHint}</Text>
@@ -192,6 +200,13 @@ export default function WalletsScreen() {
     router.push('/link-bank');
   }, [router]);
 
+  const handleAddSepay = useCallback(() => {
+    setSheetVisible(false);
+    // Token flow is the active path (personal SePay API token). The OAuth2 flow at
+    // /link-sepay stays available for future multi-user linking.
+    router.push('/link-sepay-token');
+  }, [router]);
+
   const handleTransfer = useCallback(() => {
     router.push({ pathname: '/(tabs)/wallets/transfer' });
   }, [router]);
@@ -255,7 +270,8 @@ export default function WalletsScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         onSelectBasic={handleAddBasic}
-        onSelectLinked={handleAddLinked}
+        onSelectSepay={handleAddSepay}
+        onSelectFinverse={handleAddLinked}
       />
     </SafeAreaView>
   );

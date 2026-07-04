@@ -1,4 +1,11 @@
-import type { SpendingScore, WeeklyReport, ChatMessage, ChatSession } from '../../types';
+import type {
+  SpendingScore,
+  WeeklyReport,
+  ChatMessage,
+  ChatSession,
+  AiClassificationResult,
+  CategorizationOutcome,
+} from '../../types';
 import { USER_ID } from './wallets';
 
 // ─── Mock Data — Spending Score ────────────────────────────────────────────────
@@ -216,4 +223,66 @@ export function getChatSessions(): ChatSession[] {
 
 export function getChatSessionMessages(sessionId: string): ChatMessage[] {
   return SESSION_MAP[sessionId] ?? [];
+}
+
+const delay = (ms = 900) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Mock chat: echo a canned advisory reply after a short delay. */
+export async function sendChatMessage(question: string): Promise<ChatMessage> {
+  await delay();
+  return {
+    id: `msg_${Date.now()}`,
+    customerId: USER_ID,
+    role: 'assistant',
+    content:
+      `Đây là phản hồi mẫu cho câu hỏi "${question.slice(0, 60)}". ` +
+      'Kết nối backend để nhận phân tích tài chính thực tế.',
+    sessionId: 'default',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** Mock: return the canned weekly report as if freshly generated. */
+export async function generateWeeklyReport(): Promise<WeeklyReport> {
+  await delay();
+  return { ...MOCK_WEEKLY_REPORT, generatedAt: new Date().toISOString() };
+}
+
+/** Mock AI categorization preview. */
+export async function previewCategorization(
+  _input: string,
+): Promise<AiClassificationResult> {
+  await delay(400);
+  return { categoryName: 'Ăn uống', confidence: 0.82 };
+}
+
+/** Mock: pretend the transaction was auto-classified. */
+export async function categorizeTransaction(
+  transactionId: string,
+): Promise<CategorizationOutcome> {
+  await delay(400);
+  return {
+    transactionId,
+    categoryId: 'cat_food',
+    categoryName: 'Ăn uống',
+    confidence: 0.82,
+    isAiClassified: true,
+    queued: false,
+    source: 'AI',
+  };
+}
+
+/** Mock: accept a manual category override. */
+export async function overrideCategorization(
+  transactionId: string,
+  categoryId: string,
+): Promise<CategorizationOutcome> {
+  await delay(300);
+  return {
+    transactionId,
+    categoryId,
+    isAiClassified: false,
+    queued: false,
+    source: 'RULE',
+  };
 }

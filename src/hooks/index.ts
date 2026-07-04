@@ -6,18 +6,27 @@ export {
   useUpdateWallet,
   useDeleteWallet,
   useCreateTransfer,
+  useWithdrawFromWallet,
+  useWalletTransactions,
+  useSyncFinverseWallet,
+  useLinkSepayAccount,
+  useLinkSepayWithToken,
+  useSyncSepayWallet,
 } from './useWallets';
 export {
   useTransactions,
   useTransactionById,
   useRecentTransactions,
+  useTransactionSummary,
   useCreateTransaction,
   useUpdateTransaction,
+  useClassifyTransaction,
   useDeleteTransaction,
 } from './useTransactions';
 export {
   useBudgets,
   useBudgetById,
+  useBudgetBuckets,
   useCreateBudget,
   useUpdateBudget,
   useDeleteBudget,
@@ -31,7 +40,15 @@ export {
   useAddContribution,
 } from './useGoals';
 export { useBucketSpend, type BucketSpend } from './useBucketSpend';
-export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
+export {
+  useSpendingScore,
+  useWeeklyReport,
+  useChatHistory,
+  useChatSessions,
+  useChatSessionMessages,
+  useSendChatMessage,
+  useGenerateWeeklyReport,
+} from './useReports';
 export {
   useNotifications,
   useUnreadNotifications,
@@ -50,13 +67,10 @@ export {
   useVerifyEmail,
   useChangePassword,
   useLogout,
+  useUploadAvatar,
+  useDeleteAccount,
 } from './useAuth';
 export { useBootstrapSession } from './useBootstrapSession';
-export {
-  useInstitutions,
-  useLinkedAccounts,
-  useSyncLinkedWallet,
-} from './useLinkedWallet';
 export { useRules, useCreateRule } from './useRules';
 export { useCustomerCategories, useMoveBucket } from './useCustomerCategories';
 export { useCategoryRequests, useCreateCategoryRequest } from './useCategoryRequests';

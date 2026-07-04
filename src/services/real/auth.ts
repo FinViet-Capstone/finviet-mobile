@@ -152,6 +152,28 @@ export async function updateProfile(input: UpdateProfileInput): Promise<void> {
   });
 }
 
+/**
+ * POST /api/profile/avatar — upload a new avatar image (multipart). Returns the
+ * hosted avatar URL. Accepts a local file URI from the image picker.
+ */
+export async function uploadAvatar(uri: string): Promise<string> {
+  const name = uri.split('/').pop() || 'avatar.jpg';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  // React Native FormData file part shape ({ uri, name, type }).
+  form.append('file', { uri, name, type: mime } as unknown as Blob);
+  const res = await api.post('/profile/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return unwrap<string>(res);
+}
+
+/** DELETE /api/account — self soft-delete; the backend revokes refresh tokens. */
+export async function deleteAccount(): Promise<void> {
+  await api.delete('/account');
+}
+
 // ─── login ────────────────────────────────────────────────────────────────────
 
 export async function login(input: MockLoginInput): Promise<Customer> {

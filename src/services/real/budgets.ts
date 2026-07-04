@@ -21,6 +21,8 @@ import type {
   CreateBudgetInput,
   UpdateBudgetInput,
   MonthRange,
+  BucketSummary,
+  BucketSummaryList,
 } from '@/services/mock/budgets';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
@@ -99,6 +101,54 @@ export async function getBudgetById(
 ): Promise<BudgetWithSpend | undefined> {
   const all = await getBudgets(range);
   return all.find((b) => b.id === id);
+}
+
+// ─── Bucket summary (GET /budgets/buckets) ──────────────────────────────────────
+
+interface BucketSummaryDto {
+  bucket: string;
+  allocationPct: number;
+  allocationCap: number;
+  categoryLimitTotal: number;
+  spent: number;
+  remaining: number;
+  percentage: number;
+  overAllocated: boolean;
+  expectedSpent: number;
+  paceDeviation: number;
+  paceStatus: string;
+}
+
+interface BucketSummaryListDto {
+  month: string;
+  monthlyIncome: number;
+  budgetAdherenceScore: number;
+  uncategorizedRatio: number;
+  uncategorizedWarning: boolean;
+  buckets: BucketSummaryDto[];
+}
+
+function toBucket(dto: BucketSummaryDto): BucketSummary {
+  return { ...dto };
+}
+
+/** GET /budgets/buckets?month=YYYY-MM — 50/30/20 bucket summary with pace. */
+export async function getBudgetBuckets(
+  range?: MonthRange,
+): Promise<BucketSummaryList> {
+  const month = toMonthParam(range);
+  const res = await api.get('/budgets/buckets', {
+    params: month ? { month } : undefined,
+  });
+  const d = unwrap<BucketSummaryListDto>(res);
+  return {
+    month: d.month,
+    monthlyIncome: d.monthlyIncome,
+    budgetAdherenceScore: d.budgetAdherenceScore,
+    uncategorizedRatio: d.uncategorizedRatio,
+    uncategorizedWarning: d.uncategorizedWarning,
+    buckets: (d.buckets ?? []).map(toBucket),
+  };
 }
 
 // ─── Writes ─────────────────────────────────────────────────────────────────
