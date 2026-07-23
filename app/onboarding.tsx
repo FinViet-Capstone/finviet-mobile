@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { queryKeys } from '@/lib/queryKeys';
 
 import { OnboardingIncome } from '@/components/onboarding/OnboardingIncome';
 import { OnboardingAllocation } from '@/components/onboarding/OnboardingAllocation';
@@ -25,6 +28,7 @@ import { ONBOARDING_STRINGS } from '@/data/onboardingData';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const markOnboardingDone = useAuthStore((s) => s.markOnboardingDone);
   const updateCustomer = useAuthStore((s) => s.updateCustomer);
   const customerEmail = useAuthStore((s) => s.customer?.email ?? '');
@@ -62,26 +66,28 @@ export default function OnboardingScreen() {
       const income = Number(state.monthlyIncome.replace(/\D/g, '')) || null;
       const balance = Number(state.walletBalance.replace(/\D/g, '')) || 0;
 
-      // Persist profile (name, expected income, gender, DOB) so onboarding sticks
-      // across reloads — the backend infers onboardingDone from monthly income.
-      await updateProfile({
-        fullName,
-        monthlyIncomeExpected: income,
-        gender: state.gender,
-        dateOfBirth: state.dateOfBirth,
-      });
-
-      // Create the first wallet for real (this was previously never sent anywhere).
-      await createWallet.mutateAsync({
-        name: state.walletName.trim(),
-        type: state.walletType,
-        balance,
-      });
-
-      // Seed the per-customer category set (real backend seeds lazily; mock seeds here).
-      seedCategories.mutate({ gender: state.gender, dateOfBirth: state.dateOfBirth });
+      // Group all backend requests into a single Promise.all to avoid browser
+      // connection bottlenecks and race conditions before navigation.
+      await Promise.all([
+        updateProfile({
+          fullName,
+          monthlyIncomeExpected: income,
+          gender: state.gender,
+          dateOfBirth: state.dateOfBirth,
+        }),
+        createWallet.mutateAsync({
+          name: state.walletName.trim(),
+          type: state.walletType,
+          balance,
+        }),
+        seedCategories.mutateAsync({
+          gender: state.gender,
+          dateOfBirth: state.dateOfBirth,
+        }),
+      ]);
 
       updateCustomer({ displayName: fullName, monthlyIncome: income });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.user.all() });
       markOnboardingDone();
       router.replace('/(tabs)/home');
     } catch {
@@ -105,13 +111,16 @@ export default function OnboardingScreen() {
         state.displayName.trim() ||
         (customerEmail ? customerEmail.split('@')[0] : 'Người dùng');
       const income = Number(state.monthlyIncome.replace(/\D/g, '')) || null;
-      await updateProfile({
-        fullName,
-        monthlyIncomeExpected: income,
-        gender: state.gender,
-        dateOfBirth: state.dateOfBirth,
-      });
+      await Promise.all([
+        updateProfile({
+          fullName,
+          monthlyIncomeExpected: income,
+          gender: state.gender,
+          dateOfBirth: state.dateOfBirth,
+        })
+      ]);
       updateCustomer({ displayName: fullName, monthlyIncome: income });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.user.all() });
       router.push('/link-bank');
     } catch {
       Alert.alert(

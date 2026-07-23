@@ -9,6 +9,7 @@ import {
   ViewToken,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -41,6 +42,7 @@ const VIEWABILITY_CONFIG = {
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const now = new Date();
 
   const [year, setYear] = useState(now.getFullYear());
@@ -80,6 +82,7 @@ export default function TransactionsScreen() {
     filterType,
     null,
     uncategorizedOnly,
+    isFocused,
   );
 
   const onViewableItemsChanged = useCallback(

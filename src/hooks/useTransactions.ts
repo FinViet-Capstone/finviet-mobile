@@ -16,11 +16,12 @@ import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export const useTransactions = (filters?: TransactionFilters) =>
+export const useTransactions = (filters?: TransactionFilters, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: queryKeys.transactions.list(filters ?? null),
     queryFn: () => getTransactions(filters),
     staleTime: STALE_TIME.short,
+    enabled: options?.enabled,
   });
 
 export const useTransactionById = (id: string | undefined) =>
