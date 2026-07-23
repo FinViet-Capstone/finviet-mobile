@@ -74,6 +74,10 @@ export default function OnboardingScreen() {
           monthlyIncomeExpected: income,
           gender: state.gender,
           dateOfBirth: state.dateOfBirth,
+          // Step 2's 50/30/20 sliders — persist so it doesn't get silently dropped.
+          needsPct: state.allocations.essential,
+          wantsPct: state.allocations.wants,
+          savingsPct: state.allocations.savings,
         }),
         createWallet.mutateAsync({
           name: state.walletName.trim(),
@@ -117,6 +121,9 @@ export default function OnboardingScreen() {
           monthlyIncomeExpected: income,
           gender: state.gender,
           dateOfBirth: state.dateOfBirth,
+          needsPct: state.allocations.essential,
+          wantsPct: state.allocations.wants,
+          savingsPct: state.allocations.savings,
         })
       ]);
       updateCustomer({ displayName: fullName, monthlyIncome: income });

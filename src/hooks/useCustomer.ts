@@ -35,6 +35,10 @@ export interface UpdateProfileInput {
   displayName?: string;
   avatarUrl?: string | null;
   monthlyIncome?: number | null;
+  /** 50-30-20 budget bucket allocation — pass all three together; each must be 0-100 and sum to 100. */
+  needsPct?: number;
+  wantsPct?: number;
+  savingsPct?: number;
 }
 
 export const useUpdateProfile = () => {
@@ -50,6 +54,9 @@ export const useUpdateProfile = () => {
           monthlyIncomeExpected: patch.monthlyIncome !== undefined ? patch.monthlyIncome : currentCustomer.monthlyIncome,
           gender: currentCustomer.gender,
           dateOfBirth: currentCustomer.dateOfBirth,
+          ...(patch.needsPct !== undefined && patch.wantsPct !== undefined && patch.savingsPct !== undefined
+            ? { needsPct: patch.needsPct, wantsPct: patch.wantsPct, savingsPct: patch.savingsPct }
+            : {}),
         });
       } else {
         await delay();
@@ -61,6 +68,9 @@ export const useUpdateProfile = () => {
         ...(patch.monthlyIncome !== undefined
           ? { monthlyIncome: patch.monthlyIncome }
           : {}),
+        ...(patch.needsPct !== undefined ? { needsPct: patch.needsPct } : {}),
+        ...(patch.wantsPct !== undefined ? { wantsPct: patch.wantsPct } : {}),
+        ...(patch.savingsPct !== undefined ? { savingsPct: patch.savingsPct } : {}),
         updatedAt: new Date().toISOString(),
       });
     },

@@ -104,9 +104,9 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
     gender: null,
     dateOfBirth: null,
     monthlyIncome,
-    needsPct: 50,
-    wantsPct: 30,
-    savingsPct: 20,
+    needsPct: p.needsPct ?? 50,
+    wantsPct: p.wantsPct ?? 30,
+    savingsPct: p.savingsPct ?? 20,
     defaultCurrency: 'VND',
     language: 'vi',
     theme: 'system',
@@ -142,13 +142,22 @@ const GENDER_TO_INT: Record<'male' | 'female' | 'other', number> = {
   other: 2,
 };
 
-/** PUT /api/profile — persist name, expected income, gender and date of birth. */
+/**
+ * PUT /api/profile — persist name, expected income, gender, date of birth, and the
+ * 50-30-20 budget bucket allocation. needsPct/wantsPct/savingsPct must be sent as a
+ * trio (the backend validator rejects a partial set) and must sum to 100.
+ */
 export async function updateProfile(input: UpdateProfileInput): Promise<void> {
+  const hasAllocation =
+    input.needsPct !== undefined && input.wantsPct !== undefined && input.savingsPct !== undefined;
   await api.put('/profile', {
     fullName: input.fullName,
     monthlyIncomeExpected: input.monthlyIncomeExpected ?? null,
     gender: input.gender ? GENDER_TO_INT[input.gender] : null,
     dateOfBirth: input.dateOfBirth ?? null,
+    ...(hasAllocation
+      ? { needsPct: input.needsPct, wantsPct: input.wantsPct, savingsPct: input.savingsPct }
+      : {}),
   });
 }
 

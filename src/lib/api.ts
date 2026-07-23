@@ -55,6 +55,10 @@ export interface AuthResponsePayload {
     isEmailVerified: boolean;
     isActive: boolean;
     createdAt?: string | null;
+    /** 50-30-20 budget bucket allocation (defaults 50/30/20 server-side). */
+    needsPct?: number;
+    wantsPct?: number;
+    savingsPct?: number;
   };
 }
 

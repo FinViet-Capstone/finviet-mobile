@@ -188,6 +188,10 @@ export interface UpdateProfileInput {
   gender?: 'male' | 'female' | 'other' | null;
   /** 'YYYY-MM-DD' */
   dateOfBirth?: string | null;
+  /** 50-30-20 budget bucket allocation — send all three together or omit all three. */
+  needsPct?: number;
+  wantsPct?: number;
+  savingsPct?: number;
 }
 
 /** Mock: updates the in-memory customer so it persists across mock logins. */
@@ -198,6 +202,9 @@ export async function updateProfile(input: UpdateProfileInput): Promise<void> {
     ...(input.monthlyIncomeExpected !== undefined ? { monthlyIncome: input.monthlyIncomeExpected } : {}),
     ...(input.gender !== undefined ? { gender: input.gender } : {}),
     ...(input.dateOfBirth !== undefined ? { dateOfBirth: input.dateOfBirth } : {}),
+    ...(input.needsPct !== undefined ? { needsPct: input.needsPct } : {}),
+    ...(input.wantsPct !== undefined ? { wantsPct: input.wantsPct } : {}),
+    ...(input.savingsPct !== undefined ? { savingsPct: input.savingsPct } : {}),
     onboardingDone: input.monthlyIncomeExpected != null,
   });
 }

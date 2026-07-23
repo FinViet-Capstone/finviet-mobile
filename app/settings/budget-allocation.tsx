@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -13,7 +14,8 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
-import { useCustomer, useUpdatePreferences, useUpdateProfile } from '@/hooks/useCustomer';
+import { useCustomer, useUpdateProfile } from '@/hooks/useCustomer';
+import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -95,7 +97,6 @@ function BucketCard({
 export default function BudgetAllocationScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useCustomer();
-  const updatePrefs = useUpdatePreferences();
   const updateProfile = useUpdateProfile();
 
   const [needs, setNeeds] = useState(50);
@@ -162,13 +163,18 @@ export default function BudgetAllocationScreen() {
 
   const handleSave = useCallback(async () => {
     if (!isValid) return;
-    if (!isValid) return;
-    if (parsedIncome > 0) {
-      await updateProfile.mutateAsync({ monthlyIncome: parsedIncome });
+    try {
+      await updateProfile.mutateAsync({
+        needsPct: needs,
+        wantsPct: wants,
+        savingsPct: savings,
+        ...(parsedIncome > 0 ? { monthlyIncome: parsedIncome } : {}),
+      });
+      router.back();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, 'Không thể lưu phân bổ ngân sách.'));
     }
-    await updatePrefs.mutateAsync({} as any); // prefs don't have pct yet — scaffold for real API
-    router.back();
-  }, [isValid, parsedIncome, updateProfile, updatePrefs, router]);
+  }, [isValid, needs, wants, savings, parsedIncome, updateProfile, router]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -181,7 +187,7 @@ export default function BudgetAllocationScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <TouchableOpacity activeOpacity={0.7} style={styles.saveBtn}
-          onPress={handleSave} disabled={!isValid || updatePrefs.isPending}>
+          onPress={handleSave} disabled={!isValid || updateProfile.isPending}>
           <Text style={[styles.saveBtnText, !isValid && { opacity: 0.4 }]}>{S.save}</Text>
         </TouchableOpacity>
       </View>
