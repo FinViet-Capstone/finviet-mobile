@@ -1368,10 +1368,12 @@ export interface CreateTransactionInput {
   externalId?: string | null;
 }
 
-export async function createTransaction(
-  input: CreateTransactionInput,
-): Promise<Transaction> {
-  await delay();
+/**
+ * Build a transaction from input, append it to the store, and sync the wallet
+ * balance. Shared by the async createTransaction and the sync variant used by
+ * goals.ts so the record shape and balance side-effect stay identical.
+ */
+function insertTransaction(input: CreateTransactionInput): Transaction {
   const tx: Transaction = {
     id: genTxId(),
     customerId: USER_ID,
@@ -1391,6 +1393,13 @@ export async function createTransaction(
   TRANSACTIONS = [...TRANSACTIONS, tx];
   adjustWalletBalance(tx.walletId, balanceDelta(tx));
   return tx;
+}
+
+export async function createTransaction(
+  input: CreateTransactionInput,
+): Promise<Transaction> {
+  await delay();
+  return insertTransaction(input);
 }
 
 export interface UpdateTransactionInput {
@@ -1549,25 +1558,7 @@ export async function createTransfer(
  * Wallet balance is adjusted immediately (same as the async version).
  */
 export function createTransactionSync(input: CreateTransactionInput): Transaction {
-  const tx: Transaction = {
-    id: genTxId(),
-    customerId: USER_ID,
-    walletId: input.walletId,
-    categoryId: input.categoryId,
-    amount: input.amount,
-    type: input.type,
-    description: input.description,
-    merchant: input.merchant,
-    transactionDate: input.transactionDate,
-    entryMethod: input.entryMethod,
-    transferPairId: null,
-    externalId: input.externalId ?? null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  TRANSACTIONS = [...TRANSACTIONS, tx];
-  adjustWalletBalance(tx.walletId, balanceDelta(tx));
-  return tx;
+  return insertTransaction(input);
 }
 
 /**

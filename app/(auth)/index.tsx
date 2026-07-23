@@ -31,6 +31,30 @@ import {
 } from '@/constants/theme';
 
 // ---------------------------------------------------------------------------
+// Shared field bits
+// ---------------------------------------------------------------------------
+
+// The password show/hide toggle is identical across the login password, register
+// password, and confirm-password inputs — only the bound visibility state differs.
+function renderPasswordToggle(
+  visible: boolean,
+  onToggle: () => void,
+): React.ReactNode {
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <MaterialIcon
+        name={visible ? 'visibility_off' : 'visibility'}
+        size={20}
+        color={COLORS.onSurfaceVariant}
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Validation schemas
 // ---------------------------------------------------------------------------
 
@@ -256,18 +280,9 @@ export default function AuthScreen() {
                       onChangeText={onChange}
                       onBlur={onBlur}
                       error={loginForm.formState.errors.password?.message}
-                      rightIcon={
-                        <TouchableOpacity
-                          onPress={() => setShowPassword((prev) => !prev)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <MaterialIcon
-                            name={showPassword ? 'visibility_off' : 'visibility'}
-                            size={20}
-                            color={COLORS.onSurfaceVariant}
-                          />
-                        </TouchableOpacity>
-                      }
+                      rightIcon={renderPasswordToggle(showPassword, () =>
+                        setShowPassword((prev) => !prev),
+                      )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
                     />
@@ -332,18 +347,9 @@ export default function AuthScreen() {
                       onChangeText={onChange}
                       onBlur={onBlur}
                       error={registerForm.formState.errors.password?.message}
-                      rightIcon={
-                        <TouchableOpacity
-                          onPress={() => setShowPassword((prev) => !prev)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <MaterialIcon
-                            name={showPassword ? 'visibility_off' : 'visibility'}
-                            size={20}
-                            color={COLORS.onSurfaceVariant}
-                          />
-                        </TouchableOpacity>
-                      }
+                      rightIcon={renderPasswordToggle(showPassword, () =>
+                        setShowPassword((prev) => !prev),
+                      )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
                     />
@@ -365,20 +371,9 @@ export default function AuthScreen() {
                       onChangeText={onChange}
                       onBlur={onBlur}
                       error={registerForm.formState.errors.confirmPassword?.message}
-                      rightIcon={
-                        <TouchableOpacity
-                          onPress={() => setShowConfirmPassword((prev) => !prev)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <MaterialIcon
-                            name={
-                              showConfirmPassword ? 'visibility_off' : 'visibility'
-                            }
-                            size={20}
-                            color={COLORS.onSurfaceVariant}
-                          />
-                        </TouchableOpacity>
-                      }
+                      rightIcon={renderPasswordToggle(showConfirmPassword, () =>
+                        setShowConfirmPassword((prev) => !prev),
+                      )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
                     />
