@@ -11,7 +11,7 @@ import type {
   PlanCode,
   BillingCycle,
 } from '@/types/subscription';
-import { USER_ID } from './wallets';
+import { USER_ID } from './walletStore';
 
 const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
 

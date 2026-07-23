@@ -7,7 +7,7 @@
  */
 
 import type { Rule } from '../../types';
-import { USER_ID } from './wallets';
+import { USER_ID } from './walletStore';
 import { applyMerchantRule } from './transactions';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));

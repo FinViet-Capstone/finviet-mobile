@@ -1,5 +1,6 @@
 import type { SavingsGoalWithProgress, GoalContribution } from '../../types';
-import { USER_ID, WALLET_IDS, adjustWalletBalance, getWalletById } from './wallets';
+import { getWalletById } from './wallets';
+import { USER_ID, WALLET_IDS } from './walletStore';
 import { createTransactionSync, deleteTransactionSync } from './transactions';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

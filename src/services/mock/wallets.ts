@@ -1,41 +1,15 @@
 import type { Wallet, WalletSummary, WalletType } from '../../types';
+import {
+  USER_ID,
+  adjustWalletBalance,
+  getAllWallets,
+  setWallets,
+} from './walletStore';
 
-// ─── Shared ID Constants ───────────────────────────────────────────────────────
-// Exported so transactions.ts and goals.ts can reference the same wallet IDs.
-
-export const USER_ID = 'user_khoi_01' as const;
-
-export const WALLET_IDS = {
-  CASH: 'wallet_cash_01',
-  BANK: 'wallet_bank_01',
-} as const;
-
-// ─── Mock Data (mutable) ───────────────────────────────────────────────────────
-// `let` not `const` -- the mutation services rewrite this array in place so
-// queries see the new state on the next read.
-
-let WALLETS: Wallet[] = [
-  {
-    id: WALLET_IDS.CASH,
-    customerId: USER_ID,
-    name: 'Tiền mặt',
-    type: 'basic',
-    balance: 2_350_000,
-    isDeleted: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-05-21T00:00:00.000Z',
-  },
-  {
-    id: WALLET_IDS.BANK,
-    customerId: USER_ID,
-    name: 'Vietcombank',
-    type: 'basic',
-    balance: 15_200_000,
-    isDeleted: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-05-21T00:00:00.000Z',
-  },
-];
+// Shared ID constants and the mutable WALLETS store live in ./walletStore so
+// transactions.ts can reference them without importing this module (which would
+// re-create the wallets ⇄ transactions cycle). Access the array via the
+// getAllWallets()/setWallets() accessors below.
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,13 +26,13 @@ function nowIso(): string {
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
 export function getWallets(): WalletSummary {
-  const visible = WALLETS.filter((w) => !w.isDeleted);
+  const visible = getAllWallets().filter((w) => !w.isDeleted);
   const totalBalance = visible.reduce((sum, w) => sum + w.balance, 0);
   return { wallets: visible, totalBalance };
 }
 
 export function getWalletById(id: string): Wallet | undefined {
-  return WALLETS.find((w) => w.id === id);
+  return getAllWallets().find((w) => w.id === id);
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────
@@ -91,7 +65,7 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
     updatedAt: nowIso(),
     linkedMetadata: input.linkedMetadata,
   };
-  WALLETS = [...WALLETS, wallet];
+  setWallets([...getAllWallets(), wallet]);
   return wallet;
 }
 
@@ -105,7 +79,7 @@ export async function updateWallet(
   patch: UpdateWalletInput,
 ): Promise<Wallet> {
   await delay();
-  const target = WALLETS.find((w) => w.id === id);
+  const target = getAllWallets().find((w) => w.id === id);
   if (!target) throw new Error('Wallet not found');
 
   const updated: Wallet = {
@@ -114,30 +88,17 @@ export async function updateWallet(
     ...(patch.type !== undefined ? { type: patch.type } : {}),
     updatedAt: nowIso(),
   };
-  WALLETS = WALLETS.map((w) => (w.id === id ? updated : w));
+  setWallets(getAllWallets().map((w) => (w.id === id ? updated : w)));
   return updated;
 }
 
 export async function deleteWallet(id: string): Promise<void> {
   await delay();
   // Soft-delete: flip the flag, preserve transactions linked to this wallet.
-  WALLETS = WALLETS.map((w) =>
-    w.id === id ? { ...w, isDeleted: true, updatedAt: nowIso() } : w,
-  );
-}
-
-/**
- * Internal-use balance adjuster. Called by the transactions service when a
- * transaction is created / updated / deleted so wallet balances stay in sync.
- *
- * Positive `delta` increases balance, negative decreases. No delay -- this is
- * called inside another mutation that already paid the latency cost.
- */
-export function adjustWalletBalance(id: string, delta: number): void {
-  WALLETS = WALLETS.map((w) =>
-    w.id === id
-      ? { ...w, balance: w.balance + delta, updatedAt: nowIso() }
-      : w,
+  setWallets(
+    getAllWallets().map((w) =>
+      w.id === id ? { ...w, isDeleted: true, updatedAt: nowIso() } : w,
+    ),
   );
 }
 
@@ -163,7 +124,7 @@ export async function withdrawFromWallet(
   input: WithdrawInput,
 ): Promise<WithdrawResult> {
   await delay();
-  const from = WALLETS.find((w) => w.id === input.fromWalletId);
+  const from = getAllWallets().find((w) => w.id === input.fromWalletId);
   if (!from) throw new Error('Wallet not found');
   if (input.amount <= 0) throw new Error('Amount must be positive');
   if (input.amount > from.balance) throw new Error('Insufficient balance');
@@ -172,7 +133,7 @@ export async function withdrawFromWallet(
   if (input.toWalletId) adjustWalletBalance(input.toWalletId, input.amount);
 
   const readBalance = (id?: string) =>
-    id ? WALLETS.find((w) => w.id === id)?.balance : undefined;
+    id ? getAllWallets().find((w) => w.id === id)?.balance : undefined;
 
   return {
     fromWalletId: input.fromWalletId,

@@ -1,5 +1,5 @@
 import type { Transaction, TransactionType, EntryMethod } from '../../types';
-import { USER_ID, WALLET_IDS, adjustWalletBalance } from './wallets';
+import { USER_ID, WALLET_IDS, adjustWalletBalance } from './walletStore';
 
 // ─── Filter Type ───────────────────────────────────────────────────────────────
 

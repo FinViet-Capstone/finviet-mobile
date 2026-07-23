@@ -1,6 +1,6 @@
 import type { BudgetWithSpend } from '../../types';
 import { getCategoryById } from '@/constants/categories';
-import { USER_ID } from './wallets';
+import { USER_ID } from './walletStore';
 import { getTransactions } from './transactions';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

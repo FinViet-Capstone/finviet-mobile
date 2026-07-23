@@ -6,7 +6,7 @@ import type {
   AiClassificationResult,
   CategorizationOutcome,
 } from '../../types';
-import { USER_ID } from './wallets';
+import { USER_ID } from './walletStore';
 
 // ─── Mock Data — Spending Score ────────────────────────────────────────────────
 // Week of 18–24 May 2026. Score = 72 → green (≥70).
