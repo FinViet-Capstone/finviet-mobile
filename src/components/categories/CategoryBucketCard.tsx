@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 
 export type BucketId = 'needs' | 'wants' | 'savings';
@@ -12,8 +13,13 @@ export interface CategorySubItem {
 }
 
 export interface CategorySubCategory {
+  /** Row id used for the move mutation (a CustomerCategory row id, or a CustomCategory's own id). */
   id: string;
   name: string;
+  /** The actual category id — resolves the icon via CategoryIcon (system or customer-created). */
+  categoryId: string;
+  /** false = not movable yet (e.g. a customer-created category, until drag-and-drop generalizes this). Defaults to true. */
+  canMove?: boolean;
   items?: CategorySubItem[];
 }
 
@@ -108,10 +114,11 @@ export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory
                     activeOpacity={0.7}
                   >
                     <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
+                    <CategoryIcon categoryId={sub.categoryId} size={16} />
                     <Text style={styles.subName}>{sub.name}</Text>
                   </TouchableOpacity>
                   <View style={styles.subRight}>
-                    {onMoveSubCategory && bucket.id !== 'savings' && (
+                    {onMoveSubCategory && bucket.id !== 'savings' && (sub.canMove ?? true) && (
                       <TouchableOpacity
                         onPress={() => onMoveSubCategory(sub.id, bucket.id)}
                         activeOpacity={0.7}
@@ -153,15 +160,18 @@ export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory
             );
           })}
 
-          {/* Add sub-category button */}
-          <TouchableOpacity
-            style={styles.addSubRow}
-            onPress={() => onAddSubCategory?.(bucket.id)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcon name="add_circle" size={16} color={accentColor + 'B3'} />
-            <Text style={[styles.addSubText, { color: accentColor + 'B3' }]}>Add Sub-category</Text>
-          </TouchableOpacity>
+          {/* Add sub-category button — only rendered when a caller actually wires it up,
+              so it never becomes a tappable no-op. */}
+          {onAddSubCategory && (
+            <TouchableOpacity
+              style={styles.addSubRow}
+              onPress={() => onAddSubCategory(bucket.id)}
+              activeOpacity={0.7}
+            >
+              <MaterialIcon name="add_circle" size={16} color={accentColor + 'B3'} />
+              <Text style={[styles.addSubText, { color: accentColor + 'B3' }]}>Add Sub-category</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>

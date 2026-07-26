@@ -45,7 +45,6 @@ const S = {
     password: 'Đổi mật khẩu',
     export: 'Xuất dữ liệu',
     subscription: 'Gói dịch vụ',
-    categoryRequests: 'Yêu cầu danh mục',
     logout: 'Đăng xuất',
     deleteAccount: 'Xóa tài khoản',
   },
@@ -231,10 +230,6 @@ export default function SettingsScreen() {
             <SettingsRow icon="category" iconColor={COLORS.primary}
               label={S.rows.categories}
               onPress={() => router.push({ pathname: '/settings/categories' })} />
-            <Divider />
-            <SettingsRow icon="playlist_add" iconColor={COLORS.secondary}
-              label={S.rows.categoryRequests}
-              onPress={() => router.push({ pathname: '/settings/category-requests' })} />
           </SectionCard>
         </View>
 

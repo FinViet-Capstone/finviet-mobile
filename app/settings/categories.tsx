@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -8,14 +8,16 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   CategoryBucketCard,
-  CategoryRequestSheet,
+  CustomCategorySheet,
   type CategoryBucket,
   type BucketId,
-  type CategoryRequestInput,
+  type CustomCategoryInput,
 } from '@/components/categories';
 import { useCustomerCategories, useMoveBucket } from '@/hooks/useCustomerCategories';
-import { useCreateCategoryRequest, useEffectiveIncomeAllocation } from '@/hooks';
+import { useEffectiveIncomeAllocation, useCustomCategories, useCreateCustomCategory } from '@/hooks';
 import { getCategoryById, getBucketLabel, getBucketIcon } from '@/constants/categories';
+import { saveCategoryIcon } from '@/lib/categoryIconStorage';
+import { getApiErrorMessage } from '@/utils/errors';
 
 const BUCKET_ORDER: BucketId[] = ['needs', 'wants', 'savings'];
 
@@ -23,9 +25,10 @@ export default function CategoriesRoute() {
   const router = useRouter();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
   const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const createReq = useCreateCategoryRequest();
+  const { data: customCats } = useCustomCategories();
   const moveBucket = useMoveBucket();
+  const createCustomCategory = useCreateCustomCategory();
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const handleMove = useCallback(
     (customerCategoryId: string, fromBucket: BucketId) => {
@@ -46,28 +49,52 @@ export default function CategoriesRoute() {
 
   const buckets = useMemo<CategoryBucket[]>(() => {
     const list = cats ?? [];
+    const customList = customCats ?? [];
     return BUCKET_ORDER.map((b) => ({
       id: b,
       name: getBucketLabel(b),
       icon: getBucketIcon(b),
       pct: pctOf(b),
-      subCategories: list
-        .filter((c) => c.bucketId === b)
-        .map((c) => ({
-          id: c.id, // customer_category row id — needed by useMoveBucket
-          name: getCategoryById(c.categoryId)?.nameVi ?? c.categoryId,
-        })),
+      subCategories: [
+        ...list
+          .filter((c) => c.bucketId === b)
+          .map((c) => ({
+            id: c.id, // customer_category row id — needed by useMoveBucket
+            categoryId: c.categoryId,
+            name: getCategoryById(c.categoryId)?.nameVi ?? c.categoryId,
+          })),
+        ...customList
+          .filter((c) => c.bucketId === b)
+          .map((c) => ({
+            id: c.id,
+            categoryId: c.id,
+            name: c.nameVi,
+            // Bucket reassignment for customer-created categories lands with
+            // drag-and-drop (item 5) — not movable via the swap button yet.
+            canMove: false,
+          })),
+      ],
     }));
-  }, [cats, pctOf]);
+  }, [cats, customCats, pctOf]);
 
-  const handleSubmit = useCallback(
-    (input: CategoryRequestInput) => {
-      createReq.mutate(
-        { nameVi: input.name, type: input.type, suggestedBucket: input.suggestedBucket, notes: input.notes },
-        { onSuccess: () => setSheetVisible(false) },
+  const handleSubmitCustomCategory = useCallback(
+    (input: CustomCategoryInput) => {
+      createCustomCategory.mutate(
+        { nameVi: input.name, type: 'expense', bucketId: input.bucketId, color: input.color },
+        {
+          onSuccess: (created) => {
+            // The icon file is saved locally only after the category record
+            // exists, so it's keyed by the record's real id — never uploaded.
+            saveCategoryIcon(created.id, input.pickedUri, input.ext);
+            setSheetVisible(false);
+          },
+          onError: (err) => {
+            Alert.alert('', getApiErrorMessage(err, 'Không thể tạo danh mục.'));
+          },
+        },
       );
     },
-    [createReq],
+    [createCustomCategory],
   );
 
   return (
@@ -89,16 +116,16 @@ export default function CategoriesRoute() {
       ) : (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {buckets.map((b) => (
-            <CategoryBucketCard key={b.id} bucket={b} onAddSubCategory={() => setSheetVisible(true)} onMoveSubCategory={handleMove} />
+            <CategoryBucketCard key={b.id} bucket={b} onMoveSubCategory={handleMove} />
           ))}
         </ScrollView>
       )}
 
-      <CategoryRequestSheet
+      <CustomCategorySheet
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
-        onSubmit={handleSubmit}
-        loading={createReq.isPending}
+        onSubmit={handleSubmitCustomCategory}
+        loading={createCustomCategory.isPending}
       />
     </SafeAreaView>
   );

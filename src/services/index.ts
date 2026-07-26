@@ -8,11 +8,12 @@
  * so the swap needs zero hook/screen changes.
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), category-requests, reports/AI (spending
- * score, weekly report, chat history), notifications, rules, SMS extraction, and
- * SePay bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend),
- * and photo/receipt OCR extraction (no backend — only SMS + CSV parsing exist
- * server-side).
+ * categories (customer category buckets), reports/AI (spending score, weekly
+ * report, chat history), notifications, rules, SMS extraction, and SePay
+ * bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend),
+ * photo/receipt OCR extraction (no backend — only SMS + CSV parsing exist
+ * server-side), and custom-category creation (no BE endpoint yet — see
+ * real/customCategories.ts).
  */
 
 import { USE_MOCK } from '@/lib/env';
@@ -31,8 +32,8 @@ import * as mockGoals from './mock/goals';
 import * as realGoals from './real/goals';
 import * as mockCustomerCategories from './mock/customerCategories';
 import * as realCustomerCategories from './real/categories';
-import * as mockCategoryRequests from './mock/categoryRequests';
-import * as realCategoryRequests from './real/categoryRequests';
+import * as mockCustomCategories from './mock/customCategories';
+import * as realCustomCategories from './real/customCategories';
 import * as mockReports from './mock/reports';
 import * as realReports from './real/reports';
 import * as mockNotifications from './mock/notifications';
@@ -145,11 +146,12 @@ export const deactivateCustomerCategory =
   customerCategoriesImpl.deactivateCustomerCategory;
 export type { MoveBucketPayload } from './mock/customerCategories';
 
-// ─── Category requests ────────────────────────────────────────────────────────
-const categoryRequestsImpl = USE_MOCK ? mockCategoryRequests : realCategoryRequests;
-export const createCategoryRequest = categoryRequestsImpl.createCategoryRequest;
-export const getCategoryRequests = categoryRequestsImpl.getCategoryRequests;
-export type { CreateCategoryRequestPayload } from './mock/categoryRequests';
+// ─── Custom categories (customer-created, user-picked icon) ───────────────────
+const customCategoriesImpl = USE_MOCK ? mockCustomCategories : realCustomCategories;
+export const getCustomCategories = customCategoriesImpl.getCustomCategories;
+export const createCustomCategory = customCategoriesImpl.createCustomCategory;
+export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
+export type { CreateCustomCategoryInput } from './mock/customCategories';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
 const reportsImpl = USE_MOCK ? mockReports : realReports;
