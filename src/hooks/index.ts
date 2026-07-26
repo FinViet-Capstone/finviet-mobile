@@ -31,6 +31,11 @@ export {
   useDeleteBudget,
 } from './useBudgets';
 export {
+  useEffectiveIncomeAllocation,
+  useScheduledIncomeAllocation,
+  useScheduleIncomeAllocationChange,
+} from './useIncomeAllocation';
+export {
   useGoals,
   useGoalById,
   useCreateGoal,

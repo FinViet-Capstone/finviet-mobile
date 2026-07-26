@@ -15,7 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
-import { useCustomer } from '@/hooks/useCustomer';
+import { useEffectiveIncomeAllocation } from '@/hooks/useIncomeAllocation';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
 import { useCustomerCategories } from '@/hooks/useCustomerCategories';
 import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
@@ -267,11 +267,15 @@ export default function BudgetsScreen() {
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<BucketType>>(new Set());
 
   const selectedRange = useMemo(() => monthRange(year, month), [year, month]);
+  const selectedMonthKey = useMemo(
+    () => `${year}-${String(month + 1).padStart(2, '0')}`,
+    [year, month],
+  );
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
-  const { data: user } = useCustomer();
   const { data: customerCats = [] } = useCustomerCategories();
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation(selectedMonthKey);
 
   // Per-customer category set grouped by the customer's (possibly overridden) bucket.
   // Replaces the global EXPENSE_CATEGORIES-by-defaultBucket grouping so jar moves stick.
@@ -288,11 +292,15 @@ export default function BudgetsScreen() {
     return result;
   }, [customerCats]);
 
-  const income = user?.monthlyIncome ?? 0;
+  // Resolved through the income/allocation history (mock/incomeAllocation.ts) for
+  // the *viewed* month, not Customer.needsPct/etc — those stop updating once a
+  // change is scheduled for next month, and a past month must keep showing
+  // whatever was actually in effect then.
+  const income = effectiveAllocation?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {
-    needs: (user?.needsPct ?? 50) / 100,
-    wants: (user?.wantsPct ?? 30) / 100,
-    savings: (user?.savingsPct ?? 20) / 100,
+    needs: (effectiveAllocation?.needsPct ?? 50) / 100,
+    wants: (effectiveAllocation?.wantsPct ?? 30) / 100,
+    savings: (effectiveAllocation?.savingsPct ?? 20) / 100,
   };
 
   const totalDays = daysInMonth(year, month);

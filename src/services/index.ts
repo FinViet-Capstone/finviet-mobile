@@ -25,6 +25,8 @@ import * as mockTransactions from './mock/transactions';
 import * as realTransactions from './real/transactions';
 import * as mockBudgets from './mock/budgets';
 import * as realBudgets from './real/budgets';
+import * as mockIncomeAllocation from './mock/incomeAllocation';
+import * as realIncomeAllocation from './real/incomeAllocation';
 import * as mockGoals from './mock/goals';
 import * as realGoals from './real/goals';
 import * as mockCustomerCategories from './mock/customerCategories';
@@ -106,6 +108,17 @@ export type {
   BucketSummary,
   BucketSummaryList,
 } from './mock/budgets';
+
+// ─── Income / allocation history ──────────────────────────────────────────────
+const incomeAllocationImpl = USE_MOCK ? mockIncomeAllocation : realIncomeAllocation;
+export const getEffectiveIncomeAllocation = incomeAllocationImpl.getEffectiveIncomeAllocation;
+export const getIncomeAllocationHistory = incomeAllocationImpl.getIncomeAllocationHistory;
+export const getScheduledIncomeAllocation = incomeAllocationImpl.getScheduledIncomeAllocation;
+export const scheduleIncomeAllocationChange = incomeAllocationImpl.scheduleIncomeAllocationChange;
+export type {
+  IncomeAllocationSetting,
+  ScheduleIncomeAllocationInput,
+} from './mock/incomeAllocation';
 
 // ─── Goals ──────────────────────────────────────────────────────────────────
 const goalsImpl = USE_MOCK ? mockGoals : realGoals;

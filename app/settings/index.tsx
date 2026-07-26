@@ -15,7 +15,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
-import { useLogout } from '@/hooks';
+import { useLogout, useEffectiveIncomeAllocation } from '@/hooks';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -148,6 +148,7 @@ function ToggleRow({
 export default function SettingsScreen() {
   const router = useRouter();
   const { data: user, isLoading } = useCustomer();
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
   const updatePrefs = useUpdatePreferences();
   const logoutMutation = useLogout();
   const [logoutVisible, setLogoutVisible] = useState(false);
@@ -178,9 +179,9 @@ export default function SettingsScreen() {
   }, []);
 
   const allocationLabel = useCallback(() => {
-    if (!user) return '50% · 30% · 20%';
-    return `${user.needsPct ?? 50}% · ${user.wantsPct ?? 30}% · ${user.savingsPct ?? 20}%`;
-  }, [user]);
+    if (!effectiveAllocation) return '50% · 30% · 20%';
+    return `${effectiveAllocation.needsPct}% · ${effectiveAllocation.wantsPct}% · ${effectiveAllocation.savingsPct}%`;
+  }, [effectiveAllocation]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -220,7 +221,7 @@ export default function SettingsScreen() {
           <Text style={styles.sectionLabel}>{S.sections.finance}</Text>
           <SectionCard>
             <SettingsRow icon="payments" iconColor={COLORS.secondary}
-              label={S.rows.income} value={formatIncome(user?.monthlyIncome)}
+              label={S.rows.income} value={formatIncome(effectiveAllocation?.monthlyIncome)}
               onPress={() => {}} />
             <Divider />
             <SettingsRow icon="pie_chart" iconColor={COLORS.tertiary}

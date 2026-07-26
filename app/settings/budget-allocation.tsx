@@ -14,7 +14,11 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
-import { useCustomer, useUpdateProfile } from '@/hooks/useCustomer';
+import {
+  useEffectiveIncomeAllocation,
+  useScheduledIncomeAllocation,
+  useScheduleIncomeAllocationChange,
+} from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -22,12 +26,16 @@ import { getApiErrorMessage } from '@/utils/errors';
 const S = {
   title: 'Phân bổ ngân sách',
   save: 'Lưu',
+  currentLabel: 'Đang áp dụng',
+  currentHint: 'Đã khóa cho tháng này — thay đổi bên dưới sẽ áp dụng từ tháng tới.',
+  nextLabel: 'Tháng tới, bạn muốn:',
   incomeLabel: 'Thu nhập khả dụng',
   incomeUnit: '/tháng',
   incomePlaceholder: 'Nhập thu nhập',
   resetDefault: 'Dùng mặc định 50/30/20',
   totalValid: 'Tổng: 100%',
   totalInvalid: (n: number) => `Tổng: ${n}% — phải bằng 100%`,
+  saveSuccess: 'Đã lên lịch — thay đổi sẽ áp dụng từ tháng tới.',
   buckets: {
     needs: { label: 'Thiết yếu', hint: 'Nhà ở, ăn uống, đi lại' },
     wants: { label: 'Mong muốn', hint: 'Mua sắm, giải trí' },
@@ -39,6 +47,15 @@ const S = {
 
 function formatVND(n: number): string {
   return n.toLocaleString('vi-VN') + 'đ';
+}
+
+function monthLabel(date: Date): string {
+  return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
+}
+
+function nextMonthDate(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1);
 }
 
 // ─── Bucket card ──────────────────────────────────────────────────────────────
@@ -96,26 +113,34 @@ function BucketCard({
 
 export default function BudgetAllocationScreen() {
   const router = useRouter();
-  const { data: user, isLoading } = useCustomer();
-  const updateProfile = useUpdateProfile();
+  const { data: current, isLoading: currentLoading } = useEffectiveIncomeAllocation();
+  const { data: scheduled, isLoading: scheduledLoading } = useScheduledIncomeAllocation();
+  const scheduleChange = useScheduleIncomeAllocationChange();
 
   const [needs, setNeeds] = useState(50);
   const [wants, setWants] = useState(30);
   const [savings, setSavings] = useState(20);
   const [incomeRaw, setIncomeRaw] = useState('');
   const [incomeFocused, setIncomeFocused] = useState(false);
+  const [seeded, setSeeded] = useState(false);
 
+  // Seed the editable "next month" draft once: from an already-scheduled draft
+  // if the customer already changed their mind once, else from what's currently
+  // in effect. Never touches the current month's own numbers.
   useEffect(() => {
-    if (user) {
-      setNeeds(user.needsPct ?? 50);
-      setWants(user.wantsPct ?? 30);
-      setSavings(user.savingsPct ?? 20);
-      setIncomeRaw(user.monthlyIncome ? String(user.monthlyIncome) : '');
+    if (seeded || currentLoading || scheduledLoading) return;
+    const source = scheduled ?? current;
+    if (source) {
+      setNeeds(source.needsPct);
+      setWants(source.wantsPct);
+      setSavings(source.savingsPct);
+      setIncomeRaw(source.monthlyIncome ? String(source.monthlyIncome) : '');
+      setSeeded(true);
     }
-  }, [user?.id]);
+  }, [seeded, currentLoading, scheduledLoading, scheduled, current]);
 
   const parsedIncome = parseInt(incomeRaw || '0', 10);
-  const income = parsedIncome > 0 ? parsedIncome : (user?.monthlyIncome ?? 0);
+  const income = parsedIncome > 0 ? parsedIncome : (current?.monthlyIncome ?? 0);
   const total = needs + wants + savings;
   const isValid = total === 100;
 
@@ -164,19 +189,20 @@ export default function BudgetAllocationScreen() {
   const handleSave = useCallback(async () => {
     if (!isValid) return;
     try {
-      await updateProfile.mutateAsync({
+      await scheduleChange.mutateAsync({
+        monthlyIncome: income,
         needsPct: needs,
         wantsPct: wants,
         savingsPct: savings,
-        ...(parsedIncome > 0 ? { monthlyIncome: parsedIncome } : {}),
       });
+      Alert.alert('', S.saveSuccess);
       router.back();
     } catch (err) {
       Alert.alert('', getApiErrorMessage(err, 'Không thể lưu phân bổ ngân sách.'));
     }
-  }, [isValid, needs, wants, savings, parsedIncome, updateProfile, router]);
+  }, [isValid, income, needs, wants, savings, scheduleChange, router]);
 
-  if (isLoading) return <LoadingSpinner />;
+  if (currentLoading) return <LoadingSpinner />;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -187,13 +213,33 @@ export default function BudgetAllocationScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <TouchableOpacity activeOpacity={0.7} style={styles.saveBtn}
-          onPress={handleSave} disabled={!isValid || updateProfile.isPending}>
+          onPress={handleSave} disabled={!isValid || scheduleChange.isPending}>
           <Text style={[styles.saveBtnText, !isValid && { opacity: 0.4 }]}>{S.save}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+
+        {/* Current month — read-only, locked */}
+        <View style={styles.currentCard}>
+          <View style={styles.currentHeaderRow}>
+            <Text style={styles.currentLabel}>{S.currentLabel} · {monthLabel(new Date())}</Text>
+            <MaterialIcon name="lock" size={14} color={COLORS.onSurfaceVariant} />
+          </View>
+          <Text style={styles.currentIncome}>
+            {formatVND(current?.monthlyIncome ?? 0)}
+            <Text style={styles.incomeUnit}>{S.incomeUnit}</Text>
+          </Text>
+          <View style={styles.currentPctRow}>
+            <Text style={styles.currentPctItem}>{S.buckets.needs.label} {current?.needsPct ?? 0}%</Text>
+            <Text style={styles.currentPctItem}>{S.buckets.wants.label} {current?.wantsPct ?? 0}%</Text>
+            <Text style={styles.currentPctItem}>{S.buckets.savings.label} {current?.savingsPct ?? 0}%</Text>
+          </View>
+          <Text style={styles.currentHint}>{S.currentHint}</Text>
+        </View>
+
+        <Text style={styles.nextLabel}>{S.nextLabel} · {monthLabel(nextMonthDate())}</Text>
 
         {/* Income — tappable to edit via numpad */}
         <TouchableOpacity
@@ -267,6 +313,26 @@ const styles = StyleSheet.create({
   saveBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[16], gap: SPACING[4] },
+  // Current month card
+  currentCard: {
+    backgroundColor: COLORS.surfaceContainerLow, borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[4], gap: SPACING[2],
+    borderWidth: 1, borderColor: COLORS.outlineVariant,
+  },
+  currentHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  currentLabel: {
+    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.6,
+  },
+  currentIncome: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
+  currentPctRow: { flexDirection: 'row', gap: SPACING[3], flexWrap: 'wrap' },
+  currentPctItem: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  currentHint: { fontSize: 11, color: `${COLORS.onSurfaceVariant}B3` },
+  nextLabel: {
+    fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface,
+  },
   // Income card
   incomeCard: {
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.xl,

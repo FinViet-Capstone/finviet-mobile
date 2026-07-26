@@ -26,6 +26,7 @@ import {
   useBucketSpend,
   useGoals,
   useCustomer,
+  useEffectiveIncomeAllocation,
 } from '@/hooks';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -75,6 +76,7 @@ export default function HomeScreen() {
     }),
     [curYear, curMonth],
   );
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
 
   const { data: monthTx } = useTransactions(monthRange);
   const bucketSpend = useBucketSpend(monthRange);
@@ -101,10 +103,13 @@ export default function HomeScreen() {
 
   // Bucket denominator = allocation cap (income × bucket %), matching the Budgets
   // tab — NOT the sum of per-category limits — so the two screens never disagree.
-  const income = user?.monthlyIncome ?? 0;
-  const needsLimit = Math.round((income * (user?.needsPct ?? 50)) / 100);
-  const wantsLimit = Math.round((income * (user?.wantsPct ?? 30)) / 100);
-  const savingsLimit = Math.round((income * (user?.savingsPct ?? 20)) / 100);
+  // Resolved through the income/allocation history (mock/incomeAllocation.ts)
+  // rather than Customer.needsPct/etc, which stop updating once a change is
+  // scheduled for next month.
+  const income = effectiveAllocation?.monthlyIncome ?? 0;
+  const needsLimit = Math.round((income * (effectiveAllocation?.needsPct ?? 50)) / 100);
+  const wantsLimit = Math.round((income * (effectiveAllocation?.wantsPct ?? 30)) / 100);
+  const savingsLimit = Math.round((income * (effectiveAllocation?.savingsPct ?? 20)) / 100);
 
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);
