@@ -64,6 +64,11 @@ export const queryKeys = {
   rules: {
     all: () => ['rules'] as const,
   },
+  incomeAllocation: {
+    all: () => ['income-allocation'] as const,
+    effective: (month: string) => [...queryKeys.incomeAllocation.all(), 'effective', month] as const,
+    scheduled: () => [...queryKeys.incomeAllocation.all(), 'scheduled'] as const,
+  },
   customerCategories: (customerId: string | null) =>
     ['customer-categories', customerId] as const,
   categoryRequests: (customerId: string | null) =>

@@ -2,6 +2,7 @@ import type { BudgetWithSpend } from '../../types';
 import { getCategoryById } from '@/constants/categories';
 import { USER_ID } from './walletStore';
 import { getTransactions } from './transactions';
+import { getEffectiveIncomeAllocationSync } from './incomeAllocation';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -182,25 +183,25 @@ export interface BucketSummaryList {
   buckets: BucketSummary[];
 }
 
-const BUCKET_ALLOCATION: Record<'needs' | 'wants' | 'savings', number> = {
-  needs: 0.5,
-  wants: 0.3,
-  savings: 0.2,
-};
-
 /**
- * Mock 50/30/20 bucket summary. Spend is grouped by each expense category's
- * defaultBucket over the month range; allocation caps come from summed income.
- * Mirrors the backend GET /budgets/buckets shape closely enough for the UI.
+ * Bucket summary. Spend is grouped by each expense category's defaultBucket
+ * over the month range; allocation caps come from the income/allocation
+ * setting that was in effect when `month` started (see mock/incomeAllocation.ts —
+ * never the live/current setting, so past months' numbers can't shift when the
+ * customer later schedules a change). Mirrors the backend GET /budgets/buckets
+ * shape closely enough for the UI.
  */
 export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
   const { startDate, endDate } = range ?? currentMonthRange();
   const month = startDate.slice(0, 7);
 
-  const income = getTransactions({ type: 'income', startDate, endDate }).reduce(
-    (s, t) => s + t.amount,
-    0,
-  );
+  const effective = getEffectiveIncomeAllocationSync(month);
+  const income = effective.monthlyIncome;
+  const bucketAllocation: Record<'needs' | 'wants' | 'savings', number> = {
+    needs: effective.needsPct / 100,
+    wants: effective.wantsPct / 100,
+    savings: effective.savingsPct / 100,
+  };
 
   const expenses = getTransactions({ type: 'expense', startDate, endDate });
   const spentByBucket: Record<'needs' | 'wants' | 'savings', number> = {
@@ -236,7 +237,7 @@ export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
     (clamped - monthStart.getTime()) / (monthEnd.getTime() - monthStart.getTime() || 1);
 
   const buckets: BucketSummary[] = (['needs', 'wants', 'savings'] as const).map((bucket) => {
-    const allocationPct = BUCKET_ALLOCATION[bucket];
+    const allocationPct = bucketAllocation[bucket];
     const allocationCap = Math.round(income * allocationPct);
     const spent = spentByBucket[bucket];
     const expectedSpent = Math.round(allocationCap * elapsed);

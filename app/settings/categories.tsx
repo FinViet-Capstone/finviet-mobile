@@ -14,8 +14,7 @@ import {
   type CategoryRequestInput,
 } from '@/components/categories';
 import { useCustomerCategories, useMoveBucket } from '@/hooks/useCustomerCategories';
-import { useCreateCategoryRequest } from '@/hooks';
-import { useCustomer } from '@/hooks/useCustomer';
+import { useCreateCategoryRequest, useEffectiveIncomeAllocation } from '@/hooks';
 import { getCategoryById, getBucketLabel, getBucketIcon } from '@/constants/categories';
 
 const BUCKET_ORDER: BucketId[] = ['needs', 'wants', 'savings'];
@@ -23,7 +22,7 @@ const BUCKET_ORDER: BucketId[] = ['needs', 'wants', 'savings'];
 export default function CategoriesRoute() {
   const router = useRouter();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
-  const { data: customer } = useCustomer();
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
   const [sheetVisible, setSheetVisible] = useState(false);
   const createReq = useCreateCategoryRequest();
   const moveBucket = useMoveBucket();
@@ -38,11 +37,11 @@ export default function CategoriesRoute() {
 
   const pctOf = useCallback(
     (b: BucketId) => {
-      if (b === 'needs') return customer?.needsPct ?? 50;
-      if (b === 'wants') return customer?.wantsPct ?? 30;
-      return customer?.savingsPct ?? 20;
+      if (b === 'needs') return effectiveAllocation?.needsPct ?? 50;
+      if (b === 'wants') return effectiveAllocation?.wantsPct ?? 30;
+      return effectiveAllocation?.savingsPct ?? 20;
     },
-    [customer],
+    [effectiveAllocation],
   );
 
   const buckets = useMemo<CategoryBucket[]>(() => {
