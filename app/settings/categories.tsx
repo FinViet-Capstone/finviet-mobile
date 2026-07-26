@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -8,20 +8,28 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   CategoryBucketCard,
+  CustomCategorySheet,
   type CategoryBucket,
   type BucketId,
+  type CustomCategoryInput,
 } from '@/components/categories';
 import { useCustomerCategories, useMoveBucket } from '@/hooks/useCustomerCategories';
+import { useCustomCategories, useCreateCustomCategory } from '@/hooks';
 import { useCustomer } from '@/hooks/useCustomer';
 import { getCategoryById, getBucketLabel, getBucketIcon } from '@/constants/categories';
+import { saveCategoryIcon } from '@/lib/categoryIconStorage';
+import { getApiErrorMessage } from '@/utils/errors';
 
 const BUCKET_ORDER: BucketId[] = ['needs', 'wants', 'savings'];
 
 export default function CategoriesRoute() {
   const router = useRouter();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
+  const { data: customCats } = useCustomCategories();
   const { data: customer } = useCustomer();
   const moveBucket = useMoveBucket();
+  const createCustomCategory = useCreateCustomCategory();
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const handleMove = useCallback(
     (customerCategoryId: string, fromBucket: BucketId) => {
@@ -42,19 +50,53 @@ export default function CategoriesRoute() {
 
   const buckets = useMemo<CategoryBucket[]>(() => {
     const list = cats ?? [];
+    const customList = customCats ?? [];
     return BUCKET_ORDER.map((b) => ({
       id: b,
       name: getBucketLabel(b),
       icon: getBucketIcon(b),
       pct: pctOf(b),
-      subCategories: list
-        .filter((c) => c.bucketId === b)
-        .map((c) => ({
-          id: c.id, // customer_category row id — needed by useMoveBucket
-          name: getCategoryById(c.categoryId)?.nameVi ?? c.categoryId,
-        })),
+      subCategories: [
+        ...list
+          .filter((c) => c.bucketId === b)
+          .map((c) => ({
+            id: c.id, // customer_category row id — needed by useMoveBucket
+            categoryId: c.categoryId,
+            name: getCategoryById(c.categoryId)?.nameVi ?? c.categoryId,
+          })),
+        ...customList
+          .filter((c) => c.bucketId === b)
+          .map((c) => ({
+            id: c.id,
+            categoryId: c.id,
+            name: c.nameVi,
+            // Bucket reassignment for customer-created categories lands with
+            // drag-and-drop (item 5) — not movable via the swap button yet.
+            canMove: false,
+          })),
+      ],
     }));
-  }, [cats, pctOf]);
+  }, [cats, customCats, pctOf]);
+
+  const handleSubmitCustomCategory = useCallback(
+    (input: CustomCategoryInput) => {
+      createCustomCategory.mutate(
+        { nameVi: input.name, type: 'expense', bucketId: input.bucketId, color: input.color },
+        {
+          onSuccess: (created) => {
+            // The icon file is saved locally only after the category record
+            // exists, so it's keyed by the record's real id — never uploaded.
+            saveCategoryIcon(created.id, input.pickedUri, input.ext);
+            setSheetVisible(false);
+          },
+          onError: (err) => {
+            Alert.alert('', getApiErrorMessage(err, 'Không thể tạo danh mục.'));
+          },
+        },
+      );
+    },
+    [createCustomCategory],
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -63,7 +105,9 @@ export default function CategoriesRoute() {
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
         </TouchableOpacity>
         <Text style={styles.title}>Quản lý danh mục</Text>
-        <View style={styles.btn} />
+        <TouchableOpacity activeOpacity={0.7} onPress={() => setSheetVisible(true)} style={styles.btn}>
+          <MaterialIcon name="add" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -77,6 +121,13 @@ export default function CategoriesRoute() {
           ))}
         </ScrollView>
       )}
+
+      <CustomCategorySheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        onSubmit={handleSubmitCustomCategory}
+        loading={createCustomCategory.isPending}
+      />
     </SafeAreaView>
   );
 }

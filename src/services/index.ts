@@ -29,6 +29,8 @@ import * as mockGoals from './mock/goals';
 import * as realGoals from './real/goals';
 import * as mockCustomerCategories from './mock/customerCategories';
 import * as realCustomerCategories from './real/categories';
+import * as mockCustomCategories from './mock/customCategories';
+import * as realCustomCategories from './real/customCategories';
 import * as mockReports from './mock/reports';
 import * as realReports from './real/reports';
 import * as mockNotifications from './mock/notifications';
@@ -129,6 +131,13 @@ export const seedFromPersona = customerCategoriesImpl.seedFromPersona;
 export const deactivateCustomerCategory =
   customerCategoriesImpl.deactivateCustomerCategory;
 export type { MoveBucketPayload } from './mock/customerCategories';
+
+// ─── Custom categories (customer-created, user-picked icon) ───────────────────
+const customCategoriesImpl = USE_MOCK ? mockCustomCategories : realCustomCategories;
+export const getCustomCategories = customCategoriesImpl.getCustomCategories;
+export const createCustomCategory = customCategoriesImpl.createCustomCategory;
+export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
+export type { CreateCustomCategoryInput } from './mock/customCategories';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
 const reportsImpl = USE_MOCK ? mockReports : realReports;

@@ -66,6 +66,7 @@ export const queryKeys = {
   },
   customerCategories: (customerId: string | null) =>
     ['customer-categories', customerId] as const,
+  customCategories: () => ['custom-categories'] as const,
 } as const;
 
 /**

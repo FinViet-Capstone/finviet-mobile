@@ -16,6 +16,7 @@
 import { useEffect } from 'react';
 import { getProfile } from '@/services';
 import { getAccessToken, hydrateTokenCache } from '@/lib/mmkv';
+import { hydrateCategoryIconCache } from '@/lib/categoryIconStorage';
 import { useAuthStore } from '@/stores/authStore';
 
 // Max time the splash waits on the profile fetch before showing the login gate.
@@ -40,6 +41,10 @@ export function useBootstrapSession() {
         setHydrated(true);
       }
     }, BOOTSTRAP_TIMEOUT_MS);
+
+    // Sync, local-disk only — unrelated to auth, so it doesn't need to block
+    // the timeout/gate logic below.
+    hydrateCategoryIconCache();
 
     (async () => {
       await hydrateTokenCache();
