@@ -180,7 +180,7 @@ implements them.
   isPopular?
 - CustomerSubscription: id, customerId, planCode, billingCycle ('monthly'|'annual'),
   status ('active'|'cancelled'|'expired'|'trial'), currentPeriodEnd, cancelAtPeriodEnd
-- `PlanCode = 'free' | 'basic' | 'premium'` (3 real tiers, not 2)
+- `PlanCode = 'free' | 'premium'`
 
 ### Rule (merchant → category)
 - id, customerId, merchantKeyword, categoryId, createdAt, updatedAt
@@ -220,7 +220,6 @@ implements them.
 ---
 A real 3-tier catalog exists in the mock subscription service:
 - **free** — 0đ
-- **basic** — 29.000đ/month or 290.000đ/year
 - **premium** — 59.000đ/month or 590.000đ/year (marked `isPopular`)
 
 The mock customer defaults to `planCode: 'free'`, `status: 'active'`. A Settings →
