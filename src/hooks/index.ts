@@ -8,7 +8,6 @@ export {
   useCreateTransfer,
   useWithdrawFromWallet,
   useWalletTransactions,
-  useSyncFinverseWallet,
   useLinkSepayAccount,
   useLinkSepayWithToken,
   useSyncSepayWallet,

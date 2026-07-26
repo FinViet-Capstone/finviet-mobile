@@ -41,8 +41,9 @@ module (the shared contract both sides honor).
 
 Current wiring (`docs/integration-status.md` has the full endpoint table): auth,
 wallets, transactions, budgets, saving goals, categories, category requests,
-reports/AI, notifications, rules, SMS extraction, and bank-linking (Finverse + SePay
-OAuth2) all hit the real backend when `EXPO_PUBLIC_USE_MOCK=false`. Subscriptions and
+reports/AI, notifications, rules, SMS extraction, and bank-linking (SePay OAuth2 —
+the only linking provider; Finverse was removed 2026-07) all hit the real backend
+when `EXPO_PUBLIC_USE_MOCK=false`. Subscriptions and
 photo/receipt OCR extraction have no backend counterpart and stay mock-only
 permanently — check `src/services/index.ts`'s header comment before assuming
 something is real.

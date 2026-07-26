@@ -14,8 +14,8 @@ Tracks how the mobile app (`finviet-mobile`) is wired to the .NET backend
   (`EXPO_PUBLIC_USE_MOCK`) via the barrel [`src/services/index.ts`](../src/services/index.ts).
   Screens/hooks import from the barrel only.
 - **Backend:** .NET 8, Clean Architecture, PostgreSQL (+pgvector). Bank-linking supports
-  **SePay OAuth2** (active, in-app integration) and **Finverse** (code ready, pending
-  BankHub approval).
+  **SePay OAuth2** (active, in-app integration) — the only linking provider; Finverse
+  was removed 2026-07 (it never went live, blocked on BankHub approval).
 - **Current runtime:** `EXPO_PUBLIC_USE_MOCK=false` → the app hits the live backend
   (`.env.local` → `http://<LAN-IP>:5122/api`).
 
@@ -37,7 +37,6 @@ Tracks how the mobile app (`finviet-mobile`) is wired to the .NET backend
 | Notifications | `GET /notifications`, `/{id}/read`, `/read-all` | `real/notifications.ts` |
 | Rules | `GET/POST/DELETE /rules` | `real/rules.ts` |
 | Extraction (SMS) | `POST /extract/sms` | `real/extraction.ts` |
-| Finverse link | `/wallets/finverse/link-token`, `/complete-link`, callback, `/{id}/finverse-sync` | `real/finverse.ts` + `app/link-bank.tsx` |
 | **SePay OAuth2** | `/wallets/sepay/link`, `/sepay/bank-accounts`, `/{id}/sepay-sync` | `real/sepay.ts` + `app/link-sepay.tsx` |
 
 ### Still mock (by necessity)
@@ -46,8 +45,10 @@ Tracks how the mobile app (`finviet-mobile`) is wired to the .NET backend
   image OCR endpoint. (SMS extraction is real; photo stays mock.)
 
 ### Known issues / debt
-- **Finverse live linking is blocked** on BankHub approval for personal accounts. The
-  code path is fixed and correct, but can't surface real bank data until approved.
+- **Finverse removed (2026-07).** It never went live (blocked on BankHub approval for
+  personal accounts) — the FE code path (`app/link-bank.tsx`, `real/finverse.ts`,
+  `useSyncFinverseWallet`) was deleted; BE removal is a separate, parallel cycle on
+  that repo (see `context/fe-plan-2026-07-revamp.md` reconciliation section).
 
 ---
 
@@ -93,7 +94,7 @@ Full in-app bank-linking and transaction sync via SePay OAuth2. No scripts neede
 | `src/hooks/useWallets.ts` | Added `useLinkSepayAccount()`, `useSyncSepayWallet()` |
 | `app/link-sepay.tsx` | WebView OAuth2 flow screen |
 | `app/(tabs)/wallets/[id].tsx` | Added "Đồng bộ ngay" sync button for linked wallets |
-| `app/(tabs)/wallets/index.tsx` | Updated add-wallet sheet: SePay + Finverse options |
+| `app/(tabs)/wallets/index.tsx` | Add-wallet sheet: basic + SePay options |
 
 ### Flow
 1. User taps "SePay" in the add-wallet sheet → `app/link-sepay.tsx` opens

@@ -10,9 +10,9 @@
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
  * categories (customer category buckets), category-requests, reports/AI (spending
  * score, weekly report, chat history), notifications, rules, SMS extraction, and
- * Finverse bank-linking (see real/finverse.ts + app/link-bank.tsx). Still mock:
- * subscriptions (no backend), and photo/receipt OCR extraction (no backend — only
- * SMS + CSV parsing exist server-side).
+ * SePay bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend),
+ * and photo/receipt OCR extraction (no backend — only SMS + CSV parsing exist
+ * server-side).
  */
 
 import { USE_MOCK } from '@/lib/env';

@@ -23,7 +23,6 @@ export interface OnboardingWalletProps {
   readonly onChangeWalletName: (name: string) => void;
   readonly onChangeWalletBalance: (balance: string) => void;
   readonly onFinish: () => void;
-  readonly onLinkBank: () => void;
 }
 
 export function OnboardingWallet({
@@ -35,7 +34,6 @@ export function OnboardingWallet({
   onChangeWalletName,
   onChangeWalletBalance,
   onFinish,
-  onLinkBank,
 }: OnboardingWalletProps) {
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
 
@@ -106,13 +104,6 @@ export function OnboardingWallet({
                     </View>
                   )}
 
-                  {'hasAIBadge' in type && type.hasAIBadge && (
-                    <View style={styles.aiBadgeTop}>
-                      <Text style={styles.aiBadgeIcon}>✨</Text>
-                      <Text style={styles.aiBadgeLabel}>AI</Text>
-                    </View>
-                  )}
-
                   <View style={[
                     styles.typeIcon,
                     isSelected
@@ -172,28 +163,6 @@ export function OnboardingWallet({
                 </TouchableOpacity>
                 <Text style={styles.inputHint}>{ONBOARDING_STRINGS.wallet.balanceHint}</Text>
               </View>
-            </View>
-          )}
-
-          {/* Linked bank — Finverse hosted login (consumer aggregation) */}
-          {walletType === 'linked' && (
-            <View style={styles.comingSoonCard}>
-              <Text style={styles.comingSoonIcon}>🏦</Text>
-              <Text style={styles.comingSoonTitle}>Liên kết ngân hàng qua Finverse</Text>
-              <Text style={styles.comingSoonText}>
-                Đăng nhập ngân hàng của bạn một cách an toàn (FinViet không thấy mật khẩu)
-                và tự động nhập giao dịch + số dư.
-              </Text>
-              <TouchableOpacity
-                style={styles.linkBankAction}
-                onPress={onLinkBank}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.linkBankActionText}>Liên kết ngân hàng</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => onChangeWalletType('basic')} activeOpacity={0.7}>
-                <Text style={styles.linkBankSecondary}>Hoặc tạo ví cơ bản</Text>
-              </TouchableOpacity>
             </View>
           )}
 
@@ -300,28 +269,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: FONT_WEIGHT.bold,
   },
-  aiBadgeTop: {
-    position: 'absolute',
-    top: -12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.primaryContainer,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}33`,
-  },
-  aiBadgeIcon: {
-    fontSize: 12,
-  },
-  aiBadgeLabel: {
-    fontSize: 12,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimaryContainer,
-    letterSpacing: 1.5,
-  },
   typeIcon: {
     width: 48,
     height: 48,
@@ -404,49 +351,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: `${COLORS.onSurfaceVariant}B3`,
     marginTop: 4,
-  },
-  comingSoonCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    padding: SPACING[5],
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  comingSoonIcon: {
-    fontSize: 36,
-    marginBottom: SPACING[1],
-  },
-  comingSoonTitle: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onBackground,
-    textAlign: 'center',
-  },
-  comingSoonText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  linkBankAction: {
-    marginTop: SPACING[3],
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[3],
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
-  },
-  linkBankActionText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
-  },
-  linkBankSecondary: {
-    marginTop: SPACING[2],
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHT.medium,
   },
   buttonContainer: {
     marginTop: SPACING[8],
