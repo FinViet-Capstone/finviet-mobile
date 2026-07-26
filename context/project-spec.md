@@ -34,9 +34,9 @@ Here is a list of features for FinViet Mobile, as actually implemented in this c
 
 A. Wallets & Multi-Method Transaction Entry
 - Every transaction belongs to exactly one wallet. `WalletType` is `'basic'` (manual) or
-  `'linked'` (bank-synced — the linking flows are built against SePay and a Finverse-style
-  hosted-Link WebView; `LinkedWalletMetadata` tracks `institutionId/Name`, `accountId`,
-  `syncStatus: 'active'|'error'|'pending'`).
+  `'linked'` (bank-synced — SePay OAuth2/token linking is the only provider; Finverse
+  was removed 2026-07, it never went live; `LinkedWalletMetadata` tracks
+  `institutionId/Name`, `accountId`, `syncStatus: 'active'|'error'|'pending'`).
 - Four entry methods behind a single "+" tab chooser, matching the real `EntryMethod` union
   (`'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste'`): **Manual** (no AI assist),
   **SMS paste** (extraction preview), **Photo/receipt scan** (batch up to 5, review-list UX),
@@ -211,7 +211,7 @@ implements them.
 - A `USE_MOCK` toggle in `src/services/index.ts` swaps each domain between
   `src/services/mock/*` and `src/services/real/*` with identical function signatures — this
   swap is already implemented for wallets/transactions/budgets/goals/customer-categories/
-  notifications/rules/SMS-extraction and bank-linking (SePay/Finverse-style); photo-OCR
+  notifications/rules/SMS-extraction and bank-linking (SePay only); photo-OCR
   extraction and the AI score/report/chat layer remain mock-only.
 - Backend is a separate repo not present in this codebase — this app only assumes a REST API
   reachable at `EXPO_PUBLIC_API_BASE_URL`; no specific backend technology is asserted here.

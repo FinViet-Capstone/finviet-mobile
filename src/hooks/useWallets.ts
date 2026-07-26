@@ -14,7 +14,6 @@ import {
   type WithdrawInput,
   type WalletLedgerQuery,
 } from '@/services';
-import { syncFinverseWallet } from '@/services/real/finverse';
 import { linkSepayAccount, linkSepayWithToken, syncSepayWallet } from '@/services/real/sepay';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
@@ -109,19 +108,6 @@ export const useWalletTransactions = (
     enabled: !!walletId,
     staleTime: STALE_TIME.short,
   });
-
-// ─── Finverse sync ───────────────────────────────────────────────────────────
-
-export const useSyncFinverseWallet = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (walletId: string) => syncFinverseWallet(walletId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
-      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
-    },
-  });
-};
 
 // ─── SePay link + sync ───────────────────────────────────────────────────────
 

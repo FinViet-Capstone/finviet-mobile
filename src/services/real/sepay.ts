@@ -83,7 +83,7 @@ export interface SepaySyncResult {
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function toWalletType(raw: string): WalletType {
-  return /link|finverse|sepay/i.test(raw ?? '') ? 'linked' : 'basic';
+  return /link|sepay/i.test(raw ?? '') ? 'linked' : 'basic';
 }
 
 function toWallet(dto: WalletDto): Wallet {

@@ -10,7 +10,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useWalletById, useSyncSepayWallet, useSyncFinverseWallet } from '@/hooks/useWallets';
+import { useWalletById, useSyncSepayWallet } from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import type { Transaction } from '@/types';
@@ -39,7 +39,6 @@ export default function WalletDetailScreen() {
   const router = useRouter();
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const sepaySyncMutation = useSyncSepayWallet();
-  const finverseSyncMutation = useSyncFinverseWallet();
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -53,40 +52,24 @@ export default function WalletDetailScreen() {
     router.push({ pathname: '/(tabs)/transactions/[id]', params: { id: tx.id, mode } });
   }, [wallet, router]);
 
-  const isSyncing = sepaySyncMutation.isPending || finverseSyncMutation.isPending;
+  const isSyncing = sepaySyncMutation.isPending;
 
   const handleSync = useCallback(() => {
     if (!id || isSyncing) return;
-    // Determine wallet provider from name or type metadata.
-    const walletName = wallet?.name?.toLowerCase() ?? '';
-    const isSepay = walletName.includes('sepay');
-
-    if (isSepay) {
-      sepaySyncMutation.mutate(id, {
-        onSuccess: (data) => {
-          Alert.alert(
-            S.syncSuccess,
-            `Đã thêm ${data.transactionsCreated} giao dịch mới, cập nhật ${data.transactionsUpdated} giao dịch.`,
-          );
-          refetch();
-          refetchTx();
-        },
-        onError: (err: any) => {
-          Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
-        },
-      });
-    } else {
-      finverseSyncMutation.mutate(id, {
-        onSuccess: () => {
-          refetch();
-          refetchTx();
-        },
-        onError: (err: any) => {
-          Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
-        },
-      });
-    }
-  }, [id, isSyncing, wallet, sepaySyncMutation, finverseSyncMutation, refetch, refetchTx]);
+    sepaySyncMutation.mutate(id, {
+      onSuccess: (data) => {
+        Alert.alert(
+          S.syncSuccess,
+          `Đã thêm ${data.transactionsCreated} giao dịch mới, cập nhật ${data.transactionsUpdated} giao dịch.`,
+        );
+        refetch();
+        refetchTx();
+      },
+      onError: (err: any) => {
+        Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
+      },
+    });
+  }, [id, isSyncing, sepaySyncMutation, refetch, refetchTx]);
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !wallet) return <ErrorState message={(error as Error)?.message ?? 'Không tìm thấy ví'} onRetry={refetch} />;
