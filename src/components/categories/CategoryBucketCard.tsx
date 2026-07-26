@@ -153,15 +153,18 @@ export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory
             );
           })}
 
-          {/* Add sub-category button */}
-          <TouchableOpacity
-            style={styles.addSubRow}
-            onPress={() => onAddSubCategory?.(bucket.id)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcon name="add_circle" size={16} color={accentColor + 'B3'} />
-            <Text style={[styles.addSubText, { color: accentColor + 'B3' }]}>Add Sub-category</Text>
-          </TouchableOpacity>
+          {/* Add sub-category button — only rendered when a caller actually wires it up,
+              so it never becomes a tappable no-op. */}
+          {onAddSubCategory && (
+            <TouchableOpacity
+              style={styles.addSubRow}
+              onPress={() => onAddSubCategory(bucket.id)}
+              activeOpacity={0.7}
+            >
+              <MaterialIcon name="add_circle" size={16} color={accentColor + 'B3'} />
+              <Text style={[styles.addSubText, { color: accentColor + 'B3' }]}>Add Sub-category</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>

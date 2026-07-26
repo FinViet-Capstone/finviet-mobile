@@ -33,31 +33,6 @@ export interface CustomerCategory {
 }
 
 // -------------------------------------------------------------------------
-// CategoryRequest
-// Pending admin-approval requests for new global categories.
-// -------------------------------------------------------------------------
-
-export type CategoryRequestStatus = 'pending' | 'approved' | 'rejected';
-
-export interface CategoryRequest {
-  id: string;
-  customerId: string;
-  /** Proposed display name (Vietnamese) */
-  nameVi: string;
-  /** 'expense' or 'income' */
-  type: 'expense' | 'income';
-  /** Customer's suggested bucket; null for income */
-  suggestedBucket: BucketType | null;
-  /** Optional free-text reason */
-  notes: string | null;
-  status: CategoryRequestStatus;
-  /** ISO 8601 timestamp */
-  createdAt: string;
-  /** ISO 8601 timestamp */
-  updatedAt: string;
-}
-
-// -------------------------------------------------------------------------
 // Persona + PersonaCategory
 // Used to seed customer_categories on onboarding.
 // -------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,13 +8,10 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import {
   CategoryBucketCard,
-  CategoryRequestSheet,
   type CategoryBucket,
   type BucketId,
-  type CategoryRequestInput,
 } from '@/components/categories';
 import { useCustomerCategories, useMoveBucket } from '@/hooks/useCustomerCategories';
-import { useCreateCategoryRequest } from '@/hooks';
 import { useCustomer } from '@/hooks/useCustomer';
 import { getCategoryById, getBucketLabel, getBucketIcon } from '@/constants/categories';
 
@@ -24,8 +21,6 @@ export default function CategoriesRoute() {
   const router = useRouter();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
   const { data: customer } = useCustomer();
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const createReq = useCreateCategoryRequest();
   const moveBucket = useMoveBucket();
 
   const handleMove = useCallback(
@@ -61,16 +56,6 @@ export default function CategoriesRoute() {
     }));
   }, [cats, pctOf]);
 
-  const handleSubmit = useCallback(
-    (input: CategoryRequestInput) => {
-      createReq.mutate(
-        { nameVi: input.name, type: input.type, suggestedBucket: input.suggestedBucket, notes: input.notes },
-        { onSuccess: () => setSheetVisible(false) },
-      );
-    },
-    [createReq],
-  );
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -78,9 +63,7 @@ export default function CategoriesRoute() {
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
         </TouchableOpacity>
         <Text style={styles.title}>Quản lý danh mục</Text>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => setSheetVisible(true)} style={styles.btn}>
-          <MaterialIcon name="add" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.btn} />
       </View>
 
       {isLoading ? (
@@ -90,17 +73,10 @@ export default function CategoriesRoute() {
       ) : (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {buckets.map((b) => (
-            <CategoryBucketCard key={b.id} bucket={b} onAddSubCategory={() => setSheetVisible(true)} onMoveSubCategory={handleMove} />
+            <CategoryBucketCard key={b.id} bucket={b} onMoveSubCategory={handleMove} />
           ))}
         </ScrollView>
       )}
-
-      <CategoryRequestSheet
-        visible={sheetVisible}
-        onClose={() => setSheetVisible(false)}
-        onSubmit={handleSubmit}
-        loading={createReq.isPending}
-      />
     </SafeAreaView>
   );
 }

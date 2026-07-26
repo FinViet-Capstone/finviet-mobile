@@ -8,9 +8,9 @@
  * so the swap needs zero hook/screen changes.
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), category-requests, reports/AI (spending
- * score, weekly report, chat history), notifications, rules, SMS extraction, and
- * Finverse bank-linking (see real/finverse.ts + app/link-bank.tsx). Still mock:
+ * categories (customer category buckets), reports/AI (spending score, weekly
+ * report, chat history), notifications, rules, SMS extraction, and Finverse
+ * bank-linking (see real/finverse.ts + app/link-bank.tsx). Still mock:
  * subscriptions (no backend), and photo/receipt OCR extraction (no backend — only
  * SMS + CSV parsing exist server-side).
  */
@@ -29,8 +29,6 @@ import * as mockGoals from './mock/goals';
 import * as realGoals from './real/goals';
 import * as mockCustomerCategories from './mock/customerCategories';
 import * as realCustomerCategories from './real/categories';
-import * as mockCategoryRequests from './mock/categoryRequests';
-import * as realCategoryRequests from './real/categoryRequests';
 import * as mockReports from './mock/reports';
 import * as realReports from './real/reports';
 import * as mockNotifications from './mock/notifications';
@@ -131,12 +129,6 @@ export const seedFromPersona = customerCategoriesImpl.seedFromPersona;
 export const deactivateCustomerCategory =
   customerCategoriesImpl.deactivateCustomerCategory;
 export type { MoveBucketPayload } from './mock/customerCategories';
-
-// ─── Category requests ────────────────────────────────────────────────────────
-const categoryRequestsImpl = USE_MOCK ? mockCategoryRequests : realCategoryRequests;
-export const createCategoryRequest = categoryRequestsImpl.createCategoryRequest;
-export const getCategoryRequests = categoryRequestsImpl.getCategoryRequests;
-export type { CreateCategoryRequestPayload } from './mock/categoryRequests';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
 const reportsImpl = USE_MOCK ? mockReports : realReports;

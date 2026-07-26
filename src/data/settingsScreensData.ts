@@ -8,18 +8,6 @@ export const SUBSCRIPTION_STRINGS = {
   perMonth: '/tháng',
 };
 
-// Category request list strings
-export const CATEGORY_REQUEST_STRINGS = {
-  title: 'Yêu cầu danh mục',
-  newButton: 'Mới',
-  statusPending: 'Chờ duyệt',
-  statusApproved: 'Đã duyệt',
-  statusRejected: 'Từ chối',
-  typeExpense: 'Chi tiêu',
-  typeIncome: 'Thu nhập',
-  rejectionPrefix: 'Lý do: ',
-};
-
 // Data export screen strings
 export const DATA_EXPORT_STRINGS = {
   title: 'Xuất dữ liệu',
