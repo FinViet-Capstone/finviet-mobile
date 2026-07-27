@@ -3,7 +3,8 @@
  *
  * customer_categories: per-customer expense category set, seeded from persona.
  * Income categories are global — never stored in customer_categories.
- * Savings bucket is locked — moveBucket must reject savings targets.
+ * All 3 buckets are freely movable via moveBucket (see item 5 of
+ * context/fe-plan-2026-07-revamp.md).
  */
 
 import type { BucketType } from '@/constants/categories';

@@ -76,18 +76,8 @@ export async function getCustomerCategories(
 export async function moveBucket(
   payload: MoveBucketPayload,
 ): Promise<CustomerCategory> {
-  // Savings is locked both ways — identical guard to the mock.
-  if (payload.targetBucket === 'savings') {
-    throw new Error('savings_locked');
-  }
-  const current =
-    bucketOverrides.get(payload.customerCategoryId) ??
-    getCategoryById(payload.customerCategoryId)?.defaultBucket ??
-    'needs';
-  if (current === 'savings') {
-    throw new Error('savings_locked');
-  }
-
+  // All 3 buckets are freely movable — the bucket-override endpoint has no
+  // savings restriction server-side either (confirmed with BE).
   bucketOverrides.set(payload.customerCategoryId, payload.targetBucket);
   return {
     id: payload.customerCategoryId,

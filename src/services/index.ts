@@ -151,6 +151,7 @@ const customCategoriesImpl = USE_MOCK ? mockCustomCategories : realCustomCategor
 export const getCustomCategories = customCategoriesImpl.getCustomCategories;
 export const createCustomCategory = customCategoriesImpl.createCustomCategory;
 export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
+export const updateCustomCategoryBucket = customCategoriesImpl.updateCustomCategoryBucket;
 export type { CreateCustomCategoryInput } from './mock/customCategories';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────

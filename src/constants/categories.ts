@@ -12,7 +12,8 @@
  * Nullable only for income and uncategorized. Expense categories MUST have a value.
  * Per-customer overrides will live in customer_categories (v2; FE not migrated yet).
  *
- * Savings bucket is immutable — users cannot drag categories into/out of it.
+ * All 3 buckets are freely movable — users can drag categories into/out of
+ * Savings too (see item 5 of context/fe-plan-2026-07-revamp.md).
  */
 
 // -------------------------------------------------------------------------

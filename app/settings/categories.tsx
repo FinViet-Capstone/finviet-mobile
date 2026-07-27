@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSharedValue } from 'react-native-reanimated';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -9,12 +10,20 @@ import { ErrorState } from '@/components/common/ErrorState';
 import {
   CategoryBucketCard,
   CustomCategorySheet,
+  CategoryDragOverlay,
+  zoneForAbsoluteY,
   type CategoryBucket,
   type BucketId,
   type CustomCategoryInput,
+  type DragStartInfo,
 } from '@/components/categories';
 import { useCustomerCategories, useMoveBucket } from '@/hooks/useCustomerCategories';
-import { useEffectiveIncomeAllocation, useCustomCategories, useCreateCustomCategory } from '@/hooks';
+import {
+  useEffectiveIncomeAllocation,
+  useCustomCategories,
+  useCreateCustomCategory,
+  useUpdateCustomCategoryBucket,
+} from '@/hooks';
 import { getCategoryById, getBucketLabel, getBucketIcon } from '@/constants/categories';
 import { saveCategoryIcon } from '@/lib/categoryIconStorage';
 import { getApiErrorMessage } from '@/utils/errors';
@@ -27,15 +36,47 @@ export default function CategoriesRoute() {
   const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
   const { data: customCats } = useCustomCategories();
   const moveBucket = useMoveBucket();
+  const updateCustomCategoryBucket = useUpdateCustomCategoryBucket();
   const createCustomCategory = useCreateCustomCategory();
   const [sheetVisible, setSheetVisible] = useState(false);
 
+  // Drag-and-drop: dragX/dragY are shared values the gesture updates directly
+  // (see CategoryBucketCard) so the floating chip follows the finger at 60fps
+  // without a JS re-render per frame. dragInfo/dragActive are plain state —
+  // they only change twice per drag (start, end), not every frame.
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
+  const [dragInfo, setDragInfo] = useState<DragStartInfo | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+
   const handleMove = useCallback(
     (customerCategoryId: string, fromBucket: BucketId) => {
-      // Savings is locked; only Needs↔Wants are legal — toggle to the other jar.
+      // Quick shortcut, independent of the drag gesture below — only ever
+      // toggles Needs↔Wants, unchanged from before.
       moveBucket.mutate({ customerCategoryId, targetBucket: fromBucket === 'needs' ? 'wants' : 'needs' });
     },
     [moveBucket],
+  );
+
+  const handleDragStart = useCallback((info: DragStartInfo) => {
+    setDragInfo(info);
+    setDragActive(true);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (absoluteY: number) => {
+      const target = zoneForAbsoluteY(absoluteY);
+      if (target && dragInfo) {
+        if (dragInfo.isCustom) {
+          updateCustomCategoryBucket.mutate({ id: dragInfo.subId, bucketId: target });
+        } else {
+          moveBucket.mutate({ customerCategoryId: dragInfo.subId, targetBucket: target });
+        }
+      }
+      setDragActive(false);
+      setDragInfo(null);
+    },
+    [dragInfo, moveBucket, updateCustomCategoryBucket],
   );
 
   const pctOf = useCallback(
@@ -69,9 +110,7 @@ export default function CategoriesRoute() {
             id: c.id,
             categoryId: c.id,
             name: c.nameVi,
-            // Bucket reassignment for customer-created categories lands with
-            // drag-and-drop (item 5) — not movable via the swap button yet.
-            canMove: false,
+            isCustom: true,
           })),
       ],
     }));
@@ -116,7 +155,15 @@ export default function CategoriesRoute() {
       ) : (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {buckets.map((b) => (
-            <CategoryBucketCard key={b.id} bucket={b} onMoveSubCategory={handleMove} />
+            <CategoryBucketCard
+              key={b.id}
+              bucket={b}
+              onMoveSubCategory={handleMove}
+              dragX={dragX}
+              dragY={dragY}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
           ))}
         </ScrollView>
       )}
@@ -126,6 +173,14 @@ export default function CategoriesRoute() {
         onClose={() => setSheetVisible(false)}
         onSubmit={handleSubmitCustomCategory}
         loading={createCustomCategory.isPending}
+      />
+
+      <CategoryDragOverlay
+        active={dragActive}
+        dragX={dragX}
+        dragY={dragY}
+        chipLabel={dragInfo?.name ?? null}
+        chipCategoryId={dragInfo?.categoryId ?? null}
       />
     </SafeAreaView>
   );
