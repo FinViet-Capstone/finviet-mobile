@@ -1,5 +1,5 @@
 import type { AppNotification } from '../../types';
-import { USER_ID } from './wallets';
+import { USER_ID } from './walletStore';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 // 10 notifications of all four types: budget_alert, weekly_report,

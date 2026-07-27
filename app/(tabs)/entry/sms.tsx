@@ -30,6 +30,7 @@ import { useExtractFromSMS, useWallets, useCreateTransaction } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { formatVND } from "@/utils/formatters";
 import { todayISO } from "@/utils/date";
+import { getApiErrorMessage } from "@/utils/errors";
 import type { Wallet } from "@/types/wallet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ const S = {
   sheetCategory: "Chọn danh mục",
   sheetWallet: "Chọn ví",
   tooShort: "Tin nhắn quá ngắn. Vui lòng dán toàn bộ tin nhắn ngân hàng.",
+  tooShortHint: "Cần ít nhất 10 ký tự — hãy dán đủ nội dung tin nhắn ngân hàng.",
   saveOk: "Đã lưu giao dịch.",
   saveErr: "Không lưu được. Hãy thử lại.",
   expense: "Chi tiêu",
@@ -106,18 +108,20 @@ export default function SMSEntryScreen() {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
 
+  // SMS entries can only target basic wallets — bank-linked wallets are read-only.
+  const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== "linked");
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    if (walletData?.wallets && walletId === null) {
-      const primary =
-        walletData.wallets[0];
-      setWalletId(primary?.id ?? null);
+    if (basicWallets.length > 0 && walletId === null) {
+      setWalletId(basicWallets[0].id);
     }
-  }, [walletData, walletId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basicWallets.length]);
 
   if (walletsLoading || !walletData) return <LoadingSpinner />;
 
-  const wallets: Wallet[] = walletData.wallets;
+  const wallets: Wallet[] = basicWallets;
   const selectedCategory: Category | null = categoryId
     ? (CATEGORIES.find((c) => c.id === categoryId) ?? null)
     : null;
@@ -136,6 +140,7 @@ export default function SMSEntryScreen() {
     extract.mutate(trimmed, {
       onSuccess: (result) => {
         if (result.amount !== null) setAmountRaw(String(result.amount));
+        if (result.type) setEntryType(result.type);
         if (result.merchant !== null) setMerchant(result.merchant);
         setDateIso(result.transactionDate);
         setCategoryId(result.categoryId);
@@ -195,7 +200,7 @@ export default function SMSEntryScreen() {
           Alert.alert("", S.saveOk, [
             { text: "OK", onPress: () => router.back() },
           ]),
-        onError: () => Alert.alert("", S.saveErr),
+        onError: (err) => Alert.alert("", getApiErrorMessage(err, S.saveErr)),
       },
     );
   };
@@ -232,6 +237,7 @@ export default function SMSEntryScreen() {
           <ScrollView
             contentContainerStyle={styles.reviewContent}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
             {/* Uncertain notice */}
@@ -507,6 +513,7 @@ export default function SMSEntryScreen() {
         <ScrollView
           contentContainerStyle={styles.pasteContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* Instruction */}
@@ -577,6 +584,9 @@ export default function SMSEntryScreen() {
 
       {/* Bottom action area */}
       <View style={styles.bottomArea}>
+        {smsText.trim().length > 0 && smsText.trim().length < 10 && (
+          <Text style={styles.shortHint}>{S.tooShortHint}</Text>
+        )}
         <View style={styles.aiBadge}>
           <MaterialIcon name="auto_awesome" size={13} color={COLORS.primary} />
           <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
@@ -817,7 +827,12 @@ const styles = StyleSheet.create({
   processBtnText: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
+    color: COLORS.onSurface,
+  },
+  shortHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.warning,
+    textAlign: "center",
   },
 
   // Review phase
@@ -924,7 +939,7 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onPrimary,
+    color: COLORS.onSurface,
   },
 
   disabled: { opacity: 0.45 },

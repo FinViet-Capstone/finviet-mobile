@@ -26,6 +26,7 @@ import {
   useBucketSpend,
   useGoals,
   useCustomer,
+  useEffectiveIncomeAllocation,
 } from '@/hooks';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -75,6 +76,7 @@ export default function HomeScreen() {
     }),
     [curYear, curMonth],
   );
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
 
   const { data: monthTx } = useTransactions(monthRange);
   const bucketSpend = useBucketSpend(monthRange);
@@ -101,10 +103,13 @@ export default function HomeScreen() {
 
   // Bucket denominator = allocation cap (income × bucket %), matching the Budgets
   // tab — NOT the sum of per-category limits — so the two screens never disagree.
-  const income = user?.monthlyIncome ?? 0;
-  const needsLimit = Math.round((income * (user?.needsPct ?? 50)) / 100);
-  const wantsLimit = Math.round((income * (user?.wantsPct ?? 30)) / 100);
-  const savingsLimit = Math.round((income * (user?.savingsPct ?? 20)) / 100);
+  // Resolved through the income/allocation history (mock/incomeAllocation.ts)
+  // rather than Customer.needsPct/etc, which stop updating once a change is
+  // scheduled for next month.
+  const income = effectiveAllocation?.monthlyIncome ?? 0;
+  const needsLimit = Math.round((income * (effectiveAllocation?.needsPct ?? 50)) / 100);
+  const wantsLimit = Math.round((income * (effectiveAllocation?.wantsPct ?? 30)) / 100);
+  const savingsLimit = Math.round((income * (effectiveAllocation?.savingsPct ?? 20)) / 100);
 
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);
@@ -185,7 +190,30 @@ export default function HomeScreen() {
           />
         }
       >
-        <SpendingScoreCard score={score} onToggleView={setScoreView} />
+        {/* The spending score needs transactions to be meaningful. With none yet,
+            show a call-to-action to add transactions instead of a misleading score. */}
+        {(recentTx?.length ?? 0) > 0 ? (
+          <SpendingScoreCard score={score} onToggleView={setScoreView} />
+        ) : (
+          <TouchableOpacity
+            style={styles.emptyCta}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(tabs)/entry')}
+          >
+            <View style={styles.emptyCtaIcon}>
+              <MaterialIcon name="insights" size={26} color={COLORS.primary} />
+            </View>
+            <View style={styles.emptyCtaBody}>
+              <Text style={styles.emptyCtaTitle}>Chưa đủ dữ liệu để phân tích</Text>
+              <Text style={styles.emptyCtaText}>
+                Thêm vài giao dịch để FinViet tính điểm chi tiêu và đưa ra gợi ý.
+              </Text>
+            </View>
+            <View style={styles.emptyCtaBtn}>
+              <MaterialIcon name="add" size={22} color={COLORS.onPrimary} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         <TotalBalanceCard
           totalBalance={walletData?.totalBalance ?? 0}
@@ -280,5 +308,45 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: SPACING[4],
     right: SPACING[4],
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    backgroundColor: COLORS.surfaceContainer,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}33`,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[4],
+  },
+  emptyCtaIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: `${COLORS.primary}1A`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyCtaBody: {
+    flex: 1,
+  },
+  emptyCtaTitle: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.onSurface,
+    marginBottom: 2,
+  },
+  emptyCtaText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.onSurfaceVariant,
+    lineHeight: 18,
+  },
+  emptyCtaBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

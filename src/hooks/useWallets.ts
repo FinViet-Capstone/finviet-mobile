@@ -6,10 +6,15 @@ import {
   updateWallet,
   deleteWallet,
   createTransfer,
+  withdrawFromWallet,
+  getWalletTransactions,
   type CreateWalletInput,
   type UpdateWalletInput,
   type CreateTransferInput,
+  type WithdrawInput,
+  type WalletLedgerQuery,
 } from '@/services';
+import { linkSepayAccount, linkSepayWithToken, syncSepayWallet } from '@/services/real/sepay';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -70,6 +75,73 @@ export const useCreateTransfer = () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
       qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+    },
+  });
+};
+
+// ─── Withdraw ────────────────────────────────────────────────────────────────
+
+export const useWithdrawFromWallet = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: WithdrawInput) => withdrawFromWallet(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+    },
+  });
+};
+
+// ─── Per-wallet ledger ───────────────────────────────────────────────────────
+
+export const useWalletTransactions = (
+  walletId: string | undefined,
+  query?: WalletLedgerQuery,
+) =>
+  useQuery({
+    queryKey: queryKeys.wallets.transactions(
+      walletId ?? '',
+      (query as Record<string, unknown>) ?? null,
+    ),
+    queryFn: () => getWalletTransactions(walletId!, query),
+    enabled: !!walletId,
+    staleTime: STALE_TIME.short,
+  });
+
+// ─── SePay link + sync ───────────────────────────────────────────────────────
+
+export const useLinkSepayAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, bankAccountId }: { code: string; bankAccountId?: number }) =>
+      linkSepayAccount(code, bankAccountId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+    },
+  });
+};
+
+export const useLinkSepayWithToken = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ apiToken, accountNumber }: { apiToken: string; accountNumber?: string }) =>
+      linkSepayWithToken(apiToken, accountNumber),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+    },
+  });
+};
+
+export const useSyncSepayWallet = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (walletId: string) => syncSepayWallet(walletId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
     },
   });
 };

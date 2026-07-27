@@ -6,22 +6,35 @@ export {
   useUpdateWallet,
   useDeleteWallet,
   useCreateTransfer,
+  useWithdrawFromWallet,
+  useWalletTransactions,
+  useLinkSepayAccount,
+  useLinkSepayWithToken,
+  useSyncSepayWallet,
 } from './useWallets';
 export {
   useTransactions,
   useTransactionById,
   useRecentTransactions,
+  useTransactionSummary,
   useCreateTransaction,
   useUpdateTransaction,
+  useClassifyTransaction,
   useDeleteTransaction,
 } from './useTransactions';
 export {
   useBudgets,
   useBudgetById,
+  useBudgetBuckets,
   useCreateBudget,
   useUpdateBudget,
   useDeleteBudget,
 } from './useBudgets';
+export {
+  useEffectiveIncomeAllocation,
+  useScheduledIncomeAllocation,
+  useScheduleIncomeAllocationChange,
+} from './useIncomeAllocation';
 export {
   useGoals,
   useGoalById,
@@ -31,7 +44,15 @@ export {
   useAddContribution,
 } from './useGoals';
 export { useBucketSpend, type BucketSpend } from './useBucketSpend';
-export { useSpendingScore, useWeeklyReport, useChatHistory } from './useReports';
+export {
+  useSpendingScore,
+  useWeeklyReport,
+  useChatHistory,
+  useChatSessions,
+  useChatSessionMessages,
+  useSendChatMessage,
+  useGenerateWeeklyReport,
+} from './useReports';
 export {
   useNotifications,
   useUnreadNotifications,
@@ -45,20 +66,24 @@ export {
   useRegister,
   useGoogleOAuth,
   useForgotPassword,
+  useResetPassword,
   useResendVerification,
   useVerifyEmail,
   useChangePassword,
   useLogout,
+  useUploadAvatar,
+  useDeleteAccount,
 } from './useAuth';
 export { useBootstrapSession } from './useBootstrapSession';
-export {
-  useInstitutions,
-  useLinkedAccounts,
-  useSyncLinkedWallet,
-} from './useLinkedWallet';
 export { useRules, useCreateRule } from './useRules';
 export { useCustomerCategories, useMoveBucket } from './useCustomerCategories';
-export { useCategoryRequests, useCreateCategoryRequest } from './useCategoryRequests';
+export {
+  useCustomCategories,
+  useCreateCustomCategory,
+  useDeleteCustomCategory,
+  useUpdateCustomCategoryBucket,
+} from './useCustomCategories';
+export { useCategoryVisual } from './useCategoryVisual';
 export {
   useSubscriptionPlans,
   useCurrentSubscription,

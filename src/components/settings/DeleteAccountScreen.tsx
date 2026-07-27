@@ -14,6 +14,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { DELETE_ACCOUNT_STRINGS } from '@/data/settingsScreensData';
 import { useAuthStore } from '@/stores/authStore';
+import { useDeleteAccount } from '@/hooks';
 
 interface DeleteAccountScreenProps {
   onCancel?: () => void;
@@ -23,14 +24,16 @@ interface DeleteAccountScreenProps {
 export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreenProps) {
   const customer = useAuthStore((s) => s.customer);
   const userEmail = customer?.email ?? '';
+  const deleteAccount = useDeleteAccount();
 
   const [inputEmail, setInputEmail] = useState('');
   const [focused, setFocused] = useState(false);
 
   const isConfirmed = inputEmail.trim().toLowerCase() === userEmail.toLowerCase();
+  const canDelete = isConfirmed && !deleteAccount.isPending;
 
   const handleDelete = () => {
-    if (!isConfirmed) return;
+    if (!canDelete) return;
     Alert.alert(
       'Xác nhận xóa tài khoản',
       'Bạn có chắc chắn muốn xóa tài khoản vĩnh viễn không?',
@@ -39,9 +42,13 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
         {
           text: 'Xóa vĩnh viễn',
           style: 'destructive',
-          onPress: () => {
-            // Mock: would call DELETE /customers/me in Phase 5
-            onDeleted?.();
+          onPress: async () => {
+            try {
+              await deleteAccount.mutateAsync();
+              onDeleted?.();
+            } catch {
+              Alert.alert('Lỗi', 'Không thể xóa tài khoản. Vui lòng thử lại.');
+            }
           },
         },
       ],
@@ -57,6 +64,7 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {/* Warning hero */}
@@ -111,13 +119,13 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
       {/* Fixed bottom actions */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.deleteButton, !isConfirmed && styles.deleteButtonDisabled]}
+          style={[styles.deleteButton, !canDelete && styles.deleteButtonDisabled]}
           onPress={handleDelete}
-          disabled={!isConfirmed}
-          activeOpacity={isConfirmed ? 0.8 : 1}
+          disabled={!canDelete}
+          activeOpacity={canDelete ? 0.8 : 1}
         >
-          <Text style={[styles.deleteButtonText, !isConfirmed && styles.deleteButtonTextDisabled]}>
-            {DELETE_ACCOUNT_STRINGS.deleteButton}
+          <Text style={[styles.deleteButtonText, !canDelete && styles.deleteButtonTextDisabled]}>
+            {deleteAccount.isPending ? 'Đang xóa...' : DELETE_ACCOUNT_STRINGS.deleteButton}
           </Text>
         </TouchableOpacity>
 

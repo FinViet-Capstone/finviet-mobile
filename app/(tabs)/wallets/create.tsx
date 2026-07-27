@@ -63,7 +63,7 @@ export default function CreateWalletScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
 
         {/* Type selector — only basic active */}
         <View style={styles.typeRow}>

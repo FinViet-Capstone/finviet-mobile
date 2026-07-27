@@ -4,9 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { queryKeys } from '@/lib/queryKeys';
 
 import { OnboardingIncome } from '@/components/onboarding/OnboardingIncome';
 import { OnboardingAllocation } from '@/components/onboarding/OnboardingAllocation';
@@ -14,14 +18,22 @@ import { OnboardingPersona } from '@/components/onboarding/OnboardingPersona';
 import { OnboardingWallet } from '@/components/onboarding/OnboardingWallet';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { useSeedCategories } from '@/hooks/useCustomerCategories';
+import { useCreateWallet } from '@/hooks/useWallets';
+import { updateProfile } from '@/services';
 import { useAuthStore } from '@/stores/authStore';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS } from '@/data/onboardingData';
 
+
+
 export default function OnboardingScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const markOnboardingDone = useAuthStore((s) => s.markOnboardingDone);
+  const updateCustomer = useAuthStore((s) => s.updateCustomer);
+  const customerEmail = useAuthStore((s) => s.customer?.email ?? '');
   const seedCategories = useSeedCategories();
+  const createWallet = useCreateWallet();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -42,17 +54,54 @@ export default function OnboardingScreen() {
     canFinish,
   } = useOnboardingFlow();
 
-  const handleFinish = () => {
-    if (!canFinish()) return;
+  const handleFinish = async () => {
+    if (!canFinish() || loading) return;
 
     setLoading(true);
-    // Seed the per-customer category set from the persona (gender + DOB) collected in step 3.
-    seedCategories.mutate({ gender: state.gender, dateOfBirth: state.dateOfBirth });
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Display name is optional in step 3 — fall back to the email local-part.
+      const fullName =
+        state.displayName.trim() ||
+        (customerEmail ? customerEmail.split('@')[0] : 'Người dùng');
+      const income = Number(state.monthlyIncome.replace(/\D/g, '')) || null;
+      const balance = Number(state.walletBalance.replace(/\D/g, '')) || 0;
+
+      // Group all backend requests into a single Promise.all to avoid browser
+      // connection bottlenecks and race conditions before navigation.
+      await Promise.all([
+        updateProfile({
+          fullName,
+          monthlyIncomeExpected: income,
+          gender: state.gender,
+          dateOfBirth: state.dateOfBirth,
+          // Step 2's 50/30/20 sliders — persist so it doesn't get silently dropped.
+          needsPct: state.allocations.essential,
+          wantsPct: state.allocations.wants,
+          savingsPct: state.allocations.savings,
+        }),
+        createWallet.mutateAsync({
+          name: state.walletName.trim(),
+          type: state.walletType,
+          balance,
+        }),
+        seedCategories.mutateAsync({
+          gender: state.gender,
+          dateOfBirth: state.dateOfBirth,
+        }),
+      ]);
+
+      updateCustomer({ displayName: fullName, monthlyIncome: income });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.user.all() });
       markOnboardingDone();
       router.replace('/(tabs)/home');
-    }, 500);
+    } catch {
+      Alert.alert(
+        'Không thể hoàn tất',
+        'Đã xảy ra lỗi khi lưu thiết lập. Vui lòng kiểm tra kết nối và thử lại.',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderStepContent = () => {

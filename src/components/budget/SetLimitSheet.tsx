@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
+import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
@@ -101,7 +101,7 @@ export default function SetLimitSheet({
   }, [sliderValue, categoryId, createBudget, onClose]);
 
   const handleSave = useCallback(() => {
-    if (!sliderValue) return;
+    // 0đ là giá trị hợp lệ (đặt hạn mức = 0) — không chặn.
     if (isOverRemaining) {
       Alert.alert(
         S.overWarningTitle,
@@ -179,7 +179,7 @@ export default function SetLimitSheet({
 
         {/* Slider track with remainingCap marker */}
         <View style={styles.sliderWrap}>
-          <Slider
+          <CustomSlider
             style={styles.slider}
             minimumValue={0}
             maximumValue={sliderMax}
@@ -225,10 +225,10 @@ export default function SetLimitSheet({
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[styles.saveBtn, (!sliderValue || createBudget.isPending) && styles.saveBtnDisabled,
+            style={[styles.saveBtn, createBudget.isPending && styles.saveBtnDisabled,
               isOverRemaining && styles.saveBtnWarning]}
             onPress={handleSave}
-            disabled={!sliderValue || createBudget.isPending}
+            disabled={createBudget.isPending}
           >
             {createBudget.isPending
               ? <ActivityIndicator size="small" color={COLORS.onPrimary} />

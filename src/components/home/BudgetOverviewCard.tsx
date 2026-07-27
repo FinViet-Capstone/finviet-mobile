@@ -6,9 +6,11 @@ import { formatVND } from '@/utils/formatters';
 
 const TICK_COUNT = 10;
 
-function getPctColor(spent: number, limit: number): string {
+function getPctColor(spent: number, limit: number, goalMode = false): string {
   if (limit === 0) return COLORS.budget.safe;
   const pct = (spent / limit) * 100;
+  // Savings (goalMode): đạt/vượt mục tiêu = xanh; dưới mục tiêu = trung tính, KHÔNG đỏ.
+  if (goalMode) return pct >= 100 ? COLORS.budget.safe : COLORS.onSurfaceVariant;
   if (pct > 85) return COLORS.budget.danger;
   if (pct > 60) return COLORS.budget.warning;
   return COLORS.budget.safe;
@@ -19,6 +21,7 @@ interface BucketRow {
   spent: number;
   limit: number;
   activeColor: string;
+  goalMode?: boolean;
 }
 
 export interface BudgetOverviewCardProps {
@@ -47,9 +50,9 @@ function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number
   );
 }
 
-function PctBadge({ spent, limit }: { spent: number; limit: number }) {
+function PctBadge({ spent, limit, goalMode }: { spent: number; limit: number; goalMode?: boolean }) {
   const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
-  const color = getPctColor(spent, limit);
+  const color = getPctColor(spent, limit, goalMode);
   return (
     <View style={[styles.pctBadge, { backgroundColor: `${color}26` }]}>
       <Text style={[styles.pctText, { color }]}>{pct}%</Text>
@@ -57,7 +60,7 @@ function PctBadge({ spent, limit }: { spent: number; limit: number }) {
   );
 }
 
-function BucketItem({ label, spent, limit, activeColor }: BucketRow) {
+function BucketItem({ label, spent, limit, activeColor, goalMode }: BucketRow) {
   return (
     <View style={styles.bucketItem}>
       <View style={styles.bucketHeader}>
@@ -67,7 +70,7 @@ function BucketItem({ label, spent, limit, activeColor }: BucketRow) {
             <Text style={styles.bucketSpent}>{formatVND(spent)}</Text>
             <Text style={styles.bucketLimit}> / {formatVND(limit)}</Text>
           </Text>
-          <PctBadge spent={spent} limit={limit} />
+          <PctBadge spent={spent} limit={limit} goalMode={goalMode} />
         </View>
       </View>
       <EnergyBar spent={spent} limit={limit} activeColor={activeColor} />
@@ -112,6 +115,7 @@ export function BudgetOverviewCard({
           spent={savingsSpent}
           limit={savingsLimit}
           activeColor={COLORS.tertiary}
+          goalMode
         />
       </View>
     </View>

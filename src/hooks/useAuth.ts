@@ -15,13 +15,17 @@ import {
   register,
   googleOAuth,
   forgotPassword,
+  resetPassword,
   resendVerification,
   verifyEmail,
   changePassword,
   logout,
+  uploadAvatar,
+  deleteAccount,
   type MockLoginInput,
   type MockRegisterInput,
   type MockChangePasswordInput,
+  type ResetPasswordInput,
 } from '@/services';
 import { getRefreshToken } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,6 +59,11 @@ export const useForgotPassword = () =>
     mutationFn: (email) => forgotPassword(email),
   });
 
+export const useResetPassword = () =>
+  useMutation<void, Error, ResetPasswordInput>({
+    mutationFn: (input) => resetPassword(input),
+  });
+
 export const useResendVerification = () =>
   useMutation<void, Error, string>({
     mutationFn: (email) => resendVerification(email),
@@ -80,3 +89,18 @@ export const useLogout = () => {
     onSettled: () => clearSession(),
   });
 };
+
+/** Upload a new avatar image; on success patches the avatarUrl in the store. */
+export const useUploadAvatar = () => {
+  const updateCustomer = useAuthStore((s) => s.updateCustomer);
+  return useMutation<string, Error, string>({
+    mutationFn: (uri) => uploadAvatar(uri),
+    onSuccess: (url) => updateCustomer({ avatarUrl: url }),
+  });
+};
+
+/** Self-delete the account (soft). The caller clears the session on success. */
+export const useDeleteAccount = () =>
+  useMutation<void, Error, void>({
+    mutationFn: () => deleteAccount(),
+  });

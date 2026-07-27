@@ -1,41 +1,15 @@
 import type { Wallet, WalletSummary, WalletType } from '../../types';
+import {
+  USER_ID,
+  adjustWalletBalance,
+  getAllWallets,
+  setWallets,
+} from './walletStore';
 
-// ─── Shared ID Constants ───────────────────────────────────────────────────────
-// Exported so transactions.ts and goals.ts can reference the same wallet IDs.
-
-export const USER_ID = 'user_khoi_01' as const;
-
-export const WALLET_IDS = {
-  CASH: 'wallet_cash_01',
-  BANK: 'wallet_bank_01',
-} as const;
-
-// ─── Mock Data (mutable) ───────────────────────────────────────────────────────
-// `let` not `const` -- the mutation services rewrite this array in place so
-// queries see the new state on the next read.
-
-let WALLETS: Wallet[] = [
-  {
-    id: WALLET_IDS.CASH,
-    customerId: USER_ID,
-    name: 'Tiền mặt',
-    type: 'basic',
-    balance: 2_350_000,
-    isDeleted: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-05-21T00:00:00.000Z',
-  },
-  {
-    id: WALLET_IDS.BANK,
-    customerId: USER_ID,
-    name: 'Vietcombank',
-    type: 'basic',
-    balance: 15_200_000,
-    isDeleted: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-05-21T00:00:00.000Z',
-  },
-];
+// Shared ID constants and the mutable WALLETS store live in ./walletStore so
+// transactions.ts can reference them without importing this module (which would
+// re-create the wallets ⇄ transactions cycle). Access the array via the
+// getAllWallets()/setWallets() accessors below.
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,13 +26,13 @@ function nowIso(): string {
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
 export function getWallets(): WalletSummary {
-  const visible = WALLETS.filter((w) => !w.isDeleted);
+  const visible = getAllWallets().filter((w) => !w.isDeleted);
   const totalBalance = visible.reduce((sum, w) => sum + w.balance, 0);
   return { wallets: visible, totalBalance };
 }
 
 export function getWalletById(id: string): Wallet | undefined {
-  return WALLETS.find((w) => w.id === id);
+  return getAllWallets().find((w) => w.id === id);
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────
@@ -91,7 +65,7 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
     updatedAt: nowIso(),
     linkedMetadata: input.linkedMetadata,
   };
-  WALLETS = [...WALLETS, wallet];
+  setWallets([...getAllWallets(), wallet]);
   return wallet;
 }
 
@@ -105,7 +79,7 @@ export async function updateWallet(
   patch: UpdateWalletInput,
 ): Promise<Wallet> {
   await delay();
-  const target = WALLETS.find((w) => w.id === id);
+  const target = getAllWallets().find((w) => w.id === id);
   if (!target) throw new Error('Wallet not found');
 
   const updated: Wallet = {
@@ -114,29 +88,125 @@ export async function updateWallet(
     ...(patch.type !== undefined ? { type: patch.type } : {}),
     updatedAt: nowIso(),
   };
-  WALLETS = WALLETS.map((w) => (w.id === id ? updated : w));
+  setWallets(getAllWallets().map((w) => (w.id === id ? updated : w)));
   return updated;
 }
 
 export async function deleteWallet(id: string): Promise<void> {
   await delay();
   // Soft-delete: flip the flag, preserve transactions linked to this wallet.
-  WALLETS = WALLETS.map((w) =>
-    w.id === id ? { ...w, isDeleted: true, updatedAt: nowIso() } : w,
+  setWallets(
+    getAllWallets().map((w) =>
+      w.id === id ? { ...w, isDeleted: true, updatedAt: nowIso() } : w,
+    ),
   );
 }
 
-/**
- * Internal-use balance adjuster. Called by the transactions service when a
- * transaction is created / updated / deleted so wallet balances stay in sync.
- *
- * Positive `delta` increases balance, negative decreases. No delay -- this is
- * called inside another mutation that already paid the latency cost.
- */
-export function adjustWalletBalance(id: string, delta: number): void {
-  WALLETS = WALLETS.map((w) =>
-    w.id === id
-      ? { ...w, balance: w.balance + delta, updatedAt: nowIso() }
-      : w,
-  );
+// ─── Withdraw (POST /wallets/withdraw) ──────────────────────────────────────────
+
+export interface WithdrawInput {
+  fromWalletId: string;
+  /** Optional destination wallet (move the money instead of pure expense). */
+  toWalletId?: string;
+  amount: number;
+  description?: string;
+}
+
+export interface WithdrawResult {
+  fromWalletId: string;
+  fromWalletBalance: number;
+  toWalletId?: string;
+  toWalletBalance?: number;
+}
+
+/** Withdraw from a wallet (as an expense, or moved into another wallet). */
+export async function withdrawFromWallet(
+  input: WithdrawInput,
+): Promise<WithdrawResult> {
+  await delay();
+  const from = getAllWallets().find((w) => w.id === input.fromWalletId);
+  if (!from) throw new Error('Wallet not found');
+  if (input.amount <= 0) throw new Error('Amount must be positive');
+  if (input.amount > from.balance) throw new Error('Insufficient balance');
+
+  adjustWalletBalance(input.fromWalletId, -input.amount);
+  if (input.toWalletId) adjustWalletBalance(input.toWalletId, input.amount);
+
+  const readBalance = (id?: string) =>
+    id ? getAllWallets().find((w) => w.id === id)?.balance : undefined;
+
+  return {
+    fromWalletId: input.fromWalletId,
+    fromWalletBalance: readBalance(input.fromWalletId) ?? 0,
+    toWalletId: input.toWalletId,
+    toWalletBalance: readBalance(input.toWalletId),
+  };
+}
+
+// ─── Per-wallet ledger (GET /wallets/{id}/transactions) ─────────────────────────
+
+export interface WalletLedgerQuery {
+  page?: number;
+  pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  categoryId?: string;
+  transactionType?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface WalletLedgerEntry {
+  transactionId: string;
+  walletId: string;
+  categoryId: string | null;
+  transactionType: string;
+  amount: number;
+  transactionDate: string;
+  note: string | null;
+}
+
+export interface WalletLedgerPage {
+  items: WalletLedgerEntry[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+/** Paged ledger for one wallet, newest first by default. */
+export async function getWalletTransactions(
+  walletId: string,
+  query?: WalletLedgerQuery,
+): Promise<WalletLedgerPage> {
+  await delay(200);
+  // Lazy import to avoid a static wallets ⇄ transactions import cycle.
+  const { getTransactions } = await import('./transactions');
+  let rows = getTransactions({
+    walletId,
+    startDate: query?.fromDate,
+    endDate: query?.toDate,
+    categoryId: query?.categoryId,
+  });
+  if (query?.sortOrder === 'asc') rows = [...rows].reverse();
+
+  const page = query?.page ?? 1;
+  const pageSize = query?.pageSize ?? 10;
+  const start = (page - 1) * pageSize;
+  const items = rows.slice(start, start + pageSize).map((t) => ({
+    transactionId: t.id,
+    walletId: t.walletId,
+    categoryId: t.categoryId,
+    transactionType: t.type,
+    amount: t.amount,
+    transactionDate: t.transactionDate,
+    note: t.description,
+  }));
+
+  return {
+    items,
+    page,
+    pageSize,
+    totalItems: rows.length,
+    totalPages: Math.max(1, Math.ceil(rows.length / pageSize)),
+  };
 }

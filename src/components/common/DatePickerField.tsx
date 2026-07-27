@@ -50,6 +50,8 @@ export interface DatePickerFieldProps {
   disabled?: boolean;
   /** Render an "uncategorized-orange" border when true (used by photo/sms uncertain UX). */
   uncertain?: boolean;
+  /** Custom trigger function to render a custom UI for opening the picker. */
+  customTrigger?: (openPicker: () => void) => React.ReactNode;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,6 +84,7 @@ export function DatePickerField({
   maxDate,
   disabled,
   uncertain,
+  customTrigger,
 }: DatePickerFieldProps) {
   const [iosVisible, setIosVisible] = useState(false);
   // iOS spinner needs a draft so the user can scroll without committing on every tick.
@@ -90,7 +93,7 @@ export function DatePickerField({
   const openPicker = () => {
     if (disabled) return;
     if (Platform.OS === 'ios') {
-      setIosDraft(isoToDate(value));
+      setIosDraft(isoToDate(value || dateToIso(new Date())));
       setIosVisible(true);
       return;
     }
@@ -120,27 +123,31 @@ export function DatePickerField({
 
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label && !customTrigger ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TouchableOpacity
-        style={[
-          styles.row,
-          uncertain && styles.rowUncertain,
-          disabled && styles.rowDisabled,
-        ]}
-        onPress={openPicker}
-        activeOpacity={0.75}
-        disabled={disabled}
-      >
-        <Text style={[styles.value, disabled && styles.valueDisabled]}>
-          {isoToDisplay(value)}
-        </Text>
-        {uncertain ? (
-          <Text style={styles.uncertainBadge}>?</Text>
-        ) : (
-          <Text style={styles.chevron}>›</Text>
-        )}
-      </TouchableOpacity>
+      {customTrigger ? (
+        customTrigger(openPicker)
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.row,
+            uncertain && styles.rowUncertain,
+            disabled && styles.rowDisabled,
+          ]}
+          onPress={openPicker}
+          activeOpacity={0.75}
+          disabled={disabled}
+        >
+          <Text style={[styles.value, disabled && styles.valueDisabled]}>
+            {isoToDisplay(value)}
+          </Text>
+          {uncertain ? (
+            <Text style={styles.uncertainBadge}>?</Text>
+          ) : (
+            <Text style={styles.chevron}>›</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Android one-shot dialog */}
       {Platform.OS === 'android' && androidVisible ? (

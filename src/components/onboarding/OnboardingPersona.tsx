@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 
 type Gender = 'male' | 'female' | 'other';
@@ -33,7 +34,6 @@ const GENDERS: { id: Gender; label: string }[] = [
 const S = {
   title: 'Cho chúng tôi biết về bạn',
   subtitle: 'Thông tin này giúp chúng tôi cá nhân hóa các gợi ý tài chính cho riêng bạn.',
-  aiHint: 'Dựa trên độ tuổi & giới tính, FinViet sẽ đề xuất các danh mục phù hợp — bạn có thể đổi sau.',
   nameLabel: 'Tên hiển thị',
   namePlaceholder: 'Nhập tên của bạn',
   genderLabel: 'Giới tính',
@@ -51,6 +51,11 @@ export function OnboardingPersona({
   onChangeDateOfBirth,
   onNext,
 }: OnboardingPersonaProps) {
+  // Helper to display YYYY-MM-DD as DD/MM/YYYY
+  const displayDob = dateOfBirth 
+    ? `${dateOfBirth.split('-')[2]}/${dateOfBirth.split('-')[1]}/${dateOfBirth.split('-')[0]}`
+    : '';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -60,17 +65,12 @@ export function OnboardingPersona({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         {/* Heading */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>{S.title}</Text>
           <Text style={styles.subtitle}>{S.subtitle}</Text>
-        </View>
-
-        {/* AI highlight */}
-        <View style={styles.aiBox}>
-          <MaterialIcon name="auto_awesome" size={22} color={COLORS.primary} filled />
-          <Text style={styles.aiText}>{S.aiHint}</Text>
         </View>
 
         {/* Name */}
@@ -110,16 +110,27 @@ export function OnboardingPersona({
         {/* Date of birth */}
         <View style={styles.field}>
           <Text style={styles.label}>{S.dobLabel}</Text>
-          <View style={styles.inputRow}>
-            <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
-            <TextInput
-              style={styles.inputFlex}
-              value={dateOfBirth ?? ''}
-              onChangeText={onChangeDateOfBirth}
-              placeholder={S.dobPlaceholder}
-              placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-            />
-          </View>
+          <DatePickerField
+            value={dateOfBirth ?? ''}
+            onChange={onChangeDateOfBirth}
+            customTrigger={(openPicker) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.inputRow}
+                onPress={openPicker}
+              >
+                <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+                <Text
+                  style={[
+                    styles.inputFlex,
+                    !dateOfBirth && { color: `${COLORS.onSurfaceVariant}80` }
+                  ]}
+                >
+                  {displayDob || S.dobPlaceholder}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       </ScrollView>
 
@@ -152,22 +163,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     color: COLORS.onSurfaceVariant,
     lineHeight: 24,
-  },
-  aiBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING[3],
-    backgroundColor: `${COLORS.primary}1A`,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}4D`,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-  },
-  aiText: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 20,
   },
   field: { gap: SPACING[2] },
   label: {

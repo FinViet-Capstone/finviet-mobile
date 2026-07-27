@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, SPACING } from '@/constants/theme';
-import { formatVNDCompact, signedCompact, pctChange } from '@/utils/formatters';
+import { formatVNDCompact, signedCompact } from '@/utils/formatters';
 
 export interface TransactionSummaryBannerProps {
   income: number;
@@ -10,6 +10,35 @@ export interface TransactionSummaryBannerProps {
   monthNet: number;
   prevIncome: number;
   prevExpense: number;
+}
+
+/** Trend vs tháng trước: "—" = không có gốc so sánh; "–" = không đổi; else % thay đổi. */
+function pctTrend(curr: number, prev: number): { label: string; changed: boolean } {
+  if (prev === 0) return { label: '—', changed: false };     // không có baseline
+  if (curr === prev) return { label: '–', changed: false };  // không tăng/giảm
+  const pct = Math.round((Math.abs(curr - prev) / Math.abs(prev)) * 100);
+  return { label: `${pct}%`, changed: true };
+}
+
+function TrendBadge({ curr, prev, goodWhenUp }: { curr: number; prev: number; goodWhenUp: boolean }) {
+  const t = pctTrend(curr, prev);
+  if (!t.changed) {
+    return (
+      <View style={styles.trendRow}>
+        <MaterialIcon name="remove" size={11} color={COLORS.onSurfaceVariant} />
+        <Text style={[styles.trendText, { color: COLORS.onSurfaceVariant }]}>{t.label}</Text>
+      </View>
+    );
+  }
+  const up = curr >= prev;
+  const good = goodWhenUp ? up : !up;
+  const color = good ? COLORS.tertiary : COLORS.error;
+  return (
+    <View style={styles.trendRow}>
+      <MaterialIcon name={up ? 'arrow_upward' : 'arrow_downward'} size={11} color={color} />
+      <Text style={[styles.trendText, { color }]}>{t.label}</Text>
+    </View>
+  );
 }
 
 /** Three-column month summary: Thu nhập · Chi tiêu · Tổng, each with a trend. */
@@ -21,16 +50,7 @@ export function TransactionSummaryBanner({
   prevExpense,
 }: TransactionSummaryBannerProps) {
   const hasPrevData = prevIncome > 0 || prevExpense > 0;
-  const incomeUp = income >= prevIncome;
-  const expenseDown = expense <= prevExpense;
   const prevNet = prevIncome - prevExpense;
-  // Net trend: a higher surplus is "up/good". % is relative to |prevNet| since
-  // net can be negative (a deficit month), where the plain pctChange util breaks.
-  const netUp = monthNet >= prevNet;
-  const netPct =
-    prevNet !== 0
-      ? `${Math.round((Math.abs(monthNet - prevNet) / Math.abs(prevNet)) * 100)}%`
-      : '—';
 
   return (
     <View style={styles.summaryBanner}>
@@ -40,18 +60,7 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: COLORS.tertiary }]}>
           {formatVNDCompact(income)}
         </Text>
-        {hasPrevData && (
-          <View style={styles.trendRow}>
-            <MaterialIcon
-              name={incomeUp ? 'arrow_upward' : 'arrow_downward'}
-              size={11}
-              color={incomeUp ? COLORS.tertiary : COLORS.error}
-            />
-            <Text style={[styles.trendText, { color: incomeUp ? COLORS.tertiary : COLORS.error }]}>
-              {pctChange(income, prevIncome)}
-            </Text>
-          </View>
-        )}
+        {hasPrevData && <TrendBadge curr={income} prev={prevIncome} goodWhenUp />}
       </View>
 
       <View style={styles.summaryDivider} />
@@ -62,18 +71,7 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: COLORS.error }]}>
           {formatVNDCompact(expense)}
         </Text>
-        {hasPrevData && (
-          <View style={styles.trendRow}>
-            <MaterialIcon
-              name={expenseDown ? 'arrow_downward' : 'arrow_upward'}
-              size={11}
-              color={expenseDown ? COLORS.tertiary : COLORS.error}
-            />
-            <Text style={[styles.trendText, { color: expenseDown ? COLORS.tertiary : COLORS.error }]}>
-              {pctChange(expense, prevExpense)}
-            </Text>
-          </View>
-        )}
+        {hasPrevData && <TrendBadge curr={expense} prev={prevExpense} goodWhenUp={false} />}
       </View>
 
       <View style={styles.summaryDivider} />
@@ -84,18 +82,7 @@ export function TransactionSummaryBanner({
         <Text style={[styles.summaryAmount, { color: monthNet >= 0 ? COLORS.tertiary : COLORS.error }]}>
           {signedCompact(monthNet)}
         </Text>
-        {hasPrevData && (
-          <View style={styles.trendRow}>
-            <MaterialIcon
-              name={netUp ? 'arrow_upward' : 'arrow_downward'}
-              size={11}
-              color={netUp ? COLORS.tertiary : COLORS.error}
-            />
-            <Text style={[styles.trendText, { color: netUp ? COLORS.tertiary : COLORS.error }]}>
-              {netPct}
-            </Text>
-          </View>
-        )}
+        {hasPrevData && <TrendBadge curr={monthNet} prev={prevNet} goodWhenUp />}
       </View>
     </View>
   );

@@ -92,6 +92,13 @@ export default function ForgotPasswordScreen() {
     router.replace('/(auth)');
   };
 
+  const handleEnterCode = () => {
+    router.push({
+      pathname: '/(auth)/reset-password',
+      params: { email: submittedEmail ?? getValues('email') },
+    });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const submitted = submittedEmail !== null;
@@ -105,6 +112,7 @@ export default function ForgotPasswordScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* ── Top navigation bar ──────────────────────────────────────── */}
@@ -131,8 +139,8 @@ export default function ForgotPasswordScreen() {
             </Text>
             <Text style={styles.heroSubtitle}>
               {submitted
-                ? 'Chúng tôi đã gửi link đặt lại mật khẩu đến email của bạn.'
-                : 'Nhập email đăng ký và chúng tôi sẽ gửi link để bạn tạo mật khẩu mới.'}
+                ? 'Chúng tôi đã gửi mã đặt lại mật khẩu đến email của bạn.'
+                : 'Nhập email đăng ký và chúng tôi sẽ gửi mã để bạn tạo mật khẩu mới.'}
             </Text>
           </View>
 
@@ -148,17 +156,25 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.successMessage}>
                   Vui lòng kiểm tra hộp thư đến (và thư mục spam) tới{' '}
                   <Text style={styles.successHighlight}>{submittedEmail}</Text>
-                  . Link sẽ hết hạn sau{' '}
-                  <Text style={styles.successHighlight}>30 phút</Text>.
+                  . Mã sẽ hết hạn sau{' '}
+                  <Text style={styles.successHighlight}>1 giờ</Text>.
                 </Text>
 
                 <AuthErrorBanner error={forgotMutation.error} />
 
                 <Button
-                  title="Quay lại Đăng nhập"
-                  onPress={handleBackToLogin}
+                  title="Nhập mã đặt lại"
+                  onPress={handleEnterCode}
                   style={styles.backLoginButton}
                 />
+
+                <TouchableOpacity
+                  onPress={handleBackToLogin}
+                  style={styles.cancelRow}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.cancelLabel}>Quay lại Đăng nhập</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={handleResend}
@@ -215,7 +231,7 @@ export default function ForgotPasswordScreen() {
                 />
 
                 <Button
-                  title="Gửi link đặt lại"
+                  title="Gửi mã đặt lại"
                   onPress={handleSubmit(onSubmit)}
                   loading={forgotMutation.isPending}
                   style={styles.submitButton}

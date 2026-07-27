@@ -1,50 +1,50 @@
 /**
- * mmkv.ts — fast key-value storage for auth tokens (and future prefs).
+ * mmkv.ts — secure key-value storage for auth tokens.
  *
- * Primary backend is react-native-mmkv (needs a dev build). When the native
- * module is unavailable — Jest, or Expo Go without a dev build — we transparently
- * fall back to an in-memory Map so the app still runs (tokens just won't survive
- * a reload). Token persistence across reloads requires the dev build.
+ * Backend: expo-secure-store (iOS Keychain / Android EncryptedSharedPreferences).
+ * Reads are served from an in-memory cache (sync) so the Axios request
+ * interceptor and other consumers keep their synchronous call-sites.
+ * Writes update the cache immediately, then fire-and-forget the async persist.
+ *
+ * Call `hydrateTokenCache()` once at app boot (in useBootstrapSession) before
+ * any `getAccessToken()` call to populate the cache from the secure store.
  *
  * The JWT access token here is read by the Axios request interceptor
  * (src/lib/api.ts); the refresh token drives the 401 rotation flow.
  */
 
-interface KeyValueStore {
-  getString(key: string): string | undefined;
-  set(key: string, value: string): void;
-  delete(key: string): void;
-}
+import * as SecureStore from 'expo-secure-store';
 
-function createStore(): KeyValueStore {
-  try {
-    // Lazy require so bundlers/Jest that can't resolve the native module
-    // don't crash at import time. v4 (nitro) uses a createMMKV factory, not a class.
-    const { createMMKV } = require('react-native-mmkv') as typeof import('react-native-mmkv');
-    const mmkv = createMMKV({ id: 'finviet-auth' });
-    return {
-      getString: (k) => mmkv.getString(k),
-      set: (k, v) => mmkv.set(k, v),
-      delete: (k) => { mmkv.remove(k); },
-    };
-  } catch {
-    // Fallback: process-lifetime in-memory store (no reload persistence).
-    const mem = new Map<string, string>();
-    return {
-      getString: (k) => mem.get(k),
-      set: (k, v) => { mem.set(k, v); },
-      delete: (k) => { mem.delete(k); },
-    };
-  }
-}
+// ─── In-memory cache (sync reads) ────────────────────────────────────────────
 
-export const storage: KeyValueStore = createStore();
+const cache = new Map<string, string>();
 
-// ─── Auth token helpers ───────────────────────────────────────────────────────
+// ─── Auth token keys ──────────────────────────────────────────────────────────
 
 const ACCESS_TOKEN_KEY = 'auth.accessToken';
 const REFRESH_TOKEN_KEY = 'auth.refreshToken';
 const ACCESS_EXPIRY_KEY = 'auth.accessTokenExpiry';
+
+const ALL_KEYS = [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, ACCESS_EXPIRY_KEY] as const;
+
+// ─── Boot hydration ───────────────────────────────────────────────────────────
+
+/**
+ * Populate the in-memory cache from SecureStore on app launch.
+ * Must be awaited before `getAccessToken()` is called.
+ */
+export async function hydrateTokenCache(): Promise<void> {
+  await Promise.all(
+    ALL_KEYS.map(async (key) => {
+      const value = await SecureStore.getItemAsync(key);
+      if (value != null) {
+        cache.set(key, value);
+      }
+    }),
+  );
+}
+
+// ─── Auth token helpers ───────────────────────────────────────────────────────
 
 export interface StoredAuthTokens {
   accessToken: string;
@@ -54,23 +54,37 @@ export interface StoredAuthTokens {
 }
 
 export function getAccessToken(): string | undefined {
-  return storage.getString(ACCESS_TOKEN_KEY);
+  return cache.get(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken(): string | undefined {
-  return storage.getString(REFRESH_TOKEN_KEY);
+  return cache.get(REFRESH_TOKEN_KEY);
 }
 
 export function setAuthTokens(tokens: StoredAuthTokens): void {
-  storage.set(ACCESS_TOKEN_KEY, tokens.accessToken);
-  storage.set(REFRESH_TOKEN_KEY, tokens.refreshToken);
+  // Sync: update cache immediately so subsequent reads see the new values.
+  cache.set(ACCESS_TOKEN_KEY, tokens.accessToken);
+  cache.set(REFRESH_TOKEN_KEY, tokens.refreshToken);
   if (tokens.accessTokenExpiry) {
-    storage.set(ACCESS_EXPIRY_KEY, tokens.accessTokenExpiry);
+    cache.set(ACCESS_EXPIRY_KEY, tokens.accessTokenExpiry);
+  }
+
+  // Async: persist to secure store in the background.
+  SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken);
+  SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
+  if (tokens.accessTokenExpiry) {
+    SecureStore.setItemAsync(ACCESS_EXPIRY_KEY, tokens.accessTokenExpiry);
   }
 }
 
 export function clearAuthTokens(): void {
-  storage.delete(ACCESS_TOKEN_KEY);
-  storage.delete(REFRESH_TOKEN_KEY);
-  storage.delete(ACCESS_EXPIRY_KEY);
+  // Sync: clear cache immediately.
+  cache.delete(ACCESS_TOKEN_KEY);
+  cache.delete(REFRESH_TOKEN_KEY);
+  cache.delete(ACCESS_EXPIRY_KEY);
+
+  // Async: remove from secure store in the background.
+  SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  SecureStore.deleteItemAsync(ACCESS_EXPIRY_KEY);
 }

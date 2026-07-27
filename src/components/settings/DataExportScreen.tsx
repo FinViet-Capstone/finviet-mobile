@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { DATA_EXPORT_STRINGS } from '@/data/settingsScreensData';
 
@@ -65,7 +66,23 @@ function buildSummary(from: Date, to: Date): string {
 
 export function DataExportScreen() {
   const [selected, setSelected] = useState<RangeChip>('custom');
-  const range = getDateRange(selected);
+  
+  // Custom date state (YYYY-MM-DD)
+  const defaultCustom = getDateRange('custom');
+  const [customFrom, setCustomFrom] = useState<string>(
+    defaultCustom.from.toISOString().split('T')[0]
+  );
+  const [customTo, setCustomTo] = useState<string>(
+    defaultCustom.to.toISOString().split('T')[0]
+  );
+
+  let range = getDateRange(selected);
+  if (selected === 'custom') {
+    range = {
+      from: new Date(customFrom),
+      to: new Date(customTo),
+    };
+  }
 
   const handleExport = () => {
     Alert.alert(
@@ -114,10 +131,19 @@ export function DataExportScreen() {
             <Text style={styles.dateLabel}>
               {DATA_EXPORT_STRINGS.labelFrom.toUpperCase()}
             </Text>
-            <TouchableOpacity style={styles.dateButton} activeOpacity={0.7}>
-              <Text style={styles.dateValue}>{formatDateVN(range.from)}</Text>
-              <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
-            </TouchableOpacity>
+            <DatePickerField
+              value={selected === 'custom' ? customFrom : range.from.toISOString().split('T')[0]}
+              onChange={(iso) => {
+                setCustomFrom(iso);
+                setSelected('custom');
+              }}
+              customTrigger={(openPicker) => (
+                <TouchableOpacity style={styles.dateButton} onPress={openPicker} activeOpacity={0.7}>
+                  <Text style={styles.dateValue}>{formatDateVN(range.from)}</Text>
+                  <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+            />
           </View>
 
           {/* To */}
@@ -125,10 +151,19 @@ export function DataExportScreen() {
             <Text style={styles.dateLabel}>
               {DATA_EXPORT_STRINGS.labelTo.toUpperCase()}
             </Text>
-            <TouchableOpacity style={styles.dateButton} activeOpacity={0.7}>
-              <Text style={styles.dateValue}>{formatDateVN(range.to)}</Text>
-              <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
-            </TouchableOpacity>
+            <DatePickerField
+              value={selected === 'custom' ? customTo : range.to.toISOString().split('T')[0]}
+              onChange={(iso) => {
+                setCustomTo(iso);
+                setSelected('custom');
+              }}
+              customTrigger={(openPicker) => (
+                <TouchableOpacity style={styles.dateButton} onPress={openPicker} activeOpacity={0.7}>
+                  <Text style={styles.dateValue}>{formatDateVN(range.to)}</Text>
+                  <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+            />
           </View>
         </View>
 

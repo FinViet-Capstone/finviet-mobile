@@ -2,10 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
-import { getCategoryById } from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVNDCompact } from '@/utils/formatters';
 import type { Transaction } from '@/types/transaction';
+import { getTransactionCardVisuals } from './transactionCardVisuals';
 
 export interface TransactionCardProps {
   transaction: Transaction;
@@ -50,62 +49,16 @@ function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
  * Transactions design).
  */
 export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
-  const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
-  const isIncome = tx.type === 'income';
-  const isGoalContrib = tx.categoryId === 'cat_savings_goal';
-  const category = !isTransfer && tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
-  // Transfer legs carry categoryId === null but are NOT uncategorized spend —
-  // they get their own swap styling, never the amber "classify now" treatment.
-  const isUncategorized = !isTransfer && !tx.categoryId;
-  const catColor = category?.color ?? COLORS.outlineVariant;
-
-  const iconName = isTransfer
-    ? 'swap_horiz'
-    : isGoalContrib
-    ? 'savings'
-    : isUncategorized
-    ? 'help_outline'
-    : getCategoryIcon(category?.icon);
-  const iconColor = isTransfer
-    ? COLORS.onSurfaceVariant
-    : isGoalContrib
-    ? COLORS.tertiary
-    : isUncategorized
-    ? COLORS.secondary
-    : catColor;
-  const iconBg = isTransfer
-    ? `${COLORS.onSurfaceVariant}26`
-    : isGoalContrib
-    ? `${COLORS.tertiary}26`
-    : `${catColor}26`;
-
-  // Income / transfer-in are credits (+, green); transfer-out is a debit (−, neutral);
-  // expenses stay unsigned per the Transactions design.
-  const isCredit = isIncome || tx.type === 'transfer_in';
-  const amountPrefix = isCredit ? '+' : tx.type === 'transfer_out' ? '−' : '';
-  const amountColor = isCredit
-    ? COLORS.tertiary
-    : tx.type === 'transfer_out'
-    ? COLORS.onSurfaceVariant
-    : COLORS.onSurface;
-
-  // Goal-contribution title: "Nạp mục tiêu: {name from description}"
-  const goalName = isGoalContrib && tx.description
-    ? tx.description.replace(/^Nạp mục tiêu:\s*/i, '')
-    : null;
-
-  const title = isTransfer
-    ? tx.description || 'Chuyển quỹ'
-    : isGoalContrib
-    ? `Nạp mục tiêu: ${goalName ?? ''}`
-    : tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch');
-  const subtitle = isTransfer
-    ? tx.type === 'transfer_out' ? 'Chuyển đi' : 'Nhận về'
-    : isGoalContrib
-    ? 'Tiết kiệm mục tiêu'
-    : isUncategorized
-    ? 'Phân loại ngay →'
-    : (category?.nameVi ?? walletName);
+  const {
+    iconName,
+    iconColor,
+    iconBg,
+    amountPrefix,
+    amountColor,
+    title,
+    subtitle,
+    isUncategorized,
+  } = getTransactionCardVisuals(tx, walletName);
 
   return (
     <TouchableOpacity

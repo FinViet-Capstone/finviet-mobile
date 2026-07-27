@@ -15,7 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
-import { useCustomer } from '@/hooks/useCustomer';
+import { useEffectiveIncomeAllocation } from '@/hooks/useIncomeAllocation';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
 import { useCustomerCategories } from '@/hooks/useCustomerCategories';
 import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
@@ -40,6 +40,8 @@ const S = {
   spent: 'Đã chi',
   of: '/',
   over: 'Vượt',
+  overLimit: 'vượt mức',
+  overGoal: 'Vượt chỉ tiêu',
   left: 'Còn lại',
   noLimit: 'Chưa có hạn mức',
   months: [
@@ -62,9 +64,9 @@ function formatVND(amount: number): string {
 }
 
 function pacingStatus(currentDay: number, daysInMonth: number, buckets: BucketSummary[]): 'good' | 'warning' | 'over' {
-  const over = buckets.filter((b) => b.allocationCap > 0 && b.percentage > 100);
+  const over = buckets.filter((b) => b.bucket !== 'savings' && b.allocationCap > 0 && b.percentage > 100);
   if (over.length > 0) return 'over';
-  const paced = buckets.filter((b) => b.allocationCap > 0);
+  const paced = buckets.filter((b) => b.bucket !== 'savings' && b.allocationCap > 0);
   if (paced.length === 0) return 'good';
   const avgPct = paced.reduce((s, b) => s + b.percentage, 0) / paced.length;
   const expectedPct = (currentDay / daysInMonth) * 100;
@@ -80,7 +82,7 @@ function pacingHeadline(status: 'good' | 'warning' | 'over'): string {
 
 function pacingMessage(day: number, daysInMonth: number, buckets: BucketSummary[]): string {
   const daysLeft = daysInMonth - day;
-  const paced = buckets.filter((b) => b.allocationCap > 0);
+  const paced = buckets.filter((b) => b.bucket !== 'savings' && b.allocationCap > 0);
 
   if (paced.length === 0) return `Hôm nay là ngày ${day}/${daysInMonth} — chưa có hạn mức nào để theo dõi.`;
 
@@ -88,7 +90,7 @@ function pacingMessage(day: number, daysInMonth: number, buckets: BucketSummary[
   const totalSpent = paced.reduce((s, b) => s + b.spent, 0);
   const remaining = totalCap - totalSpent;
 
-  const over = buckets.filter((b) => b.allocationCap > 0 && b.percentage > 100);
+  const over = buckets.filter((b) => b.bucket !== 'savings' && b.allocationCap > 0 && b.percentage > 100);
   if (over.length > 0) {
     const names = over.map((b) => getBucketLabel(b.bucket)).join(', ');
     return `${names} đã vượt hạn mức. Hãy điều chỉnh chi tiêu để tránh thâm hụt thêm.`;
@@ -145,21 +147,27 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
   const color = getBucketColor(summary.bucket);
   const icon = getBucketIcon(summary.bucket);
   const label = getBucketLabel(summary.bucket);
-  const isOverSpend = summary.percentage > 100;
-  const isOverAllocated = summary.allocationCap > 0 && summary.monthlyLimit > summary.allocationCap;
-  const barColor = isOverSpend ? COLORS.error : color;
+  const isSavings = summary.bucket === 'savings';
+  const isOver = summary.percentage > 100;
+  // Savings: vượt mục tiêu = TỐT (xanh). Needs/Wants: vượt ngân sách = XẤU (đỏ).
+  const isGoodOver = isSavings && isOver;
+  const isBadOver = !isSavings && isOver;
+  const isOverAllocated = !isSavings && summary.allocationCap > 0 && summary.monthlyLimit > summary.allocationCap;
+  const barColor = isBadOver ? COLORS.error : isGoodOver ? COLORS.tertiary : color;
   const barWidth = Math.min(summary.percentage, 100);
 
   return (
-    <View style={[styles.bucketCard, isOverSpend && { borderColor: COLORS.error }]}>
+    <View style={[styles.bucketCard, isBadOver && { borderColor: COLORS.error }, isGoodOver && { borderColor: COLORS.tertiary }]}>
       <View style={styles.bucketCardTop}>
         <Text style={[styles.bucketLabel, { color }]}>{label}</Text>
-        {isOverAllocated
-          ? <View style={styles.overAllocBadge}><Text style={styles.overAllocText}>vượt phân bổ</Text></View>
+        {isGoodOver
+          ? <View style={styles.overGoalBadge}><Text style={styles.overGoalText}>{S.overGoal}</Text></View>
+          : isOverAllocated
+          ? <View style={styles.overAllocBadge}><Text style={styles.overAllocText}>{S.overLimit}</Text></View>
           : <MaterialIcon name={icon} size={16} color={color} />}
       </View>
       <View style={styles.bucketAmounts}>
-        <Text style={[styles.bucketSpent, isOverSpend && { color: COLORS.error }]}>
+        <Text style={[styles.bucketSpent, isBadOver && { color: COLORS.error }, isGoodOver && { color: COLORS.tertiary }]}>
           {formatVND(summary.spent)}
         </Text>
         <Text style={styles.bucketLimit}>
@@ -249,7 +257,9 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
 
 export default function BudgetsScreen() {
   const router = useRouter();
-  const now = new Date();
+  // Stable "now" for this screen session — computing it inline during render is
+  // non-deterministic and breaks memoization of callbacks that depend on it.
+  const now = useMemo(() => new Date(), []);
 
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -257,11 +267,15 @@ export default function BudgetsScreen() {
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<BucketType>>(new Set());
 
   const selectedRange = useMemo(() => monthRange(year, month), [year, month]);
+  const selectedMonthKey = useMemo(
+    () => `${year}-${String(month + 1).padStart(2, '0')}`,
+    [year, month],
+  );
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
-  const { data: user } = useCustomer();
   const { data: customerCats = [] } = useCustomerCategories();
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation(selectedMonthKey);
 
   // Per-customer category set grouped by the customer's (possibly overridden) bucket.
   // Replaces the global EXPENSE_CATEGORIES-by-defaultBucket grouping so jar moves stick.
@@ -278,11 +292,15 @@ export default function BudgetsScreen() {
     return result;
   }, [customerCats]);
 
-  const income = user?.monthlyIncome ?? 0;
+  // Resolved through the income/allocation history (mock/incomeAllocation.ts) for
+  // the *viewed* month, not Customer.needsPct/etc — those stop updating once a
+  // change is scheduled for next month, and a past month must keep showing
+  // whatever was actually in effect then.
+  const income = effectiveAllocation?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {
-    needs: (user?.needsPct ?? 50) / 100,
-    wants: (user?.wantsPct ?? 30) / 100,
-    savings: (user?.savingsPct ?? 20) / 100,
+    needs: (effectiveAllocation?.needsPct ?? 50) / 100,
+    wants: (effectiveAllocation?.wantsPct ?? 30) / 100,
+    savings: (effectiveAllocation?.savingsPct ?? 20) / 100,
   };
 
   const totalDays = daysInMonth(year, month);
@@ -320,10 +338,14 @@ export default function BudgetsScreen() {
     else setMonth((m) => m + 1);
   }, [month]);
 
+  // Read the clock at press time (not the mount-time `now`) so this always
+  // jumps to the real current month, even if the screen has stayed mounted
+  // across a day/month boundary.
   const handleJumpCurrent = useCallback(() => {
-    setYear(now.getFullYear());
-    setMonth(now.getMonth());
-  }, [now]);
+    const today = new Date();
+    setYear(today.getFullYear());
+    setMonth(today.getMonth());
+  }, []);
 
   const handleToggleBucket = useCallback((bucket: BucketType) => {
     setCollapsedBuckets((prev) => {
@@ -806,5 +828,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.secondary,
+  },
+  overGoalBadge: {
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: `${COLORS.tertiary}20`,
+    borderWidth: 1,
+    borderColor: `${COLORS.tertiary}40`,
+  },
+  overGoalText: {
+    fontSize: 10,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.tertiary,
   },
 });

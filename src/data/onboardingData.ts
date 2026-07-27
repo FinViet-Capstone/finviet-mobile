@@ -13,13 +13,6 @@ export const WALLET_TYPES = [
     label: 'Ví cơ bản',
     description: 'Nhập tay',
   },
-  {
-    id: 'linked',
-    icon: 'account_balance',
-    label: 'Liên kết ngân hàng',
-    description: 'Tự động',
-    hasAIBadge: true,
-  },
 ] as const;
 
 export const CATEGORY_GROUPS = [

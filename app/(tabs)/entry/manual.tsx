@@ -35,10 +35,12 @@ import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
+import { DatePickerField } from "@/components/common/DatePickerField";
 import { useWallets, useCreateTransaction } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
 import { formatVND } from "@/utils/formatters";
 import { todayISO } from "@/utils/date";
+import { getApiErrorMessage } from "@/utils/errors";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,8 @@ const S = {
   sheetWallet: "Chọn ví",
   saveSuccess: "Giao dịch đã được lưu!",
   saveError: "Không thể lưu. Hãy thử lại.",
+  noWallet: "Chưa chọn ví. Hãy tạo ví cơ bản trước.",
+  insufficient: (s: string) => `Số dư ví không đủ (hiện có: ${s})`,
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -104,18 +108,21 @@ export default function ManualEntryScreen() {
   // amount is the primary field; tapping the amount re-opens it, Done/outside closes.
   const [amountFocused, setAmountFocused] = useState(true);
 
-  // Pre-select primary wallet
+  // Manual entries can only target basic wallets — bank-linked wallets are read-only
+  // (their transactions come from provider sync), and the API rejects writes to them.
+  const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== "linked");
+
+  // Pre-select the first basic wallet.
   useEffect(() => {
-    if (walletData?.wallets && selectedWalletId === null) {
-      const primary =
-        walletData.wallets[0];
-      setSelectedWalletId(primary?.id ?? null);
+    if (basicWallets.length > 0 && selectedWalletId === null) {
+      setSelectedWalletId(basicWallets[0].id);
     }
-  }, [walletData, selectedWalletId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basicWallets.length]);
 
   if (isLoading || !walletData) return <LoadingSpinner />;
 
-  const wallets: Wallet[] = walletData.wallets;
+  const wallets: Wallet[] = basicWallets;
   const effectiveWalletId = selectedWalletId ?? wallets[0]?.id;
   const selectedCategory = selectedCategoryId
     ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
@@ -148,6 +155,18 @@ export default function ManualEntryScreen() {
       return;
     }
 
+    if (!effectiveWalletId) {
+      Alert.alert("", S.noWallet);
+      return;
+    }
+
+    // Client-side guard: an expense can't exceed the wallet balance (the API enforces
+    // this too and returns 422 insufficient_balance — catch it early with a clear message).
+    if (entryType === "expense" && selectedWallet && amountNum > selectedWallet.balance) {
+      setAmountError(S.insufficient(formatVND(selectedWallet.balance)));
+      return;
+    }
+
     createMutation.mutate(
       {
         walletId: effectiveWalletId,
@@ -164,7 +183,7 @@ export default function ManualEntryScreen() {
           Alert.alert("", S.saveSuccess, [
             { text: "OK", onPress: () => router.back() },
           ]),
-        onError: () => Alert.alert("", S.saveError),
+        onError: (err) => Alert.alert("", getApiErrorMessage(err, S.saveError)),
       },
     );
   };
@@ -267,6 +286,7 @@ export default function ManualEntryScreen() {
           contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           {/* Wallet */}
           <TouchableOpacity
@@ -340,26 +360,36 @@ export default function ManualEntryScreen() {
           </TouchableOpacity>
 
           {/* Date */}
-          <View style={styles.fieldRow}>
-            <View
-              style={[
-                styles.fieldIconWrap,
-                { backgroundColor: `${COLORS.primary}15` },
-              ]}
-            >
-              <MaterialIcon
-                name="calendar_today"
-                size={20}
-                color={COLORS.onSurfaceVariant}
-              />
-            </View>
-            <View style={styles.fieldTextWrap}>
-              <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
-              <Text style={styles.fieldValue}>
-                {formatDateDisplay(dateIso)}
-              </Text>
-            </View>
-          </View>
+          <DatePickerField
+            value={dateIso}
+            onChange={setDateIso}
+            customTrigger={(openPicker) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.fieldRow}
+                onPress={openPicker}
+              >
+                <View
+                  style={[
+                    styles.fieldIconWrap,
+                    { backgroundColor: `${COLORS.primary}15` },
+                  ]}
+                >
+                  <MaterialIcon
+                    name="calendar_today"
+                    size={20}
+                    color={COLORS.onSurfaceVariant}
+                  />
+                </View>
+                <View style={styles.fieldTextWrap}>
+                  <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
+                  <Text style={styles.fieldValue}>
+                    {formatDateDisplay(dateIso)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
 
           {/* Payee */}
           <View style={styles.fieldRow}>
@@ -430,6 +460,7 @@ export default function ManualEntryScreen() {
           <FlatList
             data={[...getCategories(entryType)]}
             keyExtractor={(item) => item.id}
+            style={styles.sheetList}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -466,7 +497,13 @@ export default function ManualEntryScreen() {
           <FlatList
             data={wallets}
             keyExtractor={(item) => item.id}
+            style={styles.sheetList}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <Text style={styles.sheetEmpty}>
+                Chưa có ví nào. Hãy tạo ví ở tab Ví trước khi thêm giao dịch.
+              </Text>
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[
@@ -627,8 +664,16 @@ const styles = StyleSheet.create({
   sheet: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
-    paddingBottom: SPACING[8],
-    maxHeight: "70%",
+  },
+  // Bounded so the list scrolls inside the sheet instead of growing past the top.
+  sheetList: {
+    maxHeight: 380,
+  },
+  sheetEmpty: {
+    paddingVertical: SPACING[6],
+    textAlign: "center",
+    color: COLORS.onSurfaceVariant,
+    fontSize: FONT_SIZE.sm,
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,

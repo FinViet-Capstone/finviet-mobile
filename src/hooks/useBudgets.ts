@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getBudgets,
   getBudgetById,
+  getBudgetBuckets,
   createBudget,
   updateBudget,
   deleteBudget,
@@ -30,6 +31,14 @@ export const useBudgetById = (id: string | undefined) =>
     queryKey: queryKeys.budgets.detail(id),
     queryFn: () => (id ? getBudgetById(id) ?? null : null),
     enabled: !!id,
+    staleTime: STALE_TIME.medium,
+  });
+
+/** 50/30/20 bucket summary + pace for the given month (defaults to current). */
+export const useBudgetBuckets = (range?: MonthRange) =>
+  useQuery({
+    queryKey: queryKeys.budgets.buckets(range ?? null),
+    queryFn: () => getBudgetBuckets(range),
     staleTime: STALE_TIME.medium,
   });
 

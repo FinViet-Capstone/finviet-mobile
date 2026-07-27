@@ -3,7 +3,9 @@
  *
  * Per-customer expense category set (v2).
  * Income categories are global — never stored here.
- * Savings bucket is locked — moveBucket rejects savings targets.
+ * All 3 buckets (needs/wants/savings) are freely movable — see
+ * context/fe-plan-2026-07-revamp.md item 5. Confirmed with BE that savings
+ * was never actually locked server-side either.
  */
 
 import type { CustomerCategory, PersonaId, Persona, PersonaCategory } from '@/types/category';
@@ -150,14 +152,8 @@ export interface MoveBucketPayload {
 
 export async function moveBucket(payload: MoveBucketPayload): Promise<CustomerCategory> {
   await delay();
-  if (payload.targetBucket === 'savings') {
-    throw new Error('savings_locked'); // cannot move INTO savings
-  }
   const entry = _store.find((c) => c.id === payload.customerCategoryId);
   if (!entry) throw new Error('not_found');
-  if (entry.bucketId === 'savings') {
-    throw new Error('savings_locked'); // cannot move OUT of savings either (locked both ways)
-  }
   entry.bucketId = payload.targetBucket;
   entry.updatedAt = new Date().toISOString();
   return { ...entry };

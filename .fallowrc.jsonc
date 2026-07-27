@@ -1,0 +1,17 @@
+{
+  // FinViet Mobile — fallow configuration.
+
+  "rules": {
+    // OFF by design: src/services/mock/* and src/services/real/* intentionally
+    // export identical surfaces so the barrel (src/services/index.ts) can swap
+    // mock ⇄ real implementations at runtime with zero hook/screen changes.
+    // Every duplicate-export finding comes from this pattern, so the rule only
+    // produces noise here.
+    "duplicate-exports": "off"
+  },
+
+  // Don't flag an export whose only consumers are in its own defining file
+  // (e.g. an interface used locally but still marked `export`). These are
+  // stylistic, not dead code.
+  "ignoreExportsUsedInFile": true
+}

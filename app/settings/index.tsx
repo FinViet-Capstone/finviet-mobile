@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -11,11 +12,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import * as ImagePicker from 'expo-image-picker';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ChangePasswordSheet } from '@/components/auth/ChangePasswordSheet';
+import { EditProfileSheet } from '@/components/settings';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
-import { useLogout } from '@/hooks';
+import { useLogout, useEffectiveIncomeAllocation, useUploadAvatar } from '@/hooks';
+import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -38,26 +44,20 @@ const S = {
     budgetAlert: 'Cảnh báo ngân sách',
     weeklyReport: 'Báo cáo tuần',
     goalMilestone: 'Milestone tiết kiệm',
-    language: 'Ngôn ngữ',
-    currency: 'Đơn vị tiền tệ',
     theme: 'Giao diện',
-    biometric: 'Bảo mật (Face ID)',
     password: 'Đổi mật khẩu',
     export: 'Xuất dữ liệu',
     subscription: 'Gói dịch vụ',
-    categoryRequests: 'Yêu cầu danh mục',
     logout: 'Đăng xuất',
     deleteAccount: 'Xóa tài khoản',
   },
   values: {
-    vnd: 'VND',
     dark: 'Tối',
     light: 'Sáng',
     system: 'Hệ thống',
-    vi: 'Tiếng Việt',
-    en: 'English',
     exportCsv: 'Xuất CSV',
   },
+  themePickerTitle: 'Giao diện',
   logoutConfirmTitle: 'Đăng xuất?',
   logoutConfirmMsg: 'Bạn có chắc muốn đăng xuất khỏi FinViet?',
   logoutConfirm: 'Đăng xuất',
@@ -65,13 +65,25 @@ const S = {
   version: 'Phiên bản 1.0.0',
 };
 
+type ThemePref = 'light' | 'dark' | 'system';
+
+const THEME_OPTIONS: { id: ThemePref; label: string; icon: string }[] = [
+  { id: 'light', label: S.values.light, icon: 'light_mode' },
+  { id: 'dark', label: S.values.dark, icon: 'dark_mode' },
+  { id: 'system', label: S.values.system, icon: 'smartphone' },
+];
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SectionCard({ children }: { children: React.ReactNode }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <View style={styles.card}>{children}</View>;
 }
 
 function Divider() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <View style={styles.divider} />;
 }
 
@@ -92,6 +104,8 @@ function SettingsRow({
   rightElement?: React.ReactNode;
   danger?: boolean;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       activeOpacity={onPress ? 0.7 : 1}
@@ -99,14 +113,14 @@ function SettingsRow({
       onPress={onPress}
       disabled={!onPress && !rightElement}
     >
-      <View style={[styles.rowIcon, { backgroundColor: danger ? `${COLORS.error}15` : COLORS.surfaceVariant }]}>
-        <MaterialIcon name={icon} size={20} color={iconColor ?? (danger ? COLORS.error : COLORS.onSurface)} />
+      <View style={[styles.rowIcon, { backgroundColor: danger ? `${colors.error}15` : colors.surfaceVariant }]}>
+        <MaterialIcon name={icon} size={20} color={iconColor ?? (danger ? colors.error : colors.onSurface)} />
       </View>
-      <Text style={[styles.rowLabel, danger && { color: COLORS.error }]}>{label}</Text>
+      <Text style={[styles.rowLabel, danger && { color: colors.error }]}>{label}</Text>
       <View style={styles.rowRight}>
         {value ? <Text style={styles.rowValue}>{value}</Text> : null}
         {rightElement ?? (onPress ? (
-          <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="chevron_right" size={18} color={colors.onSurfaceVariant} />
         ) : null)}
       </View>
     </TouchableOpacity>
@@ -126,18 +140,20 @@ function ToggleRow({
   value: boolean;
   onToggle: (v: boolean) => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
-      <View style={[styles.rowIcon, { backgroundColor: COLORS.surfaceVariant }]}>
-        <MaterialIcon name={icon} size={20} color={iconColor ?? COLORS.onSurface} />
+      <View style={[styles.rowIcon, { backgroundColor: colors.surfaceVariant }]}>
+        <MaterialIcon name={icon} size={20} color={iconColor ?? colors.onSurface} />
       </View>
       <Text style={styles.rowLabel}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: COLORS.surfaceVariant, true: COLORS.primary }}
-        thumbColor={value ? COLORS.onPrimary : COLORS.onSurfaceVariant}
-        ios_backgroundColor={COLORS.surfaceVariant}
+        trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
+        thumbColor={value ? colors.onPrimary : colors.onSurfaceVariant}
+        ios_backgroundColor={colors.surfaceVariant}
       />
     </View>
   );
@@ -147,10 +163,17 @@ function ToggleRow({
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: user, isLoading } = useCustomer();
+  const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
   const updatePrefs = useUpdatePreferences();
   const logoutMutation = useLogout();
+  const uploadAvatar = useUploadAvatar();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
 
   const notifBudget = user?.notifications?.budget ?? true;
   const notifReport = user?.notifications?.report ?? true;
@@ -165,7 +188,10 @@ export default function SettingsScreen() {
     // Best-effort server-side revoke; the mutation clears the local session
     // in onSettled regardless of the network result.
     logoutMutation.mutate();
-    router.replace('/');
+    // Go straight to the auth stack. Routing through '/' would re-evaluate the
+    // gate while clearSession() is still pending in the mutation's onSettled,
+    // so isAuthenticated is briefly still true → it would bounce back to Home.
+    router.replace('/(auth)');
   }, [logoutMutation, router]);
 
   const formatIncome = useCallback((income?: number | null) => {
@@ -175,18 +201,43 @@ export default function SettingsScreen() {
   }, []);
 
   const allocationLabel = useCallback(() => {
-    if (!user) return '50% · 30% · 20%';
-    return `${user.needsPct ?? 50}% · ${user.wantsPct ?? 30}% · ${user.savingsPct ?? 20}%`;
-  }, [user]);
+    if (!effectiveAllocation) return '50% · 30% · 20%';
+    return `${effectiveAllocation.needsPct}% · ${effectiveAllocation.wantsPct}% · ${effectiveAllocation.savingsPct}%`;
+  }, [effectiveAllocation]);
+
+  const handlePickAvatar = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('', 'Thư viện ảnh chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled) return;
+    uploadAvatar.mutate(result.assets[0].uri, {
+      onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể tải ảnh lên.')),
+    });
+  }, [uploadAvatar]);
+
+  const handleSelectTheme = useCallback((theme: ThemePref) => {
+    setThemePickerVisible(false);
+    updatePrefs.mutate({ theme });
+  }, [updatePrefs]);
 
   if (isLoading) return <LoadingSpinner />;
+
+  const themeValue = user?.theme === 'light' ? S.values.light : user?.theme === 'dark' ? S.values.dark : S.values.system;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.headerBtn}>
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -199,15 +250,24 @@ export default function SettingsScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatarPlaceholder}>
-              <MaterialIcon name="person" size={40} color={COLORS.onSurfaceVariant} />
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <MaterialIcon name="person" size={40} color={colors.onSurfaceVariant} />
+              )}
             </View>
-            <TouchableOpacity activeOpacity={0.7} style={styles.avatarEditBtn}>
-              <MaterialIcon name="photo_camera" size={14} color={COLORS.primary} filled />
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.avatarEditBtn}
+              onPress={handlePickAvatar}
+              disabled={uploadAvatar.isPending}
+            >
+              <MaterialIcon name="photo_camera" size={14} color={colors.primary} filled />
             </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{user?.displayName ?? '—'}</Text>
           <Text style={styles.profileEmail}>{user?.email ?? '—'}</Text>
-          <TouchableOpacity activeOpacity={0.7} style={styles.editProfileBtn}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.editProfileBtn} onPress={() => setEditProfileVisible(true)}>
             <Text style={styles.editProfileText}>{S.profile.edit}</Text>
           </TouchableOpacity>
         </View>
@@ -216,21 +276,17 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.finance}</Text>
           <SectionCard>
-            <SettingsRow icon="payments" iconColor={COLORS.secondary}
-              label={S.rows.income} value={formatIncome(user?.monthlyIncome)}
-              onPress={() => {}} />
+            <SettingsRow icon="payments" iconColor={colors.secondary}
+              label={S.rows.income} value={formatIncome(effectiveAllocation?.monthlyIncome)}
+              onPress={() => router.push({ pathname: '/settings/budget-allocation' })} />
             <Divider />
-            <SettingsRow icon="pie_chart" iconColor={COLORS.tertiary}
+            <SettingsRow icon="pie_chart" iconColor={colors.tertiary}
               label={S.rows.allocation} value={allocationLabel()}
               onPress={() => router.push({ pathname: '/settings/budget-allocation' })} />
             <Divider />
-            <SettingsRow icon="category" iconColor={COLORS.primary}
+            <SettingsRow icon="category" iconColor={colors.primary}
               label={S.rows.categories}
               onPress={() => router.push({ pathname: '/settings/categories' })} />
-            <Divider />
-            <SettingsRow icon="playlist_add" iconColor={COLORS.secondary}
-              label={S.rows.categoryRequests}
-              onPress={() => router.push({ pathname: '/settings/category-requests' })} />
           </SectionCard>
         </View>
 
@@ -246,14 +302,14 @@ export default function SettingsScreen() {
                 handleToggleNotif('goals', v);
               }} />
             <Divider />
-            <SettingsRow icon="warning" iconColor={COLORS.secondaryContainer}
+            <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
               label={S.rows.budgetAlert} value="80% và 100%" onPress={() => {}} />
             <Divider />
-            <ToggleRow icon="calendar_today" iconColor={COLORS.info}
+            <ToggleRow icon="calendar_today" iconColor={colors.info}
               label={S.rows.weeklyReport} value={notifReport}
               onToggle={(v) => handleToggleNotif('report', v)} />
             <Divider />
-            <ToggleRow icon="flag" iconColor={COLORS.tertiary}
+            <ToggleRow icon="flag" iconColor={colors.tertiary}
               label={S.rows.goalMilestone} value={notifGoals}
               onToggle={(v) => handleToggleNotif('goals', v)} />
           </SectionCard>
@@ -263,18 +319,9 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.app}</Text>
           <SectionCard>
-            <SettingsRow icon="language" label={S.rows.language}
-              value={user?.language === 'en' ? S.values.en : S.values.vi} onPress={() => {}} />
-            <Divider />
-            <SettingsRow icon="currency_exchange" label={S.rows.currency}
-              value={S.values.vnd} onPress={() => {}} />
-            <Divider />
             <SettingsRow icon="dark_mode" label={S.rows.theme}
-              value={user?.theme === 'light' ? S.values.light : user?.theme === 'dark' ? S.values.dark : S.values.system}
-              onPress={() => {}} />
-            <Divider />
-            <ToggleRow icon="face" label={S.rows.biometric}
-              value={false} onToggle={() => {}} />
+              value={themeValue}
+              onPress={() => setThemePickerVisible(true)} />
           </SectionCard>
         </View>
 
@@ -282,11 +329,11 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.account}</Text>
           <SectionCard>
-            <SettingsRow icon="workspace_premium" iconColor={COLORS.primary}
+            <SettingsRow icon="workspace_premium" iconColor={colors.primary}
               label={S.rows.subscription}
               onPress={() => router.push({ pathname: '/settings/subscription' })} />
             <Divider />
-            <SettingsRow icon="key" label={S.rows.password} onPress={() => {}} />
+            <SettingsRow icon="key" label={S.rows.password} onPress={() => setPasswordVisible(true)} />
             <Divider />
             <SettingsRow icon="download" label={S.rows.export}
               value={S.values.exportCsv}
@@ -296,7 +343,7 @@ export default function SettingsScreen() {
               danger onPress={() => setLogoutVisible(true)} />
             <Divider />
             <SettingsRow icon="delete_forever" label={S.rows.deleteAccount}
-              danger iconColor={COLORS.danger}
+              danger iconColor={colors.danger}
               onPress={() => router.push({ pathname: '/settings/delete-account' })} />
           </SectionCard>
         </View>
@@ -324,100 +371,153 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Theme picker */}
+      <Modal visible={themePickerVisible} transparent animationType="fade"
+        onRequestClose={() => setThemePickerVisible(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1}
+          onPress={() => setThemePickerVisible(false)} />
+        <View style={styles.confirmDialog}>
+          <Text style={styles.confirmTitle}>{S.themePickerTitle}</Text>
+          <View style={styles.themeOptions}>
+            {THEME_OPTIONS.map((opt) => {
+              const selected = (user?.theme ?? 'system') === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.themeOptionRow, selected && styles.themeOptionRowSelected]}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectTheme(opt.id)}
+                >
+                  <MaterialIcon name={opt.icon} size={20} color={selected ? colors.primary : colors.onSurfaceVariant} />
+                  <Text style={[styles.themeOptionText, selected && { color: colors.primary, fontWeight: FONT_WEIGHT.semibold }]}>
+                    {opt.label}
+                  </Text>
+                  {selected && <MaterialIcon name="check" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      <ChangePasswordSheet visible={passwordVisible} onClose={() => setPasswordVisible(false)} />
+      <EditProfileSheet
+        visible={editProfileVisible}
+        onClose={() => setEditProfileVisible(false)}
+        currentName={user?.displayName ?? ''}
+      />
     </SafeAreaView>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
-  },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface, flex: 1, textAlign: 'center',
-  },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
-  // Profile
-  profileSection: { alignItems: 'center', paddingTop: SPACING[2], paddingBottom: SPACING[4], gap: SPACING[2] },
-  avatarWrap: { position: 'relative', marginBottom: SPACING[2] },
-  avatarPlaceholder: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderWidth: 2, borderColor: COLORS.surfaceVariant,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarEditBtn: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: COLORS.surfaceVariant,
-    borderWidth: 2, borderColor: COLORS.background,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  profileName: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  profileEmail: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
-  editProfileBtn: {
-    paddingHorizontal: SPACING[6], paddingVertical: SPACING[2],
-    borderRadius: BORDER_RADIUS.full, borderWidth: 1, borderColor: COLORS.outlineVariant,
-    marginTop: SPACING[2],
-  },
-  editProfileText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
-  // Sections
-  section: { gap: SPACING[2] },
-  sectionLabel: {
-    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary, textTransform: 'uppercase',
-    letterSpacing: 0.8, paddingLeft: SPACING[2],
-  },
-  card: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS['2xl'],
-    paddingVertical: SPACING[1],
-    borderWidth: 1, borderColor: `${COLORS.outlineVariant}50`,
-  },
-  divider: {
-    height: 1, backgroundColor: COLORS.surfaceVariant,
-    marginHorizontal: SPACING[4], opacity: 0.5,
-  },
-  // Row
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING[3], paddingVertical: SPACING[3],
-    minHeight: 56, gap: SPACING[3],
-  },
-  rowIcon: {
-    width: 40, height: 40, borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  rowLabel: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
-  rowValue: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
-  // Version
-  version: { fontSize: 11, color: COLORS.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
-  // Logout confirm
-  modalBackdrop: { flex: 1, backgroundColor: `${COLORS.black}80` },
-  confirmDialog: {
-    position: 'absolute', top: '35%', left: SPACING[6], right: SPACING[6],
-    backgroundColor: COLORS.surfaceContainerHigh, borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[6], gap: SPACING[3], borderWidth: 1, borderColor: COLORS.outlineVariant,
-  },
-  confirmTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  confirmMsg: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, lineHeight: 20 },
-  confirmActions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[2] },
-  cancelBtn: {
-    flex: 1, height: 48, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cancelText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  logoutBtn: {
-    flex: 2, height: 48, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.errorContainer, alignItems: 'center', justifyContent: 'center',
-  },
-  logoutBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onErrorContainer },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
+    },
+    headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: {
+      fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface, flex: 1, textAlign: 'center',
+    },
+    scroll: { flex: 1 },
+    scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
+    // Profile
+    profileSection: { alignItems: 'center', paddingTop: SPACING[2], paddingBottom: SPACING[4], gap: SPACING[2] },
+    avatarWrap: { position: 'relative', marginBottom: SPACING[2] },
+    avatarPlaceholder: {
+      width: 96, height: 96, borderRadius: 48,
+      backgroundColor: colors.surfaceContainerHigh,
+      borderWidth: 2, borderColor: colors.surfaceVariant,
+      alignItems: 'center', justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: 96, height: 96,
+    },
+    avatarEditBtn: {
+      position: 'absolute', bottom: 0, right: 0,
+      width: 32, height: 32, borderRadius: 16,
+      backgroundColor: colors.surfaceVariant,
+      borderWidth: 2, borderColor: colors.background,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    profileName: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    profileEmail: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+    editProfileBtn: {
+      paddingHorizontal: SPACING[6], paddingVertical: SPACING[2],
+      borderRadius: BORDER_RADIUS.full, borderWidth: 1, borderColor: colors.outlineVariant,
+      marginTop: SPACING[2],
+    },
+    editProfileText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
+    // Sections
+    section: { gap: SPACING[2] },
+    sectionLabel: {
+      fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary, textTransform: 'uppercase',
+      letterSpacing: 0.8, paddingLeft: SPACING[2],
+    },
+    card: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS['2xl'],
+      paddingVertical: SPACING[1],
+      borderWidth: 1, borderColor: `${colors.outlineVariant}50`,
+    },
+    divider: {
+      height: 1, backgroundColor: colors.surfaceVariant,
+      marginHorizontal: SPACING[4], opacity: 0.5,
+    },
+    // Row
+    row: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: SPACING[3], paddingVertical: SPACING[3],
+      minHeight: 56, gap: SPACING[3],
+    },
+    rowIcon: {
+      width: 40, height: 40, borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    },
+    rowLabel: { flex: 1, fontSize: FONT_SIZE.sm, color: colors.onSurface },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
+    rowValue: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+    // Version
+    version: { fontSize: 11, color: colors.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
+    // Logout confirm / theme picker dialog
+    modalBackdrop: { flex: 1, backgroundColor: `${colors.black}80` },
+    confirmDialog: {
+      position: 'absolute', top: '35%', left: SPACING[6], right: SPACING[6],
+      backgroundColor: colors.surfaceContainerHigh, borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[6], gap: SPACING[3], borderWidth: 1, borderColor: colors.outlineVariant,
+    },
+    confirmTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    confirmMsg: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, lineHeight: 20 },
+    confirmActions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[2] },
+    cancelBtn: {
+      flex: 1, height: 48, borderRadius: BORDER_RADIUS.lg,
+      borderWidth: 1, borderColor: colors.outlineVariant,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    cancelText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+    logoutBtn: {
+      flex: 2, height: 48, borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.errorContainer, alignItems: 'center', justifyContent: 'center',
+    },
+    logoutBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onErrorContainer },
+    // Theme picker options
+    themeOptions: { gap: SPACING[1] },
+    themeOptionRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
+      paddingVertical: SPACING[3], paddingHorizontal: SPACING[2],
+      borderRadius: BORDER_RADIUS.lg,
+    },
+    themeOptionRowSelected: {
+      backgroundColor: `${colors.primary}1A`,
+    },
+    themeOptionText: { flex: 1, fontSize: FONT_SIZE.sm, color: colors.onSurface },
+  });
+}

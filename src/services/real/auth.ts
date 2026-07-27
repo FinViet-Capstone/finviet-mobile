@@ -20,10 +20,28 @@ import type { Customer } from '@/types';
 import type {
   MockLoginInput,
   MockRegisterInput,
+  UpdateProfileInput,
+  ResetPasswordInput,
 } from '@/services/mock/auth';
 
-// changePassword + googleOAuth have no .NET endpoint yet — keep them on the mock.
-export { googleOAuth, changePassword } from '@/services/mock/auth';
+// changePassword has no .NET endpoint yet — keep it on the mock.
+export { changePassword } from '@/services/mock/auth';
+
+/**
+ * Google sign-in is NOT mocked in real mode. The backend (`POST /auth/google-login`)
+ * verifies a **Firebase ID token** via Firebase Admin — obtaining one needs Firebase +
+ * Google OAuth client config and a custom dev build (it cannot run inside Expo Go).
+ *
+ * Until that's wired we fail loudly here instead of minting a tokenless "demo" session,
+ * which is what caused every protected screen (wallets/budgets/entry) to 401. Use
+ * email/password against the real backend instead (e.g. the seeded demo@finviet.local).
+ */
+export async function googleOAuth(_mode: 'login' | 'register'): Promise<never> {
+  throw new AuthError(
+    'unknown',
+    'Đăng nhập Google chưa khả dụng ở bản kết nối backend. Vui lòng dùng email và mật khẩu.',
+  );
+}
 
 // ─── error mapping ────────────────────────────────────────────────────────────
 
@@ -86,9 +104,9 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
     gender: null,
     dateOfBirth: null,
     monthlyIncome,
-    needsPct: 50,
-    wantsPct: 30,
-    savingsPct: 20,
+    needsPct: p.needsPct ?? 50,
+    wantsPct: p.wantsPct ?? 30,
+    savingsPct: p.savingsPct ?? 20,
     defaultCurrency: 'VND',
     language: 'vi',
     theme: 'system',
@@ -113,6 +131,56 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
 export async function getProfile(): Promise<Customer> {
   const res = await api.get('/profile');
   return toCustomer(unwrap<AuthResponsePayload['profile']>(res));
+}
+
+// ─── update profile (onboarding / settings) ───────────────────────────────────
+
+// Backend Gender enum is serialized as an integer (0 Male, 1 Female, 2 Other).
+const GENDER_TO_INT: Record<'male' | 'female' | 'other', number> = {
+  male: 0,
+  female: 1,
+  other: 2,
+};
+
+/**
+ * PUT /api/profile — persist name, expected income, gender, date of birth, and the
+ * 50-30-20 budget bucket allocation. needsPct/wantsPct/savingsPct must be sent as a
+ * trio (the backend validator rejects a partial set) and must sum to 100.
+ */
+export async function updateProfile(input: UpdateProfileInput): Promise<void> {
+  const hasAllocation =
+    input.needsPct !== undefined && input.wantsPct !== undefined && input.savingsPct !== undefined;
+  await api.put('/profile', {
+    fullName: input.fullName,
+    monthlyIncomeExpected: input.monthlyIncomeExpected ?? null,
+    gender: input.gender ? GENDER_TO_INT[input.gender] : null,
+    dateOfBirth: input.dateOfBirth ?? null,
+    ...(hasAllocation
+      ? { needsPct: input.needsPct, wantsPct: input.wantsPct, savingsPct: input.savingsPct }
+      : {}),
+  });
+}
+
+/**
+ * POST /api/profile/avatar — upload a new avatar image (multipart). Returns the
+ * hosted avatar URL. Accepts a local file URI from the image picker.
+ */
+export async function uploadAvatar(uri: string): Promise<string> {
+  const name = uri.split('/').pop() || 'avatar.jpg';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  // React Native FormData file part shape ({ uri, name, type }).
+  form.append('file', { uri, name, type: mime } as unknown as Blob);
+  const res = await api.post('/profile/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return unwrap<string>(res);
+}
+
+/** DELETE /api/account — self soft-delete; the backend revokes refresh tokens. */
+export async function deleteAccount(): Promise<void> {
+  await api.delete('/account');
 }
 
 // ─── login ────────────────────────────────────────────────────────────────────
@@ -149,11 +217,21 @@ export async function login(input: MockLoginInput): Promise<Customer> {
  */
 export async function register(input: MockRegisterInput): Promise<Customer> {
   try {
-    await api.post('/auth/register', {
+    const res = await api.post('/auth/register', {
       fullName: input.displayName,
       email: input.email,
       password: input.password,
     });
+    // The backend returns 200 even when the verification email failed to send
+    // (e.g. SendGrid sender not verified). Don't swallow that — surface it so the
+    // user isn't stranded on the verify screen waiting for a code that never comes.
+    const message = (res.data?.data ?? res.data?.message ?? '') as string;
+    if (/could not be sent|failed to send|not be sent/i.test(message)) {
+      throw new AuthError(
+        'unknown',
+        'Đăng ký thành công nhưng không gửi được email xác minh. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      );
+    }
     return toCustomer({
       customerId: '',
       fullName: input.displayName,
@@ -165,6 +243,9 @@ export async function register(input: MockRegisterInput): Promise<Customer> {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
+    // Preserve the email-send-failure AuthError thrown above (toAuthError would
+    // collapse it to a generic message and drop the detail).
+    if (err instanceof AuthError) throw err;
     throw toAuthError(err, (status, message) => {
       if (status === 409) return 'email_in_use';
       if (status === 400 && message.includes('password')) return 'weak_password';
@@ -181,6 +262,28 @@ export async function forgotPassword(email: string): Promise<void> {
     await api.post('/auth/forgot-password', { email });
   } catch (err) {
     throw toAuthError(err);
+  }
+}
+
+// ─── reset password (code + new password) ─────────────────────────────────────
+
+/**
+ * POST /auth/reset-password — confirm the 6-char code from the reset email and
+ * set a new password. Backend body: { token, newPassword, confirmPassword }.
+ */
+export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+  try {
+    await api.post('/auth/reset-password', {
+      token: input.token.trim(),
+      newPassword: input.newPassword,
+      confirmPassword: input.confirmPassword,
+    });
+  } catch (err) {
+    throw toAuthError(err, (status) => {
+      // 400 (used/expired/mismatch) and 404 (code not found) → one "bad code" message.
+      if (status === 400 || status === 404) return 'verification_failed';
+      return undefined;
+    });
   }
 }
 

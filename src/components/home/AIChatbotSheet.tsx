@@ -23,7 +23,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
-import { useChatSessions, useChatSessionMessages } from '@/hooks/useReports';
+import { useChatSessions, useChatSessionMessages, useSendChatMessage } from '@/hooks/useReports';
 import type { ChatSession } from '@/types/ai';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -194,6 +194,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 
   const { data: sessions = [] } = useChatSessions();
   const { data: sessionMessages } = useChatSessionMessages(loadingSessionId);
+  const sendChat = useSendChatMessage();
 
   const translateY = useSharedValue(0);
 
@@ -247,9 +248,9 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
     setHistoryOpen(false);
   }, []);
 
-  const handleSend = useCallback((text: string) => {
+  const handleSend = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || isTyping) return;
 
     const userMsg: Message = { id: genId(), role: 'user', text: trimmed, timestamp: nowTime() };
     setMessages((prev) => [...prev, userMsg]);
@@ -257,19 +258,30 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
     setIsTyping(true);
     scrollToBottom();
 
-    // Simulate AI response after delay
-    setTimeout(() => {
+    try {
+      const reply = await sendChat.mutateAsync(trimmed);
       const aiMsg: Message = {
-        id: genId(),
+        id: reply.id || genId(),
         role: 'ai',
-        text: 'Tôi đang phân tích dữ liệu tài chính của bạn... Tính năng AI Advisor sẽ được kết nối với backend trong phiên tiếp theo.',
+        text: reply.content,
         timestamp: nowTime(),
       };
       setMessages((prev) => [...prev, aiMsg]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: genId(),
+          role: 'ai',
+          text: 'Xin lỗi, đã có lỗi khi kết nối trợ lý. Vui lòng thử lại.',
+          timestamp: nowTime(),
+        },
+      ]);
+    } finally {
       setIsTyping(false);
       scrollToBottom();
-    }, 1500);
-  }, [scrollToBottom]);
+    }
+  }, [scrollToBottom, sendChat, isTyping]);
 
   const handleChip = useCallback((chip: string) => {
     handleSend(chip);

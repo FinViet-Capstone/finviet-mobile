@@ -19,7 +19,7 @@
 
 import { AuthError } from '@/types/auth';
 import type { Customer } from '@/types';
-import { getCustomer } from './user';
+import { getCustomer, updateMockCustomer } from './user';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -141,6 +141,24 @@ export async function resendVerification(email: string): Promise<void> {
   // Otherwise: success (no return value -- screen shows toast/alert)
 }
 
+// ─── reset password (code + new password) ─────────────────────────────────────
+
+export interface ResetPasswordInput {
+  /** 6-char code from the reset email. */
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+/** Mock: any 6-char code succeeds; "BADCOD" (or wrong length) fails. */
+export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+  await delay();
+  const c = input.token.trim().toUpperCase();
+  if (c === 'BADCOD' || c.length !== 6) {
+    throw new AuthError('verification_failed');
+  }
+}
+
 // ─── change password ────────────────────────────────────────────────────────
 
 export interface MockChangePasswordInput {
@@ -160,6 +178,46 @@ export async function changePassword(
     // would reject too. Surface the same code path.
     throw new AuthError('weak_password');
   }
+}
+
+// ─── update profile (onboarding / settings) ───────────────────────────────────
+
+export interface UpdateProfileInput {
+  fullName: string;
+  monthlyIncomeExpected?: number | null;
+  gender?: 'male' | 'female' | 'other' | null;
+  /** 'YYYY-MM-DD' */
+  dateOfBirth?: string | null;
+  /** 50-30-20 budget bucket allocation — send all three together or omit all three. */
+  needsPct?: number;
+  wantsPct?: number;
+  savingsPct?: number;
+}
+
+/** Mock: updates the in-memory customer so it persists across mock logins. */
+export async function updateProfile(input: UpdateProfileInput): Promise<void> {
+  await delay(150);
+  updateMockCustomer({
+    displayName: input.fullName,
+    ...(input.monthlyIncomeExpected !== undefined ? { monthlyIncome: input.monthlyIncomeExpected } : {}),
+    ...(input.gender !== undefined ? { gender: input.gender } : {}),
+    ...(input.dateOfBirth !== undefined ? { dateOfBirth: input.dateOfBirth } : {}),
+    ...(input.needsPct !== undefined ? { needsPct: input.needsPct } : {}),
+    ...(input.wantsPct !== undefined ? { wantsPct: input.wantsPct } : {}),
+    ...(input.savingsPct !== undefined ? { savingsPct: input.savingsPct } : {}),
+    onboardingDone: input.monthlyIncomeExpected != null,
+  });
+}
+
+/** Mock avatar upload — echoes back the picked local URI as the "hosted" URL. */
+export async function uploadAvatar(uri: string): Promise<string> {
+  await delay(400);
+  return uri;
+}
+
+/** Mock account deletion — succeeds silently; the store clears the session. */
+export async function deleteAccount(): Promise<void> {
+  await delay(300);
 }
 
 // ─── logout ───────────────────────────────────────────────────────────────────

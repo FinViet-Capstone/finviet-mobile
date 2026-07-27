@@ -8,6 +8,7 @@ import {
   RefreshControl,
   TextInput,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,6 +18,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import { useGoals, useCreateGoal } from '@/hooks/useGoals';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
@@ -38,10 +40,7 @@ const S = {
   namePlaceholder: 'VD: Mua MacBook Pro',
   targetLabel: 'Số tiền mục tiêu',
   targetPlaceholder: 'Nhập số tiền',
-  deadlineLabel: 'Thời hạn (YYYY-MM-DD)',
-  deadlinePlaceholder: '2026-12-31',
-  emojiLabel: 'Biểu tượng (tuỳ chọn)',
-  emojiPlaceholder: '💻',
+  deadlineLabel: 'Thời hạn',
   save: 'Tạo mục tiêu',
   cancel: 'Huỷ',
   months: [
@@ -64,6 +63,16 @@ function daysUntil(isoDate: string): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+/** YYYY-MM-DD for `days` from today (local time). */
+function isoDaysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function deadlineBadge(goal: SavingsGoalWithProgress): { label: string; color: string; bg: string } {
   if (goal.isCompleted) return { label: S.completed, color: COLORS.tertiary, bg: `${COLORS.tertiary}20` };
   const days = daysUntil(goal.deadline);
@@ -83,9 +92,12 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   const createGoal = useCreateGoal();
   const [name, setName] = useState('');
   const [targetRaw, setTargetRaw] = useState('');
-  const [deadline, setDeadline] = useState('');
-  const [emoji, setEmoji] = useState('');
+  // Default the deadline to 90 days out so it's always valid + in the future.
+  const [deadline, setDeadline] = useState(() => isoDaysFromNow(90));
   const [targetFocused, setTargetFocused] = useState(false);
+
+  // Deadline must be in the future — earliest selectable date is tomorrow.
+  const minDeadline = isoDaysFromNow(1);
 
   const parsedTarget = parseInt(targetRaw || '0', 10);
   const targetDisplay = parsedTarget > 0 ? parsedTarget.toLocaleString('vi-VN') + 'đ' : '';
@@ -106,18 +118,23 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
       name: name.trim(),
       targetAmount: parsedTarget,
       deadline,
-      iconEmoji: emoji.trim() || undefined,
     });
-    setName(''); setTargetRaw(''); setDeadline(''); setEmoji(''); setTargetFocused(false);
+    setName(''); setTargetRaw(''); setDeadline(isoDaysFromNow(90)); setTargetFocused(false);
     onClose();
-  }, [name, parsedTarget, deadline, emoji, createGoal, onClose]);
+  }, [name, parsedTarget, deadline, createGoal, onClose]);
 
   const isValid = name.trim() && targetRaw && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
 
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}>
+      <ScrollView
+        style={styles.sheetScroll}
+        contentContainerStyle={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
@@ -138,14 +155,11 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
         </TouchableOpacity>
 
         <Text style={styles.fieldLabel}>{S.deadlineLabel}</Text>
-        <TextInput style={styles.fieldInput} value={deadline} onChangeText={setDeadline}
-          placeholder={S.deadlinePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
-          onFocus={() => setTargetFocused(false)} />
-
-        <Text style={styles.fieldLabel}>{S.emojiLabel}</Text>
-        <TextInput style={styles.fieldInput} value={emoji} onChangeText={setEmoji}
-          placeholder={S.emojiPlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
-          onFocus={() => setTargetFocused(false)} />
+        <DatePickerField
+          value={deadline}
+          onChange={setDeadline}
+          minDate={minDeadline}
+        />
 
         <View style={styles.sheetActions}>
           <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
@@ -159,7 +173,7 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </DraggableSheet>
     <NumericKeypad
       visible={visible && targetFocused}
@@ -390,7 +404,10 @@ const styles = StyleSheet.create({
   barTrack: { height: 4, backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   // Sheet
-  // Sheet
+  sheetScroll: {
+    // Bounded so the form scrolls inside the sheet and the Save button is always reachable.
+    maxHeight: Dimensions.get('window').height * 0.7,
+  },
   sheet: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],

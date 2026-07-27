@@ -27,6 +27,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import {
   useTransactionById,
   useWallets,
@@ -249,6 +250,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         <ScrollView
           contentContainerStyle={[styles.fieldsContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           {/* Category */}
@@ -292,15 +294,27 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           </TouchableOpacity>
 
           {/* Date */}
-          <View style={styles.fieldRow}>
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}15` }]}>
-              <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
-            </View>
-            <View style={styles.fieldTextWrap}>
-              <Text style={styles.fieldLabel}>{S.dateLabel}</Text>
-              <Text style={styles.fieldValue}>{formatDateDisplay(dateIso || tx.transactionDate)}</Text>
-            </View>
-          </View>
+          <DatePickerField
+            value={dateIso || tx.transactionDate}
+            onChange={setDateIso}
+            disabled={fieldsLocked}
+            customTrigger={(openPicker) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.fieldRow}
+                onPress={openPicker}
+                disabled={fieldsLocked}
+              >
+                <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}15` }]}>
+                  <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+                </View>
+                <View style={styles.fieldTextWrap}>
+                  <Text style={styles.fieldLabel}>{S.dateLabel}</Text>
+                  <Text style={styles.fieldValue}>{formatDateDisplay(dateIso || tx.transactionDate)}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
 
           {/* Merchant */}
           {!isTransfer ? (
@@ -352,16 +366,19 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
                 : <Text style={styles.saveBtnText}>{S.save}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[styles.deleteBtn, deleteMutation.isPending && styles.btnDisabled]}
-              onPress={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending
-                ? <ActivityIndicator size="small" color={COLORS.error} />
-                : <Text style={styles.deleteBtnText}>{S.delete}</Text>}
-            </TouchableOpacity>
+            {/* Bank-synced (linked-wallet) transactions are read-only and cannot be deleted. */}
+            {selectedWallet?.type !== 'linked' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[styles.deleteBtn, deleteMutation.isPending && styles.btnDisabled]}
+                onPress={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending
+                  ? <ActivityIndicator size="small" color={COLORS.error} />
+                  : <Text style={styles.deleteBtnText}>{S.delete}</Text>}
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

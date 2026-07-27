@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -6,7 +6,8 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -27,6 +28,8 @@ export function Button({
   disabled = false,
   style,
 }: ButtonProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDisabled = disabled || loading;
 
   const containerStyle = variant === 'primary'
@@ -41,7 +44,7 @@ export function Button({
     ? styles.secondaryLabel
     : styles.ghostLabel;
 
-  const spinnerColor = variant === 'primary' ? COLORS.onPrimary : COLORS.primary;
+  const spinnerColor = variant === 'primary' ? colors.onPrimary : colors.primary;
 
   return (
     <TouchableOpacity
@@ -59,39 +62,41 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    height: 48,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING[6],
-  },
-  primary: {
-    backgroundColor: COLORS.primary,
-  },
-  secondary: {
-    backgroundColor: COLORS.transparent,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  ghost: {
-    backgroundColor: COLORS.transparent,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  label: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-  primaryLabel: {
-    color: COLORS.onPrimary,
-  },
-  secondaryLabel: {
-    color: COLORS.onSurface,
-  },
-  ghostLabel: {
-    color: COLORS.primary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    base: {
+      height: 48,
+      borderRadius: BORDER_RADIUS.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: SPACING[6],
+    },
+    primary: {
+      backgroundColor: colors.primary,
+    },
+    secondary: {
+      backgroundColor: colors.transparent,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    ghost: {
+      backgroundColor: colors.transparent,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    label: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+    primaryLabel: {
+      color: colors.onPrimary,
+    },
+    secondaryLabel: {
+      color: colors.onSurface,
+    },
+    ghostLabel: {
+      color: colors.primary,
+    },
+  });
+}

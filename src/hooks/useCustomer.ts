@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Customer } from '@/types';
+import { updateProfile } from '@/services';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -34,6 +35,10 @@ export interface UpdateProfileInput {
   displayName?: string;
   avatarUrl?: string | null;
   monthlyIncome?: number | null;
+  /** 50-30-20 budget bucket allocation — pass all three together; each must be 0-100 and sum to 100. */
+  needsPct?: number;
+  wantsPct?: number;
+  savingsPct?: number;
 }
 
 export const useUpdateProfile = () => {
@@ -41,13 +46,31 @@ export const useUpdateProfile = () => {
   const updateCustomer = useAuthStore((s) => s.updateCustomer);
   return useMutation({
     mutationFn: async (patch: UpdateProfileInput) => {
-      await delay();
+      const currentCustomer = useAuthStore.getState().customer;
+      if (currentCustomer) {
+        // Fallback to existing values if not specified in patch
+        await updateProfile({
+          fullName: patch.displayName ?? currentCustomer.displayName,
+          monthlyIncomeExpected: patch.monthlyIncome !== undefined ? patch.monthlyIncome : currentCustomer.monthlyIncome,
+          gender: currentCustomer.gender,
+          dateOfBirth: currentCustomer.dateOfBirth,
+          ...(patch.needsPct !== undefined && patch.wantsPct !== undefined && patch.savingsPct !== undefined
+            ? { needsPct: patch.needsPct, wantsPct: patch.wantsPct, savingsPct: patch.savingsPct }
+            : {}),
+        });
+      } else {
+        await delay();
+      }
+
       updateCustomer({
         ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
         ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),
         ...(patch.monthlyIncome !== undefined
           ? { monthlyIncome: patch.monthlyIncome }
           : {}),
+        ...(patch.needsPct !== undefined ? { needsPct: patch.needsPct } : {}),
+        ...(patch.wantsPct !== undefined ? { wantsPct: patch.wantsPct } : {}),
+        ...(patch.savingsPct !== undefined ? { savingsPct: patch.savingsPct } : {}),
         updatedAt: new Date().toISOString(),
       });
     },

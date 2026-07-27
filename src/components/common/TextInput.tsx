@@ -1,4 +1,4 @@
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,8 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   label?: string;
@@ -27,12 +28,14 @@ export function TextInput({
   ...rest
 }: TextInputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const borderColor = error
-    ? COLORS.error
+    ? colors.error
     : isFocused
-    ? COLORS.primary
-    : COLORS.outlineVariant;
+    ? colors.primary
+    : colors.outlineVariant;
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
@@ -47,7 +50,7 @@ export function TextInput({
             leftIcon ? styles.inputWithLeft : undefined,
             rightIcon ? styles.inputWithRight : undefined,
           ]}
-          placeholderTextColor={COLORS.outline}
+          placeholderTextColor={colors.outline}
           secureTextEntry={secureTextEntry}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -62,50 +65,52 @@ export function TextInput({
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: SPACING[1],
-  },
-  label: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: SPACING[1],
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceVariant + '80', // 50% opacity
-    minHeight: 48,
-  },
-  iconLeft: {
-    paddingLeft: SPACING[3],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconRight: {
-    paddingRight: SPACING[3],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  input: {
-    flex: 1,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[3],
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-  },
-  inputWithLeft: {
-    paddingLeft: SPACING[2],
-  },
-  inputWithRight: {
-    paddingRight: SPACING[2],
-  },
-  error: {
-    marginTop: SPACING[1],
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.error,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrapper: {
+      marginBottom: SPACING[1],
+    },
+    label: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurfaceVariant,
+      marginBottom: SPACING[1],
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.surfaceVariant + '80', // 50% opacity
+      minHeight: 48,
+    },
+    iconLeft: {
+      paddingLeft: SPACING[3],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    iconRight: {
+      paddingRight: SPACING[3],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    input: {
+      flex: 1,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[3],
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurface,
+    },
+    inputWithLeft: {
+      paddingLeft: SPACING[2],
+    },
+    inputWithRight: {
+      paddingRight: SPACING[2],
+    },
+    error: {
+      marginTop: SPACING[1],
+      fontSize: FONT_SIZE.xs,
+      color: colors.error,
+    },
+  });
+}

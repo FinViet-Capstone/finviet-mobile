@@ -43,6 +43,7 @@ export function useMonthlyTransactions(
   filterType: 'all' | 'income' | 'expense' = 'all',
   filterCategoryId: string | null = null,
   uncategorizedOnly: boolean = false,
+  enabled: boolean = true,
 ) {
   // ── Date ranges ──────────────────────────────────────────────────────────
   const monthStart = isoDate(year, monthIdx, 1);
@@ -58,12 +59,12 @@ export function useMonthlyTransactions(
     startDate: monthStart,
     endDate: monthEnd,
     walletId: selectedWalletId ?? undefined,
-  });
+  }, { enabled });
   const { data: prevTxData } = useTransactions({
     startDate: prevStart,
     endDate: prevEnd,
     walletId: selectedWalletId ?? undefined,
-  });
+  }, { enabled });
   const { data: walletsData } = useWallets();
 
   const transactions = useMemo(() => {

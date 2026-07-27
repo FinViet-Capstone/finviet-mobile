@@ -3,8 +3,10 @@ import {
   getTransactions,
   getTransactionById,
   getRecentTransactions,
+  getTransactionSummary,
   createTransaction,
   updateTransaction,
+  classifyTransaction,
   deleteTransaction,
   type TransactionFilters,
   type CreateTransactionInput,
@@ -14,11 +16,12 @@ import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export const useTransactions = (filters?: TransactionFilters) =>
+export const useTransactions = (filters?: TransactionFilters, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: queryKeys.transactions.list(filters ?? null),
     queryFn: () => getTransactions(filters),
     staleTime: STALE_TIME.short,
+    enabled: options?.enabled,
   });
 
 export const useTransactionById = (id: string | undefined) =>
@@ -33,6 +36,14 @@ export const useRecentTransactions = (n: number = 10) =>
   useQuery({
     queryKey: queryKeys.transactions.recent(n),
     queryFn: () => getRecentTransactions(n),
+    staleTime: STALE_TIME.short,
+  });
+
+/** Monthly income/expense/net + breakdowns. `month` is 1-based (Jan = 1). */
+export const useTransactionSummary = (year: number, month: number) =>
+  useQuery({
+    queryKey: queryKeys.transactions.summary(year, month),
+    queryFn: () => getTransactionSummary(year, month),
     staleTime: STALE_TIME.short,
   });
 
@@ -70,6 +81,16 @@ export const useDeleteTransaction = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteTransaction(id),
+    onSuccess: () => invalidateTransactionDependents(qc),
+  });
+};
+
+/** Recategorize a transaction (category-only), then refresh dependents. */
+export const useClassifyTransaction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, categoryId }: { id: string; categoryId: string | null }) =>
+      classifyTransaction(id, categoryId),
     onSuccess: () => invalidateTransactionDependents(qc),
   });
 };

@@ -10,7 +10,7 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency } from '@/data/onboardingData';
 
@@ -69,7 +69,15 @@ export function OnboardingWallet({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TouchableWithoutFeedback onPress={handleDismissKeypad}>
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[
+            styles.contentContainer,
+            // Extra bottom space so the balance field can scroll above the keypad.
+            isBalanceFocused && { paddingBottom: NUMPAD_HEIGHT },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>{ONBOARDING_STRINGS.wallet.title}</Text>
@@ -93,13 +101,6 @@ export function OnboardingWallet({
                   {isSelected && (
                     <View style={styles.checkBadge}>
                       <Text style={styles.checkIcon}>✓</Text>
-                    </View>
-                  )}
-
-                  {'hasAIBadge' in type && type.hasAIBadge && (
-                    <View style={styles.aiBadgeTop}>
-                      <Text style={styles.aiBadgeIcon}>✨</Text>
-                      <Text style={styles.aiBadgeLabel}>AI</Text>
                     </View>
                   )}
 
@@ -267,28 +268,6 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimary,
     fontSize: 14,
     fontWeight: FONT_WEIGHT.bold,
-  },
-  aiBadgeTop: {
-    position: 'absolute',
-    top: -12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.primaryContainer,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}33`,
-  },
-  aiBadgeIcon: {
-    fontSize: 12,
-  },
-  aiBadgeLabel: {
-    fontSize: 12,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimaryContainer,
-    letterSpacing: 1.5,
   },
   typeIcon: {
     width: 48,

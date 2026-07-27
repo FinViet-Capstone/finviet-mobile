@@ -3,7 +3,8 @@
  *
  * customer_categories: per-customer expense category set, seeded from persona.
  * Income categories are global — never stored in customer_categories.
- * Savings bucket is locked — moveBucket must reject savings targets.
+ * All 3 buckets are freely movable via moveBucket (see item 5 of
+ * context/fe-plan-2026-07-revamp.md).
  */
 
 import type { BucketType } from '@/constants/categories';
@@ -26,31 +27,6 @@ export interface CustomerCategory {
   source: CategorySource;
   /** false = hidden from budgets and pickers but not deleted */
   isActive: boolean;
-  /** ISO 8601 timestamp */
-  createdAt: string;
-  /** ISO 8601 timestamp */
-  updatedAt: string;
-}
-
-// -------------------------------------------------------------------------
-// CategoryRequest
-// Pending admin-approval requests for new global categories.
-// -------------------------------------------------------------------------
-
-export type CategoryRequestStatus = 'pending' | 'approved' | 'rejected';
-
-export interface CategoryRequest {
-  id: string;
-  customerId: string;
-  /** Proposed display name (Vietnamese) */
-  nameVi: string;
-  /** 'expense' or 'income' */
-  type: 'expense' | 'income';
-  /** Customer's suggested bucket; null for income */
-  suggestedBucket: BucketType | null;
-  /** Optional free-text reason */
-  notes: string | null;
-  status: CategoryRequestStatus;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */

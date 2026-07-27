@@ -42,3 +42,7 @@ const MOCK_USER: Customer = {
 export function getCustomer(): Customer {
   return MOCK_USER;
 }
+
+export function updateMockCustomer(patch: Partial<Customer>): void {
+  Object.assign(MOCK_USER, patch);
+}
