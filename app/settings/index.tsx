@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -11,11 +12,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ChangePasswordSheet } from '@/components/auth/ChangePasswordSheet';
+import { EditProfileSheet } from '@/components/settings';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
-import { useLogout, useEffectiveIncomeAllocation } from '@/hooks';
+import { useLogout, useEffectiveIncomeAllocation, useUploadAvatar } from '@/hooks';
+import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -38,10 +43,7 @@ const S = {
     budgetAlert: 'Cảnh báo ngân sách',
     weeklyReport: 'Báo cáo tuần',
     goalMilestone: 'Milestone tiết kiệm',
-    language: 'Ngôn ngữ',
-    currency: 'Đơn vị tiền tệ',
     theme: 'Giao diện',
-    biometric: 'Bảo mật (Face ID)',
     password: 'Đổi mật khẩu',
     export: 'Xuất dữ liệu',
     subscription: 'Gói dịch vụ',
@@ -49,12 +51,9 @@ const S = {
     deleteAccount: 'Xóa tài khoản',
   },
   values: {
-    vnd: 'VND',
     dark: 'Tối',
     light: 'Sáng',
     system: 'Hệ thống',
-    vi: 'Tiếng Việt',
-    en: 'English',
     exportCsv: 'Xuất CSV',
   },
   logoutConfirmTitle: 'Đăng xuất?',
@@ -150,7 +149,10 @@ export default function SettingsScreen() {
   const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
   const updatePrefs = useUpdatePreferences();
   const logoutMutation = useLogout();
+  const uploadAvatar = useUploadAvatar();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
 
   const notifBudget = user?.notifications?.budget ?? true;
   const notifReport = user?.notifications?.report ?? true;
@@ -182,6 +184,24 @@ export default function SettingsScreen() {
     return `${effectiveAllocation.needsPct}% · ${effectiveAllocation.wantsPct}% · ${effectiveAllocation.savingsPct}%`;
   }, [effectiveAllocation]);
 
+  const handlePickAvatar = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('', 'Thư viện ảnh chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled) return;
+    uploadAvatar.mutate(result.assets[0].uri, {
+      onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể tải ảnh lên.')),
+    });
+  }, [uploadAvatar]);
+
   if (isLoading) return <LoadingSpinner />;
 
   return (
@@ -202,15 +222,24 @@ export default function SettingsScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatarPlaceholder}>
-              <MaterialIcon name="person" size={40} color={COLORS.onSurfaceVariant} />
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <MaterialIcon name="person" size={40} color={COLORS.onSurfaceVariant} />
+              )}
             </View>
-            <TouchableOpacity activeOpacity={0.7} style={styles.avatarEditBtn}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.avatarEditBtn}
+              onPress={handlePickAvatar}
+              disabled={uploadAvatar.isPending}
+            >
               <MaterialIcon name="photo_camera" size={14} color={COLORS.primary} filled />
             </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{user?.displayName ?? '—'}</Text>
           <Text style={styles.profileEmail}>{user?.email ?? '—'}</Text>
-          <TouchableOpacity activeOpacity={0.7} style={styles.editProfileBtn}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.editProfileBtn} onPress={() => setEditProfileVisible(true)}>
             <Text style={styles.editProfileText}>{S.profile.edit}</Text>
           </TouchableOpacity>
         </View>
@@ -221,7 +250,7 @@ export default function SettingsScreen() {
           <SectionCard>
             <SettingsRow icon="payments" iconColor={COLORS.secondary}
               label={S.rows.income} value={formatIncome(effectiveAllocation?.monthlyIncome)}
-              onPress={() => {}} />
+              onPress={() => router.push({ pathname: '/settings/budget-allocation' })} />
             <Divider />
             <SettingsRow icon="pie_chart" iconColor={COLORS.tertiary}
               label={S.rows.allocation} value={allocationLabel()}
@@ -262,18 +291,9 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.app}</Text>
           <SectionCard>
-            <SettingsRow icon="language" label={S.rows.language}
-              value={user?.language === 'en' ? S.values.en : S.values.vi} onPress={() => {}} />
-            <Divider />
-            <SettingsRow icon="currency_exchange" label={S.rows.currency}
-              value={S.values.vnd} onPress={() => {}} />
-            <Divider />
             <SettingsRow icon="dark_mode" label={S.rows.theme}
               value={user?.theme === 'light' ? S.values.light : user?.theme === 'dark' ? S.values.dark : S.values.system}
               onPress={() => {}} />
-            <Divider />
-            <ToggleRow icon="face" label={S.rows.biometric}
-              value={false} onToggle={() => {}} />
           </SectionCard>
         </View>
 
@@ -285,7 +305,7 @@ export default function SettingsScreen() {
               label={S.rows.subscription}
               onPress={() => router.push({ pathname: '/settings/subscription' })} />
             <Divider />
-            <SettingsRow icon="key" label={S.rows.password} onPress={() => {}} />
+            <SettingsRow icon="key" label={S.rows.password} onPress={() => setPasswordVisible(true)} />
             <Divider />
             <SettingsRow icon="download" label={S.rows.export}
               value={S.values.exportCsv}
@@ -323,6 +343,13 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <ChangePasswordSheet visible={passwordVisible} onClose={() => setPasswordVisible(false)} />
+      <EditProfileSheet
+        visible={editProfileVisible}
+        onClose={() => setEditProfileVisible(false)}
+        currentName={user?.displayName ?? ''}
+      />
     </SafeAreaView>
   );
 }
@@ -350,6 +377,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainerHigh,
     borderWidth: 2, borderColor: COLORS.surfaceVariant,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 96, height: 96,
   },
   avatarEditBtn: {
     position: 'absolute', bottom: 0, right: 0,
