@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   runOnJS,
@@ -9,7 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BORDER_RADIUS, COLORS, SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, SPACING } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const DISMISS_THRESHOLD = 120;
 const SPRING_CONFIG = { damping: 20, stiffness: 200 };
@@ -25,6 +26,8 @@ interface Props {
 
 export function DraggableSheet({ visible, onClose, children }: Props) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const translateY = useSharedValue(0);
   const backdropOpacity = useSharedValue(0);
 
@@ -93,28 +96,30 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: `${COLORS.black}80`,
-  },
-  sheet: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingTop: SPACING[2],
-    overflow: 'hidden',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: SPACING[4],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: `${colors.black}80`,
+    },
+    sheet: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderTopLeftRadius: BORDER_RADIUS['2xl'],
+      borderTopRightRadius: BORDER_RADIUS['2xl'],
+      paddingTop: SPACING[2],
+      overflow: 'hidden',
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.outlineVariant,
+      alignSelf: 'center',
+      marginBottom: SPACING[4],
+    },
+  });
+}

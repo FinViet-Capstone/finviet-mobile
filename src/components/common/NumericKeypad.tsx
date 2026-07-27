@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,10 @@ import {
   Keyboard,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
+
+type Styles = ReturnType<typeof createStyles>;
 
 export type Operator = '+' | '-' | '×' | '÷';
 
@@ -48,10 +51,12 @@ function NumKey({
   label,
   wide,
   onPress,
+  styles,
 }: {
   label: string;
   wide?: boolean;
   onPress: (num: string) => void;
+  styles: Styles;
 }) {
   return (
     <Pressable
@@ -68,11 +73,13 @@ function OpKey({
   symbol,
   active,
   onPress,
+  styles,
 }: {
   op: Operator;
   symbol: string;
   active: boolean;
   onPress?: (op: Operator) => void;
+  styles: Styles;
 }) {
   return (
     <Pressable
@@ -98,6 +105,8 @@ export function NumericKeypad({
   onOperatorPress,
   activeOperator,
 }: NumericKeypadProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const mounted = useRef(false);
@@ -165,10 +174,10 @@ export function NumericKeypad({
           <View style={styles.grid}>
             {/* Row 1: 7 8 9 ÷ C */}
             <View style={styles.row}>
-              <NumKey label="7" onPress={onNumberPress} />
-              <NumKey label="8" onPress={onNumberPress} />
-              <NumKey label="9" onPress={onNumberPress} />
-              <OpKey op="÷" symbol="÷" active={isOpActive('÷')} onPress={onOperatorPress} />
+              <NumKey label="7" onPress={onNumberPress} styles={styles} />
+              <NumKey label="8" onPress={onNumberPress} styles={styles} />
+              <NumKey label="9" onPress={onNumberPress} styles={styles} />
+              <OpKey op="÷" symbol="÷" active={isOpActive('÷')} onPress={onOperatorPress} styles={styles} />
               <Pressable
                 style={({ pressed }) => [styles.key, styles.clearKey, pressed && styles.keyPressed]}
                 onPress={onClear}
@@ -179,15 +188,15 @@ export function NumericKeypad({
 
             {/* Row 2: 4 5 6 × ⌫ */}
             <View style={styles.row}>
-              <NumKey label="4" onPress={onNumberPress} />
-              <NumKey label="5" onPress={onNumberPress} />
-              <NumKey label="6" onPress={onNumberPress} />
-              <OpKey op="×" symbol="×" active={isOpActive('×')} onPress={onOperatorPress} />
+              <NumKey label="4" onPress={onNumberPress} styles={styles} />
+              <NumKey label="5" onPress={onNumberPress} styles={styles} />
+              <NumKey label="6" onPress={onNumberPress} styles={styles} />
+              <OpKey op="×" symbol="×" active={isOpActive('×')} onPress={onOperatorPress} styles={styles} />
               <Pressable
                 style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
                 onPress={onBackspace}
               >
-                <MaterialIcon name="backspace" size={24} color={COLORS.secondary} />
+                <MaterialIcon name="backspace" size={24} color={colors.secondary} />
               </Pressable>
             </View>
 
@@ -196,16 +205,16 @@ export function NumericKeypad({
               <View style={styles.rowsDoubleLeft}>
                 {/* Row 3 left */}
                 <View style={styles.row}>
-                  <NumKey label="1" onPress={onNumberPress} />
-                  <NumKey label="2" onPress={onNumberPress} />
-                  <NumKey label="3" onPress={onNumberPress} />
-                  <OpKey op="-" symbol="−" active={isOpActive('-')} onPress={onOperatorPress} />
+                  <NumKey label="1" onPress={onNumberPress} styles={styles} />
+                  <NumKey label="2" onPress={onNumberPress} styles={styles} />
+                  <NumKey label="3" onPress={onNumberPress} styles={styles} />
+                  <OpKey op="-" symbol="−" active={isOpActive('-')} onPress={onOperatorPress} styles={styles} />
                 </View>
                 {/* Row 4 left */}
                 <View style={styles.row}>
-                  <NumKey label="0" onPress={onNumberPress} />
-                  <NumKey label="000" wide onPress={onNumberPress} />
-                  <OpKey op="+" symbol="+" active={isOpActive('+')} onPress={onOperatorPress} />
+                  <NumKey label="0" onPress={onNumberPress} styles={styles} />
+                  <NumKey label="000" wide onPress={onNumberPress} styles={styles} />
+                  <OpKey op="+" symbol="+" active={isOpActive('+')} onPress={onOperatorPress} styles={styles} />
                 </View>
               </View>
 
@@ -217,7 +226,7 @@ export function NumericKeypad({
                 {activeOperator ? (
                   <Text style={styles.equalText}>=</Text>
                 ) : (
-                  <MaterialIcon name="check_circle" size={36} color={COLORS.onPrimary} filled />
+                  <MaterialIcon name="check_circle" size={36} color={colors.onPrimary} filled />
                 )}
               </Pressable>
             </View>
@@ -228,110 +237,112 @@ export function NumericKeypad({
   );
 }
 
-const styles = StyleSheet.create({
-  // Transparent — the keypad must NOT dim/obscure the form above it. (Tap here
-  // still dismisses via onClose; it blocks touch, not the view.)
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
-  panel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    overflow: 'hidden',
-    backgroundColor: COLORS.surfaceContainerHigh, // solid (no glassmorphism)
-    borderTopWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  blur: {
-    paddingTop: SPACING[5],
-    paddingHorizontal: H_PAD,
-    paddingBottom: SPACING[10],
-  },
-  grid: {
-    gap: GAP,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: GAP,
-  },
-  // Rows 3-4 container
-  rowsDouble: {
-    flexDirection: 'row',
-    gap: GAP,
-  },
-  rowsDoubleLeft: {
-    flex: 4, // 4 of 5 columns
-    gap: GAP,
-  },
-  // Standard key: flex:1 within a row of 5
-  key: {
-    flex: 1,
-    aspectRatio: 1,
-    backgroundColor: COLORS.surfaceContainerHighest,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // 000 key spans 2 columns in a row of 4 (cols 2-3 of left section)
-  keyWide: {
-    flex: 2,
-    aspectRatio: undefined,
-    alignSelf: 'stretch',
-  },
-  keyPressed: {
-    backgroundColor: COLORS.surfaceVariant,
-    transform: [{ scale: 0.95 }],
-  },
-  keyOp: {
-    backgroundColor: COLORS.surfaceContainerHighest,
-  },
-  keyOpActive: {
-    backgroundColor: COLORS.primaryContainer,
-    borderColor: COLORS.primary,
-  },
-  clearKey: {
-    backgroundColor: COLORS.errorContainer,
-    borderColor: COLORS.error,
-  },
-  doneKey: {
-    flex: 1, // 1 of 5 columns
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doneKeyPressed: {
-    backgroundColor: COLORS.primaryContainer,
-    transform: [{ scale: 0.97 }],
-  },
-  keyText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-  },
-  opText: {
-    color: COLORS.onSurfaceVariant,
-  },
-  opTextActive: {
-    color: COLORS.onPrimaryContainer,
-  },
-  clearText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onErrorContainer,
-  },
-  equalText: {
-    fontSize: FONT_SIZE['3xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onPrimary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    // Transparent — the keypad must NOT dim/obscure the form above it. (Tap here
+    // still dismisses via onClose; it blocks touch, not the view.)
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'transparent',
+    },
+    panel: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      borderTopLeftRadius: BORDER_RADIUS['2xl'],
+      borderTopRightRadius: BORDER_RADIUS['2xl'],
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainerHigh, // solid (no glassmorphism)
+      borderTopWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    blur: {
+      paddingTop: SPACING[5],
+      paddingHorizontal: H_PAD,
+      paddingBottom: SPACING[10],
+    },
+    grid: {
+      gap: GAP,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: GAP,
+    },
+    // Rows 3-4 container
+    rowsDouble: {
+      flexDirection: 'row',
+      gap: GAP,
+    },
+    rowsDoubleLeft: {
+      flex: 4, // 4 of 5 columns
+      gap: GAP,
+    },
+    // Standard key: flex:1 within a row of 5
+    key: {
+      flex: 1,
+      aspectRatio: 1,
+      backgroundColor: colors.surfaceContainerHighest,
+      borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // 000 key spans 2 columns in a row of 4 (cols 2-3 of left section)
+    keyWide: {
+      flex: 2,
+      aspectRatio: undefined,
+      alignSelf: 'stretch',
+    },
+    keyPressed: {
+      backgroundColor: colors.surfaceVariant,
+      transform: [{ scale: 0.95 }],
+    },
+    keyOp: {
+      backgroundColor: colors.surfaceContainerHighest,
+    },
+    keyOpActive: {
+      backgroundColor: colors.primaryContainer,
+      borderColor: colors.primary,
+    },
+    clearKey: {
+      backgroundColor: colors.errorContainer,
+      borderColor: colors.error,
+    },
+    doneKey: {
+      flex: 1, // 1 of 5 columns
+      backgroundColor: colors.primary,
+      borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    doneKeyPressed: {
+      backgroundColor: colors.primaryContainer,
+      transform: [{ scale: 0.97 }],
+    },
+    keyText: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+    },
+    opText: {
+      color: colors.onSurfaceVariant,
+    },
+    opTextActive: {
+      color: colors.onPrimaryContainer,
+    },
+    clearText: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onErrorContainer,
+    },
+    equalText: {
+      fontSize: FONT_SIZE['3xl'],
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onPrimary,
+    },
+  });
+}

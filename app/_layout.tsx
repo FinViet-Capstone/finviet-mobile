@@ -11,6 +11,7 @@ import { setupNotifications } from '@/lib/notifications';
 import { queryClient } from '@/lib/queryClient';
 import { useBootstrapSession } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
+import { ThemeProvider } from '@/providers/ThemeProvider';
 
 export default function RootLayout() {
   // Registered under the exact family name MaterialIcon expects, so the
@@ -37,15 +38,17 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-        </SafeAreaProvider>
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <StatusBar style="auto" />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          </SafeAreaProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
