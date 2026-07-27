@@ -55,3 +55,16 @@ export async function deleteCustomCategory(id: string): Promise<void> {
     c.id === id ? { ...c, isActive: false, updatedAt: new Date().toISOString() } : c,
   );
 }
+
+/** Reassign a customer-created category to a different bucket (drag-and-drop). */
+export async function updateCustomCategoryBucket(
+  id: string,
+  bucketId: BucketType,
+): Promise<CustomCategory> {
+  await delay();
+  const entry = _store.find((c) => c.id === id);
+  if (!entry) throw new Error('not_found');
+  entry.bucketId = bucketId;
+  entry.updatedAt = new Date().toISOString();
+  return { ...entry };
+}

@@ -81,6 +81,7 @@ export {
   useCustomCategories,
   useCreateCustomCategory,
   useDeleteCustomCategory,
+  useUpdateCustomCategoryBucket,
 } from './useCustomCategories';
 export { useCategoryVisual } from './useCategoryVisual';
 export {

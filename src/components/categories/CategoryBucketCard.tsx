@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, type SharedValue } from 'react-native-reanimated';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -18,8 +20,10 @@ export interface CategorySubCategory {
   name: string;
   /** The actual category id — resolves the icon via CategoryIcon (system or customer-created). */
   categoryId: string;
-  /** false = not movable yet (e.g. a customer-created category, until drag-and-drop generalizes this). Defaults to true. */
+  /** false = not movable yet. Defaults to true. */
   canMove?: boolean;
+  /** true = a customer-created category (needs a different move mutation than a system one). */
+  isCustom?: boolean;
   items?: CategorySubItem[];
 }
 
@@ -31,11 +35,30 @@ export interface CategoryBucket {
   subCategories: CategorySubCategory[];
 }
 
+/** Info about the sub-category currently being dragged, reported to the parent. */
+export interface DragStartInfo {
+  subId: string;
+  categoryId: string;
+  name: string;
+  fromBucket: BucketId;
+  isCustom: boolean;
+}
+
 interface Props {
   bucket: CategoryBucket;
   onAddSubCategory?: (bucketId: BucketId) => void;
-  /** Move a sub-category to the other jar (Needs↔Wants; savings is locked). */
+  /** Quick tap-to-swap shortcut, Needs↔Wants only (unrelated to the drag gesture below, which reaches all 3 buckets). */
   onMoveSubCategory?: (subId: string, fromBucket: BucketId) => void;
+  /**
+   * Drag-and-drop wiring (all three optional — a card renders fine without
+   * them, just without draggable rows). `dragX`/`dragY` are shared values the
+   * gesture updates directly so the parent's floating drag chip can follow
+   * the finger without a re-render per frame.
+   */
+  dragX?: SharedValue<number>;
+  dragY?: SharedValue<number>;
+  onDragStart?: (info: DragStartInfo) => void;
+  onDragEnd?: (absoluteY: number) => void;
 }
 
 const BUCKET_COLORS: Record<BucketId, string> = {
@@ -54,7 +77,15 @@ function formatVND(amount: number): string {
   return `₫ ${amount.toLocaleString('vi-VN')}`;
 }
 
-export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory }: Props) {
+export function CategoryBucketCard({
+  bucket,
+  onAddSubCategory,
+  onMoveSubCategory,
+  dragX,
+  dragY,
+  onDragStart,
+  onDragEnd,
+}: Props) {
   const [expanded, setExpanded] = useState(bucket.id === 'needs');
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set(['housing']));
 
@@ -105,15 +136,46 @@ export function CategoryBucketCard({ bucket, onAddSubCategory, onMoveSubCategory
 
           {bucket.subCategories.map((sub) => {
             const isSubExpanded = expandedSubs.has(sub.id);
+            const dragGesture = onDragStart && onDragEnd && dragX && dragY
+              ? Gesture.Pan()
+                  .onStart((e) => {
+                    dragX.value = e.absoluteX;
+                    dragY.value = e.absoluteY;
+                    runOnJS(onDragStart)({
+                      subId: sub.id,
+                      categoryId: sub.categoryId,
+                      name: sub.name,
+                      fromBucket: bucket.id,
+                      isCustom: !!sub.isCustom,
+                    });
+                  })
+                  .onUpdate((e) => {
+                    dragX.value = e.absoluteX;
+                    dragY.value = e.absoluteY;
+                  })
+                  .onEnd((e) => {
+                    runOnJS(onDragEnd)(e.absoluteY);
+                  })
+              : undefined;
             return (
               <View key={sub.id} style={styles.subCategoryBlock}>
                 <View style={styles.subRow}>
+                  {dragGesture ? (
+                    <GestureDetector gesture={dragGesture}>
+                      <View style={styles.dragHandle} hitSlop={{ top: 10, bottom: 10, left: 10, right: 4 }}>
+                        <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
+                      </View>
+                    </GestureDetector>
+                  ) : (
+                    <View style={styles.dragHandle}>
+                      <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
+                    </View>
+                  )}
                   <TouchableOpacity
                     style={styles.subLeft}
                     onPress={() => toggleSub(sub.id)}
                     activeOpacity={0.7}
                   >
-                    <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
                     <CategoryIcon categoryId={sub.categoryId} size={16} />
                     <Text style={styles.subName}>{sub.name}</Text>
                   </TouchableOpacity>
@@ -245,6 +307,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: SPACING[2],
+  },
+  dragHandle: {
+    paddingVertical: SPACING[1],
+    paddingRight: SPACING[2],
   },
   subLeft: {
     flex: 1,

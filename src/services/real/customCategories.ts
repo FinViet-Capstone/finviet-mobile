@@ -11,5 +11,6 @@ export {
   getCustomCategories,
   createCustomCategory,
   deleteCustomCategory,
+  updateCustomCategoryBucket,
   type CreateCustomCategoryInput,
 } from '@/services/mock/customCategories';

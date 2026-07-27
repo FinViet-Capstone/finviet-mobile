@@ -1,31 +1,27 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Light/dark theme system, Wave 1: infrastructure + shared-primitive migration. Second (larger) half of item 2 in `context/fe-plan-2026-07-revamp.md`.
+Category drag-and-drop: move a category between all 3 buckets (Needs/Wants/Savings) by dragging, instead of the tap-to-swap button. Item 5 of `context/fe-plan-2026-07-revamp.md`.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed (Wave 1 — see Notes for what's deferred to Wave 2)
+Completed
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Split `constants/theme.ts`'s `COLORS` into `DARK_COLORS` (unchanged, byte-identical to the old `COLORS`) and a new `LIGHT_COLORS`, authored from scratch using Material Design 3 tonal-role conventions hue-matched to the existing purple/orange/green brand identity — checked both FinViet Stitch design-system assets first; neither has a light mode, so there was no existing design to extract.
-- `COLORS` stays exported as an alias for `DARK_COLORS` — every one of the ~75 still-unmigrated files that import it directly keeps working exactly as before.
-- New `src/providers/ThemeProvider.tsx` (`ThemeProvider` + `useThemeColors()`) resolving the active palette from `Customer.theme` ('light'/'dark'/'system') + `useColorScheme()` for the system case. Mounted in `app/_layout.tsx` inside `QueryClientProvider` (needs `useCustomer()`).
-- Wired the "Giao diện" row in Settings to a real light/dark/system picker (a modal, matching the existing logout-confirm pattern) calling `useUpdatePreferences({ theme })`.
-- Migrated the files that actually use theme-*varying* colors (audited all 14 `src/components/common/*` files that import `COLORS` — only 5 use role-based keys; the other 9 only use theme-invariant `gray`/`brand`/semantic colors and needed no change): `Button`, `DraggableSheet`, `ErrorState`, `NumericKeypad`, `TextInput`; plus the tab bar shell (`app/(tabs)/_layout.tsx`) and `app/settings/index.tsx` itself (for immediate visual feedback when picking a theme).
+- Remove the `savings_locked` guard in `mock/customerCategories.ts` (both directions) and the "Savings bucket is immutable" doc comments in `constants/categories.ts`/`types/category.ts` — confirmed by BE that this was never actually enforced server-side either (an FE-only invention), per the user's decision to unlock full mobility.
+- Replace the decorative `drag_indicator` with a real drag gesture (existing stack: `react-native-gesture-handler` + `react-native-reanimated`, same as `DraggableSheet.tsx` — no new dependency).
+- Dragging a category and releasing it over any of the 3 bucket cards moves it there — for system categories via `moveBucket`, for customer-created categories via a new `updateCustomCategoryBucket` mutation (the `canMove: false` deferral from the category-request-removal feature ends here).
+- No backend change needed — BE confirmed the bucket-override endpoint already supports all 3 buckets with no restriction.
 
 ## Notes
 
 <!-- Any extra notes -->
-**Wave 2 (separate follow-up, not this pass):** the remaining ~65 domain-screen files still import the theme-invariant `COLORS` directly and render in dark mode regardless of the customer's preference — switching them to `useThemeColors()` is real, screen-by-screen effort, explicitly deferred per the plan doc (`context/fe-plan-2026-07-revamp.md` item 2) so it doesn't get bundled into this infrastructure branch.
-
-Migration pattern used throughout (for whoever picks up Wave 2): replace the module-scope `const styles = StyleSheet.create({...COLORS.x...})` with a `function createStyles(colors: ThemeColors) { return StyleSheet.create({...colors.x...}); }` factory, then inside the component call `const colors = useThemeColors(); const styles = useMemo(() => createStyles(colors), [colors]);`. For small sub-components defined outside the main component (e.g. `NumericKeypad`'s `NumKey`/`OpKey`), thread `styles` down as a prop rather than having each one call `useThemeColors()` independently.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
 - 2026-07-27 — Started.
-- 2026-07-27 — Implemented per Goals above. `type-check`/`lint`/`test` all pass — no new lint warnings in any touched file. UI rendering itself (does light mode actually look right, does the toggle visibly work) could not be verified — no RN simulator/browser available in this environment; only compile-time and lint-time correctness confirmed. Completed (Wave 1 scope).
+- 2026-07-27 — Implemented: removed the `savings_locked` guard from both `mock/customerCategories.ts` and `real/categories.ts` (it was duplicated in both, an FE-only invention never enforced server-side) plus the stale doc comments in `constants/categories.ts`/`types/category.ts`. Added `updateCustomCategoryBucket` (mock/real/barrel/hook) so customer-created categories can be reassigned too, not just system ones. Built the drag gesture in `CategoryBucketCard.tsx` (a `Gesture.Pan()` on the drag handle, reusing the existing `react-native-gesture-handler`/`reanimated` stack — no new dependency) and a new `CategoryDragOverlay` showing 3 fixed, screen-anchored drop zones + a floating chip that follows the finger. Deliberately used fixed zones (computed from `Dimensions.get('window')`) instead of measuring the actual scrolling bucket cards' live position, to avoid a `measure()`-based design I'd have no way to visually verify here. The existing tap-to-swap button is left as an independent Needs↔Wants-only shortcut, unrelated to the new drag gesture. `type-check`/`lint`/`test` all pass — no new warnings in any touched file. UI/gesture behavior itself (does the chip actually follow the finger smoothly, does the hover highlight look right, does the drop actually register) could not be visually verified — no RN simulator/browser available in this environment. Completed.
