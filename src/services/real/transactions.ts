@@ -3,9 +3,8 @@
  *
  * Mirrors src/services/mock/transactions.ts so the barrel can swap mock ⇄ real.
  *
- * Backend: api/transactions/* (TransactionsController). IMPORTANT: unlike every
- * other controller, these endpoints return the RAW dto / PagedResult — they are
- * NOT wrapped in ApiResponse<T>. So we read `res.data` directly (never unwrap()).
+ * Backend: api/transactions/* (TransactionsController). Like every other
+ * controller, these endpoints are wrapped in ApiResponse<T> — read via unwrap().
  *
  * Backend limitations folded in here so the UI contract is unchanged:
  *   - PUT /transactions/{id} only updates categoryId (UpdateTransactionDto). Edits
@@ -16,7 +15,7 @@
  *     keep behaviour identical to the mock.
  */
 
-import { api } from '@/lib/api';
+import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
 import type { Transaction, TransactionType, EntryMethod } from '@/types';
 import type {
@@ -132,7 +131,7 @@ export async function getTransactions(
   if (serverType) params.type = serverType;
 
   const res = await api.get('/transactions', { params });
-  const paged = res.data as PagedDto<TransactionDto>;
+  const paged = unwrap<PagedDto<TransactionDto>>(res);
   let rows = (paged.items ?? []).map(toTransaction);
 
   // Re-apply the mock's finer semantics client-side so the swap is transparent.
@@ -160,27 +159,26 @@ export async function getTransactions(
 
 export async function getTransactionById(id: string): Promise<Transaction | undefined> {
   const res = await api.get(`/transactions/${id}`);
-  return toTransaction(res.data as TransactionDto);
+  return toTransaction(unwrap<TransactionDto>(res));
 }
 
 /**
  * GET /transactions/summary?year&month — monthly income/expense/net plus category,
- * day and beneficiary breakdowns. Like the rest of this controller the payload is
- * raw (NOT wrapped in ApiResponse), so read res.data directly.
+ * day and beneficiary breakdowns.
  */
 export async function getTransactionSummary(
   year: number,
   month: number,
 ): Promise<TransactionSummary> {
   const res = await api.get('/transactions/summary', { params: { year, month } });
-  const d = res.data as {
+  const d = unwrap<{
     income: number;
     expense: number;
     net: number;
     byCategory?: { categoryId?: string | null; categoryName?: string | null; total: number }[];
     byDay?: { date: string; income: number; expense: number; net: number }[];
     topBeneficiaries?: { beneficiary: string; total: number }[];
-  };
+  }>(res);
   return {
     income: d.income ?? 0,
     expense: d.expense ?? 0,
@@ -202,7 +200,7 @@ export async function getTransactionSummary(
 
 export async function getRecentTransactions(n: number = 10): Promise<Transaction[]> {
   const res = await api.get('/transactions', { params: { page: 1, pageSize: n } });
-  const paged = res.data as PagedDto<TransactionDto>;
+  const paged = unwrap<PagedDto<TransactionDto>>(res);
   return (paged.items ?? [])
     .map(toTransaction)
     .sort((a, b) => {
@@ -229,7 +227,7 @@ export async function createTransaction(
     merchant: input.merchant ?? null,
     entryMethod: input.entryMethod,
   }, idempotentConfig());
-  return toTransaction(res.data as TransactionDto);
+  return toTransaction(unwrap<TransactionDto>(res));
 }
 
 export async function updateTransaction(
@@ -240,7 +238,7 @@ export async function updateTransaction(
   const res = await api.put(`/transactions/${id}`, {
     categoryId: patch.categoryId ?? null,
   });
-  return toTransaction(res.data as TransactionDto);
+  return toTransaction(unwrap<TransactionDto>(res));
 }
 
 /**
@@ -255,7 +253,7 @@ export async function classifyTransaction(
   const res = await api.patch(`/transactions/${id}/classify`, {
     categoryId: categoryId ?? null,
   });
-  return toTransaction(res.data as TransactionDto);
+  return toTransaction(unwrap<TransactionDto>(res));
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -279,7 +277,7 @@ export async function createTransfer(
     amount: input.amount,
     description: input.note ?? null,
   }, idempotentConfig());
-  const data = unwrapEnvelope<TransferDto>(res.data);
+  const data = unwrap<TransferDto>(res);
   const date = (input.transactionDate ?? new Date().toISOString()).slice(0, 10);
 
   const leg = (
@@ -306,9 +304,4 @@ export async function createTransfer(
     outTx: leg(data.fromWalletId, 'transfer_out'),
     inTx: leg(data.toWalletId, 'transfer_in'),
   };
-}
-
-/** The transfer endpoint IS enveloped (it lives on WalletsController). */
-function unwrapEnvelope<T>(body: unknown): T {
-  return (body as { data: T }).data;
 }
