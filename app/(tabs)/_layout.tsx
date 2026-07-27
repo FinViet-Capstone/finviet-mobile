@@ -1,11 +1,14 @@
+import { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import TabBarIcon from '@/components/common/TabBarIcon';
-import { COLORS } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -13,22 +16,23 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       style={styles.entryWrapper}
     >
       <View style={styles.entryButton}>
-        <MaterialIcon name="add" color={COLORS.onPrimary} size={28} />
+        <MaterialIcon name="add" color={colors.onPrimary} size={28} />
       </View>
     </TouchableOpacity>
   );
 }
 
 export default function TabLayout() {
+  const colors = useThemeColors();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.onSurfaceVariant,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.onSurfaceVariant,
         tabBarStyle: {
-          backgroundColor: `${COLORS.surfaceContainer}E6`,
-          borderTopColor: `${COLORS.outlineVariant}66`,
+          backgroundColor: `${colors.surfaceContainer}E6`,
+          borderTopColor: `${colors.outlineVariant}66`,
           height: 64,
           paddingBottom: 10,
           paddingTop: 4,
@@ -87,25 +91,27 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  entryWrapper: {
-    top: -20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  entryButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 4,
-    borderColor: COLORS.background,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    entryWrapper: {
+      top: -20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    entryButton: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      elevation: 8,
+      borderWidth: 4,
+      borderColor: colors.background,
+    },
+  });
+}
