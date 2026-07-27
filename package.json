@@ -11,6 +11,19 @@
     "test": "jest",
     "test:watch": "jest --watch"
   },
+  "overrides": {
+    "postcss": "^8.5.18",
+    "uuid": "^11.1.1",
+    "minimatch@3.1.5": {
+      "brace-expansion": "^1.1.16"
+    },
+    "minimatch@9.0.9": {
+      "brace-expansion": "^2.1.2"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "^2.1.2"
+    }
+  },
   "jest": {
     "preset": "jest-expo",
     "setupFiles": [
