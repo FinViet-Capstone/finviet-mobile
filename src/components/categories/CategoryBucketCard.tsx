@@ -2,9 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, type SharedValue } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+
+/** How long a row must be held before the pan gesture activates as a drag (ms). */
+const DRAG_ACTIVATION_DELAY_MS = 300;
+
+function triggerDragHaptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
 
 export type BucketId = 'needs' | 'wants' | 'savings';
 
@@ -47,13 +55,13 @@ export interface DragStartInfo {
 interface Props {
   bucket: CategoryBucket;
   onAddSubCategory?: (bucketId: BucketId) => void;
-  /** Quick tap-to-swap shortcut, Needs↔Wants only (unrelated to the drag gesture below, which reaches all 3 buckets). */
-  onMoveSubCategory?: (subId: string, fromBucket: BucketId) => void;
   /**
    * Drag-and-drop wiring (all three optional — a card renders fine without
    * them, just without draggable rows). `dragX`/`dragY` are shared values the
    * gesture updates directly so the parent's floating drag chip can follow
-   * the finger without a re-render per frame.
+   * the finger without a re-render per frame. The gesture is attached to the
+   * whole row and only activates after a short hold (DRAG_ACTIVATION_DELAY_MS)
+   * so a plain tap still expands the row instead of starting a drag.
    */
   dragX?: SharedValue<number>;
   dragY?: SharedValue<number>;
@@ -80,7 +88,6 @@ function formatVND(amount: number): string {
 export function CategoryBucketCard({
   bucket,
   onAddSubCategory,
-  onMoveSubCategory,
   dragX,
   dragY,
   onDragStart,
@@ -136,11 +143,16 @@ export function CategoryBucketCard({
 
           {bucket.subCategories.map((sub) => {
             const isSubExpanded = expandedSubs.has(sub.id);
+            // Holding anywhere on the row (not just the small handle icon) starts the
+            // drag, but only after DRAG_ACTIVATION_DELAY_MS so a quick tap still just
+            // expands the row instead of picking it up.
             const dragGesture = onDragStart && onDragEnd && dragX && dragY
               ? Gesture.Pan()
+                  .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
                   .onStart((e) => {
                     dragX.value = e.absoluteX;
                     dragY.value = e.absoluteY;
+                    runOnJS(triggerDragHaptic)();
                     runOnJS(onDragStart)({
                       subId: sub.id,
                       categoryId: sub.categoryId,
@@ -157,49 +169,39 @@ export function CategoryBucketCard({
                     runOnJS(onDragEnd)(e.absoluteY);
                   })
               : undefined;
+            const subRowContent = (
+              <View style={styles.subRow}>
+                <View style={styles.dragHandle}>
+                  <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
+                </View>
+                <TouchableOpacity
+                  style={styles.subLeft}
+                  onPress={() => toggleSub(sub.id)}
+                  activeOpacity={0.7}
+                >
+                  <CategoryIcon categoryId={sub.categoryId} size={16} />
+                  <Text style={styles.subName}>{sub.name}</Text>
+                </TouchableOpacity>
+                <View style={styles.subRight}>
+                  {sub.items && sub.items.length > 0 && (
+                    <TouchableOpacity onPress={() => toggleSub(sub.id)} activeOpacity={0.7}>
+                      <MaterialIcon
+                        name={isSubExpanded ? 'expand_less' : 'expand_more'}
+                        size={16}
+                        color={COLORS.onSurfaceVariant}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
             return (
               <View key={sub.id} style={styles.subCategoryBlock}>
-                <View style={styles.subRow}>
-                  {dragGesture ? (
-                    <GestureDetector gesture={dragGesture}>
-                      <View style={styles.dragHandle} hitSlop={{ top: 10, bottom: 10, left: 10, right: 4 }}>
-                        <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
-                      </View>
-                    </GestureDetector>
-                  ) : (
-                    <View style={styles.dragHandle}>
-                      <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.subLeft}
-                    onPress={() => toggleSub(sub.id)}
-                    activeOpacity={0.7}
-                  >
-                    <CategoryIcon categoryId={sub.categoryId} size={16} />
-                    <Text style={styles.subName}>{sub.name}</Text>
-                  </TouchableOpacity>
-                  <View style={styles.subRight}>
-                    {onMoveSubCategory && bucket.id !== 'savings' && (sub.canMove ?? true) && (
-                      <TouchableOpacity
-                        onPress={() => onMoveSubCategory(sub.id, bucket.id)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <MaterialIcon name="swap_horiz" size={16} color={accentColor} />
-                      </TouchableOpacity>
-                    )}
-                    {sub.items && sub.items.length > 0 && (
-                      <TouchableOpacity onPress={() => toggleSub(sub.id)} activeOpacity={0.7}>
-                        <MaterialIcon
-                          name={isSubExpanded ? 'expand_less' : 'expand_more'}
-                          size={16}
-                          color={COLORS.onSurfaceVariant}
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
+                {dragGesture ? (
+                  <GestureDetector gesture={dragGesture}>{subRowContent}</GestureDetector>
+                ) : (
+                  subRowContent
+                )}
 
                 {/* Nested items */}
                 {isSubExpanded && sub.items && (

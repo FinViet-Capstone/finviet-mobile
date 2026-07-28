@@ -49,15 +49,6 @@ export default function CategoriesRoute() {
   const [dragInfo, setDragInfo] = useState<DragStartInfo | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const handleMove = useCallback(
-    (customerCategoryId: string, fromBucket: BucketId) => {
-      // Quick shortcut, independent of the drag gesture below — only ever
-      // toggles Needs↔Wants, unchanged from before.
-      moveBucket.mutate({ customerCategoryId, targetBucket: fromBucket === 'needs' ? 'wants' : 'needs' });
-    },
-    [moveBucket],
-  );
-
   const handleDragStart = useCallback((info: DragStartInfo) => {
     setDragInfo(info);
     setDragActive(true);
@@ -158,7 +149,6 @@ export default function CategoriesRoute() {
             <CategoryBucketCard
               key={b.id}
               bucket={b}
-              onMoveSubCategory={handleMove}
               dragX={dragX}
               dragY={dragY}
               onDragStart={handleDragStart}

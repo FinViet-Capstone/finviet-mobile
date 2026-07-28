@@ -27,10 +27,10 @@ export interface SpendingScore {
   color: ScoreColor;
   /** One-word verdict in Vietnamese */
   verdictVi: string;
-  /** One-line explanation in Vietnamese */
-  reasonVi: string;
-  /** Full paragraph AI commentary for the score detail screen */
-  commentaryVi: string;
+  /** One-line explanation in Vietnamese. Null when the AI provider was unavailable. */
+  reasonVi: string | null;
+  /** Full paragraph AI commentary for the score detail screen. Null when the AI provider was unavailable. */
+  commentaryVi: string | null;
   /** ISO 8601 date "YYYY-MM-DD" -- always the Monday of the scored week */
   weekStart: string;
   /** ISO 8601 timestamp */

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
   ActivityIndicator, Alert,
 } from 'react-native';
+import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -10,7 +11,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useWalletById, useSyncSepayWallet } from '@/hooks/useWallets';
+import { useWalletById, useSyncSepayWallet, useDeleteWallet } from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import type { Transaction } from '@/types';
@@ -18,6 +19,7 @@ import type { Transaction } from '@/types';
 const S = {
   back: 'arrow_back',
   edit: 'edit',
+  delete: 'delete',
   basic: 'Ví cơ bản',
   linked: 'Ví liên kết',
   balance: 'Số dư',
@@ -28,7 +30,24 @@ const S = {
   syncing: 'Đang đồng bộ',
   syncBtn: 'Đồng bộ ngay',
   syncSuccess: 'Đồng bộ thành công',
+  deleteTitle: 'Xóa ví?',
+  deleteCancel: 'Hủy',
+  deleteConfirm: 'Xóa',
+  deleteErrorTitle: 'Không thể xóa ví',
 };
+
+/** Codes WalletService.DeleteWalletAsync throws as a 422 BusinessRuleException. */
+const WALLET_DELETE_ERROR_MESSAGES: Record<string, string> = {
+  wallet_has_transactions: 'Ví này đã có giao dịch nên không thể xóa.',
+  last_wallet: 'Không thể xóa ví duy nhất còn lại của bạn.',
+};
+
+function getWalletDeleteErrorMessage(err: unknown): string {
+  const code = isAxiosError(err)
+    ? (err.response?.data as { code?: string } | undefined)?.code
+    : undefined;
+  return (code && WALLET_DELETE_ERROR_MESSAGES[code]) || 'Không thể xóa ví. Vui lòng thử lại.';
+}
 
 function formatVND(n: number): string {
   return n.toLocaleString('vi-VN') + 'đ';
@@ -39,6 +58,7 @@ export default function WalletDetailScreen() {
   const router = useRouter();
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const sepaySyncMutation = useSyncSepayWallet();
+  const deleteWalletMutation = useDeleteWallet();
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -53,6 +73,28 @@ export default function WalletDetailScreen() {
   }, [wallet, router]);
 
   const isSyncing = sepaySyncMutation.isPending;
+  const isDeleting = deleteWalletMutation.isPending;
+
+  const handleDeletePress = useCallback(() => {
+    if (!id || isDeleting) return;
+    Alert.alert(
+      S.deleteTitle,
+      `Bạn có chắc muốn xóa ví "${wallet?.name ?? ''}"? Hành động này không thể hoàn tác.`,
+      [
+        { text: S.deleteCancel, style: 'cancel' },
+        {
+          text: S.deleteConfirm,
+          style: 'destructive',
+          onPress: () => {
+            deleteWalletMutation.mutate(id, {
+              onSuccess: () => router.back(),
+              onError: (err) => Alert.alert(S.deleteErrorTitle, getWalletDeleteErrorMessage(err)),
+            });
+          },
+        },
+      ],
+    );
+  }, [id, isDeleting, wallet, deleteWalletMutation, router]);
 
   const handleSync = useCallback(() => {
     if (!id || isSyncing) return;
@@ -83,9 +125,23 @@ export default function WalletDetailScreen() {
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{wallet.name}</Text>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
-          <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
+            <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.headerBtn}
+            onPress={handleDeletePress}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={COLORS.error} />
+            ) : (
+              <MaterialIcon name={S.delete} size={22} color={COLORS.error} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
@@ -158,6 +214,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary, textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[3] },
