@@ -75,6 +75,11 @@ export default function WalletDetailScreen() {
   const isSyncing = sepaySyncMutation.isPending;
   const isDeleting = deleteWalletMutation.isPending;
 
+  const handleEditPress = useCallback(() => {
+    if (!id) return;
+    router.push({ pathname: '/(tabs)/wallets/edit/[id]', params: { id } });
+  }, [id, router]);
+
   const handleDeletePress = useCallback(() => {
     if (!id || isDeleting) return;
     Alert.alert(
@@ -126,7 +131,7 @@ export default function WalletDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{wallet.name}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleEditPress}>
             <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
           </TouchableOpacity>
           <TouchableOpacity
