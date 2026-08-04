@@ -2,8 +2,8 @@
  * real/categories.ts — real .NET category service (customer category set).
  *
  * Mirrors the surface of src/services/mock/customerCategories.ts that the app
- * consumes (getCustomerCategories / moveBucket / seedFromPersona) so the barrel
- * can swap mock ⇄ real.
+ * consumes (getCustomerCategories / moveBucket / seedDefaultCategories) so the
+ * barrel can swap mock ⇄ real.
  *
  * Backend reality: the .NET API exposes a GLOBAL category catalog
  * (GET /api/categories) where each expense category carries a `expenseClass`
@@ -96,11 +96,7 @@ export async function moveBucket(
  * there is nothing to seed. Returns the current customer set so onboarding flows
  * that await this keep working.
  */
-export async function seedFromPersona(
-  customerId: string,
-  _gender: 'male' | 'female' | 'other' | null,
-  _dateOfBirth: string | null,
-): Promise<CustomerCategory[]> {
+export async function seedDefaultCategories(customerId: string): Promise<CustomerCategory[]> {
   return getCustomerCategories(customerId);
 }
 

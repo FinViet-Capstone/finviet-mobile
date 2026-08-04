@@ -52,10 +52,11 @@ B. Categories & Bucket System (Needs/Wants/Savings)
   Di chuyển, Sức khỏe, Giáo dục, Gửi tiền gia đình), 4 Wants (Giải trí, Làm đẹp, Mua sắm, Ăn
   ngoài), 3 Savings (Tiết kiệm, Đầu tư, and an auto-only `cat_savings_goal` never shown in
   manual pickers), 5 Income categories (no bucket), plus `cat_uncategorized`.
-- Onboarding seeds each customer's own category set based on a **persona** derived from
-  gender + age (`student_male`/`student_female`/`young_professional_male`/
-  `young_professional_female`/`default`), each persona activating a fixed hardcoded subset of
-  categories.
+- Onboarding seeds each customer's own category set with **every system expense category** at
+  its default bucket — a uniform full-catalog seed, not a persona-derived subset. (Persona-based
+  seeding — gender/age → one of 5 fixed category subsets — was removed; the team decided months
+  ago to drop it, and gender/date-of-birth collection at onboarding is kept only for future
+  analytics, no longer feeding category selection.)
 - Customers can hide/deactivate a category (`CustomerCategory.isActive`); the mock service
   currently only implements deactivation — there is no reactivation path yet.
 - Categories can be dragged between Needs and Wants; the **Savings bucket is locked in both
@@ -127,7 +128,9 @@ implements them.
 
 ### Customer
 - id, email, passwordHash/googleId, displayName, avatarUrl
-- gender ('male'|'female'|'other'), dateOfBirth — used for persona-based category seeding
+- gender ('male'|'female'|'other'), dateOfBirth — collected and persisted at onboarding;
+  reserved for future analytics, not currently consumed by any feature (persona-based category
+  seeding that used to derive from these fields was removed)
 - monthlyIncome, needsPct/wantsPct/savingsPct (default 50/30/20)
 - defaultCurrency, language ('vi'|'en'), theme ('light'|'dark'|'system')
 - isActive, emailVerified, onboardingDone, notifications settings, fcmToken
@@ -149,9 +152,6 @@ implements them.
   type ('expense'|'income'), defaultBucket, autoOnly? (true only for `cat_savings_goal`)
 - CustomerCategory: id, customerId, categoryId, bucketId, source, isActive, createdAt,
   updatedAt
-- Persona / PersonaCategory: gender+age → one of `student_male`/`student_female`/
-  `young_professional_male`/`young_professional_female`/`default`, each mapping to a fixed
-  category list used at onboarding
 - CategoryRequest: nameVi (requested), type, suggestedBucket, notes,
   status ('pending'|'approved'|'rejected')
 

@@ -13,7 +13,7 @@ import type { CustomerCategory } from '@/types/category';
 import {
   getCustomerCategories,
   moveBucket,
-  seedFromPersona,
+  seedDefaultCategories,
   type MoveBucketPayload,
 } from '@/services';
 
@@ -44,15 +44,15 @@ export const useMoveBucket = () => {
   });
 };
 
-// ─── Mutation: seed from persona (onboarding) ──────────────────────────────────
+// ─── Mutation: seed default categories (onboarding) ─────────────────────────────
 
 export const useSeedCategories = () => {
   const qc = useQueryClient();
   const customerId = useAuthStore((s) => s.customer?.id ?? null);
   return useMutation({
-    mutationFn: async (input: { gender: 'male' | 'female' | 'other' | null; dateOfBirth: string | null }) => {
+    mutationFn: async () => {
       if (!customerId) return [];
-      return seedFromPersona(customerId, input.gender, input.dateOfBirth);
+      return seedDefaultCategories(customerId);
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) }),

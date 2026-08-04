@@ -141,7 +141,7 @@ const customerCategoriesImpl = USE_MOCK
   : realCustomerCategories;
 export const getCustomerCategories = customerCategoriesImpl.getCustomerCategories;
 export const moveBucket = customerCategoriesImpl.moveBucket;
-export const seedFromPersona = customerCategoriesImpl.seedFromPersona;
+export const seedDefaultCategories = customerCategoriesImpl.seedDefaultCategories;
 export const deactivateCustomerCategory =
   customerCategoriesImpl.deactivateCustomerCategory;
 export type { MoveBucketPayload } from './mock/customerCategories';
