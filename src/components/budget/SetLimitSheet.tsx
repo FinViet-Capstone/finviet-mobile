@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -146,80 +147,86 @@ export default function SetLimitSheet({
 
   return (
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING[4] }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{S.title}</Text>
-          <Text style={styles.categoryName}>{categoryName}</Text>
-        </View>
-
-        {/* Scope picker */}
-        <Text style={styles.sectionLabel}>{S.subtitle}</Text>
-        <FlatList
-          data={scopeOptions}
-          keyExtractor={(item) => item.id ?? 'all'}
-          renderItem={renderScope}
-          scrollEnabled={false}
-          style={styles.scopeList}
-        />
-
-        {/* Slider */}
-        <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
-
-        {!hasIncome && (
-          <Text style={styles.noIncomeHint}>{S.noIncome}</Text>
-        )}
-
-        <View style={styles.sliderAmountRow}>
-          <Text style={[styles.sliderAmount, isOverRemaining && { color: COLORS.secondary }]}>
-            {sliderValue > 0 ? `${formatVND(Math.round(sliderValue))}đ` : '0đ'}
-          </Text>
-          <Text style={styles.sliderSuffix}>{S.monthly}</Text>
-        </View>
-
-        {/* Slider track with remainingCap marker */}
-        <View style={styles.sliderWrap}>
-          <CustomSlider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={sliderMax}
-            step={50_000}
-            value={sliderValue}
-            onValueChange={setSliderValue}
-            minimumTrackTintColor={trackColor}
-            maximumTrackTintColor={COLORS.surfaceVariant}
-            thumbTintColor={thumbColor}
-          />
-          {/* Remaining cap marker */}
-          {hasIncome && markerPct > 0 && markerPct < 100 && (
-            <View style={[styles.marker, { left: `${markerPct}%` as any }]} />
-          )}
-        </View>
-
-        <View style={styles.sliderLabels}>
-          <Text style={styles.sliderLabelMin}>0đ</Text>
-          {hasIncome && remainingCap > 0 && remainingCap < allocationCap && (
-            <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: COLORS.secondary }]}>
-              {S.remaining}: {formatVND(remainingCap)}đ
-            </Text>
-          )}
-          {hasIncome && (
-            <Text style={styles.sliderLabelMax}>{formatVND(sliderMax)}đ</Text>
-          )}
-        </View>
-
-        {/* Over-remaining warning */}
-        {isOverRemaining && (
-          <View style={styles.overWarning}>
-            <MaterialIcon name="warning" size={14} color={COLORS.secondary} />
-            <Text style={styles.overWarningText}>
-              Vượt ngân sách còn lại của nhóm {bucket}
-            </Text>
+      <View style={styles.sheet}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{S.title}</Text>
+            <Text style={styles.categoryName}>{categoryName}</Text>
           </View>
-        )}
 
-        {/* Actions */}
-        <View style={styles.actions}>
+          {/* Scope picker */}
+          <Text style={styles.sectionLabel}>{S.subtitle}</Text>
+          <FlatList
+            data={scopeOptions}
+            keyExtractor={(item) => item.id ?? 'all'}
+            renderItem={renderScope}
+            scrollEnabled={false}
+            style={styles.scopeList}
+          />
+
+          {/* Slider */}
+          <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
+
+          {!hasIncome && (
+            <Text style={styles.noIncomeHint}>{S.noIncome}</Text>
+          )}
+
+          <View style={styles.sliderAmountRow}>
+            <Text style={[styles.sliderAmount, isOverRemaining && { color: COLORS.secondary }]}>
+              {sliderValue > 0 ? `${formatVND(Math.round(sliderValue))}đ` : '0đ'}
+            </Text>
+            <Text style={styles.sliderSuffix}>{S.monthly}</Text>
+          </View>
+
+          {/* Slider track with remainingCap marker */}
+          <View style={styles.sliderWrap}>
+            <CustomSlider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={sliderMax}
+              step={50_000}
+              value={sliderValue}
+              onValueChange={setSliderValue}
+              minimumTrackTintColor={trackColor}
+              maximumTrackTintColor={COLORS.surfaceVariant}
+              thumbTintColor={thumbColor}
+            />
+            {/* Remaining cap marker */}
+            {hasIncome && markerPct > 0 && markerPct < 100 && (
+              <View style={[styles.marker, { left: `${markerPct}%` as any }]} />
+            )}
+          </View>
+
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabelMin}>0đ</Text>
+            {hasIncome && remainingCap > 0 && remainingCap < allocationCap && (
+              <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: COLORS.secondary }]}>
+                {S.remaining}: {formatVND(remainingCap)}đ
+              </Text>
+            )}
+            {hasIncome && (
+              <Text style={styles.sliderLabelMax}>{formatVND(sliderMax)}đ</Text>
+            )}
+          </View>
+
+          {/* Over-remaining warning */}
+          {isOverRemaining && (
+            <View style={styles.overWarning}>
+              <MaterialIcon name="warning" size={14} color={COLORS.secondary} />
+              <Text style={styles.overWarningText}>
+                Vượt ngân sách còn lại của nhóm {bucket}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Actions — pinned below the scroll area so they're always reachable */}
+        <View style={[styles.actions, { paddingBottom: insets.bottom + SPACING[2] }]}>
           <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
             <Text style={styles.cancelText}>{S.cancel}</Text>
           </TouchableOpacity>
@@ -244,8 +251,15 @@ export default function SetLimitSheet({
 
 const styles = StyleSheet.create({
   sheet: {
+    flexShrink: 1,
+  },
+  scroll: {
+    flexShrink: 1,
+  },
+  scrollContent: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
   header: { marginBottom: SPACING[4] },
   title: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
@@ -293,7 +307,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: `${COLORS.secondary}30`,
   },
   overWarningText: { fontSize: FONT_SIZE.xs, color: COLORS.secondary, flex: 1 },
-  actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[2] },
+  actions: {
+    flexDirection: 'row', gap: SPACING[3],
+    paddingHorizontal: SPACING[4], paddingTop: SPACING[3],
+    borderTopWidth: 1, borderTopColor: COLORS.outlineVariant,
+  },
   cancelBtn: {
     flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1, borderColor: COLORS.outlineVariant,
