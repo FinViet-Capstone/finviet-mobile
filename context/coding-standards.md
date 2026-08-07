@@ -22,13 +22,13 @@ You are an expert in TypeScript, React Native, Expo, and Mobile UI development.
   - Use the "function" keyword for pure functions.
   - Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
   - Use declarative JSX.
-  - Use Prettier for consistent code formatting.
+  - Rely on ESLint (eslint-config-expo) for code style enforcement; this project does not use Prettier.
 
   UI and Styling
   - Use Expo's built-in components for common UI patterns and layouts.
   - Implement responsive design with Flexbox and Expo's useWindowDimensions for screen size adjustments.
-  - Use styled-components or Tailwind CSS for component styling.
-  - Implement dark mode support using Expo's useColorScheme.
+  - Use plain React Native `StyleSheet` with centralized design tokens (`src/constants/theme.ts`) for component styling — not styled-components or Tailwind.
+  - Implement dark/light mode support via `useThemeColors()` (`src/providers/ThemeProvider.tsx`), which resolves `DARK_COLORS`/`LIGHT_COLORS` from `src/constants/theme.ts` based on user preference + `useColorScheme`. Prefer it over importing the theme-invariant `COLORS` export directly in new code.
   - Ensure high accessibility (a11y) standards using ARIA roles and native accessibility props.
   - Leverage react-native-reanimated and react-native-gesture-handler for performant animations and gestures.
 
@@ -40,21 +40,20 @@ You are an expert in TypeScript, React Native, Expo, and Mobile UI development.
 
   Performance Optimization
   - Minimize the use of useState and useEffect; prefer context and reducers for state management.
-  - Use Expo's AppLoading and SplashScreen for optimized app startup experience.
+  - Use expo-splash-screen for optimized app startup experience (AppLoading was removed in SDK 44).
   - Optimize images: use WebP format where supported, include size data, implement lazy loading with expo-image.
-  - Implement code splitting and lazy loading for non-critical components with React's Suspense and dynamic imports.
+  - Rely on Expo Router's automatic route-based code loading; `React.lazy`/`Suspense` do not reduce startup cost the same way in RN's single-bundle model.
   - Profile and monitor performance using React Native's built-in tools and Expo's debugging features.
   - Avoid unnecessary re-renders by memoizing components and using useMemo and useCallback hooks appropriately.
 
   Navigation
-  - Use react-navigation for routing and navigation; follow its best practices for stack, tab, and drawer navigators.
+  - Use Expo Router (file-based, built on react-navigation) for routing and navigation.
   - Leverage deep linking and universal links for better user engagement and navigation flow.
   - Use dynamic routes with expo-router for better navigation handling.
 
   State Management
-  - Use React Context and useReducer for managing global state.
+  - Use Zustand for global UI/session state (see `src/stores/`); reserve React Context for cross-cutting concerns like theming. Avoid `useReducer` unless a store's local logic genuinely needs it.
   - Leverage react-query for data fetching and caching; avoid excessive API calls.
-  - For complex state management, consider using Zustand or Redux Toolkit.
   - Handle URL search parameters using libraries like expo-linking.
 
   Error Handling and Validation
@@ -75,20 +74,19 @@ You are an expert in TypeScript, React Native, Expo, and Mobile UI development.
 
   Security
   - Sanitize user inputs to prevent XSS attacks.
-  - Use react-native-encrypted-storage for secure storage of sensitive data.
+  - Use expo-secure-store for secure storage of sensitive data (iOS Keychain / Android EncryptedSharedPreferences).
   - Ensure secure communication with APIs using HTTPS and proper authentication.
   - Use Expo's Security guidelines to protect your app: https://docs.expo.dev/guides/security/
 
   Internationalization (i18n)
-  - Use react-native-i18n or expo-localization for internationalization and localization.
-  - Support multiple languages and RTL layouts.
+  - This app is Vietnamese-only; do not add an i18n library. Extract Vietnamese UI strings to named constants in `src/data/` or `src/constants/` rather than inlining them in JSX.
   - Ensure text scaling and font adjustments for accessibility.
 
   Key Conventions
   1. Rely on Expo's managed workflow for streamlined development and deployment.
-  2. Prioritize Mobile Web Vitals (Load Time, Jank, and Responsiveness).
-  3. Use expo-constants for managing environment variables and configuration.
-  4. Use expo-permissions to handle device permissions gracefully.
+  2. Prioritize native performance metrics (cold-start time, JS-thread frame rate/jank, list scroll FPS) — there is no web target.
+  3. Use `EXPO_PUBLIC_*` build-time environment variables (see `src/lib/env.ts`) for configuration; reserve expo-constants for native manifest fields.
+  4. Use per-module permission APIs (e.g. expo-image-picker, expo-notifications) to handle device permissions gracefully — expo-permissions was removed in SDK 46.
   5. Implement expo-updates for over-the-air (OTA) updates.
   6. Follow Expo's best practices for app deployment and publishing: https://docs.expo.dev/distribution/introduction/
   7. Ensure compatibility with iOS and Android by testing extensively on both platforms.
