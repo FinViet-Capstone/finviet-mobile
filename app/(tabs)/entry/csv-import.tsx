@@ -7,16 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { CategoryPickerSheet } from '@/components/categories';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateTransaction } from '@/hooks/useTransactions';
-import { getCategoryById, CATEGORIES } from '@/constants/categories';
+import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import type { Wallet } from '@/types/wallet';
 import { getApiErrorMessage } from '@/utils/errors';
@@ -326,33 +325,14 @@ export default function CsvImportScreen() {
       </View>
 
       {/* Category picker for uncategorized rows */}
-      <DraggableSheet visible={editingRowId !== null} onClose={() => setEditingRowId(null)}>
-        <View style={styles.catSheetContent}>
-          <Text style={styles.catSheetTitle}>{S.pickCategory}</Text>
-          <FlatList
-            data={[...CATEGORIES]}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const editing = rows.find((r) => r.id === editingRowId);
-              const selected = editing?.suggestedCategoryId === item.id;
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[styles.catRow, selected && styles.catRowSelected]}
-                  onPress={() => handleCategorySelect(item.id)}
-                >
-                  <View style={[styles.catIconWrap, { backgroundColor: `${item.color}25` }]}>
-                    <MaterialIcon name={getCategoryIcon(item.icon)} size={16} color={item.color} />
-                  </View>
-                  <Text style={styles.catRowText}>{item.nameVi}</Text>
-                  {selected && <MaterialIcon name="check" size={18} color={COLORS.primary} />}
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </DraggableSheet>
+      <CategoryPickerSheet
+        visible={editingRowId !== null}
+        onClose={() => setEditingRowId(null)}
+        title={S.pickCategory}
+        entryType={rows.find((r) => r.id === editingRowId)?.type ?? 'expense'}
+        selectedCategoryId={rows.find((r) => r.id === editingRowId)?.suggestedCategoryId}
+        onSelect={handleCategorySelect}
+      />
     </SafeAreaView>
   );
 }
@@ -481,12 +461,6 @@ const styles = StyleSheet.create({
   uncatBadgeText: { fontSize: 10, color: COLORS.secondary, fontWeight: FONT_WEIGHT.semibold },
 
   // Category picker sheet
-  catSheetContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[8], maxHeight: '70%' },
-  catSheetTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, marginBottom: SPACING[3] },
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[3], borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant },
-  catRowSelected: { backgroundColor: `${COLORS.primaryContainer}22`, borderRadius: BORDER_RADIUS.md, paddingHorizontal: SPACING[2], borderBottomWidth: 0, marginVertical: SPACING[1] },
-  catIconWrap: { width: 32, height: 32, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  catRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
 
   // Guide
   guideCard: {

@@ -26,6 +26,7 @@ import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { CATEGORIES } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
+import { CategoryPickerSheet } from "@/components/categories";
 import { useExtractFromSMS, useWallets, useCreateTransaction } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { formatVND } from "@/utils/formatters";
@@ -422,39 +423,18 @@ export default function SMSEntryScreen() {
         </KeyboardAvoidingView>
 
         {/* Category modal */}
-        <PickerModal
+        <CategoryPickerSheet
           visible={showCategoryModal}
-          title={S.sheetCategory}
           onClose={() => setShowCategoryModal(false)}
-        >
-          <FlatList
-            data={[...CATEGORIES]}
-            keyExtractor={(i) => i.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.sheetRow,
-                  categoryId === item.id && styles.sheetRowSelected,
-                ]}
-                onPress={() => {
-                  setCategoryId(item.id);
-                  setCategoryUncertain(false);
-                  setShowCategoryModal(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[styles.sheetDot, { backgroundColor: item.color }]}
-                />
-                <Text style={styles.sheetRowText}>{item.nameVi}</Text>
-                {categoryId === item.id && (
-                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-          />
-        </PickerModal>
+          title={S.sheetCategory}
+          entryType={entryType}
+          selectedCategoryId={categoryId}
+          onSelect={(id) => {
+            setCategoryId(id);
+            setCategoryUncertain(false);
+            setShowCategoryModal(false);
+          }}
+        />
 
         {/* Wallet modal */}
         <PickerModal
@@ -987,12 +967,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 0,
     marginVertical: SPACING[1],
-  },
-  sheetDot: {
-    width: 14,
-    height: 14,
-    borderRadius: BORDER_RADIUS.full,
-    flexShrink: 0,
   },
   sheetRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
 });
