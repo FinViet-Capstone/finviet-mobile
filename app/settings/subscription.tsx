@@ -11,7 +11,8 @@ export default function SubscriptionRoute() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.btn}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.btn}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
         </TouchableOpacity>
         <Text style={styles.title}>Gói dịch vụ</Text>

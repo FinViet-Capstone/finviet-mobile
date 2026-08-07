@@ -209,7 +209,8 @@ export default function CsvImportScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name={S.back} size={20} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>

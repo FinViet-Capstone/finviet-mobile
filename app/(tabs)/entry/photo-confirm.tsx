@@ -441,6 +441,8 @@ export default function PhotoConfirmScreen() {
             activeOpacity={0.7}
             style={styles.headerBtn}
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
           >
             <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
           </TouchableOpacity>
@@ -460,6 +462,8 @@ export default function PhotoConfirmScreen() {
           activeOpacity={0.7}
           style={styles.headerBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
         >
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>

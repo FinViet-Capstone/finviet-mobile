@@ -70,6 +70,8 @@ export default function EntryChooserScreen() {
           activeOpacity={0.7}
           style={styles.closeBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Đóng"
         >
           <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>

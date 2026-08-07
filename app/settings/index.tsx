@@ -236,7 +236,8 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.headerBtn}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>

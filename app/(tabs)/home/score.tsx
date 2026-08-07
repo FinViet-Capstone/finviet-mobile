@@ -136,7 +136,8 @@ export default function SpendingScoreDetail() {
 function Header({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.header}>
-      <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}>
+      <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}
+        accessibilityRole="button" accessibilityLabel="Quay lại">
         <MaterialIcon name="arrow_back" size={24} color={COLORS.onSurface} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>{S.title}</Text>

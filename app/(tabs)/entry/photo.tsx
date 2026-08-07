@@ -91,7 +91,8 @@ export default function PhotoEntryScreen() {
     <SafeAreaView style={styles.container} edges={[]}>
       {/* Top navigation */}
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.topBtn} onPress={() => router.back()}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.topBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onBackground} />
         </TouchableOpacity>
         <Text style={styles.topTitle}>{S.title}</Text>

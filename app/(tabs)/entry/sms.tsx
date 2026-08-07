@@ -521,6 +521,8 @@ export default function SMSEntryScreen() {
                   activeOpacity={0.7}
                   style={styles.textareaActionBtn}
                   onPress={() => setSmsText("")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa nội dung"
                 >
                   <MaterialIcon
                     name="close"
@@ -611,6 +613,8 @@ function Header({
         activeOpacity={0.7}
         style={styles.headerBtn}
         onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Quay lại"
       >
         <MaterialIcon name="arrow_back_ios" size={20} color={COLORS.primary} />
       </TouchableOpacity>

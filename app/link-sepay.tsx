@@ -121,6 +121,8 @@ export default function LinkSepayScreen() {
           activeOpacity={0.7}
           style={styles.headerBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
         >
           <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
         </TouchableOpacity>
