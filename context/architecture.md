@@ -10,14 +10,15 @@ mock). Screens and hooks import **only from `@/services`**, never from
 happen with zero call-site changes. Input/return types always come from the `mock/*`
 module (the shared contract both sides honor).
 
-Current wiring (`docs/integration-status.md` has the full endpoint table): auth,
-wallets, transactions, budgets, saving goals, categories, category requests,
-reports/AI, notifications, rules, SMS extraction, and bank-linking (SePay OAuth2 —
+Current wiring: auth,
+wallets, transactions, budgets, saving goals, categories, reports/AI,
+notifications, rules, SMS extraction, and bank-linking (SePay OAuth2 —
 the only linking provider; Finverse was removed 2026-07) all hit the real backend
 when `EXPO_PUBLIC_USE_MOCK=false`. Subscriptions and
 photo/receipt OCR extraction have no backend counterpart and stay mock-only
 permanently — check `src/services/index.ts`'s header comment before assuming
-something is real.
+something is real. There is no category-request feature (never had an
+admin-approval UI, removed as a concept months ago) — don't reintroduce it.
 
 ## Data flow: screen → hook → services barrel → mock or real
 

@@ -62,8 +62,9 @@ B. Categories & Bucket System (Needs/Wants/Savings)
 - Categories can be dragged between Needs and Wants; the **Savings bucket is locked in both
   directions** — the move-bucket logic explicitly rejects moving a category into savings or
   out of it, and the UI hides the move affordance for savings rows entirely.
-- Missing a category → a `CategoryRequest` (requested name, type, suggested bucket, notes,
-  status `pending`/`approved`/`rejected`) that an admin reviews outside this app.
+- There is no category-request feature: a user cannot ask an admin to add a custom category.
+  This was deliberately removed (decided months ago, per the team) — no admin-approval UI
+  ever existed for it, and no trace of it remains in the codebase.
 
 C. Budgets & Pacing
 - Two distinct, both-implemented budgeting mechanisms:
@@ -118,8 +119,8 @@ F. Notifications
 
 G. Settings & Utilities
 - Real, routed screens under `app/settings/`: profile/preferences home, budget-allocation
-  sliders (needs/wants/savings %), category bucket management, category requests, data export,
-  account deletion, and subscription management.
+  sliders (needs/wants/savings %), category bucket management, data export, account deletion,
+  and subscription management.
 
 ## Data
 ---
@@ -152,8 +153,7 @@ implements them.
   type ('expense'|'income'), defaultBucket, autoOnly? (true only for `cat_savings_goal`)
 - CustomerCategory: id, customerId, categoryId, bucketId, source, isActive, createdAt,
   updatedAt
-- CategoryRequest: nameVi (requested), type, suggestedBucket, notes,
-  status ('pending'|'approved'|'rejected')
+- (No `CategoryRequest` type exists — there is no category-request feature; see Features §B.)
 
 ### Budget
 - id, customerId, categoryId, monthlyLimit, resetDay, createdAt, updatedAt
