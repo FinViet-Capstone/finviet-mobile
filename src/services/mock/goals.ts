@@ -236,10 +236,13 @@ export async function deleteGoal(id: string): Promise<void> {
   const goal = GOALS.find((g) => g.id === id);
   if (!goal) throw new Error('Goal not found');
 
-  // Reverse every contribution that has a linked transaction
+  // Reverse every contribution that has a linked transaction. deleteTransactionSync
+  // restores balance on whichever wallet the transaction itself was posted to, so
+  // goal.fundingWalletId (which may be unset, e.g. for goals with no preset funding
+  // wallet) is irrelevant here — gating on it left real debits unreversed.
   const goalContribs = CONTRIBUTIONS.filter((c) => c.goalId === id);
   for (const contrib of goalContribs) {
-    if (contrib.transactionId && goal.fundingWalletId) {
+    if (contrib.transactionId) {
       // Delete the transaction and restore wallet balance
       deleteTransactionSync(contrib.transactionId);
     }
@@ -262,7 +265,9 @@ export interface AddContributionInput {
 /**
  * Add a goal contribution.
  * - Guards: amount must be > 0, ≤ remaining, and ≤ wallet balance (if funded).
- * - If fundingWalletId set: creates a cat_savings_goal expense tx, links it.
+ * - Funding wallet = input.fundingWalletId (picked in the contribution sheet),
+ *   falling back to the goal's preset fundingWalletId. If either is set: creates
+ *   a cat_savings_goal expense tx, links it.
  * - currentAmount = Σ contributions (single source of truth).
  */
 export async function addGoalContribution(
@@ -283,9 +288,16 @@ export async function addGoalContribution(
     throw new Error('amount_exceeds_remaining');
   }
 
+  // The wallet actually picked in the contribution sheet takes priority over the
+  // goal's preset funding wallet (goals created without one — the common case,
+  // since the create-goal form never collects fundingWalletId — would otherwise
+  // skip both the balance guard and the debit transaction below, letting
+  // currentAmount rise with no real money ever leaving a wallet).
+  const fundingWalletId = input.fundingWalletId ?? goal.fundingWalletId;
+
   // Guard: cannot contribute more than wallet balance
-  if (goal.fundingWalletId) {
-    const wallet = getWalletById(goal.fundingWalletId);
+  if (fundingWalletId) {
+    const wallet = getWalletById(fundingWalletId);
     if (wallet && input.amount > wallet.balance) {
       throw new Error('insufficient_balance');
     }
@@ -293,9 +305,9 @@ export async function addGoalContribution(
 
   let transactionId: string | undefined;
 
-  if (goal.fundingWalletId) {
+  if (fundingWalletId) {
     const tx = createTransactionSync({
-      walletId: goal.fundingWalletId,
+      walletId: fundingWalletId,
       categoryId: 'cat_savings_goal',
       amount: input.amount,
       type: 'expense',
