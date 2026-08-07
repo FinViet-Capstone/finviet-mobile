@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -57,7 +57,8 @@ function ScaleRow({ color, label, range }: { color: string; label: string; range
 
 export default function SpendingScoreDetail() {
   const router = useRouter();
-  const { data: score, isLoading } = useSpendingScore('weekly');
+  const { view } = useLocalSearchParams<{ view?: 'weekly' | 'monthly' }>();
+  const { data: score, isLoading } = useSpendingScore(view === 'monthly' ? 'monthly' : 'weekly');
   const [chatOpen, setChatOpen] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;

@@ -97,7 +97,7 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
         </Text>
         <TouchableOpacity
           style={styles.insightLink}
-          onPress={() => router.push('/(tabs)/home/score')}
+          onPress={() => router.push({ pathname: '/(tabs)/home/score', params: { view: activeView } })}
           activeOpacity={0.7}
         >
           <Text style={styles.insightLinkText}>Xem phân tích chi tiết</Text>
