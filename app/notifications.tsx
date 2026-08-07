@@ -102,7 +102,7 @@ function notifEntityRoute(
 
 // ─── Notification row ─────────────────────────────────────────────────────────
 
-function NotifRow({
+const NotifRow = React.memo(function NotifRow({
   item,
   onPress,
 }: {
@@ -145,7 +145,7 @@ function NotifRow({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Filter type ──────────────────────────────────────────────────────────────
 
