@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import { Button } from '@/components/common/Button';
@@ -22,6 +21,12 @@ import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useRegister, useGoogleOAuth } from '@/hooks';
 import { USE_MOCK } from '@/lib/env';
 import { isAuthError } from '@/types/auth';
+import {
+  loginSchema,
+  registerSchema,
+  type LoginInput as LoginFormValues,
+  type RegisterInput as RegisterFormValues,
+} from '@/validators/auth.schema';
 import {
   COLORS,
   SPACING,
@@ -53,43 +58,6 @@ function renderPasswordToggle(
     </TouchableOpacity>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Validation schemas
-// ---------------------------------------------------------------------------
-
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email không được để trống')
-    .email('Địa chỉ email không hợp lệ'),
-  password: z
-    .string()
-    .min(1, 'Mật khẩu không được để trống')
-    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự'),
-});
-
-const registerSchema = z
-  .object({
-    email: z
-      .string()
-      .min(1, 'Email không được để trống')
-      .email('Địa chỉ email không hợp lệ'),
-    password: z
-      .string()
-      .min(1, 'Mật khẩu không được để trống')
-      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-      .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ in hoa')
-      .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 chữ số'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
-    path: ['confirmPassword'],
-  });
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
 
 // ---------------------------------------------------------------------------
 // Screen

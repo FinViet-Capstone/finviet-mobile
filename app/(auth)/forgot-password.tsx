@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
@@ -27,38 +26,13 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-
-// ---------------------------------------------------------------------------
-// Validation schemas
-// ---------------------------------------------------------------------------
-
-const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email không được để trống')
-    .email('Địa chỉ email không hợp lệ'),
-});
-
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
-
-const CODE_LENGTH = 6;
-
-const resetPasswordSchema = z
-  .object({
-    code: z.string().length(CODE_LENGTH, `Mã gồm ${CODE_LENGTH} ký tự`),
-    newPassword: z
-      .string()
-      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-      .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ in hoa')
-      .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 chữ số'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
-  })
-  .refine((d) => d.newPassword === d.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
-    path: ['confirmPassword'],
-  });
-
-type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  RESET_CODE_LENGTH as CODE_LENGTH,
+  type ForgotPasswordInput as ForgotPasswordFormValues,
+  type ResetPasswordInput as ResetPasswordFormValues,
+} from '@/validators/auth.schema';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
