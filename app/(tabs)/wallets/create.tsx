@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert,
 } from 'react-native';
+import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -20,7 +21,20 @@ const S = {
   comingSoon: 'Sắp ra mắt',
   typeBasic: 'Ví cơ bản',
   typeLinked: 'Liên kết ngân hàng',
+  errorTitle: 'Không thể tạo ví',
 };
+
+/** Real backend: 400 with an English `message`. Mock: a plain Error whose
+ * message IS the code (see mock/wallets.ts createWallet). */
+function getCreateErrorMessage(err: unknown): string {
+  const raw = isAxiosError(err)
+    ? (err.response?.data as { message?: string } | undefined)?.message
+    : (err as Error | undefined)?.message;
+  if (raw === 'duplicate_name' || (raw && /already exists/i.test(raw))) {
+    return 'Tên ví này đã tồn tại. Hãy chọn tên khác.';
+  }
+  return 'Không thể tạo ví. Vui lòng thử lại.';
+}
 
 export default function CreateWalletScreen() {
   const router = useRouter();
@@ -49,8 +63,12 @@ export default function CreateWalletScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parsedBalance });
-    router.back();
+    try {
+      await createWallet.mutateAsync({ name: name.trim(), type: 'basic', balance: parsedBalance });
+      router.back();
+    } catch (err) {
+      Alert.alert(S.errorTitle, getCreateErrorMessage(err));
+    }
   };
 
   return (

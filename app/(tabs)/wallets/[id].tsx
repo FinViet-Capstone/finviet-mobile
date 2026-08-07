@@ -43,9 +43,11 @@ const WALLET_DELETE_ERROR_MESSAGES: Record<string, string> = {
 };
 
 function getWalletDeleteErrorMessage(err: unknown): string {
+  // Real backend: 422 { code }. Mock: a plain Error whose message IS the code
+  // (see mock/wallets.ts deleteWallet).
   const code = isAxiosError(err)
     ? (err.response?.data as { code?: string } | undefined)?.code
-    : undefined;
+    : (err as Error | undefined)?.message;
   return (code && WALLET_DELETE_ERROR_MESSAGES[code]) || 'Không thể xóa ví. Vui lòng thử lại.';
 }
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, TextInput,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,6 +27,8 @@ const S = {
   balance: (n: number) => `Số dư: ${n.toLocaleString('vi-VN')}đ`,
   sameWalletError: 'Không thể chuyển cùng một ví',
   insufficient: 'Số tiền vượt quá số dư ví nguồn',
+  errorTitle: 'Không thể chuyển quỹ',
+  errorGeneric: 'Không thể chuyển quỹ. Vui lòng thử lại.',
 };
 
 export default function TransferScreen() {
@@ -67,13 +69,19 @@ export default function TransferScreen() {
 
   const handleConfirm = useCallback(async () => {
     if (!fromId || !toId || !parsedAmount || exceedsBalance) return;
-    await createTransfer.mutateAsync({
-      fromWalletId: fromId,
-      toWalletId: toId,
-      amount: parsedAmount,
-      note: note.trim() || undefined,
-    });
-    router.back();
+    try {
+      await createTransfer.mutateAsync({
+        fromWalletId: fromId,
+        toWalletId: toId,
+        amount: parsedAmount,
+        note: note.trim() || undefined,
+      });
+      router.back();
+    } catch (err) {
+      Alert.alert(S.errorTitle, (err as Error)?.message === 'Insufficient balance'
+        ? S.insufficient
+        : S.errorGeneric);
+    }
   }, [fromId, toId, parsedAmount, exceedsBalance, note, createTransfer, router]);
 
   if (isLoading) return <LoadingSpinner />;
