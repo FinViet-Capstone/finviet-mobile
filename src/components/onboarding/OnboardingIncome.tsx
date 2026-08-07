@@ -9,7 +9,11 @@ import {
 } from 'react-native';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
-import { ONBOARDING_STRINGS, formatVietnameseCurrency } from '@/data/onboardingData';
+import {
+  ONBOARDING_STRINGS,
+  formatVietnameseCurrency,
+  parseVietnameseCurrency,
+} from '@/data/onboardingData';
 
 export interface OnboardingIncomeProps {
   readonly value: string;
@@ -21,6 +25,7 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
   // Numpad is a modal overlay — auto-open on mount (income is the only field);
   // tapping the amount re-opens it, Done/outside dismisses to reveal "Tiếp tục".
   const [focused, setFocused] = useState(true);
+  const hasIncome = parseVietnameseCurrency(value) > 0;
 
   const handleNumberPress = (num: string) => {
     const currentValue = value.replace(/\./g, '');
@@ -75,9 +80,10 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
       {/* Next Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, !hasIncome && styles.buttonDisabled]}
           onPress={onNext}
           activeOpacity={0.9}
+          disabled={!hasIncome}
         >
           <Text style={styles.buttonText}>{ONBOARDING_STRINGS.income.button}</Text>
         </TouchableOpacity>
@@ -181,6 +187,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 14,
     elevation: 6,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: FONT_SIZE.base,
