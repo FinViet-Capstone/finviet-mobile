@@ -4,7 +4,7 @@ export const SUBSCRIPTION_STRINGS = {
   currentPlan: 'Gói hiện tại',
   inUse: 'Đang sử dụng',
   upgradeButton: 'Nâng cấp Premium',
-  safePayment: 'Thanh toán an toàn, huỷ bất cứ lúc nào.',
+  safePayment: 'Bản demo — chưa thu phí thật. Huỷ bất cứ lúc nào.',
   perMonth: '/tháng',
 };
 
