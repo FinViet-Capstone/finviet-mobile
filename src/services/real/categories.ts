@@ -91,6 +91,25 @@ export async function moveBucket(
   };
 }
 
+/** Persist every staged drag-and-drop move in one round trip ("Lưu thay đổi"). */
+export async function bulkMoveBucket(
+  payloads: MoveBucketPayload[],
+): Promise<CustomerCategory[]> {
+  return payloads.map((payload) => {
+    bucketOverrides.set(payload.customerCategoryId, payload.targetBucket);
+    return {
+      id: payload.customerCategoryId,
+      customerId: '',
+      categoryId: payload.customerCategoryId,
+      bucketId: payload.targetBucket,
+      source: 'system' as const,
+      isActive: true,
+      createdAt: '',
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
 /**
  * No-op against the real API: the backend catalog already carries buckets, so
  * there is nothing to seed. Returns the current customer set so onboarding flows

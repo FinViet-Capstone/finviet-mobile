@@ -4,7 +4,9 @@ import {
   createCustomCategory,
   deleteCustomCategory,
   updateCustomCategoryBucket,
+  bulkUpdateCustomCategoryBucket,
   type CreateCustomCategoryInput,
+  type BulkBucketMove,
 } from '@/services';
 import type { BucketType } from '@/constants/categories';
 import type { CustomCategory } from '@/types/customCategory';
@@ -54,5 +56,14 @@ export const useUpdateCustomCategoryBucket = () => {
       if (context?.previous) qc.setQueryData(key, context.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+};
+
+/** Persist every staged drag-and-drop move for custom categories in one round trip. */
+export const useBulkUpdateCustomCategoryBucket = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (moves: BulkBucketMove[]) => bulkUpdateCustomCategoryBucket(moves),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.customCategories() }),
   });
 };

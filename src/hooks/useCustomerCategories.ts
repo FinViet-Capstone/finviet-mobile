@@ -13,6 +13,7 @@ import type { CustomerCategory } from '@/types/category';
 import {
   getCustomerCategories,
   moveBucket,
+  bulkMoveBucket,
   seedDefaultCategories,
   type MoveBucketPayload,
 } from '@/services';
@@ -58,6 +59,19 @@ export const useMoveBucket = () => {
       if (context?.previous) qc.setQueryData(key, context.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+};
+
+// ─── Mutation: bulk move bucket ("Lưu thay đổi") ─────────────────────────────
+
+/** Persist every staged drag-and-drop move for system categories in one round trip. */
+export const useBulkMoveBucket = () => {
+  const qc = useQueryClient();
+  const customerId = useAuthStore((s) => s.customer?.id ?? null);
+  return useMutation({
+    mutationFn: (payloads: MoveBucketPayload[]) => bulkMoveBucket(payloads),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) }),
   });
 };
 

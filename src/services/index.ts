@@ -141,6 +141,7 @@ const customerCategoriesImpl = USE_MOCK
   : realCustomerCategories;
 export const getCustomerCategories = customerCategoriesImpl.getCustomerCategories;
 export const moveBucket = customerCategoriesImpl.moveBucket;
+export const bulkMoveBucket = customerCategoriesImpl.bulkMoveBucket;
 export const seedDefaultCategories = customerCategoriesImpl.seedDefaultCategories;
 export const deactivateCustomerCategory =
   customerCategoriesImpl.deactivateCustomerCategory;
@@ -152,7 +153,8 @@ export const getCustomCategories = customCategoriesImpl.getCustomCategories;
 export const createCustomCategory = customCategoriesImpl.createCustomCategory;
 export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
 export const updateCustomCategoryBucket = customCategoriesImpl.updateCustomCategoryBucket;
-export type { CreateCustomCategoryInput } from './mock/customCategories';
+export const bulkUpdateCustomCategoryBucket = customCategoriesImpl.bulkUpdateCustomCategoryBucket;
+export type { CreateCustomCategoryInput, BulkBucketMove } from './mock/customCategories';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
 const reportsImpl = USE_MOCK ? mockReports : realReports;

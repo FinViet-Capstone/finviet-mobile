@@ -71,6 +71,20 @@ export async function moveBucket(payload: MoveBucketPayload): Promise<CustomerCa
   return { ...entry };
 }
 
+/** Persist every staged drag-and-drop move in one round trip ("Lưu thay đổi"). */
+export async function bulkMoveBucket(payloads: MoveBucketPayload[]): Promise<CustomerCategory[]> {
+  await delay();
+  const updated: CustomerCategory[] = [];
+  for (const payload of payloads) {
+    const entry = _store.find((c) => c.id === payload.customerCategoryId);
+    if (!entry) continue;
+    entry.bucketId = payload.targetBucket;
+    entry.updatedAt = new Date().toISOString();
+    updated.push({ ...entry });
+  }
+  return updated;
+}
+
 export async function deactivateCustomerCategory(id: string): Promise<void> {
   await delay();
   const entry = _store.find((c) => c.id === id);

@@ -303,7 +303,16 @@ export default function SettingsScreen() {
               }} />
             <Divider />
             <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
-              label={S.rows.budgetAlert} value="80% và 100%" onPress={() => {}} />
+              label={S.rows.budgetAlert} value="80% và 100%"
+              rightElement={
+                <Switch
+                  value={notifBudget}
+                  onValueChange={(v) => handleToggleNotif('budget', v)}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
+                  thumbColor={notifBudget ? colors.onPrimary : colors.onSurfaceVariant}
+                  ios_backgroundColor={colors.surfaceVariant}
+                />
+              } />
             <Divider />
             <ToggleRow icon="calendar_today" iconColor={colors.info}
               label={S.rows.weeklyReport} value={notifReport}
