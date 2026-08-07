@@ -60,7 +60,8 @@
         }
       ],
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@sentry/react-native"
     ],
     "extra": {
       "router": {},

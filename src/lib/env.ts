@@ -22,3 +22,6 @@ if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
     'EXPO_PUBLIC_API_BASE_URL must be an https:// URL in production builds.',
   );
 }
+
+/** Sentry DSN. Empty disables crash reporting (e.g. local dev). */
+export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
