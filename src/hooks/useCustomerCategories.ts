@@ -37,10 +37,27 @@ export const useCustomerCategories = () => {
 export const useMoveBucket = () => {
   const qc = useQueryClient();
   const customerId = useAuthStore((s) => s.customer?.id ?? null);
+  const key = queryKeys.customerCategories(customerId);
   return useMutation({
     mutationFn: (payload: MoveBucketPayload) => moveBucket(payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) }),
+    // Optimistic update — the drag-and-drop UI needs the new bucket to show
+    // immediately, not after the invalidate→refetch round trip resolves.
+    onMutate: async (payload) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<CustomerCategory[]>(key);
+      qc.setQueryData<CustomerCategory[]>(key, (old) =>
+        old?.map((c) =>
+          c.id === payload.customerCategoryId
+            ? { ...c, bucketId: payload.targetBucket }
+            : c,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _payload, context) => {
+      if (context?.previous) qc.setQueryData(key, context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
 };
 
