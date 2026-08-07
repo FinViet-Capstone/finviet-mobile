@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -14,17 +13,12 @@ import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
-import { useWallets } from '@/hooks/useWallets';
 import { useCreateBudget } from '@/hooks/useBudgets';
-import type { Wallet } from '@/types/wallet';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
 const S = {
   title: 'Đặt hạn mức',
-  subtitle: 'Áp dụng cho',
-  allWallets: 'Tất cả ví',
-  allWalletsHint: 'Giới hạn tổng cho tất cả ví',
   amountLabel: 'Hạn mức hàng tháng',
   save: 'Lưu',
   cancel: 'Huỷ',
@@ -52,8 +46,6 @@ interface Props {
   onClose: () => void;
 }
 
-type ScopeOption = { id: string | null; name: string; hint: string };
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatVND(n: number): string {
@@ -75,26 +67,14 @@ export default function SetLimitSheet({
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { data: walletsData } = useWallets();
-  const wallets = (walletsData as any)?.wallets ?? (Array.isArray(walletsData) ? walletsData : []) as Wallet[];
   const createBudget = useCreateBudget();
 
-  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [sliderValue, setSliderValue] = useState(existingLimit ?? 0);
 
   const sliderMax = allocationCap > 0 ? allocationCap : 10_000_000;
   const hasIncome = allocationCap > 0;
   const isOverRemaining = sliderValue > remainingCap && remainingCap >= 0;
   const markerPct = sliderMax > 0 ? Math.min(100, (remainingCap / sliderMax) * 100) : 0;
-
-  const scopeOptions: ScopeOption[] = [
-    { id: null, name: S.allWallets, hint: S.allWalletsHint },
-    ...(wallets as Wallet[]).map((w) => ({
-      id: w.id,
-      name: w.name,
-      hint: w.type === 'linked' ? 'Ví liên kết' : 'Ví cơ bản',
-    })),
-  ];
 
   const doSave = useCallback(async () => {
     await createBudget.mutateAsync({ categoryId, monthlyLimit: Math.round(sliderValue) });
@@ -117,31 +97,6 @@ export default function SetLimitSheet({
     }
   }, [sliderValue, isOverRemaining, bucket, allocationCap, doSave]);
 
-  const renderScope = useCallback(
-    ({ item }: { item: ScopeOption }) => {
-      const active = item.id === selectedWalletId;
-      return (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[styles.scopeRow, active && styles.scopeRowActive]}
-          onPress={() => setSelectedWalletId(item.id)}
-        >
-          <MaterialIcon
-            name={item.id === null ? 'account_balance_wallet' : 'wallet'}
-            size={20}
-            color={active ? COLORS.primary : COLORS.onSurfaceVariant}
-          />
-          <View style={styles.scopeText}>
-            <Text style={[styles.scopeName, active && styles.scopeNameActive]}>{item.name}</Text>
-            <Text style={styles.scopeHint}>{item.hint}</Text>
-          </View>
-          {active && <MaterialIcon name="check_circle" size={20} color={COLORS.primary} />}
-        </TouchableOpacity>
-      );
-    },
-    [selectedWalletId],
-  );
-
   const thumbColor = isOverRemaining ? COLORS.secondary : COLORS.primary;
   const trackColor = isOverRemaining ? COLORS.secondary : COLORS.primary;
 
@@ -158,16 +113,6 @@ export default function SetLimitSheet({
             <Text style={styles.title}>{S.title}</Text>
             <Text style={styles.categoryName}>{categoryName}</Text>
           </View>
-
-          {/* Scope picker */}
-          <Text style={styles.sectionLabel}>{S.subtitle}</Text>
-          <FlatList
-            data={scopeOptions}
-            keyExtractor={(item) => item.id ?? 'all'}
-            renderItem={renderScope}
-            scrollEnabled={false}
-            style={styles.scopeList}
-          />
 
           {/* Slider */}
           <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
@@ -269,18 +214,6 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant, textTransform: 'uppercase',
     letterSpacing: 0.5, marginBottom: SPACING[2],
   },
-  scopeList: { marginBottom: SPACING[4] },
-  scopeRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
-    padding: SPACING[3], borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceContainer, marginBottom: SPACING[2],
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
-  },
-  scopeRowActive: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
-  scopeText: { flex: 1 },
-  scopeName: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: COLORS.onSurface },
-  scopeNameActive: { color: COLORS.primary },
-  scopeHint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: 2 },
   noIncomeHint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginBottom: SPACING[3] },
   sliderAmountRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING[1], marginBottom: SPACING[2] },
   sliderAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
