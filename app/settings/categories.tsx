@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useSharedValue } from 'react-native-reanimated';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
@@ -39,6 +40,7 @@ interface PendingMove {
 
 export default function CategoriesRoute() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
   const { data: effectiveAllocation } = useEffectiveIncomeAllocation();
@@ -99,7 +101,8 @@ export default function CategoriesRoute() {
     [dragInfo, originalBucketOf],
   );
 
-  const handleSaveChanges = useCallback(async () => {
+  /** Returns whether the save actually succeeded — callers that navigate away afterward need to know. */
+  const handleSaveChanges = useCallback(async (): Promise<boolean> => {
     const moves = Array.from(pendingMoves.values());
     const systemMoves = moves.filter((m) => !m.isCustom);
     const customMoves = moves.filter((m) => m.isCustom);
@@ -120,12 +123,38 @@ export default function CategoriesRoute() {
           : Promise.resolve(),
       ]);
       setPendingMoves(new Map());
+      return true;
     } catch (err) {
       Alert.alert('', getApiErrorMessage(err, 'Không thể lưu thay đổi.'));
+      return false;
     }
   }, [pendingMoves, bulkMoveBucket, bulkUpdateCustomCategoryBucket]);
 
   const isSaving = bulkMoveBucket.isPending || bulkUpdateCustomCategoryBucket.isPending;
+
+  // Block leaving (header back, hardware back, swipe-back) while a bucket move
+  // is staged but not yet saved — otherwise it's silently discarded.
+  usePreventRemove(pendingMoves.size > 0, ({ data }) => {
+    Alert.alert(
+      'Chưa lưu thay đổi',
+      'Bạn có thay đổi danh mục chưa được lưu. Bạn muốn làm gì?',
+      [
+        { text: 'Ở lại', style: 'cancel' },
+        {
+          text: 'Không lưu',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(data.action),
+        },
+        {
+          text: 'Lưu',
+          onPress: async () => {
+            const saved = await handleSaveChanges();
+            if (saved) navigation.dispatch(data.action);
+          },
+        },
+      ],
+    );
+  });
 
   const pctOf = useCallback(
     (b: BucketId) => {
