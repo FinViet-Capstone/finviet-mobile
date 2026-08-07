@@ -14,7 +14,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Customer } from '@/types';
-import { updateProfile } from '@/services';
+import { updateProfile, USE_MOCK } from '@/services';
+import { updateMockCustomer } from '@/services/mock/user';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -92,7 +93,7 @@ export const useUpdatePreferences = () => {
   return useMutation({
     mutationFn: async (patch: UpdatePreferencesInput) => {
       await delay();
-      updateCustomer({
+      const merged = {
         ...(patch.language !== undefined ? { language: patch.language } : {}),
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
         ...(patch.defaultCurrency !== undefined
@@ -107,7 +108,13 @@ export const useUpdatePreferences = () => {
             }
           : {}),
         updatedAt: new Date().toISOString(),
-      });
+      };
+      updateCustomer(merged);
+      // Preferences have no real-backend counterpart yet (the real profile
+      // mapper hardcodes theme/language — see real/auth.ts toCustomer), but the
+      // mock backing store can and should hold them so a preference survives a
+      // logout/login instead of resetting to the seed value.
+      if (USE_MOCK) updateMockCustomer(merged);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.user.all() }),
   });
