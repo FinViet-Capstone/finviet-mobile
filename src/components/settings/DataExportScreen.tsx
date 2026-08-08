@@ -6,11 +6,45 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { DATA_EXPORT_STRINGS } from '@/data/settingsScreensData';
+import { useTransactions } from '@/hooks';
+import { useWallets } from '@/hooks/useWallets';
+import { getCategoryById } from '@/constants/categories';
+import type { Transaction, TransactionType } from '@/types';
+
+const TYPE_VI: Record<TransactionType, string> = {
+  expense: 'Chi tiêu',
+  income: 'Thu nhập',
+  transfer_out: 'Chuyển đi',
+  transfer_in: 'Chuyển đến',
+};
+
+/** Quotes a field only when it needs it (contains a comma, quote, or newline). */
+function csvField(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function buildCsv(transactions: Transaction[], walletNames: Map<string, string>): string {
+  const header = ['Ngày', 'Loại', 'Ví', 'Danh mục', 'Mô tả', 'Số tiền (VND)'];
+  const rows = transactions.map((t) => [
+    t.transactionDate,
+    TYPE_VI[t.type],
+    walletNames.get(t.walletId) ?? 'Ví đã xóa',
+    t.categoryId ? (getCategoryById(t.categoryId)?.nameVi ?? t.categoryId) : 'Chưa phân loại',
+    t.merchant ?? t.description ?? '',
+    String(t.amount),
+  ]);
+  return [header, ...rows].map((cols) => cols.map(csvField).join(',')).join('\r\n');
+}
+
+const EXPORT_DIR = new Directory(Paths.cache, 'exports');
 
 type RangeChip = 'this_month' | '3_months' | 'this_year' | 'custom';
 
@@ -56,17 +90,16 @@ function formatDateVN(d: Date): string {
   });
 }
 
-function buildSummary(from: Date, to: Date): string {
+function buildSummary(from: Date, to: Date, count: number): string {
   const fromStr = formatDateVN(from);
   const toStr = formatDateVN(to);
-  const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-  const approxTx = Math.round(days * 4);
-  return `Khoảng: ${fromStr} – ${toStr} · ~${approxTx} giao dịch`;
+  return `Khoảng: ${fromStr} – ${toStr} · ${count} giao dịch`;
 }
 
 export function DataExportScreen() {
   const [selected, setSelected] = useState<RangeChip>('custom');
-  
+  const [isExporting, setIsExporting] = useState(false);
+
   // Custom date state (YYYY-MM-DD)
   const defaultCustom = getDateRange('custom');
   const [customFrom, setCustomFrom] = useState<string>(
@@ -84,12 +117,51 @@ export function DataExportScreen() {
     };
   }
 
-  const handleExport = () => {
-    Alert.alert(
-      'Xuất dữ liệu',
-      `Đang xuất file CSV từ ${formatDateVN(range.from)} đến ${formatDateVN(range.to)}…`,
-      [{ text: 'OK' }],
-    );
+  const startDate = range.from.toISOString().split('T')[0];
+  const endDate = range.to.toISOString().split('T')[0];
+  const { data: txData } = useTransactions({ startDate, endDate });
+  const transactions = (txData ?? []) as Transaction[];
+  const { data: walletsData } = useWallets();
+  const wallets = (walletsData as any)?.wallets ?? [];
+
+  const handleExport = async () => {
+    if (isExporting) return;
+    if (transactions.length === 0) {
+      Alert.alert(DATA_EXPORT_STRINGS.errorTitle, DATA_EXPORT_STRINGS.noData);
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert(DATA_EXPORT_STRINGS.errorTitle, DATA_EXPORT_STRINGS.sharingUnavailable);
+        return;
+      }
+
+      const walletNames = new Map<string, string>(
+        wallets.map((w: { id: string; name: string }) => [w.id, w.name]),
+      );
+      const csv = buildCsv(transactions, walletNames);
+
+      if (!EXPORT_DIR.exists) EXPORT_DIR.create({ intermediates: true });
+      const file = new File(EXPORT_DIR, `finviet_${startDate}_${endDate}.csv`);
+      if (file.exists) file.delete();
+      file.create();
+      // Leading BOM so Excel opens the Vietnamese diacritics as UTF-8, not Latin-1.
+      const BOM = String.fromCharCode(0xfeff);
+      file.write(BOM + csv);
+
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'text/csv',
+        dialogTitle: DATA_EXPORT_STRINGS.shareDialogTitle,
+        UTI: 'public.comma-separated-values-text',
+      });
+    } catch {
+      Alert.alert(DATA_EXPORT_STRINGS.errorTitle, DATA_EXPORT_STRINGS.errorGeneric);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -170,19 +242,28 @@ export function DataExportScreen() {
         {/* Summary line */}
         <View style={styles.summaryRow}>
           <MaterialIcon name="info" size={18} color={COLORS.primary} />
-          <Text style={styles.summaryText}>{buildSummary(range.from, range.to)}</Text>
+          <Text style={styles.summaryText}>
+            {buildSummary(range.from, range.to, transactions.length)}
+          </Text>
         </View>
       </ScrollView>
 
       {/* Fixed bottom action */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={styles.exportButton}
+          style={[styles.exportButton, isExporting && styles.exportButtonDisabled]}
           onPress={handleExport}
           activeOpacity={0.8}
+          disabled={isExporting}
         >
-          <MaterialIcon name="download" size={20} color={COLORS.onPrimary} />
-          <Text style={styles.exportButtonText}>{DATA_EXPORT_STRINGS.exportButton}</Text>
+          {isExporting ? (
+            <ActivityIndicator size="small" color={COLORS.onPrimary} />
+          ) : (
+            <>
+              <MaterialIcon name="download" size={20} color={COLORS.onPrimary} />
+              <Text style={styles.exportButtonText}>{DATA_EXPORT_STRINGS.exportButton}</Text>
+            </>
+          )}
         </TouchableOpacity>
         <Text style={styles.exportNote}>{DATA_EXPORT_STRINGS.exportNote}</Text>
       </View>
@@ -317,6 +398,9 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     paddingVertical: SPACING[4],
     height: 56,
+  },
+  exportButtonDisabled: {
+    opacity: 0.6,
   },
   exportButtonText: {
     fontSize: FONT_SIZE.xl,

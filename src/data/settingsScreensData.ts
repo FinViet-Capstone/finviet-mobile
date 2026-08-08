@@ -20,6 +20,11 @@ export const DATA_EXPORT_STRINGS = {
   labelTo: 'Đến ngày',
   exportButton: 'Xuất file CSV',
   exportNote: 'File sẽ được lưu hoặc chia sẻ qua ứng dụng.',
+  noData: 'Không có giao dịch nào trong khoảng thời gian đã chọn.',
+  sharingUnavailable: 'Thiết bị này không hỗ trợ chia sẻ file.',
+  errorTitle: 'Không thể xuất file',
+  errorGeneric: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
+  shareDialogTitle: 'Xuất lịch sử giao dịch',
 };
 
 // Delete account screen strings
