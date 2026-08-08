@@ -143,8 +143,6 @@ export const getCustomerCategories = customerCategoriesImpl.getCustomerCategorie
 export const moveBucket = customerCategoriesImpl.moveBucket;
 export const bulkMoveBucket = customerCategoriesImpl.bulkMoveBucket;
 export const seedDefaultCategories = customerCategoriesImpl.seedDefaultCategories;
-export const deactivateCustomerCategory =
-  customerCategoriesImpl.deactivateCustomerCategory;
 export type { MoveBucketPayload } from './mock/customerCategories';
 
 // ─── Custom categories (customer-created, user-picked icon) ───────────────────

@@ -26,8 +26,6 @@ export interface CustomerCategory {
   bucketId: BucketType;
   /** How this entry was created */
   source: CategorySource;
-  /** false = hidden from budgets and pickers but not deleted */
-  isActive: boolean;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */

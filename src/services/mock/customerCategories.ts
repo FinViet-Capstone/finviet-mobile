@@ -34,7 +34,6 @@ export function seedDefaultCategories(customerId: string): CustomerCategory[] {
     categoryId: c.id,
     bucketId: c.defaultBucket,
     source: 'system' as const,
-    isActive: true,
     createdAt: now,
     updatedAt: now,
   }));
@@ -47,12 +46,12 @@ export function seedDefaultCategories(customerId: string): CustomerCategory[] {
 
 export async function getCustomerCategories(customerId: string): Promise<CustomerCategory[]> {
   await delay();
-  let rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+  let rows = _store.filter((c) => c.customerId === customerId);
   // Lazy default-seed so an already-onboarded (or demo) customer never has an empty set.
   // Real onboarding calls seedDefaultCategories() up front; this only fires as a fallback.
   if (rows.length === 0) {
     seedDefaultCategories(customerId);
-    rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+    rows = _store.filter((c) => c.customerId === customerId);
   }
   return rows;
 }
@@ -83,13 +82,4 @@ export async function bulkMoveBucket(payloads: MoveBucketPayload[]): Promise<Cus
     updated.push({ ...entry });
   }
   return updated;
-}
-
-export async function deactivateCustomerCategory(id: string): Promise<void> {
-  await delay();
-  const entry = _store.find((c) => c.id === id);
-  if (entry) {
-    entry.isActive = false;
-    entry.updatedAt = new Date().toISOString();
-  }
 }

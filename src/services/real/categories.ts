@@ -55,7 +55,6 @@ function toCustomerCategory(dto: CategoryDto): CustomerCategory {
     categoryId: dto.categoryId,
     bucketId,
     source: 'system',
-    isActive: true,
     createdAt: '',
     updatedAt: '',
   };
@@ -85,7 +84,6 @@ export async function moveBucket(
     categoryId: payload.customerCategoryId,
     bucketId: payload.targetBucket,
     source: 'system',
-    isActive: true,
     createdAt: '',
     updatedAt: new Date().toISOString(),
   };
@@ -103,7 +101,6 @@ export async function bulkMoveBucket(
       categoryId: payload.customerCategoryId,
       bucketId: payload.targetBucket,
       source: 'system' as const,
-      isActive: true,
       createdAt: '',
       updatedAt: new Date().toISOString(),
     };
@@ -117,8 +114,4 @@ export async function bulkMoveBucket(
  */
 export async function seedDefaultCategories(customerId: string): Promise<CustomerCategory[]> {
   return getCustomerCategories(customerId);
-}
-
-export async function deactivateCustomerCategory(_id: string): Promise<void> {
-  // No per-customer category row to deactivate server-side; no-op.
 }

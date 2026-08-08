@@ -57,8 +57,9 @@ B. Categories & Bucket System (Needs/Wants/Savings)
   seeding — gender/age → one of 5 fixed category subsets — was removed; the team decided months
   ago to drop it, and gender/date-of-birth collection at onboarding is kept only for future
   analytics, no longer feeding category selection.)
-- Customers can hide/deactivate a category (`CustomerCategory.isActive`); the mock service
-  currently only implements deactivation — there is no reactivation path yet.
+- There is no category deactivation feature: a customer cannot hide a category from budgets
+  or pickers. This existed as a data-layer function with no UI entry point and no reactivation
+  path at any layer, and was removed entirely (2026-08-08) rather than finished.
 - Categories can be dragged between Needs and Wants; the **Savings bucket is locked in both
   directions** — the move-bucket logic explicitly rejects moving a category into savings or
   out of it, and the UI hides the move affordance for savings rows entirely.
@@ -151,8 +152,8 @@ implements them.
 ### Category (global) / CustomerCategory (per-customer)
 - Category: id (slug, e.g. `cat_food`), nameVi, nameEn, icon, color, isSystem, sortOrder,
   type ('expense'|'income'), defaultBucket, autoOnly? (true only for `cat_savings_goal`)
-- CustomerCategory: id, customerId, categoryId, bucketId, source, isActive, createdAt,
-  updatedAt
+- CustomerCategory: id, customerId, categoryId, bucketId, source, createdAt, updatedAt
+  (no `isActive` field — category deactivation was removed; see Features §B.)
 - (No `CategoryRequest` type exists — there is no category-request feature; see Features §B.)
 
 ### Budget
