@@ -20,6 +20,7 @@ import {
 } from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
+import { getApiErrorMessage, BUSINESS_RULE_MESSAGES_VI } from '@/utils/errors';
 import type { Transaction } from '@/types';
 
 const S = {
@@ -50,19 +51,14 @@ const S = {
   unlinkError: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
 };
 
-/** Codes WalletService.DeleteWalletAsync throws as a 422 BusinessRuleException. */
-const WALLET_DELETE_ERROR_MESSAGES: Record<string, string> = {
-  wallet_has_transactions: 'Ví này đã có giao dịch nên không thể xóa.',
-  last_wallet: 'Không thể xóa ví duy nhất còn lại của bạn.',
-};
-
 function getWalletDeleteErrorMessage(err: unknown): string {
   // Real backend: 422 { code }. Mock: a plain Error whose message IS the code
-  // (see mock/wallets.ts deleteWallet).
+  // (see mock/wallets.ts deleteWallet). Both wallet_has_transactions/last_wallet
+  // live in the shared BUSINESS_RULE_MESSAGES_VI map now, not a local duplicate.
   const code = isAxiosError(err)
     ? (err.response?.data as { code?: string } | undefined)?.code
     : (err as Error | undefined)?.message;
-  return (code && WALLET_DELETE_ERROR_MESSAGES[code]) || 'Không thể xóa ví. Vui lòng thử lại.';
+  return (code && BUSINESS_RULE_MESSAGES_VI[code]) || 'Không thể xóa ví. Vui lòng thử lại.';
 }
 
 function formatVND(n: number): string {
@@ -129,8 +125,8 @@ export default function WalletDetailScreen() {
         onPress: () => {
           unlinkMutation.mutate(id, {
             onSuccess: () => { refetch(); refetchTx(); },
-            onError: (err: any) =>
-              Alert.alert(S.unlinkErrorTitle, err?.message ?? S.unlinkError),
+            onError: (err) =>
+              Alert.alert(S.unlinkErrorTitle, getApiErrorMessage(err, S.unlinkError)),
           });
         },
       },
@@ -148,8 +144,8 @@ export default function WalletDetailScreen() {
         refetch();
         refetchTx();
       },
-      onError: (err: any) => {
-        Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
+      onError: (err) => {
+        Alert.alert('Lỗi đồng bộ', getApiErrorMessage(err, 'Không thể đồng bộ giao dịch.'));
       },
     });
   }, [id, isSyncing, sepaySyncMutation, refetch, refetchTx]);
