@@ -7,13 +7,12 @@
  * The backend computes all progress fields server-side (SavingGoalResponse), so
  * we map them straight across rather than recomputing.
  *
- * Backend gaps vs the mock contract:
- *   - UpdateSavingGoalRequest has no fundingWalletId → that patch field is ignored.
- *   - ContributeSavingGoalRequest has no note → the note is ignored.
- *   - No endpoint for contribution/withdrawal history yet
- *     (getContributionsByGoalId stubs to []) and no withdraw endpoint yet
- *     (withdrawFromGoal stubs to a throw) — see mock/goals.ts for the real
- *     mock-only implementation of both.
+ * Backend gap that remains (by design, not a missing feature):
+ *   - UpdateSavingGoalRequest has no fundingWalletId, and there is intentionally
+ *     no "reassign the goal's funding wallet" endpoint — a goal never has a
+ *     static, permanent funding wallet. Wallet choice happens per-action
+ *     instead: addGoalContribution's fundingWalletId and withdrawFromGoal's
+ *     required walletId below.
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -82,12 +81,34 @@ export async function getGoalById(
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
-// TODO(backend): no contribution-history endpoint yet — stub to empty rather
-// than guessing a URL that would 404.
+interface SavingGoalContributionDto {
+  contributionId: string;
+  goalId: string;
+  amount: number;
+  type: 'contribution' | 'withdrawal';
+  contributedAt: string;
+  note: string | null;
+  transactionId: string | null;
+}
+
+function toContribution(dto: SavingGoalContributionDto): GoalContribution {
+  return {
+    id: dto.contributionId,
+    goalId: dto.goalId,
+    amount: dto.amount,
+    type: dto.type,
+    contributedAt: dto.contributedAt,
+    note: dto.note ?? undefined,
+    transactionId: dto.transactionId ?? undefined,
+  };
+}
+
+/** GET /saving-goals/{id}/contributions — combined contribution+withdrawal ledger, newest first. */
 export async function getContributionsByGoalId(
-  _goalId: string,
+  goalId: string,
 ): Promise<GoalContribution[]> {
-  return [];
+  const res = await api.get(`/saving-goals/${goalId}/contributions`);
+  return unwrap<SavingGoalContributionDto[]>(res).map(toContribution);
 }
 
 // ─── Writes ─────────────────────────────────────────────────────────────────
@@ -129,14 +150,25 @@ export async function addGoalContribution(
   const res = await api.post(`/saving-goals/${goalId}/contribute`, {
     amount: input.amount,
     fundingWalletId: input.fundingWalletId ?? null,
+    note: input.note?.trim() || null,
   }, idempotentConfig());
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
-// TODO(backend): no withdraw endpoint yet.
+/**
+ * POST /saving-goals/{id}/withdraw — walletId is required on every call (no
+ * static withdrawal wallet on the goal, mirrors contribute's per-action
+ * wallet choice). Credits the wallet, decrements currentAmount, records a
+ * type="withdrawal" ledger row.
+ */
 export async function withdrawFromGoal(
-  _goalId: string,
-  _input: WithdrawGoalInput,
+  goalId: string,
+  input: WithdrawGoalInput,
 ): Promise<SavingsGoalWithProgress> {
-  throw new Error('withdrawFromGoal not yet supported by backend');
+  const res = await api.post(`/saving-goals/${goalId}/withdraw`, {
+    amount: input.amount,
+    walletId: input.walletId,
+    note: input.note?.trim() || null,
+  }, idempotentConfig());
+  return toGoal(unwrap<SavingGoalDto>(res));
 }
