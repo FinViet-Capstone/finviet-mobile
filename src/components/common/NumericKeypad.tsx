@@ -15,8 +15,6 @@ import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 type Styles = ReturnType<typeof createStyles>;
 
-export type Operator = '+' | '-' | '×' | '÷';
-
 export interface NumericKeypadProps {
   visible: boolean;
   onClose?: () => void;
@@ -24,14 +22,12 @@ export interface NumericKeypadProps {
   onBackspace: () => void;
   onClear: () => void;
   onDone?: () => void;
-  onOperatorPress?: (op: Operator) => void;
-  activeOperator?: Operator | null;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const GAP = SPACING[3];   // 12
 const H_PAD = SPACING[4]; // 16
-const KEY_W = (SCREEN_WIDTH - 2 * H_PAD - 4 * GAP) / 5;
+const KEY_W = (SCREEN_WIDTH - 2 * H_PAD - 3 * GAP) / 4;
 
 /**
  * Approx height of the solid panel. Screens add this as bottom padding so the
@@ -39,7 +35,7 @@ const KEY_W = (SCREEN_WIDTH - 2 * H_PAD - 4 * GAP) / 5;
  */
 export const NUMPAD_HEIGHT = Math.round(SPACING[5] + 4 * KEY_W + 3 * GAP + SPACING[10]);
 
-// Each key: (screenWidth - 2*16px padding - 4*12px gaps) / 5
+// Each key: (screenWidth - 2*16px padding - 3*12px gaps) / 4
 // We use fixed pixel calculations via onLayout or just use a fixed aspect approach.
 // Grid uses a fixed gap and percentage widths aren't reliable in RN flex-wrap,
 // so we lay out rows manually for precise control.
@@ -68,33 +64,6 @@ function NumKey({
   );
 }
 
-function OpKey({
-  op,
-  symbol,
-  active,
-  onPress,
-  styles,
-}: {
-  op: Operator;
-  symbol: string;
-  active: boolean;
-  onPress?: (op: Operator) => void;
-  styles: Styles;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.key,
-        active ? styles.keyOpActive : styles.keyOp,
-        pressed && styles.keyPressed,
-      ]}
-      onPress={() => onPress?.(op)}
-    >
-      <Text style={[styles.keyText, active ? styles.opTextActive : styles.opText]}>{symbol}</Text>
-    </Pressable>
-  );
-}
-
 export function NumericKeypad({
   visible,
   onClose,
@@ -102,8 +71,6 @@ export function NumericKeypad({
   onBackspace,
   onClear,
   onDone,
-  onOperatorPress,
-  activeOperator,
 }: NumericKeypadProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -148,8 +115,6 @@ export function NumericKeypad({
 
   if (!visible && !mounted.current) return null;
 
-  const isOpActive = (op: Operator) => activeOperator === op;
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Tap-outside backdrop */}
@@ -167,17 +132,16 @@ export function NumericKeypad({
       >
         <View style={styles.blur}>
           {/*
-            Layout: 5 columns, 4 rows.
-            Col 5 row 3-4 is the Done key (spans 2 rows).
+            Layout: 4 columns, 4 rows.
+            Col 4 row 3-4 is the Done key (spans 2 rows).
             We render row-by-row so the last col of rows 3-4 can share space.
           */}
           <View style={styles.grid}>
-            {/* Row 1: 7 8 9 ÷ C */}
+            {/* Row 1: 7 8 9 C */}
             <View style={styles.row}>
               <NumKey label="7" onPress={onNumberPress} styles={styles} />
               <NumKey label="8" onPress={onNumberPress} styles={styles} />
               <NumKey label="9" onPress={onNumberPress} styles={styles} />
-              <OpKey op="÷" symbol="÷" active={isOpActive('÷')} onPress={onOperatorPress} styles={styles} />
               <Pressable
                 style={({ pressed }) => [styles.key, styles.clearKey, pressed && styles.keyPressed]}
                 onPress={onClear}
@@ -186,12 +150,11 @@ export function NumericKeypad({
               </Pressable>
             </View>
 
-            {/* Row 2: 4 5 6 × ⌫ */}
+            {/* Row 2: 4 5 6 ⌫ */}
             <View style={styles.row}>
               <NumKey label="4" onPress={onNumberPress} styles={styles} />
               <NumKey label="5" onPress={onNumberPress} styles={styles} />
               <NumKey label="6" onPress={onNumberPress} styles={styles} />
-              <OpKey op="×" symbol="×" active={isOpActive('×')} onPress={onOperatorPress} styles={styles} />
               <Pressable
                 style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
                 onPress={onBackspace}
@@ -200,7 +163,7 @@ export function NumericKeypad({
               </Pressable>
             </View>
 
-            {/* Rows 3-4: left 4 cols + Done key spanning both rows */}
+            {/* Rows 3-4: left 3 cols + Done key spanning both rows */}
             <View style={styles.rowsDouble}>
               <View style={styles.rowsDoubleLeft}>
                 {/* Row 3 left */}
@@ -208,13 +171,11 @@ export function NumericKeypad({
                   <NumKey label="1" onPress={onNumberPress} styles={styles} />
                   <NumKey label="2" onPress={onNumberPress} styles={styles} />
                   <NumKey label="3" onPress={onNumberPress} styles={styles} />
-                  <OpKey op="-" symbol="−" active={isOpActive('-')} onPress={onOperatorPress} styles={styles} />
                 </View>
                 {/* Row 4 left */}
                 <View style={styles.row}>
                   <NumKey label="0" onPress={onNumberPress} styles={styles} />
                   <NumKey label="000" wide onPress={onNumberPress} styles={styles} />
-                  <OpKey op="+" symbol="+" active={isOpActive('+')} onPress={onOperatorPress} styles={styles} />
                 </View>
               </View>
 
@@ -223,11 +184,7 @@ export function NumericKeypad({
                 style={({ pressed }) => [styles.doneKey, pressed && styles.doneKeyPressed]}
                 onPress={onDone}
               >
-                {activeOperator ? (
-                  <Text style={styles.equalText}>=</Text>
-                ) : (
-                  <MaterialIcon name="check_circle" size={36} color={colors.onPrimary} filled />
-                )}
+                <MaterialIcon name="check_circle" size={36} color={colors.onPrimary} filled />
               </Pressable>
             </View>
           </View>
@@ -275,10 +232,10 @@ function createStyles(colors: ThemeColors) {
       gap: GAP,
     },
     rowsDoubleLeft: {
-      flex: 4, // 4 of 5 columns
+      flex: 3, // 3 of 4 columns
       gap: GAP,
     },
-    // Standard key: flex:1 within a row of 5
+    // Standard key: flex:1 within a row of 4
     key: {
       flex: 1,
       aspectRatio: 1,
@@ -299,19 +256,12 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surfaceVariant,
       transform: [{ scale: 0.95 }],
     },
-    keyOp: {
-      backgroundColor: colors.surfaceContainerHighest,
-    },
-    keyOpActive: {
-      backgroundColor: colors.primaryContainer,
-      borderColor: colors.primary,
-    },
     clearKey: {
       backgroundColor: colors.errorContainer,
       borderColor: colors.error,
     },
     doneKey: {
-      flex: 1, // 1 of 5 columns
+      flex: 1, // 1 of 4 columns
       backgroundColor: colors.primary,
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
@@ -328,21 +278,10 @@ function createStyles(colors: ThemeColors) {
       fontWeight: FONT_WEIGHT.bold,
       color: colors.onSurface,
     },
-    opText: {
-      color: colors.onSurfaceVariant,
-    },
-    opTextActive: {
-      color: colors.onPrimaryContainer,
-    },
     clearText: {
       fontSize: FONT_SIZE.xl,
       fontWeight: FONT_WEIGHT.bold,
       color: colors.onErrorContainer,
-    },
-    equalText: {
-      fontSize: FONT_SIZE['3xl'],
-      fontWeight: FONT_WEIGHT.bold,
-      color: colors.onPrimary,
     },
   });
 }
