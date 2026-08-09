@@ -40,8 +40,6 @@ const S = {
   spent: 'Đã chi',
   of: '/',
   over: 'Vượt',
-  overLimit: 'vượt mức',
-  overGoal: 'Vượt chỉ tiêu',
   left: 'Còn lại',
   noLimit: 'Chưa có hạn mức',
   months: [
@@ -148,26 +146,35 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
   const icon = getBucketIcon(summary.bucket);
   const label = getBucketLabel(summary.bucket);
   const isSavings = summary.bucket === 'savings';
-  const isOver = summary.percentage > 100;
-  // Savings: vượt mục tiêu = TỐT (xanh). Needs/Wants: vượt ngân sách = XẤU (đỏ).
-  const isGoodOver = isSavings && isOver;
-  const isBadOver = !isSavings && isOver;
-  const isOverAllocated = !isSavings && summary.allocationCap > 0 && summary.monthlyLimit > summary.allocationCap;
-  const barColor = isBadOver ? COLORS.error : isGoodOver ? COLORS.tertiary : color;
+  const isGoodOver = isSavings && summary.percentage > 100;
+
+  // Needs/Wants: color the whole card by spend pace alone so status reads at
+  // a glance — a text badge here ("vượt mức") gets clipped at this card's
+  // width and was unreadable. Savings keeps the documented neutral-below-
+  // target scheme (exceeding a savings target is good, not bad, unlike
+  // overspending Needs/Wants; below target it stays neutral gray, no tint at
+  // all — never warning/danger).
+  const statusColor = isGoodOver
+    ? COLORS.tertiary
+    : isSavings
+    ? null
+    : summary.percentage > 80
+    ? COLORS.budget.danger
+    : summary.percentage > 60
+    ? COLORS.budget.warning
+    : COLORS.budget.safe;
+
+  const displayColor = statusColor ?? color;
   const barWidth = Math.min(summary.percentage, 100);
 
   return (
-    <View style={[styles.bucketCard, isBadOver && { borderColor: COLORS.error }, isGoodOver && { borderColor: COLORS.tertiary }]}>
+    <View style={[styles.bucketCard, statusColor && { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}60` }]}>
       <View style={styles.bucketCardTop}>
         <Text style={[styles.bucketLabel, { color }]}>{label}</Text>
-        {isGoodOver
-          ? <View style={styles.overGoalBadge}><Text style={styles.overGoalText}>{S.overGoal}</Text></View>
-          : isOverAllocated
-          ? <View style={styles.overAllocBadge}><Text style={styles.overAllocText}>{S.overLimit}</Text></View>
-          : <MaterialIcon name={icon} size={16} color={color} />}
+        <MaterialIcon name={icon} size={16} color={displayColor} />
       </View>
       <View style={styles.bucketAmounts}>
-        <Text style={[styles.bucketSpent, isBadOver && { color: COLORS.error }, isGoodOver && { color: COLORS.tertiary }]}>
+        <Text style={[styles.bucketSpent, { color: displayColor }]}>
           {formatVND(summary.spent)}
         </Text>
         <Text style={styles.bucketLimit}>
@@ -178,7 +185,7 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
         <View
           style={[
             styles.bucketBarFill,
-            { width: `${barWidth}%` as any, backgroundColor: barColor },
+            { width: `${barWidth}%` as any, backgroundColor: displayColor },
           ]}
         />
       </View>
@@ -815,31 +822,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.primary,
-  },
-  overAllocBadge: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.secondary}20`,
-    borderWidth: 1,
-    borderColor: `${COLORS.secondary}40`,
-  },
-  overAllocText: {
-    fontSize: 10,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.secondary,
-  },
-  overGoalBadge: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.tertiary}20`,
-    borderWidth: 1,
-    borderColor: `${COLORS.tertiary}40`,
-  },
-  overGoalText: {
-    fontSize: 10,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.tertiary,
   },
 });
