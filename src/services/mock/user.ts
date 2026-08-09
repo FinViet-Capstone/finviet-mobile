@@ -31,6 +31,7 @@ const MOCK_USER: Customer = {
     report: true,
     goals: true,
   },
+  notifBudgetThresholds: [80, 100],
   fcmToken: 'mock_fcm_token_abc123',
   onboardingDone: true,
   createdAt: '2026-01-01T00:00:00.000Z',

@@ -66,6 +66,8 @@ export interface Customer {
   /** False until the user clicks the verification link in their inbox. Soft gate -- onboarding still runs. */
   emailVerified: boolean;
   notifications: NotificationSettings;
+  /** [warningPct, exceededPct] for budget_alert notifications. Default [80, 100]. */
+  notifBudgetThresholds: [number, number];
   /** Firebase Cloud Messaging device token for push notifications */
   fcmToken: string | null;
   onboardingDone: boolean;

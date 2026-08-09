@@ -8,8 +8,8 @@
  * string (see ApiResponse / ExceptionHandlingMiddleware). We map those onto the
  * FE AuthErrorCode union so AuthErrorBanner renders consistent Vietnamese copy.
  *
- * Endpoints with no backend equivalent (changePassword, googleOAuth) re-export
- * the mock so the swap stays whole.
+ * googleOAuth has no usable backend equivalent yet (needs a Firebase ID token
+ * + custom dev build) so it still fails loudly below.
  */
 
 import axios from 'axios';
@@ -20,12 +20,11 @@ import type { Customer } from '@/types';
 import type {
   MockLoginInput,
   MockRegisterInput,
+  MockChangePasswordInput,
   UpdateProfileInput,
+  UpdateProfileSettingsInput,
   ResetPasswordInput,
 } from '@/services/mock/auth';
-
-// changePassword has no .NET endpoint yet — keep it on the mock.
-export { changePassword } from '@/services/mock/auth';
 
 /**
  * Google sign-in is NOT mocked in real mode. The backend (`POST /auth/google-login`)
@@ -92,6 +91,20 @@ function toAuthError(
 
 // ─── profile → Customer mapper ────────────────────────────────────────────────
 
+const BE_THEME_TO_FE: Record<string, Customer['theme']> = {
+  Light: 'light',
+  Dark: 'dark',
+  System: 'system',
+};
+
+function toTheme(raw: AuthResponsePayload['profile']['theme']): Customer['theme'] {
+  return (raw && BE_THEME_TO_FE[raw]) ?? 'system';
+}
+
+function toThresholds(raw: number[] | undefined): [number, number] {
+  return raw && raw.length === 2 ? [raw[0], raw[1]] : [80, 100];
+}
+
 function toCustomer(p: AuthResponsePayload['profile']): Customer {
   const monthlyIncome = p.monthlyIncomeExpected ?? null;
   return {
@@ -109,10 +122,11 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
     savingsPct: p.savingsPct ?? 20,
     defaultCurrency: 'VND',
     language: 'vi',
-    theme: 'system',
+    theme: toTheme(p.theme),
     isActive: p.isActive,
     emailVerified: p.isEmailVerified,
     notifications: { budget: true, report: true, goals: true },
+    notifBudgetThresholds: toThresholds(p.notifBudgetThresholds),
     fcmToken: null,
     // ProfileDto carries no onboarding flag; monthly income is the only signal
     // available at login time (see plan / docs). Replaced once GET /me lands.
@@ -161,6 +175,27 @@ export async function updateProfile(input: UpdateProfileInput): Promise<void> {
   });
 }
 
+const FE_THEME_TO_BE: Record<'light' | 'dark' | 'system', string> = {
+  light: 'Light',
+  dark: 'Dark',
+  system: 'System',
+};
+
+/**
+ * PATCH /api/profile/settings — theme + budget-alert notification thresholds.
+ * Upserts a CustomerSetting row server-side on first call. Distinct from
+ * PUT /profile (updateProfile above), which the backend locks down for the
+ * income/allocation trio once onboarding is done — settings has no such lock.
+ */
+export async function updateProfileSettings(input: UpdateProfileSettingsInput): Promise<void> {
+  await api.patch('/profile/settings', {
+    ...(input.theme !== undefined ? { theme: FE_THEME_TO_BE[input.theme] } : {}),
+    ...(input.notifBudgetThresholds !== undefined
+      ? { notifBudgetThresholds: input.notifBudgetThresholds }
+      : {}),
+  });
+}
+
 /**
  * POST /api/profile/avatar — upload a new avatar image (multipart). Returns the
  * hosted avatar URL. Accepts a local file URI from the image picker.
@@ -181,6 +216,30 @@ export async function uploadAvatar(uri: string): Promise<string> {
 /** DELETE /api/account — self soft-delete; the backend revokes refresh tokens. */
 export async function deleteAccount(): Promise<void> {
   await api.delete('/account');
+}
+
+/**
+ * POST /api/auth/change-password — customer JWT required. On success the
+ * backend revokes all of the customer's active refresh tokens (same
+ * forced-logout-elsewhere behavior as reset-password): the current access
+ * token keeps working until it naturally expires, but the next silent
+ * refresh will fail and route back to login.
+ */
+export async function changePassword(input: MockChangePasswordInput): Promise<void> {
+  try {
+    await api.post('/auth/change-password', {
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+    });
+  } catch (err) {
+    throw toAuthError(err, (status) => {
+      // FluentValidation weak-password 400s are already caught above (they
+      // carry an `errors` object); a plain 400 here means the current
+      // password itself was wrong.
+      if (status === 400) return 'wrong_current_password';
+      return undefined;
+    });
+  }
 }
 
 // ─── login ────────────────────────────────────────────────────────────────────
