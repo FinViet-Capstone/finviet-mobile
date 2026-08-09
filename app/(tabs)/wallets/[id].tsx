@@ -11,7 +11,13 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useWalletById, useSyncSepayWallet, useDeleteWallet } from '@/hooks/useWallets';
+import {
+  useWalletById,
+  useSyncSepayWallet,
+  useDeleteWallet,
+  useSepayLinks,
+  useUnlinkSepayAccount,
+} from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import type { Transaction } from '@/types';
@@ -34,6 +40,14 @@ const S = {
   deleteCancel: 'Hủy',
   deleteConfirm: 'Xóa',
   deleteErrorTitle: 'Không thể xóa ví',
+  relinkBanner: 'Kết nối ngân hàng đã hết hạn. Vui lòng liên kết lại để tiếp tục đồng bộ.',
+  unlinkBtn: 'Ngắt kết nối',
+  unlinkTitle: 'Ngắt kết nối ngân hàng?',
+  unlinkMsg: 'Ví sẽ chuyển về ví thường và không còn tự động đồng bộ giao dịch. Lịch sử giao dịch đã có sẽ được giữ lại.',
+  unlinkCancel: 'Hủy',
+  unlinkConfirm: 'Ngắt kết nối',
+  unlinkErrorTitle: 'Không thể ngắt kết nối',
+  unlinkError: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
 };
 
 /** Codes WalletService.DeleteWalletAsync throws as a 422 BusinessRuleException. */
@@ -61,6 +75,8 @@ export default function WalletDetailScreen() {
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const sepaySyncMutation = useSyncSepayWallet();
   const deleteWalletMutation = useDeleteWallet();
+  const { data: sepayLinks } = useSepayLinks();
+  const unlinkMutation = useUnlinkSepayAccount();
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -103,6 +119,24 @@ export default function WalletDetailScreen() {
     );
   }, [id, isDeleting, wallet, deleteWalletMutation, router]);
 
+  const handleUnlink = useCallback(() => {
+    if (!id || unlinkMutation.isPending) return;
+    Alert.alert(S.unlinkTitle, S.unlinkMsg, [
+      { text: S.unlinkCancel, style: 'cancel' },
+      {
+        text: S.unlinkConfirm,
+        style: 'destructive',
+        onPress: () => {
+          unlinkMutation.mutate(id, {
+            onSuccess: () => { refetch(); refetchTx(); },
+            onError: (err: any) =>
+              Alert.alert(S.unlinkErrorTitle, err?.message ?? S.unlinkError),
+          });
+        },
+      },
+    ]);
+  }, [id, unlinkMutation, refetch, refetchTx]);
+
   const handleSync = useCallback(() => {
     if (!id || isSyncing) return;
     sepaySyncMutation.mutate(id, {
@@ -124,6 +158,8 @@ export default function WalletDetailScreen() {
   if (isError || !wallet) return <ErrorState message={(error as Error)?.message ?? 'Không tìm thấy ví'} onRetry={refetch} />;
 
   const syncStatus = wallet.linkedMetadata?.syncStatus;
+  const linkStatus = sepayLinks?.find((l) => l.walletId === id);
+  const relinkRequired = wallet.type === 'linked' && linkStatus?.relinkRequired === true;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -155,6 +191,14 @@ export default function WalletDetailScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); refetchTx(); }} tintColor={COLORS.primary} />}>
+
+        {/* Relink-required banner */}
+        {relinkRequired && (
+          <View style={styles.relinkBanner}>
+            <MaterialIcon name="warning" size={18} color={COLORS.error} />
+            <Text style={styles.relinkBannerText}>{S.relinkBanner}</Text>
+          </View>
+        )}
 
         {/* Balance card */}
         <View style={styles.balanceCard}>
@@ -193,6 +237,23 @@ export default function WalletDetailScreen() {
             <Text style={styles.syncBtnText}>
               {isSyncing ? S.syncing : S.syncBtn}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Unlink button for linked wallets */}
+        {wallet.type === 'linked' && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.unlinkBtn, unlinkMutation.isPending && styles.syncBtnDisabled]}
+            onPress={handleUnlink}
+            disabled={unlinkMutation.isPending}
+          >
+            {unlinkMutation.isPending ? (
+              <ActivityIndicator size="small" color={COLORS.error} />
+            ) : (
+              <MaterialIcon name="link_off" size={18} color={COLORS.error} />
+            )}
+            <Text style={styles.unlinkBtnText}>{S.unlinkBtn}</Text>
           </TouchableOpacity>
         )}
 
@@ -243,5 +304,19 @@ const styles = StyleSheet.create({
   },
   syncBtnDisabled: { opacity: 0.6 },
   syncBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
+  unlinkBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING[2], backgroundColor: 'transparent', borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.error}50`,
+    paddingVertical: SPACING[3], paddingHorizontal: SPACING[5],
+  },
+  unlinkBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.error },
+  relinkBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+    backgroundColor: `${COLORS.error}15`, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.error}30`,
+    padding: SPACING[3],
+  },
+  relinkBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 16 },
   sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
 });

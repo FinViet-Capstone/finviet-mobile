@@ -11,6 +11,8 @@ export {
   useLinkSepayAccount,
   useLinkSepayWithToken,
   useSyncSepayWallet,
+  useSepayLinks,
+  useUnlinkSepayAccount,
 } from './useWallets';
 export {
   useTransactions,
