@@ -18,12 +18,21 @@ This is the common workflow that we will use for every single feature/fix:
 4. **Test** - Verify it works in the browser. Implement unit testing later. Run `npm run build` and fix any errors
 5. **Iterate** - Iterate and change things if needed
 6. **Commit** - Only after build passes and everything works
-7. **Merge** - Merge to main
+7. **Merge** - Merge to `dev` (the shared integration branch every feature/fix branch merges into — `main` is a separate release branch updated on its own cadence, not per-fix, so don't merge feature/fix branches directly into it unless explicitly asked)
 8. **Delete Branch** - Delete branch after merge
 9. **Review** - Review AI-generated code periodically and on demand.
 10. Mark as completed in @context/current-feature.md and add to history
 
 Do NOT commit without permission and until the build passes. If build fails, fix the issues first.
+
+## Bug Fixes
+
+For bug reports specifically, follow: **diagnose → plan → ask → fix**.
+
+- **Diagnose** - Investigate and confirm the root cause in the actual code before proposing anything. Cite the exact file/line responsible; don't guess.
+- **Plan** - Write up the root cause and the proposed fix (what changes, why, and what's explicitly out of scope).
+- **Ask** - Get explicit go-ahead on the plan before writing any code — this is separate from, and earlier than, asking before committing.
+- **Fix** - Implement, then verify per the Test step above.
 
 ## Branching
 
