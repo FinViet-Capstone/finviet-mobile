@@ -2,16 +2,23 @@
  * real/sepay.ts — SePay OAuth2 bank-linking via the .NET backend.
  *
  * Backend (WalletsController, api/wallets/sepay/*):
- *   - POST /wallets/sepay/link         { code, bankAccountId? }  → SepayLinkResult
- *   - POST /wallets/sepay/bank-accounts{ code }                  → SepayBankAccount[]
+ *   - GET  /wallets/sepay/authorize-url                          → SepayAuthorizeUrlResponse
+ *   - POST /wallets/sepay/link         { code, state?, bankAccountId? } → SepayLinkResult
+ *   - POST /wallets/sepay/bank-accounts{ code, state? }           → SepayBankAccount[]
+ *   - GET  /wallets/sepay/links                                   → SepayLinkStatusResponse[]
  *   - POST /wallets/{id}/sepay-sync                               → SepayWalletSyncResponse
+ *   - DELETE /wallets/{id}/sepay-link                             → SepayUnlinkResponse
  *
  * Flow:
- *  1. Open SePay OAuth2 authorize URL in a WebView.
- *  2. User authorizes → redirect back with `code` query param.
- *  3. Frontend sends the code to POST /wallets/sepay/link.
- *  4. Backend exchanges code for tokens, creates wallet, syncs initial transactions.
- *  5. To re-sync later: POST /wallets/{id}/sepay-sync.
+ *  1. GET /wallets/sepay/authorize-url — the backend owns ClientId/RedirectUri
+ *     config and issues a signed, single-customer, expiring `state` (CSRF)
+ *     token; the client must never build the authorize URL itself.
+ *  2. Open the returned authorizeUrl in a WebView.
+ *  3. User authorizes → redirect back with `code` query param.
+ *  4. Frontend sends `code` + the same `state` to POST /wallets/sepay/link.
+ *  5. Backend validates `state`, exchanges `code` for tokens, creates wallet,
+ *     syncs initial transactions.
+ *  6. To re-sync later: POST /wallets/{id}/sepay-sync.
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -54,6 +61,33 @@ interface SepaySyncDto {
   syncedAt: string;
 }
 
+interface SepayAuthorizeUrlDto {
+  authorizeUrl: string;
+  state: string;
+  expiresAt: string;
+}
+
+interface SepayLinkStatusDto {
+  walletId: string;
+  walletName: string;
+  balance: number;
+  authMode: string;
+  sepayBankAccountId?: number | null;
+  bankShortName?: string | null;
+  accountMask?: string | null;
+  accountHolderName?: string | null;
+  lastSyncedAt?: string | null;
+  relinkRequired: boolean;
+  webhookId?: number | null;
+  webhookRegistered: boolean;
+}
+
+interface SepayUnlinkDto {
+  walletId: string;
+  walletType: string;
+  transactionsRetained: number;
+}
+
 // ─── Exported types ────────────────────────────────────────────────────────────
 
 export interface SepayBankAccount {
@@ -78,6 +112,32 @@ export interface SepaySyncResult {
   transactionsCreated: number;
   transactionsUpdated: number;
   syncedAt: string;
+}
+
+export interface SepayAuthorizeUrl {
+  authorizeUrl: string;
+  /** Signed CSRF token — echo back to linkSepayAccount()/getSepayBankAccounts(). */
+  state: string;
+  expiresAt: string;
+}
+
+export interface SepayLinkStatus {
+  walletId: string;
+  walletName: string;
+  balance: number;
+  /** "oauth" or "static". */
+  authMode: string;
+  bankShortName?: string;
+  accountMask?: string;
+  lastSyncedAt?: string;
+  /** True when the stored authorization can no longer be renewed — re-link required. */
+  relinkRequired: boolean;
+  webhookRegistered: boolean;
+}
+
+export interface SepayUnlinkResult {
+  walletId: string;
+  transactionsRetained: number;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -122,20 +182,48 @@ function toBankAccount(dto: SepayBankAccountDto): SepayBankAccount {
   };
 }
 
+function toLinkStatus(dto: SepayLinkStatusDto): SepayLinkStatus {
+  return {
+    walletId: dto.walletId,
+    walletName: dto.walletName,
+    balance: dto.balance,
+    authMode: dto.authMode,
+    bankShortName: dto.bankShortName ?? undefined,
+    accountMask: dto.accountMask ?? undefined,
+    lastSyncedAt: dto.lastSyncedAt ?? undefined,
+    relinkRequired: dto.relinkRequired,
+    webhookRegistered: dto.webhookRegistered,
+  };
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 /**
- * Link a SePay bank account using an OAuth2 authorization code.
+ * GET /wallets/sepay/authorize-url — the only correct source for the OAuth2
+ * authorize URL. The backend owns ClientId/RedirectUri config and issues a
+ * signed, single-customer, expiring `state` token (1–30 min lifetime); the
+ * client must never construct this URL or a `state` value itself.
+ */
+export async function getSepayAuthorizeUrl(): Promise<SepayAuthorizeUrl> {
+  const res = await api.get('/wallets/sepay/authorize-url');
+  return unwrap<SepayAuthorizeUrlDto>(res);
+}
+
+/**
+ * Link a SePay bank account using an OAuth2 authorization code. `state` should
+ * be the value returned by getSepayAuthorizeUrl() — the backend validates it
+ * belongs to the caller when present.
  * The backend exchanges the code for tokens, creates a sepay_linked wallet,
  * and performs the initial transaction sync.
  */
 export async function linkSepayAccount(
   code: string,
   bankAccountId?: number,
+  state?: string,
 ): Promise<SepayLinkResult> {
   const res = await api.post(
     '/wallets/sepay/link',
-    { code, bankAccountId: bankAccountId ?? null },
+    { code, state: state ?? null, bankAccountId: bankAccountId ?? null },
     { timeout: 120_000 },
   );
   const dto = unwrap<SepayLinkResultDto>(res);
@@ -171,8 +259,9 @@ export async function linkSepayWithToken(
  */
 export async function getSepayBankAccounts(
   code: string,
+  state?: string,
 ): Promise<SepayBankAccount[]> {
-  const res = await api.post('/wallets/sepay/bank-accounts', { code });
+  const res = await api.post('/wallets/sepay/bank-accounts', { code, state: state ?? null });
   return unwrap<SepayBankAccountDto[]>(res).map(toBankAccount);
 }
 
@@ -184,4 +273,21 @@ export async function syncSepayWallet(
     timeout: 120_000,
   });
   return unwrap<SepaySyncDto>(res);
+}
+
+/** GET /wallets/sepay/links — connection status for every SePay-linked wallet. */
+export async function getSepayLinks(): Promise<SepayLinkStatus[]> {
+  const res = await api.get('/wallets/sepay/links');
+  return unwrap<SepayLinkStatusDto[]>(res).map(toLinkStatus);
+}
+
+/**
+ * DELETE /wallets/{id}/sepay-link — disconnect a bank-linked wallet. Converts
+ * it back to a basic wallet; transaction history is never deleted, only the
+ * link/authorization record.
+ */
+export async function unlinkSepayAccount(walletId: string): Promise<SepayUnlinkResult> {
+  const res = await api.delete(`/wallets/${walletId}/sepay-link`);
+  const dto = unwrap<SepayUnlinkDto>(res);
+  return { walletId: dto.walletId, transactionsRetained: dto.transactionsRetained };
 }
