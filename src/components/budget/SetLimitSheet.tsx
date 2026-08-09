@@ -13,6 +13,7 @@ import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { useCreateBudget } from '@/hooks/useBudgets';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -70,11 +71,40 @@ export default function SetLimitSheet({
   const createBudget = useCreateBudget();
 
   const [sliderValue, setSliderValue] = useState(existingLimit ?? 0);
+  const [amountFocused, setAmountFocused] = useState(false);
+  const [amountRaw, setAmountRaw] = useState('');
 
   const sliderMax = allocationCap > 0 ? allocationCap : 10_000_000;
   const hasIncome = allocationCap > 0;
-  const isOverRemaining = sliderValue > remainingCap && remainingCap >= 0;
+  const isOverRemaining = sliderValue > remainingCap;
   const markerPct = sliderMax > 0 ? Math.min(100, (remainingCap / sliderMax) * 100) : 0;
+
+  const openAmountKeypad = useCallback(() => {
+    setAmountRaw('');
+    setAmountFocused(true);
+  }, []);
+
+  const handleAmountNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleAmountBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleAmountClear = useCallback(() => setAmountRaw(''), []);
+
+  const handleAmountClose = useCallback(() => {
+    setAmountFocused(false);
+    setAmountRaw('');
+  }, []);
+
+  const handleAmountDone = useCallback(() => {
+    const typed = parseInt(amountRaw || '0', 10);
+    setSliderValue(Math.min(Math.max(typed, 0), sliderMax));
+    setAmountFocused(false);
+    setAmountRaw('');
+  }, [amountRaw, sliderMax]);
 
   const doSave = useCallback(async () => {
     await createBudget.mutateAsync({ categoryId, monthlyLimit: Math.round(sliderValue) });
@@ -101,94 +131,114 @@ export default function SetLimitSheet({
   const trackColor = isOverRemaining ? COLORS.secondary : COLORS.primary;
 
   return (
-    <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={styles.sheet}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{S.title}</Text>
-            <Text style={styles.categoryName}>{categoryName}</Text>
-          </View>
-
-          {/* Slider */}
-          <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
-
-          {!hasIncome && (
-            <Text style={styles.noIncomeHint}>{S.noIncome}</Text>
-          )}
-
-          <View style={styles.sliderAmountRow}>
-            <Text style={[styles.sliderAmount, isOverRemaining && { color: COLORS.secondary }]}>
-              {sliderValue > 0 ? `${formatVND(Math.round(sliderValue))}đ` : '0đ'}
-            </Text>
-            <Text style={styles.sliderSuffix}>{S.monthly}</Text>
-          </View>
-
-          {/* Slider track with remainingCap marker */}
-          <View style={styles.sliderWrap}>
-            <CustomSlider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={sliderMax}
-              step={50_000}
-              value={sliderValue}
-              onValueChange={setSliderValue}
-              minimumTrackTintColor={trackColor}
-              maximumTrackTintColor={COLORS.surfaceVariant}
-              thumbTintColor={thumbColor}
-            />
-            {/* Remaining cap marker */}
-            {hasIncome && markerPct > 0 && markerPct < 100 && (
-              <View style={[styles.marker, { left: `${markerPct}%` as any }]} />
-            )}
-          </View>
-
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabelMin}>0đ</Text>
-            {hasIncome && remainingCap > 0 && remainingCap < allocationCap && (
-              <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: COLORS.secondary }]}>
-                {S.remaining}: {formatVND(remainingCap)}đ
-              </Text>
-            )}
-            {hasIncome && (
-              <Text style={styles.sliderLabelMax}>{formatVND(sliderMax)}đ</Text>
-            )}
-          </View>
-
-          {/* Over-remaining warning */}
-          {isOverRemaining && (
-            <View style={styles.overWarning}>
-              <MaterialIcon name="warning" size={14} color={COLORS.secondary} />
-              <Text style={styles.overWarningText}>
-                Vượt ngân sách còn lại của nhóm {bucket}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Actions — pinned below the scroll area so they're always reachable */}
-        <View style={[styles.actions, { paddingBottom: insets.bottom + SPACING[2] }]}>
-          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelText}>{S.cancel}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[styles.saveBtn, createBudget.isPending && styles.saveBtnDisabled,
-              isOverRemaining && styles.saveBtnWarning]}
-            onPress={handleSave}
-            disabled={createBudget.isPending}
+    <>
+      <DraggableSheet visible={visible} onClose={onClose}>
+        <View style={styles.sheet}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}
+            showsVerticalScrollIndicator={false}
           >
-            {createBudget.isPending
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
-              : <Text style={styles.saveText}>{S.save}</Text>}
-          </TouchableOpacity>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>{S.title}</Text>
+              <Text style={styles.categoryName}>{categoryName}</Text>
+            </View>
+
+            {/* Slider */}
+            <Text style={styles.sectionLabel}>{S.amountLabel}</Text>
+
+            {!hasIncome && (
+              <Text style={styles.noIncomeHint}>{S.noIncome}</Text>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.sliderAmountRow}
+              onPress={openAmountKeypad}
+              accessibilityRole="button"
+              accessibilityLabel={S.amountLabel}
+            >
+              <Text style={[styles.sliderAmount, isOverRemaining && { color: COLORS.secondary }]}>
+                {amountFocused
+                  ? `${parseInt(amountRaw || '0', 10) > 0 ? formatVND(parseInt(amountRaw, 10)) : '0'}đ`
+                  : sliderValue > 0 ? `${formatVND(Math.round(sliderValue))}đ` : '0đ'}
+              </Text>
+              <Text style={styles.sliderSuffix}>{S.monthly}</Text>
+              <MaterialIcon name="edit" size={14} color={isOverRemaining ? COLORS.secondary : COLORS.primary} />
+            </TouchableOpacity>
+
+            {/* Slider track with remainingCap marker */}
+            <View style={styles.sliderWrap}>
+              <CustomSlider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={sliderMax}
+                step={50_000}
+                value={sliderValue}
+                onValueChange={setSliderValue}
+                minimumTrackTintColor={trackColor}
+                maximumTrackTintColor={COLORS.surfaceVariant}
+                thumbTintColor={thumbColor}
+              />
+              {/* Remaining cap marker */}
+              {hasIncome && markerPct > 0 && markerPct < 100 && (
+                <View style={[styles.marker, { left: `${markerPct}%` as any }]} />
+              )}
+            </View>
+
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabelMin}>0đ</Text>
+              {hasIncome && remainingCap > 0 && remainingCap < allocationCap && (
+                <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: COLORS.secondary }]}>
+                  {S.remaining}: {formatVND(remainingCap)}đ
+                </Text>
+              )}
+              {hasIncome && (
+                <Text style={styles.sliderLabelMax}>{formatVND(sliderMax)}đ</Text>
+              )}
+            </View>
+
+            {/* Over-remaining warning */}
+            {isOverRemaining && (
+              <View style={styles.overWarning}>
+                <MaterialIcon name="warning" size={14} color={COLORS.secondary} />
+                <Text style={styles.overWarningText}>
+                  Vượt ngân sách còn lại của nhóm {bucket}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Actions — pinned below the scroll area so they're always reachable */}
+          <View style={[styles.actions, { paddingBottom: insets.bottom + SPACING[2] }]}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+              <Text style={styles.cancelText}>{S.cancel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.saveBtn, createBudget.isPending && styles.saveBtnDisabled,
+                isOverRemaining && styles.saveBtnWarning]}
+              onPress={handleSave}
+              disabled={createBudget.isPending}
+            >
+              {createBudget.isPending
+                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                : <Text style={styles.saveText}>{S.save}</Text>}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </DraggableSheet>
+      </DraggableSheet>
+
+      <NumericKeypad
+        visible={amountFocused}
+        onClose={handleAmountClose}
+        onNumberPress={handleAmountNumberPress}
+        onBackspace={handleAmountBackspace}
+        onClear={handleAmountClear}
+        onDone={handleAmountDone}
+      />
+    </>
   );
 }
 
