@@ -6,9 +6,12 @@ import {
   updateGoal,
   deleteGoal,
   addGoalContribution,
+  getContributionsByGoalId,
+  withdrawFromGoal,
   type CreateGoalInput,
   type UpdateGoalInput,
   type AddContributionInput,
+  type WithdrawGoalInput,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
@@ -26,6 +29,14 @@ export const useGoalById = (id: string | undefined) =>
     queryKey: queryKeys.goals.detail(id),
     queryFn: () => (id ? getGoalById(id) ?? null : null),
     enabled: !!id,
+    staleTime: STALE_TIME.medium,
+  });
+
+export const useGoalContributions = (goalId: string | undefined) =>
+  useQuery({
+    queryKey: queryKeys.goals.contributions(goalId),
+    queryFn: () => (goalId ? getContributionsByGoalId(goalId) : []),
+    enabled: !!goalId,
     staleTime: STALE_TIME.medium,
   });
 
@@ -70,6 +81,15 @@ export const useAddContribution = () => {
   return useMutation({
     mutationFn: ({ goalId, input }: { goalId: string; input: AddContributionInput }) =>
       addGoalContribution(goalId, input),
+    onSuccess: () => invalidateGoalDependents(qc),
+  });
+};
+
+export const useWithdrawFromGoal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, input }: { goalId: string; input: WithdrawGoalInput }) =>
+      withdrawFromGoal(goalId, input),
     onSuccess: () => invalidateGoalDependents(qc),
   });
 };

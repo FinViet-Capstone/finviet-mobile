@@ -129,10 +129,13 @@ export const createGoal = goalsImpl.createGoal;
 export const updateGoal = goalsImpl.updateGoal;
 export const deleteGoal = goalsImpl.deleteGoal;
 export const addGoalContribution = goalsImpl.addGoalContribution;
+export const getContributionsByGoalId = goalsImpl.getContributionsByGoalId;
+export const withdrawFromGoal = goalsImpl.withdrawFromGoal;
 export type {
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
+  WithdrawGoalInput,
 } from './mock/goals';
 
 // ─── Customer categories (bucket model) ───────────────────────────────────────

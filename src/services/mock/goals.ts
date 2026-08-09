@@ -119,6 +119,7 @@ let CONTRIBUTIONS: GoalContribution[] = GOALS.filter((g) => g.currentAmount > 0)
     id: `contrib_seed_${g.id}`,
     goalId: g.id,
     amount: g.currentAmount,
+    type: 'contribution' as const,
     contributedAt: g.createdAt,
     note: 'Số dư ban đầu',
   }),
@@ -136,6 +137,14 @@ export function getGoalById(id: string): SavingsGoalWithProgress | undefined {
 
 export function getContributionsByGoalId(goalId: string): GoalContribution[] {
   return CONTRIBUTIONS.filter((c) => c.goalId === goalId);
+}
+
+/** currentAmount = Σ contributions − Σ withdrawals (single source of truth). */
+function computeCurrentAmount(goalId: string): number {
+  return CONTRIBUTIONS.filter((c) => c.goalId === goalId).reduce(
+    (sum, c) => sum + (c.type === 'withdrawal' ? -c.amount : c.amount),
+    0,
+  );
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────
@@ -187,6 +196,7 @@ export async function createGoal(
       id: genContribId(),
       goalId: goal.id,
       amount: initial,
+      type: 'contribution',
       contributedAt: nowIso(),
       transactionId: tx.id,
     };
@@ -324,17 +334,74 @@ export async function addGoalContribution(
     id: genContribId(),
     goalId,
     amount: input.amount,
+    type: 'contribution',
     contributedAt: nowIso(),
     note: input.note,
     transactionId,
   };
   CONTRIBUTIONS = [...CONTRIBUTIONS, contrib];
 
-  // currentAmount = Σ all contributions (single source of truth)
-  const totalContributed = CONTRIBUTIONS
-    .filter((c) => c.goalId === goalId)
-    .reduce((sum, c) => sum + c.amount, 0);
+  const totalContributed = computeCurrentAmount(goalId);
+  const merged = {
+    ...goal,
+    currentAmount: totalContributed,
+    isCompleted: totalContributed >= goal.targetAmount,
+    updatedAt: nowIso(),
+  };
+  const after = recomputeProgress(merged);
+  GOALS = GOALS.map((g) => (g.id === goalId ? after : g));
+  return after;
+}
 
+export interface WithdrawGoalInput {
+  amount: number;
+  walletId: string;
+  note?: string;
+}
+
+/**
+ * Withdraw part of a goal's saved amount back into a wallet.
+ * - Guards: amount must be > 0 and ≤ the goal's currentAmount.
+ * - Always credits `input.walletId` (an income transaction on cat_savings_goal,
+ *   the mirror image of a contribution's expense) — withdrawal has no notion of
+ *   a "preset" wallet the way contributions fall back to goal.fundingWalletId.
+ * - currentAmount = Σ contributions − Σ withdrawals (see computeCurrentAmount).
+ *   A withdrawal can drop a completed goal back to incomplete.
+ */
+export async function withdrawFromGoal(
+  goalId: string,
+  input: WithdrawGoalInput,
+): Promise<SavingsGoalWithProgress> {
+  await delay();
+  const goal = GOALS.find((g) => g.id === goalId);
+  if (!goal) throw new Error('Goal not found');
+
+  if (input.amount <= 0) throw new Error('invalid_amount');
+  if (input.amount > goal.currentAmount) throw new Error('amount_exceeds_saved');
+
+  const tx = createTransactionSync({
+    walletId: input.walletId,
+    categoryId: 'cat_savings_goal',
+    amount: input.amount,
+    type: 'income',
+    description: `Rút mục tiêu: ${goal.name}`,
+    merchant: null,
+    transactionDate: todayIso(),
+    entryMethod: 'manual',
+  });
+
+  const contrib: GoalContribution = {
+    id: genContribId(),
+    goalId,
+    amount: input.amount,
+    type: 'withdrawal',
+    contributedAt: nowIso(),
+    note: input.note,
+    transactionId: tx.id,
+  };
+  CONTRIBUTIONS = [...CONTRIBUTIONS, contrib];
+
+  const totalContributed = computeCurrentAmount(goalId);
   const merged = {
     ...goal,
     currentAmount: totalContributed,

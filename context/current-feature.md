@@ -1,7 +1,7 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: SetLimitSheet's "over remaining budget" warning was silently suppressed exactly when it mattered most.
+Fix + feature: Savings Goal detail screen — wire up the contribution history (was hardcoded empty) and add a withdraw-to-wallet capability (didn't exist at all).
 
 ## Status
 
@@ -11,20 +11,22 @@ In Progress
 ## Goals
 
 <!-- Goals and requirements -->
-- `SetLimitSheet.tsx`'s `isOverRemaining = sliderValue > remainingCap && remainingCap >= 0` suppressed the warning/confirm-dialog/orange-button whenever `remainingCap` (bucket cap − sum of the *other* categories' limits) was negative — i.e. exactly when the bucket's other categories alone already exceed the cap. That's the worst case, yet it silently showed no warning at all, while categories with a still-positive `remainingCap` correctly warned. User found this by comparing 3 categories in the same over-allocated "Thiết yếu" bucket.
-- Fix: drop the `&& remainingCap >= 0` clause — `isOverRemaining = sliderValue > remainingCap` — so the warning fires whenever the proposed limit doesn't fit in what's actually left, negative or not.
-- This is a single shared component used for every bucket's category-limit sheet, so the fix applies uniformly to Needs/Wants/Savings, not just the bucket where it was noticed.
-- Out of scope: the "Còn lại trong nhóm" label still just hides itself (rather than showing e.g. "Đã vượt 1.3Mđ") when remaining is negative — not asked for, not touched.
-- Follow-up (verified fix, then requested next): precise numeric entry for the monthly limit amount, matching the pattern already established on the Budget Allocation screen. Made the amount text in `SetLimitSheet` tappable (+ pencil icon), opening the shared `NumericKeypad` (new local `amountFocused`/`amountRaw` state) to type an exact VND amount instead of only dragging the slider. On Done, the typed value is clamped to `[0, sliderMax]` and committed via the same `setSliderValue` the slider itself uses, so `isOverRemaining`/warning/button-color react identically whether the value came from a drag or from typing.
-- The keypad had to be mounted as a sibling to `<DraggableSheet>` (return wrapped in a Fragment), not nested inside it — nesting would confine the keypad's own `StyleSheet.absoluteFill` to `DraggableSheet`'s own capped box instead of the full screen, the same class of bug fixed earlier this session for `DraggableSheet` itself. Added conditional `NUMPAD_HEIGHT` bottom padding to the ScrollView (matching the app-wide convention) since the amount field sits near the top of a short sheet — no active scroll-to-focus needed here, unlike the Budget Allocation screen's deeper bucket cards.
+- Bug: the "Lịch sử đóng góp" section on `app/(tabs)/budgets/goals/[id].tsx` always rendered a hardcoded "Chưa có lần nào đóng góp" placeholder, even for goals with real progress. Root cause: `getContributionsByGoalId` was fully implemented in `src/services/mock/goals.ts` but never exported from the `src/services` barrel and never called by any hook/screen — the history section never fetched anything. Fix: export it, add a `useGoalContributions` hook, and render the real list (note-or-default label, date, signed amount) in place of the placeholder.
+- Feature: there was no way to withdraw savings back to a wallet at any layer (type, mock service, real service, hook, UI) — only `deleteGoal`, which reverses *all* contributions and deletes the whole goal. Added a new `withdrawFromGoal` mock-service function + `useWithdrawFromGoal` hook + a `WithdrawSheet` UI (mirrors the existing `ContributionSheet`), restricted to basic wallets (same restriction contributions already use — crediting a linked/bank-synced wallet manually would desync it from the real account).
+- `GoalContribution` gained a required `type: 'contribution' | 'withdrawal'` field. `currentAmount` is now `Σ(contributions) − Σ(withdrawals)`. Withdrawals are stored in the same `CONTRIBUTIONS` array as contributions (not a separate store), so `deleteGoal`'s existing reversal loop reverses withdrawals for free with no logic change there.
+- A withdrawal books `type: 'income'` + `categoryId: 'cat_savings_goal'` on the chosen wallet (symmetric with a contribution's `type: 'expense'` on the same category). Verified this is safe: `useBucketSpend` only counts `type === 'expense'`, so a withdrawal correctly does NOT reduce the Savings bucket's pacing "spent" figure; `transactionCardVisuals.ts` already signs the amount by `tx.type`, so a withdrawal shows as `+amount` with no changes needed there.
+- Explicitly decided with the user: both pieces are **mock-only for now** — the real .NET backend has no endpoints for contribution history or withdrawal yet. `src/services/real/goals.ts` gets thin stubs (empty-array read, throwing write) rather than live calls, so the barrel's `USE_MOCK ? mock : real` swap doesn't break if ever flipped to real.
+- Withdraw destination is restricted to basic wallets only (not linked/bank-synced wallets) — confirmed with the user.
+- Out of scope: editing/deleting an individual history entry; withdrawing to a linked wallet; any real backend wiring.
 
 ## Notes
 
 <!-- Any extra notes -->
+Full plan (file list, exact guard/error-code names, test list) is in
+`C:\Users\Lenovo\.claude\plans\ch-a-c-n-i-l-ch-frolicking-puppy.md`.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-08-09 — Started.
-- 2026-08-09 — isOverRemaining fix verified on-device.
-- 2026-08-09 — Added precise numeric entry for the monthly limit amount (SetLimitSheet).
+- 2026-08-09 — Started. Diagnosed both gaps, planned, confirmed scope with user (mock-only, basic wallets only).
+- 2026-08-09 — Implemented: type field + withdrawFromGoal in mock service, real/goals.ts stubs, barrel/queryKeys/hooks wiring, history list + WithdrawSheet UI, 5 new tests. type-check/lint/full test suite (64/64) all pass. Not yet verified on-device (app has no web target to browser-test).

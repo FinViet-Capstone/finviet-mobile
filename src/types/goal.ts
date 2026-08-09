@@ -24,9 +24,11 @@ export interface GoalContribution {
   id: string;
   goalId: string;
   amount: number;
+  /** 'contribution' adds to the goal; 'withdrawal' takes savings back out. */
+  type: 'contribution' | 'withdrawal';
   contributedAt: string;
   note?: string;
-  /** Links to the expense transaction created when fundingWalletId is set */
+  /** Links to the expense/income transaction created when a wallet is involved */
   transactionId?: string;
 }
 
