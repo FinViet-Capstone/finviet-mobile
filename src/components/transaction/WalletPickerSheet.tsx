@@ -84,7 +84,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: SPACING[5],
     paddingBottom: SPACING[10],
-    maxHeight: '60%',
   },
   modalTitle: {
     fontSize: FONT_SIZE.lg,

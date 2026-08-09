@@ -1,7 +1,7 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Category drag-and-drop: move a category between all 3 buckets (Needs/Wants/Savings) by dragging, instead of the tap-to-swap button. Item 5 of `context/fe-plan-2026-07-revamp.md`.
+Fix: `DraggableSheet` bottom sheet doesn't pull up — only the drag handle sliver renders, no content. Reported by user with screenshots from the Budget tab's "Set Limit" sheet and Transaction History's wallet-picker sheet.
 
 ## Status
 
@@ -11,17 +11,20 @@ Completed
 ## Goals
 
 <!-- Goals and requirements -->
-- Remove the `savings_locked` guard in `mock/customerCategories.ts` (both directions) and the "Savings bucket is immutable" doc comments in `constants/categories.ts`/`types/category.ts` — confirmed by BE that this was never actually enforced server-side either (an FE-only invention), per the user's decision to unlock full mobility.
-- Replace the decorative `drag_indicator` with a real drag gesture (existing stack: `react-native-gesture-handler` + `react-native-reanimated`, same as `DraggableSheet.tsx` — no new dependency).
-- Dragging a category and releasing it over any of the 3 bucket cards moves it there — for system categories via `moveBucket`, for customer-created categories via a new `updateCustomCategoryBucket` mutation (the `canMove: false` deferral from the category-request-removal feature ends here).
-- No backend change needed — BE confirmed the bucket-override endpoint already supports all 3 buckets with no restriction.
+- Root cause: `MAX_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.85)` in `DraggableSheet.tsx` was computed once at module-import time, outside any component/hook — a known Expo/RN timing hazard where `Dimensions.get('window')` can resolve to a stale/too-small value before the native window is measured. Combined with `overflow: 'hidden'` on the same sheet box, a bad read hard-clipped every sheet (for the whole app session) down to just its handle + padding.
+- Fix: replaced the module-scope constant with `useWindowDimensions()` called inside the `DraggableSheet` component, matching the pattern already used correctly in `src/components/charts/WeeklySpendingSwiper.tsx`. No consumer files changed — `DraggableSheet` is the shared component behind nearly every sheet in the app.
+- Second bug found while verifying the above on-device: `WalletPickerSheet.tsx`'s `styles.content` had a redundant `maxHeight: '60%'` on top of `DraggableSheet`'s own cap — percentage-against-an-indefinite-parent, a classic RN/Yoga ambiguous case since the ancestor's height is content-driven, not definite, until it actually hits `DraggableSheet`'s cap. This truncated the wallet list with dead space below instead of showing it in full. Fix: removed the redundant line; `SetLimitSheet.tsx` never had this second cap and works fine relying solely on `DraggableSheet`'s own cap.
+- Out of scope (user decision): `AIChatbotSheet.tsx`/`ChangePasswordSheet.tsx` use an independent `<Modal>` implementation with a real `height: '90%'`, not proven to share this bug — left untouched. `CategoryDragOverlay.tsx` has the same `Dimensions.get()`-at-module-scope anti-pattern but no evidence of a current bug — left untouched per minimal-change guidance.
 
 ## Notes
 
 <!-- Any extra notes -->
+Both fixes verified working on the user's device.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-07-27 — Started.
-- 2026-07-27 — Implemented: removed the `savings_locked` guard from both `mock/customerCategories.ts` and `real/categories.ts` (it was duplicated in both, an FE-only invention never enforced server-side) plus the stale doc comments in `constants/categories.ts`/`types/category.ts`. Added `updateCustomCategoryBucket` (mock/real/barrel/hook) so customer-created categories can be reassigned too, not just system ones. Built the drag gesture in `CategoryBucketCard.tsx` (a `Gesture.Pan()` on the drag handle, reusing the existing `react-native-gesture-handler`/`reanimated` stack — no new dependency) and a new `CategoryDragOverlay` showing 3 fixed, screen-anchored drop zones + a floating chip that follows the finger. Deliberately used fixed zones (computed from `Dimensions.get('window')`) instead of measuring the actual scrolling bucket cards' live position, to avoid a `measure()`-based design I'd have no way to visually verify here. The existing tap-to-swap button is left as an independent Needs↔Wants-only shortcut, unrelated to the new drag gesture. `type-check`/`lint`/`test` all pass — no new warnings in any touched file. UI/gesture behavior itself (does the chip actually follow the finger smoothly, does the hover highlight look right, does the drop actually register) could not be visually verified — no RN simulator/browser available in this environment. Completed.
+- 2026-07-27 — Started (category drag-and-drop; see git history for that completed feature's notes).
+- 2026-08-09 — Started: DraggableSheet max-height fix.
+- 2026-08-09 — User confirmed DraggableSheet fix works on-device. Found + fixed a second, related bug in `WalletPickerSheet.tsx` (redundant `maxHeight: '60%'` truncating the wallet list).
+- 2026-08-09 — User confirmed both fixes on-device. Completed.
