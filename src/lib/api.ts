@@ -59,6 +59,9 @@ export interface AuthResponsePayload {
     needsPct?: number;
     wantsPct?: number;
     savingsPct?: number;
+    theme?: 'Light' | 'Dark' | 'System';
+    /** [warningPct, exceededPct] for budget_alert notifications. */
+    notifBudgetThresholds?: number[];
   };
 }
 

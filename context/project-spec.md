@@ -60,9 +60,11 @@ B. Categories & Bucket System (Needs/Wants/Savings)
 - There is no category deactivation feature: a customer cannot hide a category from budgets
   or pickers. This existed as a data-layer function with no UI entry point and no reactivation
   path at any layer, and was removed entirely (2026-08-08) rather than finished.
-- Categories can be dragged between Needs and Wants; the **Savings bucket is locked in both
-  directions** — the move-bucket logic explicitly rejects moving a category into savings or
-  out of it, and the UI hides the move affordance for savings rows entirely.
+- Categories can be dragged freely between all three buckets, **including Savings** — a
+  category is not locked into Savings once assigned, nor barred from being moved into it.
+  This was reversed from an earlier "Savings is locked" design (per
+  `context/fe-plan-2026-07-revamp.md` item 5, confirmed with BE: savings was never actually
+  locked server-side either).
 - There is no category-request feature: a user cannot ask an admin to add a custom category.
   This was deliberately removed (decided months ago, per the team) — no admin-approval UI
   ever existed for it, and no trace of it remains in the codebase.

@@ -205,6 +205,7 @@ export const changePassword = authImpl.changePassword;
 export const logout = authImpl.logout;
 export const getProfile = authImpl.getProfile;
 export const updateProfile = authImpl.updateProfile;
+export const updateProfileSettings = authImpl.updateProfileSettings;
 export const uploadAvatar = authImpl.uploadAvatar;
 export const deleteAccount = authImpl.deleteAccount;
 
@@ -213,5 +214,6 @@ export type {
   MockRegisterInput,
   MockChangePasswordInput,
   UpdateProfileInput,
+  UpdateProfileSettingsInput,
   ResetPasswordInput,
 } from './mock/auth';

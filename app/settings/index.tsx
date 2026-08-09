@@ -231,6 +231,8 @@ export default function SettingsScreen() {
   if (isLoading) return <LoadingSpinner />;
 
   const themeValue = user?.theme === 'light' ? S.values.light : user?.theme === 'dark' ? S.values.dark : S.values.system;
+  const [warningPct, exceededPct] = user?.notifBudgetThresholds ?? [80, 100];
+  const budgetAlertValue = `${warningPct}% và ${exceededPct}%`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -304,7 +306,7 @@ export default function SettingsScreen() {
               }} />
             <Divider />
             <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
-              label={S.rows.budgetAlert} value="80% và 100%"
+              label={S.rows.budgetAlert} value={budgetAlertValue}
               rightElement={
                 <Switch
                   value={notifBudget}

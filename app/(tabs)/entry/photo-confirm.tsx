@@ -385,7 +385,12 @@ export default function PhotoConfirmScreen() {
 
   const handleConfirmAll = useCallback(async () => {
     const wallets = walletsData?.wallets ?? [];
-    const primary = wallets[0];
+    // Photo entries can only target basic wallets — bank-linked wallets are
+    // read-only (their transactions come from provider sync), and the API
+    // rejects writes to them. There's no wallet picker in this flow yet, so
+    // this just needs to skip past any linked wallet rather than blindly
+    // using wallets[0].
+    const primary = wallets.find((w) => w.type !== "linked");
     if (!primary) {
       Alert.alert(S.noWallet, S.noWalletMsg);
       return;
