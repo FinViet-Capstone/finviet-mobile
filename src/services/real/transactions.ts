@@ -7,8 +7,12 @@
  * controller, these endpoints are wrapped in ApiResponse<T> — read via unwrap().
  *
  * Backend limitations folded in here so the UI contract is unchanged:
- *   - PUT /transactions/{id} only updates categoryId (UpdateTransactionDto). Edits
- *     to amount/merchant/date are dropped server-side; we forward categoryId.
+ *   - PUT /transactions/{id} accepts { categoryId?, amount?, merchant?,
+ *     transactionDate? } as a partial update — but rejects amount/merchant/date
+ *     (422 synced_transaction_fields_locked) when the transaction's wallet is
+ *     sepay_linked, since those values come from provider sync. Category is
+ *     always editable regardless of wallet type. walletId/description have no
+ *     backend field at all and are silently dropped either way.
  *   - The server filter vocabulary is coarse (INCOME/EXPENSE/TRANSFER), so the
  *     finer mock filters (uncategorizedOnly transfer-exclusion, hideGoalContributions,
  *     transfer_in/out subtype) are re-applied client-side on the fetched page to
@@ -234,9 +238,17 @@ export async function updateTransaction(
   id: string,
   patch: UpdateTransactionInput,
 ): Promise<Transaction> {
-  // Backend only supports recategorization (PUT body = { categoryId }).
+  // Partial update: only include fields actually present in the patch.
+  // walletId/description have no backend field and are silently dropped —
+  // the backend itself enforces category-only edits for sepay_linked-wallet
+  // transactions (422 synced_transaction_fields_locked) if amount/merchant/
+  // transactionDate are sent for one; transfers reject any field change at
+  // all (422 transfer_managed).
   const res = await api.put(`/transactions/${id}`, {
-    categoryId: patch.categoryId ?? null,
+    ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
+    ...(patch.amount !== undefined ? { amount: patch.amount } : {}),
+    ...(patch.merchant !== undefined ? { merchant: patch.merchant } : {}),
+    ...(patch.transactionDate !== undefined ? { transactionDate: patch.transactionDate } : {}),
   });
   return toTransaction(unwrap<TransactionDto>(res));
 }

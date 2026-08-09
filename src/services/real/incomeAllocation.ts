@@ -2,21 +2,16 @@
  * real/incomeAllocation.ts — real .NET income-allocation service.
  *
  * Backend: GET/POST /profile/income-allocation (ProfileController).
- *   - GET  → { current: IncomeAllocationEntry, pending: IncomeAllocationEntry | null }
- *     `current` is always resolved for *today's* calendar month (carry-forward
- *     from the latest scheduled entry with effectiveMonth <= now, or the
- *     customer's onboarding defaults) — there is no month-lookup parameter, so
- *     this only answers "what's in effect right now?", not "what was in effect
- *     in month X?" for an arbitrary past/future month.
+ *   - GET ?month=yyyy-MM → { current: IncomeAllocationEntry, pending: IncomeAllocationEntry | null }
+ *     Without `month`, `current` resolves for today's calendar month
+ *     (carry-forward from the latest scheduled entry with effectiveMonth <=
+ *     month, or the customer's onboarding defaults). With `month`, the same
+ *     carry-forward resolution runs against the requested month instead —
+ *     answers "what was in effect for month X?" for any past/future month.
+ *     `pending` is always null when `month` is given ("next month's draft"
+ *     isn't meaningful relative to an arbitrary queried month), so callers
+ *     that want the scheduled draft must query without `month`.
  *   - POST → schedules a new entry, always effective next calendar month.
- *
- * getEffectiveIncomeAllocation(month) is therefore only precise when `month`
- * is the current month — which covers every real caller except the Budgets
- * screen's month-picker, and that screen was switched to source its
- * numbers from GET /budgets/buckets?month= instead (see
- * app/(tabs)/budgets/index.tsx), which the backend already resolves
- * correctly per-month. For any other month passed here, this falls back to
- * "current" rather than fabricating a wrong-but-plausible number.
  *
  * getIncomeAllocationHistory has no backend equivalent (no full-history
  * listing endpoint exists) and stays on the mock — it isn't called from any
@@ -59,24 +54,22 @@ function toSetting(dto: IncomeAllocationEntryDto, id: string): IncomeAllocationS
   };
 }
 
-function ymFrom(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-async function getSummary(): Promise<IncomeAllocationSummaryDto> {
-  const res = await api.get('/profile/income-allocation');
+async function getSummary(month?: string): Promise<IncomeAllocationSummaryDto> {
+  const res = await api.get('/profile/income-allocation', {
+    params: month ? { month } : undefined,
+  });
   return unwrap<IncomeAllocationSummaryDto>(res);
 }
 
 // ─── Reads ──────────────────────────────────────────────────────────────────
 
 export async function getEffectiveIncomeAllocation(month: string): Promise<IncomeAllocationSetting> {
-  const summary = await getSummary();
-  // See file header: only the current month is precisely resolvable here.
-  return toSetting(summary.current, month === ymFrom(new Date()) ? 'current' : 'current-fallback');
+  const summary = await getSummary(month);
+  return toSetting(summary.current, 'current');
 }
 
 export async function getScheduledIncomeAllocation(): Promise<IncomeAllocationSetting | null> {
+  // No `month` here — `pending` is only ever populated on the unfiltered query.
   const summary = await getSummary();
   return summary.pending ? toSetting(summary.pending, 'pending') : null;
 }

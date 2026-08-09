@@ -1,11 +1,11 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: wire the FE `real/*.ts` service layer to backend endpoints that have shipped since they
-were last touched (categories, custom categories, change-password, income allocation) plus a
-few low-risk client-side guardrails and a doc correction. First of three grouped branches from
-the FE↔BE API reconciliation pass (see Notes) — the other two (SePay OAuth fix,
-structured error-code messaging) get their own `current-feature.md` cycles.
+Fix: wire the FE `real/*.ts` service layer to backend endpoints that shipped as part of the
+BE todos handoff (`finviet-be/docs/10-08-2026-be-todos.md`) — transaction full-edit and the
+savings-goal ledger rework (contribution history, withdraw-to-wallet, per-action wallet
+choice, contribution notes). Second of the FE↔BE reconciliation follow-up branches (see
+Notes) — the SePay OAuth fix and structured error-code messaging remain their own cycles.
 
 ## Status
 
@@ -15,66 +15,65 @@ Completed (this branch's scope — not yet verified on-device)
 ## Goals
 
 <!-- Goals and requirements -->
-- Category bucket moves: replace `real/categories.ts`'s session-local `Map` override
-  (`moveBucket`/`bulkMoveBucket`, lost on app restart) with real `PUT`/`DELETE /categories/{id}/bucket`
-  calls. Keep FE's existing pre-flight validation (bucket enum, etc.).
-- Custom categories: replace `real/customCategories.ts`'s wholesale mock re-export with real
-  `POST /categories/custom` / `DELETE /categories/custom/{id}` calls. Icon stays device-local
-  as today (backend has no icon field).
-- Change password: replace `real/auth.ts`'s `changePassword` mock re-export with a real
-  `POST /auth/change-password` call. `ChangePasswordSheet` UI/validation is already shaped
-  correctly and needs no changes.
-- Profile settings: wire `useUpdatePreferences` (or a new hook) to `PATCH /profile/settings`
-  for theme + budget-alert notification thresholds — currently not wired to any backend call
-  in real mode at all.
-- Income allocation: replace `real/incomeAllocation.ts`'s wholesale mock re-export with real
-  `GET`/`POST /profile/income-allocation` calls, mapping the backend's `{current, pending}`
-  shape onto FE's existing `useEffectiveIncomeAllocation`/`useScheduledIncomeAllocation` hooks.
-- Wallet-picker guardrails: confirm manual-entry and photo-entry wallet pickers exclude
-  `sepay_linked` wallets (CSV-import already does this); add source/target wallet-type
-  filtering to the wallet-withdraw screen (`POST /wallets/withdraw` requires a `sepay_linked`
-  source and rejects a `sepay_linked` target).
-- `cat_income` check: confirm no category picker offers a bare `cat_income` leaf (backend
-  silently remaps it to `cat_income_other` on transaction create).
-- Doc fix: `context/project-spec.md` §B still claims the Savings bucket is locked in both
-  directions — stale against both the FE mock and the backend (confirmed unrestricted
-  server-side too). One-line correction, folded into this branch since it's adjacent to the
-  category-buckets work.
-- Out of scope (this branch): SePay OAuth link-flow fix, structured `BusinessRuleException`
-  error-code → Vietnamese messaging utility (each is its own branch/cycle), and everything
-  blocked on new backend work (transaction full-edit, goal ledger rework) — tracked in
-  `finviet-be/docs/10-08-2026-be-todos.md` for a separate backend-side session.
+- Transaction full-edit: `real/transactions.ts`'s `updateTransaction()` currently only ever
+  sends `{ categoryId }`, silently dropping amount/merchant/date. Backend's
+  `UpdateTransactionDto` now accepts `{ categoryId?, amount?, merchant?, transactionDate? }`,
+  enforcing category-only edits server-side for `sepay_linked`-wallet transactions
+  (`synced_transaction_fields_locked`). `app/(tabs)/transactions/[id].tsx` already implements
+  exactly this split (`categoryOnly = modeParam === 'category' || selectedWallet?.type ===
+  'linked'`) and sends the right patch shape — this is a pure service-layer fix, no UI change
+  needed. `walletId`/`description` stay unsupported (backend has no fields for them) — a
+  pre-existing, already-documented gap, not part of this fix.
+- Goal contribution history: `real/goals.ts`'s `getContributionsByGoalId()` is stubbed to
+  `[]`. Backend now has `GET /saving-goals/{id}/contributions` returning the combined
+  contribution+withdrawal ledger, matching the mock's `GoalContribution` shape.
+- Goal withdraw-to-wallet: `real/goals.ts`'s `withdrawFromGoal()` throws. Backend now has
+  `POST /saving-goals/{id}/withdraw` with `{ amount, walletId, note? }` — `walletId` required
+  per call (no static goal-level withdrawal wallet, matching the confirmed "no 1-goal-1-wallet
+  binding" design). The `WithdrawSheet` UI in `[id].tsx` already sends this exact shape.
+- Goal per-action wallet choice + notes on contribute: `real/goals.ts`'s
+  `addGoalContribution()` already sends `fundingWalletId` but drops `note`. Backend's
+  `ContributeSavingGoalRequest` now accepts `{ amount, fundingWalletId?, note? }` (note capped
+  at 255 chars server-side). `ContributionSheet` UI already collects and sends a note.
+- Income allocation cleanup (opportunistic, not originally scoped): backend also shipped the
+  `GET /profile/income-allocation?month=` param I flagged as a gap while wiring the previous
+  branch. `real/incomeAllocation.ts`'s `getEffectiveIncomeAllocation(month)` can now resolve
+  any month precisely instead of only ever falling back to "current" — simplify it to pass
+  `month` through and drop the `'current-fallback'` placeholder id. Not reverting
+  `budgets/index.tsx`'s `useBudgetBuckets`-sourced approach from the previous branch — it's
+  still correct and there's no need to churn it back.
+- Out of scope (this branch): SePay OAuth link-flow fix, structured
+  `BusinessRuleException` error-code → Vietnamese messaging utility (each is its own
+  branch/cycle per the original plan).
 
 ## Notes
 
 <!-- Any extra notes -->
-Full FE↔BE reconciliation findings and the 3-branch grouping this came out of are in
-`C:\Users\Lenovo\.claude\plans\here-s-what-backend-has-woolly-barto.md`. Backend-only TODOs
-(with validation/business rules) are in `finviet-be/docs/10-08-2026-be-todos.md`.
+Full FE↔BE reconciliation findings and the branch grouping this came out of are in
+`C:\Users\Lenovo\.claude\plans\here-s-what-backend-has-woolly-barto.md`. The backend TODOs
+this branch consumes (with validation/business rules as originally requested) are in
+`finviet-be/docs/10-08-2026-be-todos.md` §1, §2, §3 — all now shipped per the updated
+`finviet-be/docs/api-reference.md`.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-08-09 — Savings Goal contribution-history + withdraw feature: implemented, 64/64 tests
-  passing, not yet verified on-device. Superseded by the new feature below without an on-device
-  check having happened — worth verifying manually whenever the app is next run.
-- 2026-08-10 — Started this feature: FE↔BE API reconciliation done (compared
-  `finviet-be/docs/api-reference.md` against `src/services/real/*.ts`), found the backend has
-  shipped 4 endpoints the FE still treats as unavailable, plus a real bug in the SePay OAuth
-  screen and several backend gaps. Plan approved, branching grouped by risk (this branch =
-  low-risk wiring items).
-- 2026-08-10 — Implemented all 8 items: category bucket moves + custom categories rewired to
-  real `PUT`/`DELETE .../bucket` and `POST`/`DELETE /categories/custom`; change-password wired
-  to real `POST /auth/change-password`; income allocation rewired to real
-  `GET`/`POST /profile/income-allocation` (discovered and worked around a real-mode precision
-  gap — no arbitrary-month lookup — by switching `budgets/index.tsx` to source its per-month
-  income/split from `useBudgetBuckets` instead, which the backend already resolves correctly
-  per month; gap logged in `finviet-be/docs/10-08-2026-be-todos.md` §3); profile settings
-  (theme + `notifBudgetThresholds`) wired to real `PATCH /profile/settings` — required adding
-  `notifBudgetThresholds` to the `Customer` type and threading it through
-  `AuthResponsePayload`/`toCustomer()`/`useUpdatePreferences`; fixed a real bug in
-  `photo-confirm.tsx` (was saving to `wallets[0]` with no basic-wallet filter, unlike every
-  other entry method); confirmed `cat_income` is never a selectable leaf and the wallet-level
-  withdraw hook has no consuming screen (nothing to guard yet); corrected the stale
-  savings-bucket-locked claim in `project-spec.md`. type-check/lint/64 tests all pass. Not yet
-  verified on-device.
+- 2026-08-10 — Previous branch (category buckets, custom categories, change-password, income
+  allocation, profile settings, wallet-picker guardrails) merged to `dev`. FE↔BE reconciliation
+  plan's remaining backend-blocked items written up as BE todos with validation/business rules
+  in `finviet-be/docs/10-08-2026-be-todos.md`, handed off for a separate backend-side session.
+- 2026-08-10 — Backend session shipped all of it (confirmed via updated
+  `finviet-be/docs/api-reference.md`): transaction full-edit with the wallet-type guard, the
+  full savings-goal ledger rework, and a bonus income-allocation month param. Started this
+  feature to wire the FE `real/*.ts` layer to the newly-shipped endpoints — confirmed the UI
+  for both major features (transaction edit screen, goal contribution/withdraw sheets) was
+  already built end-to-end against the exact target shapes during earlier mock-only work, so
+  this is a contained service-layer fix.
+- 2026-08-10 — Implemented all 5 items: `real/transactions.ts`'s `updateTransaction()` now
+  forwards `amount`/`merchant`/`transactionDate` alongside `categoryId` as a partial update
+  (no UI change needed — the edit screen already sent the right shape); `real/goals.ts` gained
+  a real `getContributionsByGoalId()` (was stubbed to `[]`), a real `withdrawFromGoal()` (was a
+  throw), and `addGoalContribution()` now forwards `note`; `real/incomeAllocation.ts` was
+  simplified to pass the new `?month=` param through instead of only ever resolving "current".
+  Updated `finviet-be/docs/10-08-2026-be-todos.md` and the FE plan file to record all of it as
+  shipped. type-check/lint/64 tests all pass. Not yet verified on-device.
