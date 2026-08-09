@@ -85,3 +85,124 @@ describe('mock goals service — contribution/deletion wallet integrity', () => 
     expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(0);
   });
 });
+
+describe('mock goals service — withdrawFromGoal', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  it('credits the destination wallet and reduces currentAmount', async () => {
+    const goals = require('@/services/mock/goals');
+    const wallets = require('@/services/mock/wallets');
+
+    const goal = await goals.createGoal({
+      name: 'Quỹ dự phòng',
+      targetAmount: 10_000_000,
+      deadline: '2027-01-01',
+    });
+    const contributed = await goals.addGoalContribution(goal.id, {
+      amount: 2_000_000,
+      fundingWalletId: WALLET_IDS.CASH,
+    });
+    expect(contributed.currentAmount).toBe(2_000_000);
+
+    const before = wallets.getWalletById(WALLET_IDS.CASH)!.balance;
+    const after = await goals.withdrawFromGoal(goal.id, {
+      amount: 800_000,
+      walletId: WALLET_IDS.CASH,
+    });
+
+    expect(after.currentAmount).toBe(1_200_000);
+    expect(wallets.getWalletById(WALLET_IDS.CASH)!.balance).toBe(before + 800_000);
+  });
+
+  it('rejects a non-positive amount and an amount exceeding currentAmount', async () => {
+    const goals = require('@/services/mock/goals');
+
+    const goal = await goals.createGoal({
+      name: 'Quỹ dự phòng 2',
+      targetAmount: 10_000_000,
+      deadline: '2027-01-01',
+    });
+    await goals.addGoalContribution(goal.id, {
+      amount: 1_000_000,
+      fundingWalletId: WALLET_IDS.CASH,
+    });
+
+    await expect(
+      goals.withdrawFromGoal(goal.id, { amount: 0, walletId: WALLET_IDS.CASH }),
+    ).rejects.toThrow('invalid_amount');
+
+    await expect(
+      goals.withdrawFromGoal(goal.id, { amount: 1_000_001, walletId: WALLET_IDS.CASH }),
+    ).rejects.toThrow('amount_exceeds_saved');
+  });
+
+  it('records both a contribution and a withdrawal in history with correct types', async () => {
+    const goals = require('@/services/mock/goals');
+
+    const goal = await goals.createGoal({
+      name: 'Quỹ dự phòng 3',
+      targetAmount: 10_000_000,
+      deadline: '2027-01-01',
+    });
+    await goals.addGoalContribution(goal.id, {
+      amount: 1_000_000,
+      fundingWalletId: WALLET_IDS.CASH,
+    });
+    await goals.withdrawFromGoal(goal.id, { amount: 300_000, walletId: WALLET_IDS.CASH });
+
+    const history = goals.getContributionsByGoalId(goal.id);
+    expect(history).toHaveLength(2);
+    expect(history.map((c: { type: string }) => c.type).sort()).toEqual([
+      'contribution',
+      'withdrawal',
+    ]);
+  });
+
+  it('flips a completed goal back to incomplete after a withdrawal', async () => {
+    const goals = require('@/services/mock/goals');
+
+    const goal = await goals.createGoal({
+      name: 'Mua tai nghe',
+      targetAmount: 1_000_000,
+      deadline: '2027-01-01',
+    });
+    const completed = await goals.addGoalContribution(goal.id, {
+      amount: 1_000_000,
+      fundingWalletId: WALLET_IDS.CASH,
+    });
+    expect(completed.isCompleted).toBe(true);
+
+    const after = await goals.withdrawFromGoal(goal.id, {
+      amount: 200_000,
+      walletId: WALLET_IDS.CASH,
+    });
+    expect(after.isCompleted).toBe(false);
+    expect(after.currentAmount).toBe(800_000);
+  });
+
+  it('deleteGoal nets out correctly after both a contribution and a withdrawal', async () => {
+    const goals = require('@/services/mock/goals');
+    const wallets = require('@/services/mock/wallets');
+
+    const before = wallets.getWalletById(WALLET_IDS.BANK)!.balance;
+
+    const goal = await goals.createGoal({
+      name: 'Du lịch Phú Quốc',
+      targetAmount: 10_000_000,
+      deadline: '2027-01-01',
+    });
+    await goals.addGoalContribution(goal.id, {
+      amount: 3_000_000,
+      fundingWalletId: WALLET_IDS.BANK,
+    });
+    await goals.withdrawFromGoal(goal.id, { amount: 1_000_000, walletId: WALLET_IDS.BANK });
+    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before - 2_000_000);
+
+    await goals.deleteGoal(goal.id);
+
+    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before);
+    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(0);
+  });
+});

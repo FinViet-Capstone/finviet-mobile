@@ -50,6 +50,8 @@ export const queryKeys = {
   goals: {
     all: () => ['goals'] as const,
     detail: (id: string | undefined) => [...queryKeys.goals.all(), id] as const,
+    contributions: (id: string | undefined) =>
+      [...queryKeys.goals.all(), id, 'contributions'] as const,
   },
   reports: {
     all: () => ['reports'] as const,

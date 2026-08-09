@@ -10,15 +10,20 @@
  * Backend gaps vs the mock contract:
  *   - UpdateSavingGoalRequest has no fundingWalletId → that patch field is ignored.
  *   - ContributeSavingGoalRequest has no note → the note is ignored.
+ *   - No endpoint for contribution/withdrawal history yet
+ *     (getContributionsByGoalId stubs to []) and no withdraw endpoint yet
+ *     (withdrawFromGoal stubs to a throw) — see mock/goals.ts for the real
+ *     mock-only implementation of both.
  */
 
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { SavingsGoalWithProgress } from '@/types';
+import type { SavingsGoalWithProgress, GoalContribution } from '@/types';
 import type {
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
+  WithdrawGoalInput,
 } from '@/services/mock/goals';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
@@ -77,6 +82,14 @@ export async function getGoalById(
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
+// TODO(backend): no contribution-history endpoint yet — stub to empty rather
+// than guessing a URL that would 404.
+export async function getContributionsByGoalId(
+  _goalId: string,
+): Promise<GoalContribution[]> {
+  return [];
+}
+
 // ─── Writes ─────────────────────────────────────────────────────────────────
 
 export async function createGoal(
@@ -118,4 +131,12 @@ export async function addGoalContribution(
     fundingWalletId: input.fundingWalletId ?? null,
   }, idempotentConfig());
   return toGoal(unwrap<SavingGoalDto>(res));
+}
+
+// TODO(backend): no withdraw endpoint yet.
+export async function withdrawFromGoal(
+  _goalId: string,
+  _input: WithdrawGoalInput,
+): Promise<SavingsGoalWithProgress> {
+  throw new Error('withdrawFromGoal not yet supported by backend');
 }
