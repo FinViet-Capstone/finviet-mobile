@@ -375,6 +375,7 @@ export default function BudgetsScreen() {
         <Text style={styles.headerTitle}>{S.title}</Text>
         <TouchableOpacity
           activeOpacity={0.7}
+          style={styles.headerBtn}
           onPress={() => router.push({ pathname: '/settings/budget-allocation' })}
         >
           <MaterialIcon name={S.settings} size={24} color={COLORS.primary} />
@@ -545,6 +546,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.primary,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleWrap: {
     paddingHorizontal: SPACING[4],

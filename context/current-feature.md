@@ -1,65 +1,65 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: structured `BusinessRuleException.Code` → Vietnamese error messaging, cross-cutting
-across every domain (not just auth, which already has this via `AUTH_ERROR_MESSAGES_VI`).
-Last item from the FE↔BE API reconciliation pass (see Notes).
+Fix: Ngân sách ↔ Mục tiêu tiết kiệm toggle feels like navigating to a new page (no transition
+animation + mismatched header/toggle styling between the two routes).
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — this was the last item from the FE↔BE reconciliation plan; all of it is now done
+Completed — verified on device (slide transition, matching header/toggle colors, back button,
+aligned header heights, legible "+ Tạo mục tiêu" button)
 
 ## Goals
 
 <!-- Goals and requirements -->
-- The backend's `ExceptionHandlingMiddleware` puts a machine-readable `code` at the top level
-  of every error envelope for `BusinessRuleException` (422), `ExternalServiceException` (502),
-  and `IntegrationUnavailableException` (503) — confirmed directly against
-  `finviet-be/src/FinViet.Api/Middlewares/ExceptionHandlingMiddleware.cs`, whose own comment
-  says "FE maps to VI message." `src/utils/errors.ts`'s `getApiErrorMessage()` already declares
-  a `code` field on its local `ApiErrorBody` type but never reads it — it falls straight to the
-  raw (English) backend `message`.
-- Extracted and verified the complete, current list of codes directly from
-  `finviet-be` source (`grep`-ing every `new BusinessRuleException/ExternalServiceException/
-  IntegrationUnavailableException(...)` call site, not just the markdown API reference, which
-  turned out to be missing several — e.g. `wallet_has_transactions`, `transaction_type_invalid`,
-  `sepay_wallet_orphaned`, and 5 dynamic `sepay_*` codes generated from SePay's own HTTP
-  status on upstream failures, including a `sepay_error_{statusCode}` catch-all pattern).
-  38 stable codes total, covering Transactions, Wallets, SePay linking, Saving Goals, and
-  Extract.
-- Add `BUSINESS_RULE_MESSAGES_VI` (same pattern as `AUTH_ERROR_MESSAGES_VI`) in
-  `src/utils/errors.ts`, wire code-based lookup into `getApiErrorMessage()` **ahead of**
-  `data.message` (a recognized code should always win over the raw English text — matches the
-  backend's own stated intent).
-- Consolidate `app/(tabs)/wallets/[id].tsx`'s local `WALLET_DELETE_ERROR_MESSAGES` map (the
-  only pre-existing local code→message map found in the app) into the shared utility, reusing
-  its exact existing Vietnamese copy for `wallet_has_transactions`/`last_wallet` so wording
-  doesn't drift.
-- Out of scope: this only changes what message text is shown for errors already being
-  displayed (via `getApiErrorMessage()`, used at 7 existing call sites) — not adding new
-  error-handling UI where none exists today.
+- The "Ngân sách" tab's two-pill toggle ("Ngân sách" / "Mục tiêu tiết kiệm") is real Expo
+  Router navigation between two separate routes (`app/(tabs)/budgets/index.tsx` push/pop to
+  `app/(tabs)/budgets/goals/index.tsx`), not a local in-screen toggle. Two concrete bugs make
+  this read as "navigated to an unrelated page with no way back":
+  1. No explicit transition `animation` configured on the shared `Stack` in
+     `app/(tabs)/budgets/_layout.tsx` — the switch is an abrupt cut.
+  2. The Goals screen's header/toggle styling doesn't match the Budgets screen's (confirmed
+     diff: `headerTitle.color`, `toggle.backgroundColor`, `toggleOptionActive.backgroundColor`,
+     `toggleTextActive.color`, `toggleWrap.marginBottom` all differ).
+- Fix: add `animation: 'slide_from_right'` to the Budgets stack's `screenOptions`, and sync
+  the 5 mismatched style values in `app/(tabs)/budgets/goals/index.tsx` to match
+  `app/(tabs)/budgets/index.tsx` exactly (Ngân sách's values win, per user instruction).
+- Out of scope (explicitly rejected by user during planning): merging the two routes/screens
+  or their data-fetching hooks into one file, and any new shared/reusable toggle component —
+  keep the existing two-route architecture, fix only the transition + style-value mismatch.
 
 ## Notes
 
 <!-- Any extra notes -->
-Full FE↔BE reconciliation findings and branch grouping are in
-`C:\Users\Lenovo\.claude\plans\here-s-what-backend-has-woolly-barto.md`. This is the last
-remaining item from that plan.
+Plan written during planning session: `C:\Users\Lenovo\.claude\plans\thay-v-toggle-gi-a-encapsulated-wolf.md`.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-08-10 — Previous three branches (shipped-endpoint wiring; transaction-edit + goal-ledger
-  wiring; SePay OAuth fix) merged to `dev`. Started this feature — verified the complete error
-  code list against `finviet-be` source directly rather than trusting the markdown reference
-  alone, since it was already found to be incomplete for this exact list.
-- 2026-08-10 — Implemented: `BUSINESS_RULE_MESSAGES_VI` (38 codes) added to
-  `src/utils/errors.ts`; `getApiErrorMessage()` now checks `code` first, ahead of the raw
-  `message`; consolidated `app/(tabs)/wallets/[id].tsx`'s local `WALLET_DELETE_ERROR_MESSAGES`
-  duplicate into the shared map and upgraded its sync/unlink error handlers to the same
-  utility. Added `src/utils/__tests__/errors.test.ts` (8 tests: code-priority-over-message,
-  the dynamic `sepay_error_{status}` catch-all, FluentValidation field-error fallback,
-  non-axios-error safety, and a completeness check that every mapped code has a non-empty
-  message). type-check/lint/72 tests all pass (64 prior + 8 new). This closes out every item
-  from the FE↔BE reconciliation plan.
+- 2026-08-10 — Documented and branched (`fix/budgets-goals-toggle-format`) off `dev`. Prior
+  feature (structured `BusinessRuleException.Code` messaging) shipped and merged to `dev`
+  before this one started.
+- 2026-08-10 — Implemented: added `animation: 'slide_from_right'` to
+  `app/(tabs)/budgets/_layout.tsx`'s `Stack` `screenOptions`; synced the 5 mismatched style
+  values in `app/(tabs)/budgets/goals/index.tsx` (`headerTitle.color`,
+  `toggle.backgroundColor`, `toggleOptionActive.backgroundColor`, `toggleTextActive.color`,
+  `toggleWrap.marginBottom`) to match `app/(tabs)/budgets/index.tsx`. type-check clean,
+  lint 0 errors (95 pre-existing warnings, unrelated), 72/72 tests pass. Not yet manually
+  verified on a simulator/device (no web target to check via the in-app browser) — pending
+  that check before commit.
+- 2026-08-10 — Round 2, after real-device test feedback: color sync confirmed working, but 3
+  new issues found. Added a standard back-chevron button (`arrow_back`, top-left,
+  `router.back()`) to the Goals header, matching the app's established back-button convention
+  (`app/(tabs)/wallets/[id].tsx`, `app/settings/budget-allocation.tsx`, etc). Added a shared
+  40×40 `headerBtn` sizing to both screens' right-side header controls so header row height
+  (and title vertical position) is now identical between the two screens. Fixed a genuine
+  contrast bug on "+ Tạo mục tiêu": it used `COLORS.onPrimary` (dark purple) text/icon on
+  `COLORS.inversePrimary` (medium purple) background — both dark, unreadable, looked disabled;
+  changed to `COLORS.onBackground` (verified high-contrast against `inversePrimary` in both
+  `DARK_COLORS`/`LIGHT_COLORS`). Same `inversePrimary`+`onPrimary` bug also exists in
+  `app/(tabs)/entry/csv-import.tsx` and `sms.tsx` — flagged as out-of-scope follow-up, not
+  fixed here. type-check/lint (0 errors)/72 tests all pass again. Pending final device
+  re-check before commit.
+- 2026-08-10 — User verified round 2 on device: back button, aligned header heights, and the
+  "+ Tạo mục tiêu" contrast fix all confirmed working. Committing.
