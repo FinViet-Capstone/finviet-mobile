@@ -502,7 +502,7 @@ export default function CsvImportScreen() {
               disabled={!canStart || isImporting}
             >
               {isImporting
-                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                ? <ActivityIndicator size="small" color={COLORS.onBackground} />
                 : <Text style={styles.confirmText}>{S.confirmBtn} ({selectedCount})</Text>}
             </TouchableOpacity>
           </>
@@ -514,7 +514,7 @@ export default function CsvImportScreen() {
             onPress={handleParse}
           >
             {isParsing
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              ? <ActivityIndicator size="small" color={COLORS.onBackground} />
               : <Text style={styles.confirmText}>{S.startBtn}</Text>}
           </TouchableOpacity>
         )}
@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmBtnDisabled: { opacity: 0.45 },
-  confirmText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  confirmText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onBackground },
   startBtn: {
     flex: 1,
     height: 52,
