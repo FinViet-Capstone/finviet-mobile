@@ -8,7 +8,7 @@ screenshot of the Transactions tab search bar ("Merchant là gì? Người dùng
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-In Progress — implemented, type-check/lint clean, awaiting device verification
+Completed — verified on device, merged to `dev`
 
 ## Goals
 
@@ -59,3 +59,10 @@ file: `C:\Users\Lenovo\.claude\plans\merchant-l-g-ng-i-transient-pearl.md`.
   unrelated), 72/72 tests pass.
 - 2026-08-10 — User verified on device: keypad now closes fully on checkmark tap, no more
   stuck half-open panel.
+- 2026-08-10 — Documented and branched (`fix/merchant-search-placeholder`) off `dev` for the
+  English "merchant" loanword leaking into the Transactions search placeholder. Fixed
+  `app/(tabs)/transactions/index.tsx:275` to read "Tìm theo tên người nhận...", matching the
+  "Người nhận" term already used on the transaction-detail, SMS-entry, and photo-entry screens.
+  type-check clean, lint 0 errors (84 pre-existing warnings, unrelated).
+- 2026-08-10 — User verified on device: search placeholder now shows the Vietnamese term.
+  Merged to `dev`.
