@@ -147,7 +147,7 @@ function WalletCard({
             </Text>
           </View>
         ) : (
-          <Text style={styles.walletType}>{S.typeBasic}</Text>
+          <Text style={styles.walletType}>{isLinked ? S.typeLinked : S.typeBasic}</Text>
         )}
       </View>
       <View style={styles.walletRight}>
