@@ -272,7 +272,7 @@ export default function TransactionsScreen() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Tìm theo tên merchant..."
+            placeholder="Tìm theo tên người nhận..."
             placeholderTextColor={COLORS.onSurfaceVariant}
             autoFocus
             returnKeyType="search"
