@@ -1,47 +1,38 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: `NumericKeypad` (the shared custom keypad overlay used across 12 screens) gets stuck
-half-closed instead of fully sliding away when its checkmark ("Done") key is tapped — reported
-on the "Thêm Giao Dịch" (Add Transaction) screen, the 5th recurrence of a "modal" bug in this
-app.
+Fix: transaction-list search placeholder reads "Tìm theo tên merchant..." — an unexplained
+English loanword dropped into otherwise Vietnamese-only UI copy. Reported by the user via a
+screenshot of the Transactions tab search bar ("Merchant là gì? Người dùng Việt không hiểu").
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — verified on device
+In Progress — implemented, type-check/lint clean, awaiting device verification
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Root cause: `src/components/common/NumericKeypad.tsx` read `Dimensions.get('window')` once at
-  module load to get `SCREEN_HEIGHT`, then used that stale value as the close animation's
-  off-screen `translateY` target. When that value didn't match the real, current window height,
-  the "closed" position never actually cleared the viewport, so the panel visually stopped
-  partway down. This is the identical anti-pattern already fixed in the sibling
-  `DraggableSheet.tsx` (commit `5b2566c`, switched to reactive `useWindowDimensions()`) — that
-  fix was never ported to `NumericKeypad.tsx`, so the same bug kept resurfacing on whichever of
-  the 12 consumer screens it was reported on next.
-- Fix: replaced the hand-rolled `Dimensions`/`Animated.Value`/`translateY` open-close
-  choreography in `NumericKeypad.tsx` with React Native's native `<Modal transparent
-  animationType="slide" onRequestClose>`, mirroring the already-proven pattern used in
-  `AIChatbotSheet.tsx` and `ChangePasswordSheet.tsx`. Native `Modal` animates against the OS's
-  live window bounds, so there's no JS-held pixel value that can go stale — it can't get stuck
-  by construction. Removed the `translateY`/`backdropOpacity`/`mounted` refs and the manual
-  open/close `useEffect`; kept the `Keyboard.dismiss()`-on-open behavior. `NUMPAD_HEIGHT`
-  export and all 12 call sites' props are unchanged.
-- Out of scope: `SCREEN_WIDTH` (module-scope `Dimensions.get('window')`, used only for `KEY_W`
-  sizing) has the same latent staleness pattern but isn't the reported bug — left untouched per
-  minimal-change convention.
+- Root cause: `app/(tabs)/transactions/index.tsx:275` hardcoded the English word "merchant"
+  into the search placeholder. Every other screen that surfaces this same concept (transaction
+  counterparty) already localizes it consistently as **"Người nhận"** —
+  `src/data/transactionDetailData.ts:28` (`merchantLabel: "Người nhận"`),
+  `app/(tabs)/entry/photo-confirm.tsx:43` (`merchantLabel: "Người nhận"`), and
+  `app/(tabs)/entry/sms.tsx:64` (`fieldMerchant: "Người nhận / Mô tả"`). Only the
+  transactions-list search bar was missed when those other screens were localized.
+- Fix: changed the placeholder string to `"Tìm theo tên người nhận..."`, matching the
+  established term. Single-line copy change — no logic touched; `searchQuery` still matches
+  against the `transaction.merchant` data field, which is unrelated to the displayed label.
+- Out of scope: not extracting this (or the file's other inline Vietnamese strings) into
+  `src/data/`/`src/constants/` — that file has no existing local-strings pattern, so keeping
+  the fix inline matches the file's current style and avoids an unrelated refactor.
 
 ## Notes
 
 <!-- Any extra notes -->
-Diagnosed via full exploration of the modal/keypad code plus git history of past "sheet"-related
-fixes (`5b2566c`, `b72363f`, `4abfef2`, `e6dfe0c`, `3a6243c`) — none of the prior fixes touched
-`NumericKeypad.tsx`'s animation logic itself, only styling or the sibling `DraggableSheet.tsx`.
-Branched `fix/numpad-stuck-close-modal` off `dev`. Plan file:
-`C:\Users\Lenovo\.claude\plans\sau-khi-nh-n-n-t-warm-cerf.md`.
+Found via `Grep` for "merchant" across `app/` and `src/` — confirmed no other screen leaks the
+English word into Vietnamese copy. Branched `fix/merchant-search-placeholder` off `dev`. Plan
+file: `C:\Users\Lenovo\.claude\plans\merchant-l-g-ng-i-transient-pearl.md`.
 
 ## History
 
