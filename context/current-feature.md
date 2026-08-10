@@ -1,10 +1,10 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: low-contrast text/icons on `COLORS.inversePrimary`-background buttons in the CSV-import
-and SMS-paste entry flows (dark-on-dark, buttons read as disabled). Follow-up from the
-Budgets/Goals toggle fix, where the same `inversePrimary` + `onPrimary` pairing bug was found
-and fixed on the Savings Goals "+ Tạo mục tiêu" button.
+Fix: `NumericKeypad` (the shared custom keypad overlay used across 12 screens) gets stuck
+half-closed instead of fully sliding away when its checkmark ("Done") key is tapped — reported
+on the "Thêm Giao Dịch" (Add Transaction) screen, the 5th recurrence of a "modal" bug in this
+app.
 
 ## Status
 
@@ -14,28 +14,34 @@ Completed — verified on device
 ## Goals
 
 <!-- Goals and requirements -->
-- `app/(tabs)/entry/csv-import.tsx`: `confirmBtn`/`startBtn` use `backgroundColor:
-  COLORS.inversePrimary` (`#6d3bd7`, medium purple) with `confirmText.color: COLORS.onPrimary`
-  (`#3c0091`, dark purple) and matching `ActivityIndicator` spinner color — both dark, low
-  contrast. Changed `confirmText.color` and both spinner colors to `COLORS.onBackground`
-  (`#e7e0ed`, near-white in the app's only active dark theme) — verified in
-  `src/constants/theme.ts` to stay high-contrast against `inversePrimary` in both
-  `DARK_COLORS` and `LIGHT_COLORS`.
-- `app/(tabs)/entry/sms.tsx`: `confirmBtn`/`processBtn` also use `inversePrimary`
-  backgrounds, but their text (`confirmBtnText`/`processBtnText`) was already correctly
-  `COLORS.onSurface` — only the `arrow_forward` icon inside each button used the mismatched
-  `COLORS.onPrimary`. Changed both icons to `COLORS.onSurface` to match their sibling text.
-- Out of scope: no other `inversePrimary` usages found beyond these two files plus the
-  already-fixed Goals screen.
+- Root cause: `src/components/common/NumericKeypad.tsx` read `Dimensions.get('window')` once at
+  module load to get `SCREEN_HEIGHT`, then used that stale value as the close animation's
+  off-screen `translateY` target. When that value didn't match the real, current window height,
+  the "closed" position never actually cleared the viewport, so the panel visually stopped
+  partway down. This is the identical anti-pattern already fixed in the sibling
+  `DraggableSheet.tsx` (commit `5b2566c`, switched to reactive `useWindowDimensions()`) — that
+  fix was never ported to `NumericKeypad.tsx`, so the same bug kept resurfacing on whichever of
+  the 12 consumer screens it was reported on next.
+- Fix: replaced the hand-rolled `Dimensions`/`Animated.Value`/`translateY` open-close
+  choreography in `NumericKeypad.tsx` with React Native's native `<Modal transparent
+  animationType="slide" onRequestClose>`, mirroring the already-proven pattern used in
+  `AIChatbotSheet.tsx` and `ChangePasswordSheet.tsx`. Native `Modal` animates against the OS's
+  live window bounds, so there's no JS-held pixel value that can go stale — it can't get stuck
+  by construction. Removed the `translateY`/`backdropOpacity`/`mounted` refs and the manual
+  open/close `useEffect`; kept the `Keyboard.dismiss()`-on-open behavior. `NUMPAD_HEIGHT`
+  export and all 12 call sites' props are unchanged.
+- Out of scope: `SCREEN_WIDTH` (module-scope `Dimensions.get('window')`, used only for `KEY_W`
+  sizing) has the same latent staleness pattern but isn't the reported bug — left untouched per
+  minimal-change convention.
 
 ## Notes
 
 <!-- Any extra notes -->
-Flagged while fixing `app/(tabs)/budgets/goals/index.tsx` on branch
-`fix/budgets-goals-toggle-format` (see that branch's commit + plan at
-`C:\Users\Lenovo\.claude\plans\thay-v-toggle-gi-a-encapsulated-wolf.md` for the original
-diagnosis, including the toggle/header/back-button fix this one followed on from). Branched
-separately (`fix/entry-inverseprimary-contrast`, off `dev`) since it touches unrelated screens.
+Diagnosed via full exploration of the modal/keypad code plus git history of past "sheet"-related
+fixes (`5b2566c`, `b72363f`, `4abfef2`, `e6dfe0c`, `3a6243c`) — none of the prior fixes touched
+`NumericKeypad.tsx`'s animation logic itself, only styling or the sibling `DraggableSheet.tsx`.
+Branched `fix/numpad-stuck-close-modal` off `dev`. Plan file:
+`C:\Users\Lenovo\.claude\plans\sau-khi-nh-n-n-t-warm-cerf.md`.
 
 ## History
 
@@ -53,3 +59,12 @@ separately (`fix/entry-inverseprimary-contrast`, off `dev`) since it touches unr
   type-check clean, lint 0 errors (95 pre-existing warnings, unrelated), 72/72 tests pass.
 - 2026-08-10 — User verified on device: CSV-import and SMS-paste buttons are now legible.
   Both features merged to `dev`.
+- 2026-08-10 — Documented and branched (`fix/numpad-stuck-close-modal`) off `dev` for the
+  recurring "keypad stuck half-closed" bug. Diagnosed root cause (stale module-scope
+  `Dimensions.get('window')` used as the close-animation target in `NumericKeypad.tsx`) and
+  implemented the fix (native `<Modal animationType="slide">` replacing the custom
+  `translateY`/`Dimensions` animation, matching the pattern already used by `AIChatbotSheet.tsx`
+  / `ChangePasswordSheet.tsx`). type-check clean, lint 0 errors (84 pre-existing warnings,
+  unrelated), 72/72 tests pass.
+- 2026-08-10 — User verified on device: keypad now closes fully on checkmark tap, no more
+  stuck half-open panel.
