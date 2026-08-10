@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  Animated,
+  Modal,
   TouchableWithoutFeedback,
   Dimensions,
   Keyboard,
@@ -24,7 +24,7 @@ export interface NumericKeypadProps {
   onDone?: () => void;
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = SPACING[3];   // 12
 const H_PAD = SPACING[4]; // 16
 const KEY_W = (SCREEN_WIDTH - 2 * H_PAD - 3 * GAP) / 4;
@@ -74,62 +74,22 @@ export function NumericKeypad({
 }: NumericKeypadProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const mounted = useRef(false);
 
   useEffect(() => {
-    if (visible) {
-      mounted.current = true;
-      // Mutual exclusion: the custom numpad and the system keyboard must never be
-      // open at once. Dismiss the system keyboard whenever the numpad opens.
-      Keyboard.dismiss();
-      Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          damping: 22,
-          stiffness: 220,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: SCREEN_HEIGHT,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    // Mutual exclusion: the custom numpad and the system keyboard must never be
+    // open at once. Dismiss the system keyboard whenever the numpad opens.
+    if (visible) Keyboard.dismiss();
   }, [visible]);
 
-  if (!visible && !mounted.current) return null;
-
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => onClose?.()}>
       {/* Tap-outside backdrop */}
       <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View
-          style={[styles.backdrop, { opacity: backdropOpacity }]}
-          pointerEvents={visible ? 'auto' : 'none'}
-        />
+        <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
 
       {/* Sliding panel */}
-      <Animated.View
-        style={[styles.panel, { transform: [{ translateY }] }]}
-        pointerEvents={visible ? 'auto' : 'none'}
-      >
+      <View style={styles.panel}>
         <View style={styles.blur}>
           {/*
             Layout: 4 columns, 4 rows.
@@ -189,8 +149,8 @@ export function NumericKeypad({
             </View>
           </View>
         </View>
-      </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
