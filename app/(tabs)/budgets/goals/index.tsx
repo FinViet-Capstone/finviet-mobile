@@ -279,10 +279,14 @@ export default function GoalsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
+          <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <TouchableOpacity activeOpacity={0.7} style={styles.createBtn}
           onPress={() => setNewGoalVisible(true)}>
-          <MaterialIcon name="add" size={16} color={COLORS.onPrimary} />
+          <MaterialIcon name="add" size={16} color={COLORS.onBackground} />
           <Text style={styles.createBtnText}>{S.createBtn}</Text>
         </TouchableOpacity>
       </View>
@@ -343,21 +347,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
   },
-  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onBackground },
+  headerTitle: { flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   createBtn: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[1],
     backgroundColor: COLORS.inversePrimary, paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2], borderRadius: BORDER_RADIUS.full,
   },
-  createBtnText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
-  toggleWrap: { paddingHorizontal: SPACING[4], marginBottom: SPACING[3] },
+  createBtnText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onBackground },
+  toggleWrap: { paddingHorizontal: SPACING[4], marginBottom: SPACING[2] },
   toggle: {
-    flexDirection: 'row', backgroundColor: COLORS.surfaceContainer,
+    flexDirection: 'row', backgroundColor: COLORS.surfaceContainerHighest,
     borderRadius: BORDER_RADIUS.full, padding: 4,
   },
   toggleOption: { flex: 1, paddingVertical: SPACING[2], alignItems: 'center', borderRadius: BORDER_RADIUS.full },
-  toggleOptionActive: { backgroundColor: COLORS.primaryContainer },
-  toggleTextActive: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimaryContainer },
+  toggleOptionActive: { backgroundColor: COLORS.primary },
+  toggleTextActive: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
   toggleTextInactive: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[3] },
