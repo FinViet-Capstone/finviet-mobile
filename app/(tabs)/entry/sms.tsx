@@ -415,7 +415,7 @@ export default function SMSEntryScreen() {
                 <MaterialIcon
                   name="arrow_forward"
                   size={18}
-                  color={COLORS.onPrimary}
+                  color={COLORS.onSurface}
                 />
               </TouchableOpacity>
             </View>
@@ -586,7 +586,7 @@ export default function SMSEntryScreen() {
           <MaterialIcon
             name="arrow_forward"
             size={18}
-            color={COLORS.onPrimary}
+            color={COLORS.onSurface}
           />
         </TouchableOpacity>
       </View>
