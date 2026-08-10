@@ -20,6 +20,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { useLinkSepayWithToken } from '@/hooks/useWallets';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { USE_MOCK, API_BASE_URL } from '@/lib/env';
+import { getApiErrorMessage } from '@/utils/errors';
 
 const S = {
   title: 'Liên kết SePay',
@@ -37,6 +38,7 @@ const S = {
   errorTitle: 'Liên kết thất bại',
   retry: 'Thử lại',
   done: 'Xong',
+  linkError: 'Không thể liên kết tài khoản SePay.',
 };
 
 type Phase = 'input' | 'linking' | 'success' | 'error';
@@ -74,8 +76,10 @@ export default function LinkSepayTokenScreen() {
           setSyncCount(result.transactionsSynced);
           setPhase('success');
         },
-        onError: (err: any) => {
-          setErrorMessage(err?.message ?? 'Không thể liên kết tài khoản SePay.');
+        onError: (err: unknown) => {
+          // The backend explains *why* in the error envelope's `message`; Axios's own
+          // err.message is only "Request failed with status code 400".
+          setErrorMessage(getApiErrorMessage(err, S.linkError));
           setPhase('error');
         },
       },
@@ -232,7 +236,9 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
     backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[4], marginTop: SPACING[4],
+    // paddingHorizontal matters in the success/error phases: statusWrap centers its
+    // children, so the button shrinks to its content instead of filling the width.
+    paddingVertical: SPACING[4], paddingHorizontal: SPACING[6], marginTop: SPACING[4],
   },
   primaryBtnDisabled: { opacity: 0.5 },
   primaryBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
