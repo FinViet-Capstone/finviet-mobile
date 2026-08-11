@@ -18,7 +18,7 @@ This is the common workflow that we will use for every single feature/fix:
 4. **Test** - Verify it works in the browser. Implement unit testing later. Run `npm run build` and fix any errors
 5. **Iterate** - Iterate and change things if needed
 6. **Commit** - Only after build passes and everything works
-7. **Merge** - Merge to `dev` (the shared integration branch every feature/fix branch merges into — `main` is a separate release branch updated on its own cadence, not per-fix, so don't merge feature/fix branches directly into it unless explicitly asked)
+7. **Merge** - Merge to `dev` (the shared integration branch every feature/fix branch merges into — `main` is a separate release branch updated on its own cadence, not per-fix, so don't merge feature/fix branches directly into it unless explicitly asked). Both `dev` and `main` are ruleset-protected (see Branching below) — merging means opening a PR and getting it approved, not pushing/merging directly.
 8. **Delete Branch** - Delete branch after merge
 9. **Review** - Review AI-generated code periodically and on demand.
 10. Mark as completed in @context/current-feature.md and add to history
@@ -37,6 +37,22 @@ For bug reports specifically, follow: **diagnose → plan → ask → fix**.
 ## Branching
 
 We will create a new branch for every feature/fix. Name branch **feature/[feature]** or **fix[fix]**, etc. Ask to delete the branch once merged.
+
+**Branch protection (GitHub ruleset `protect-main-dev`, added 2026-08-11):** `main`
+and `dev` both block direct pushes, merges, force pushes, and branch deletion —
+everything lands via an approved PR.
+- Requires a PR before merging, ≥1 approval, stale approvals dismissed whenever new
+  commits are pushed, and approval of the most recent push specifically.
+- Only `NhanNguyen275`, `dekukoi`, `sdkoi98`, and the Vercel app are allowed to
+  dismiss PR reviews.
+- Force pushes and deletions are blocked on both branches (no bypass actors
+  configured).
+
+Since `git push`/merge to `dev` or `main` will simply be rejected now, treat "Merge"
+in the Workflow above as "open a PR and get it approved" rather than a direct
+merge. For work that isn't a discrete feature/fix (build/deploy config, CI, etc.), a
+personal branch (e.g. `khoi`) is fine in place of `feature/`/`fix/` naming — same PR
+requirement applies to land it in `dev`.
 
 ## Commits
 
