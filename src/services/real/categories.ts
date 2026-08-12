@@ -2,19 +2,17 @@
  * real/categories.ts — real .NET category service (customer category set).
  *
  * Mirrors the surface of src/services/mock/customerCategories.ts that the app
- * consumes (getCustomerCategories / moveBucket / seedFromPersona) so the barrel
- * can swap mock ⇄ real.
+ * consumes (getCustomerCategories / moveBucket / seedDefaultCategories) so the
+ * barrel can swap mock ⇄ real.
  *
  * Backend reality: the .NET API exposes a GLOBAL category catalog
  * (GET /api/categories) where each expense category carries a `expenseClass`
  * (needs | wants | savings) — the same 3-bucket model the FE calls bucketId.
- * There is no per-customer bucket table server-side, so:
- *   - getCustomerCategories derives the customer set from the catalog (the
- *     category's expenseClass is the bucket).
- *   - moveBucket has no endpoint to persist to; it records a SESSION-LOCAL
- *     override so the UI stays responsive. Overrides are intentionally not
- *     persisted across launches — flag for backend follow-up if real
- *     per-customer buckets are needed.
+ * There is no per-customer bucket TABLE server-side, but the backend does now
+ * persist a per-customer bucket OVERRIDE via PUT /categories/{id}/bucket
+ * (upserts a CustomerCategory row keyed on categoryId), and GET /categories
+ * already reflects any active override in `expenseClass` — so moveBucket
+ * writes through to the real backend instead of a session-local cache.
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -38,24 +36,19 @@ interface CategoryDto {
   sortOrder: number | null;
 }
 
-// Session-local bucket overrides keyed by categoryId (no backend persistence).
-const bucketOverrides = new Map<string, BucketType>();
-
 function isBucket(v: string | null | undefined): v is BucketType {
   return v === 'needs' || v === 'wants' || v === 'savings';
 }
 
 function toCustomerCategory(dto: CategoryDto): CustomerCategory {
   const fallback = getCategoryById(dto.categoryId)?.defaultBucket ?? 'needs';
-  const baseBucket = isBucket(dto.expenseClass) ? dto.expenseClass : fallback;
-  const bucketId = bucketOverrides.get(dto.categoryId) ?? baseBucket;
+  const bucketId = isBucket(dto.expenseClass) ? dto.expenseClass : fallback;
   return {
     id: dto.categoryId,
     customerId: '',
     categoryId: dto.categoryId,
     bucketId,
     source: 'system',
-    isActive: true,
     createdAt: '',
     updatedAt: '',
   };
@@ -78,17 +71,23 @@ export async function moveBucket(
 ): Promise<CustomerCategory> {
   // All 3 buckets are freely movable — the bucket-override endpoint has no
   // savings restriction server-side either (confirmed with BE).
-  bucketOverrides.set(payload.customerCategoryId, payload.targetBucket);
-  return {
-    id: payload.customerCategoryId,
-    customerId: '',
-    categoryId: payload.customerCategoryId,
+  const res = await api.put(`/categories/${payload.customerCategoryId}/bucket`, {
     bucketId: payload.targetBucket,
-    source: 'system',
-    isActive: true,
-    createdAt: '',
-    updatedAt: new Date().toISOString(),
-  };
+  });
+  return toCustomerCategory(unwrap<CategoryDto>(res));
+}
+
+/** Persist every staged drag-and-drop move in one round trip ("Lưu thay đổi"). */
+export async function bulkMoveBucket(
+  payloads: MoveBucketPayload[],
+): Promise<CustomerCategory[]> {
+  const results: CustomerCategory[] = [];
+  for (const payload of payloads) {
+    // Sequential, not Promise.all: each call upserts a per-category row on the
+    // backend, and there is no bulk endpoint to batch them into.
+    results.push(await moveBucket(payload));
+  }
+  return results;
 }
 
 /**
@@ -96,14 +95,6 @@ export async function moveBucket(
  * there is nothing to seed. Returns the current customer set so onboarding flows
  * that await this keep working.
  */
-export async function seedFromPersona(
-  customerId: string,
-  _gender: 'male' | 'female' | 'other' | null,
-  _dateOfBirth: string | null,
-): Promise<CustomerCategory[]> {
+export async function seedDefaultCategories(customerId: string): Promise<CustomerCategory[]> {
   return getCustomerCategories(customerId);
-}
-
-export async function deactivateCustomerCategory(_id: string): Promise<void> {
-  // No per-customer category row to deactivate server-side; no-op.
 }

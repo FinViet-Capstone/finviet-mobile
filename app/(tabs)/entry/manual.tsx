@@ -29,12 +29,13 @@ import {
   FONT_WEIGHT,
   SPACING,
 } from "@/constants/theme";
-import { CATEGORIES, getCategories } from "@/constants/categories";
+import { CATEGORIES } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
+import { CategoryPickerSheet } from "@/components/categories";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { useWallets, useCreateTransaction } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
@@ -451,41 +452,17 @@ export default function ManualEntryScreen() {
       />
 
       {/* ── Category Sheet ── */}
-      <DraggableSheet
+      <CategoryPickerSheet
         visible={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
-      >
-        <View style={styles.sheet}>
-          <Text style={styles.sheetTitle}>{S.sheetCategory}</Text>
-          <FlatList
-            data={[...getCategories(entryType)]}
-            keyExtractor={(item) => item.id}
-            style={styles.sheetList}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.sheetRow,
-                  selectedCategoryId === item.id && styles.sheetRowSelected,
-                ]}
-                onPress={() => {
-                  setSelectedCategoryId(item.id);
-                  setShowCategoryModal(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[styles.sheetDot, { backgroundColor: item.color }]}
-                />
-                <Text style={styles.sheetRowText}>{item.nameVi}</Text>
-                {selectedCategoryId === item.id && (
-                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </DraggableSheet>
+        title={S.sheetCategory}
+        entryType={entryType}
+        selectedCategoryId={selectedCategoryId}
+        onSelect={(id) => {
+          setSelectedCategoryId(id);
+          setShowCategoryModal(false);
+        }}
+      />
 
       {/* ── Wallet Sheet ── */}
       <DraggableSheet
@@ -695,12 +672,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 0,
     marginVertical: SPACING[1],
-  },
-  sheetDot: {
-    width: 14,
-    height: 14,
-    borderRadius: BORDER_RADIUS.full,
-    flexShrink: 0,
   },
   sheetRowText: {
     flex: 1,

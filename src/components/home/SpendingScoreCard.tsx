@@ -93,11 +93,11 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
       <View style={styles.insightBox}>
         <Text style={styles.insightLabel}>AI INSIGHT</Text>
         <Text style={styles.insightText} numberOfLines={3}>
-          {score?.commentaryVi ?? score?.reasonVi ?? 'Đang phân tích dữ liệu chi tiêu của bạn...'}
+          {score?.commentaryVi ?? score?.reasonVi ?? 'Chưa có nhận xét AI cho giai đoạn này.'}
         </Text>
         <TouchableOpacity
           style={styles.insightLink}
-          onPress={() => router.push('/(tabs)/home/score')}
+          onPress={() => router.push({ pathname: '/(tabs)/home/score', params: { view: activeView } })}
           activeOpacity={0.7}
         >
           <Text style={styles.insightLinkText}>Xem phân tích chi tiết</Text>

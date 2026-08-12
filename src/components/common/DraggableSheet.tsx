@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -14,9 +14,6 @@ import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const DISMISS_THRESHOLD = 120;
 const SPRING_CONFIG = { damping: 20, stiffness: 200 };
-// Cap the sheet so tall content scrolls inside it instead of growing past the
-// top of the screen (which left the title off-screen and un-scrollable).
-const MAX_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.85);
 
 interface Props {
   visible: boolean;
@@ -30,6 +27,13 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const translateY = useSharedValue(0);
   const backdropOpacity = useSharedValue(0);
+  // Cap the sheet so tall content scrolls inside it instead of growing past
+  // the top of the screen (which left the title off-screen and
+  // un-scrollable). Read via the hook, not `Dimensions.get()` at module
+  // scope, since the latter can resolve before the native window is
+  // measured and then stays wrong for the app's whole lifetime.
+  const { height: windowHeight } = useWindowDimensions();
+  const maxSheetHeight = Math.round(windowHeight * 0.85);
 
   useEffect(() => {
     if (visible) {
@@ -83,7 +87,7 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
           style={[
             styles.sheet,
             // Clear the home indicator / gesture bar so the last row isn't clipped.
-            { maxHeight: MAX_SHEET_HEIGHT, paddingBottom: insets.bottom + SPACING[2] },
+            { maxHeight: maxSheetHeight, paddingBottom: insets.bottom + SPACING[2] },
             sheetStyle,
           ]}
         >

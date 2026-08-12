@@ -14,7 +14,13 @@ import {
   type WithdrawInput,
   type WalletLedgerQuery,
 } from '@/services';
-import { linkSepayAccount, linkSepayWithToken, syncSepayWallet } from '@/services/real/sepay';
+import {
+  linkSepayAccount,
+  linkSepayWithToken,
+  syncSepayWallet,
+  getSepayLinks,
+  unlinkSepayAccount,
+} from '@/services/real/sepay';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -114,8 +120,9 @@ export const useWalletTransactions = (
 export const useLinkSepayAccount = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ code, bankAccountId }: { code: string; bankAccountId?: number }) =>
-      linkSepayAccount(code, bankAccountId),
+    mutationFn: (
+      { code, bankAccountId, state }: { code: string; bankAccountId?: number; state?: string },
+    ) => linkSepayAccount(code, bankAccountId, state),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
@@ -142,6 +149,24 @@ export const useSyncSepayWallet = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+    },
+  });
+};
+
+/** Connection status (relink-required, webhook state) for every SePay-linked wallet. */
+export const useSepayLinks = () =>
+  useQuery({
+    queryKey: queryKeys.wallets.sepayLinks(),
+    queryFn: () => getSepayLinks(),
+    staleTime: STALE_TIME.medium,
+  });
+
+export const useUnlinkSepayAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (walletId: string) => unlinkSepayAccount(walletId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
     },
   });
 };

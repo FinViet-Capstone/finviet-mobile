@@ -85,7 +85,8 @@ function AddWalletSheet({
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>{S.addSheetTitle}</Text>
-        <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.sheetCloseBtn}>
+        <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.sheetCloseBtn}
+          accessibilityRole="button" accessibilityLabel="Đóng">
           <MaterialIcon name="close" size={20} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
@@ -146,7 +147,7 @@ function WalletCard({
             </Text>
           </View>
         ) : (
-          <Text style={styles.walletType}>{S.typeBasic}</Text>
+          <Text style={styles.walletType}>{isLinked ? S.typeLinked : S.typeBasic}</Text>
         )}
       </View>
       <View style={styles.walletRight}>

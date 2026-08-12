@@ -1,27 +1,68 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Category drag-and-drop: move a category between all 3 buckets (Needs/Wants/Savings) by dragging, instead of the tap-to-swap button. Item 5 of `context/fe-plan-2026-07-revamp.md`.
+Fix: transaction-list search placeholder reads "Tìm theo tên merchant..." — an unexplained
+English loanword dropped into otherwise Vietnamese-only UI copy. Reported by the user via a
+screenshot of the Transactions tab search bar ("Merchant là gì? Người dùng Việt không hiểu").
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed
+Completed — verified on device, merged to `dev`
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Remove the `savings_locked` guard in `mock/customerCategories.ts` (both directions) and the "Savings bucket is immutable" doc comments in `constants/categories.ts`/`types/category.ts` — confirmed by BE that this was never actually enforced server-side either (an FE-only invention), per the user's decision to unlock full mobility.
-- Replace the decorative `drag_indicator` with a real drag gesture (existing stack: `react-native-gesture-handler` + `react-native-reanimated`, same as `DraggableSheet.tsx` — no new dependency).
-- Dragging a category and releasing it over any of the 3 bucket cards moves it there — for system categories via `moveBucket`, for customer-created categories via a new `updateCustomCategoryBucket` mutation (the `canMove: false` deferral from the category-request-removal feature ends here).
-- No backend change needed — BE confirmed the bucket-override endpoint already supports all 3 buckets with no restriction.
+- Root cause: `app/(tabs)/transactions/index.tsx:275` hardcoded the English word "merchant"
+  into the search placeholder. Every other screen that surfaces this same concept (transaction
+  counterparty) already localizes it consistently as **"Người nhận"** —
+  `src/data/transactionDetailData.ts:28` (`merchantLabel: "Người nhận"`),
+  `app/(tabs)/entry/photo-confirm.tsx:43` (`merchantLabel: "Người nhận"`), and
+  `app/(tabs)/entry/sms.tsx:64` (`fieldMerchant: "Người nhận / Mô tả"`). Only the
+  transactions-list search bar was missed when those other screens were localized.
+- Fix: changed the placeholder string to `"Tìm theo tên người nhận..."`, matching the
+  established term. Single-line copy change — no logic touched; `searchQuery` still matches
+  against the `transaction.merchant` data field, which is unrelated to the displayed label.
+- Out of scope: not extracting this (or the file's other inline Vietnamese strings) into
+  `src/data/`/`src/constants/` — that file has no existing local-strings pattern, so keeping
+  the fix inline matches the file's current style and avoids an unrelated refactor.
 
 ## Notes
 
 <!-- Any extra notes -->
+Found via `Grep` for "merchant" across `app/` and `src/` — confirmed no other screen leaks the
+English word into Vietnamese copy. Branched `fix/merchant-search-placeholder` off `dev`. Plan
+file: `C:\Users\Lenovo\.claude\plans\merchant-l-g-ng-i-transient-pearl.md`.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-07-27 — Started.
-- 2026-07-27 — Implemented: removed the `savings_locked` guard from both `mock/customerCategories.ts` and `real/categories.ts` (it was duplicated in both, an FE-only invention never enforced server-side) plus the stale doc comments in `constants/categories.ts`/`types/category.ts`. Added `updateCustomCategoryBucket` (mock/real/barrel/hook) so customer-created categories can be reassigned too, not just system ones. Built the drag gesture in `CategoryBucketCard.tsx` (a `Gesture.Pan()` on the drag handle, reusing the existing `react-native-gesture-handler`/`reanimated` stack — no new dependency) and a new `CategoryDragOverlay` showing 3 fixed, screen-anchored drop zones + a floating chip that follows the finger. Deliberately used fixed zones (computed from `Dimensions.get('window')`) instead of measuring the actual scrolling bucket cards' live position, to avoid a `measure()`-based design I'd have no way to visually verify here. The existing tap-to-swap button is left as an independent Needs↔Wants-only shortcut, unrelated to the new drag gesture. `type-check`/`lint`/`test` all pass — no new warnings in any touched file. UI/gesture behavior itself (does the chip actually follow the finger smoothly, does the hover highlight look right, does the drop actually register) could not be visually verified — no RN simulator/browser available in this environment. Completed.
+- 2026-08-10 — Prior feature (`fix/budgets-goals-toggle-format`): fixed the Ngân sách ↔ Mục
+  tiêu tiết kiệm toggle feeling like page navigation — added a slide transition, synced
+  header/toggle styling between the two routes, added a back button, equalized header heights,
+  and fixed the "+ Tạo mục tiêu" button's `onPrimary`-on-`inversePrimary` contrast bug. Verified
+  on device across two rounds of feedback, merged to `dev`.
+- 2026-08-10 — Documented and branched (`fix/entry-inverseprimary-contrast`) off `dev` to
+  follow up on the same `inversePrimary`+`onPrimary` contrast bug found in two more screens.
+  Implemented: `csv-import.tsx`'s `confirmText` color + both `ActivityIndicator` spinner
+  colors changed `onPrimary` → `onBackground`; `sms.tsx`'s two `arrow_forward` icon colors
+  changed `onPrimary` → `onSurface` (matching their already-correct sibling text color).
+  type-check clean, lint 0 errors (95 pre-existing warnings, unrelated), 72/72 tests pass.
+- 2026-08-10 — User verified on device: CSV-import and SMS-paste buttons are now legible.
+  Both features merged to `dev`.
+- 2026-08-10 — Documented and branched (`fix/numpad-stuck-close-modal`) off `dev` for the
+  recurring "keypad stuck half-closed" bug. Diagnosed root cause (stale module-scope
+  `Dimensions.get('window')` used as the close-animation target in `NumericKeypad.tsx`) and
+  implemented the fix (native `<Modal animationType="slide">` replacing the custom
+  `translateY`/`Dimensions` animation, matching the pattern already used by `AIChatbotSheet.tsx`
+  / `ChangePasswordSheet.tsx`). type-check clean, lint 0 errors (84 pre-existing warnings,
+  unrelated), 72/72 tests pass.
+- 2026-08-10 — User verified on device: keypad now closes fully on checkmark tap, no more
+  stuck half-open panel.
+- 2026-08-10 — Documented and branched (`fix/merchant-search-placeholder`) off `dev` for the
+  English "merchant" loanword leaking into the Transactions search placeholder. Fixed
+  `app/(tabs)/transactions/index.tsx:275` to read "Tìm theo tên người nhận...", matching the
+  "Người nhận" term already used on the transaction-detail, SMS-entry, and photo-entry screens.
+  type-check clean, lint 0 errors (84 pre-existing warnings, unrelated).
+- 2026-08-10 — User verified on device: search placeholder now shows the Vietnamese term.
+  Merged to `dev`.

@@ -55,7 +55,7 @@ export async function login(input: MockLoginInput): Promise<Customer> {
     return { ...getCustomer(), email: input.email, emailVerified: false, onboardingDone: true };
   }
 
-  return { ...getCustomer(), email: input.email, onboardingDone: true };
+  return { ...getCustomer(), email: input.email };
 }
 
 // ─── register ───────────────────────────────────────────────────────────────
@@ -74,14 +74,16 @@ export async function register(input: MockRegisterInput): Promise<Customer> {
   if (e === 'taken@test.com') throw new AuthError('email_in_use');
   if (e === 'weak@test.com') throw new AuthError('weak_password');
 
-  // Fresh registration: not verified, not onboarded.
-  return {
-    ...getCustomer(),
+  // Fresh registration: not verified, not onboarded. Persist onto the shared
+  // mock singleton so the auto-login after email verification sees it too.
+  updateMockCustomer({
     email: input.email,
     displayName: input.displayName,
     emailVerified: false,
     onboardingDone: false,
-  };
+  });
+
+  return getCustomer();
 }
 
 // ─── google oauth ───────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ export async function verifyEmail(code: string): Promise<void> {
   if (c === 'BADCOD' || c.length !== 6) {
     throw new AuthError('verification_failed');
   }
+  updateMockCustomer({ emailVerified: true });
 }
 
 // ─── resend verification ────────────────────────────────────────────────────
@@ -206,6 +209,23 @@ export async function updateProfile(input: UpdateProfileInput): Promise<void> {
     ...(input.wantsPct !== undefined ? { wantsPct: input.wantsPct } : {}),
     ...(input.savingsPct !== undefined ? { savingsPct: input.savingsPct } : {}),
     onboardingDone: input.monthlyIncomeExpected != null,
+  });
+}
+
+export interface UpdateProfileSettingsInput {
+  theme?: 'light' | 'dark' | 'system';
+  /** [warningPct, exceededPct] for budget_alert notifications. */
+  notifBudgetThresholds?: [number, number];
+}
+
+/** Mock: PATCH /profile/settings — theme + budget-alert notification thresholds. */
+export async function updateProfileSettings(input: UpdateProfileSettingsInput): Promise<void> {
+  await delay(150);
+  updateMockCustomer({
+    ...(input.theme !== undefined ? { theme: input.theme } : {}),
+    ...(input.notifBudgetThresholds !== undefined
+      ? { notifBudgetThresholds: input.notifBudgetThresholds }
+      : {}),
   });
 }
 

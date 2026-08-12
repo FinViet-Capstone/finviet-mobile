@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -231,12 +231,15 @@ export default function SettingsScreen() {
   if (isLoading) return <LoadingSpinner />;
 
   const themeValue = user?.theme === 'light' ? S.values.light : user?.theme === 'dark' ? S.values.dark : S.values.system;
+  const [warningPct, exceededPct] = user?.notifBudgetThresholds ?? [80, 100];
+  const budgetAlertValue = `${warningPct}% và ${exceededPct}%`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.headerBtn}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
@@ -251,7 +254,7 @@ export default function SettingsScreen() {
           <View style={styles.avatarWrap}>
             <View style={styles.avatarPlaceholder}>
               {user?.avatarUrl ? (
-                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} transition={150} />
               ) : (
                 <MaterialIcon name="person" size={40} color={colors.onSurfaceVariant} />
               )}
@@ -303,7 +306,16 @@ export default function SettingsScreen() {
               }} />
             <Divider />
             <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
-              label={S.rows.budgetAlert} value="80% và 100%" onPress={() => {}} />
+              label={S.rows.budgetAlert} value={budgetAlertValue}
+              rightElement={
+                <Switch
+                  value={notifBudget}
+                  onValueChange={(v) => handleToggleNotif('budget', v)}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
+                  thumbColor={notifBudget ? colors.onPrimary : colors.onSurfaceVariant}
+                  ios_backgroundColor={colors.surfaceVariant}
+                />
+              } />
             <Divider />
             <ToggleRow icon="calendar_today" iconColor={colors.info}
               label={S.rows.weeklyReport} value={notifReport}

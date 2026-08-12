@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { SvgUri } from 'react-native-svg';
 import { MaterialIcon } from './MaterialIcon';
 import { useCategoryVisual } from '@/hooks/useCategoryVisual';
@@ -29,7 +30,8 @@ export function CategoryIcon({ categoryId, size = 20, color }: CategoryIconProps
       <Image
         source={{ uri: visual.iconRef }}
         style={[styles.image, { width: size, height: size }]}
-        resizeMode="contain"
+        contentFit="contain"
+        transition={150}
       />
     );
   }

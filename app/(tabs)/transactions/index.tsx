@@ -222,7 +222,7 @@ export default function TransactionsScreen() {
       <TransactionCard
         transaction={tx}
         walletName={wallets.find((w) => w.id === tx.walletId)?.name ?? "Ví đã xóa"}
-        onPress={() => handleTxPress(tx)}
+        onPress={handleTxPress}
       />
     ),
     [wallets, handleTxPress],
@@ -272,13 +272,14 @@ export default function TransactionsScreen() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Tìm theo tên merchant..."
+            placeholder="Tìm theo tên người nhận..."
             placeholderTextColor={COLORS.onSurfaceVariant}
             autoFocus
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchQuery("")}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchQuery("")}
+              accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
               <MaterialIcon name="close" size={18} color={COLORS.onSurfaceVariant} />
             </TouchableOpacity>
           )}

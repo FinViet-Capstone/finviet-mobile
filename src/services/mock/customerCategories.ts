@@ -8,93 +8,11 @@
  * was never actually locked server-side either.
  */
 
-import type { CustomerCategory, PersonaId, Persona, PersonaCategory } from '@/types/category';
+import type { CustomerCategory } from '@/types/category';
 import type { BucketType } from '@/constants/categories';
 import { EXPENSE_CATEGORIES } from '@/constants/categories';
 
 const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
-
-// ─── Persona definitions ──────────────────────────────────────────────────────
-
-const PERSONA_MAP: Record<PersonaId, Persona> = {
-  student_male: {
-    id: 'student_male',
-    label: 'Sinh viên (nam)',
-    categories: [
-      { categoryId: 'cat_food',      bucketId: 'needs' },
-      { categoryId: 'cat_transport', bucketId: 'needs' },
-      { categoryId: 'cat_education', bucketId: 'needs' },
-      { categoryId: 'cat_housing',   bucketId: 'needs' },
-      { categoryId: 'cat_entertain', bucketId: 'wants' },
-      { categoryId: 'cat_dining',    bucketId: 'wants' },
-      { categoryId: 'cat_savings',   bucketId: 'savings' },
-    ],
-  },
-  student_female: {
-    id: 'student_female',
-    label: 'Sinh viên (nữ)',
-    categories: [
-      { categoryId: 'cat_food',      bucketId: 'needs' },
-      { categoryId: 'cat_transport', bucketId: 'needs' },
-      { categoryId: 'cat_education', bucketId: 'needs' },
-      { categoryId: 'cat_housing',   bucketId: 'needs' },
-      { categoryId: 'cat_beauty',    bucketId: 'wants' },
-      { categoryId: 'cat_dining',    bucketId: 'wants' },
-      { categoryId: 'cat_savings',   bucketId: 'savings' },
-    ],
-  },
-  young_professional_male: {
-    id: 'young_professional_male',
-    label: 'Đi làm trẻ (nam)',
-    categories: [
-      { categoryId: 'cat_food',      bucketId: 'needs' },
-      { categoryId: 'cat_housing',   bucketId: 'needs' },
-      { categoryId: 'cat_transport', bucketId: 'needs' },
-      { categoryId: 'cat_health',    bucketId: 'needs' },
-      { categoryId: 'cat_entertain', bucketId: 'wants' },
-      { categoryId: 'cat_shopping',  bucketId: 'wants' },
-      { categoryId: 'cat_dining',    bucketId: 'wants' },
-      { categoryId: 'cat_savings',   bucketId: 'savings' },
-      { categoryId: 'cat_invest',    bucketId: 'savings' },
-    ],
-  },
-  young_professional_female: {
-    id: 'young_professional_female',
-    label: 'Đi làm trẻ (nữ)',
-    categories: [
-      { categoryId: 'cat_food',      bucketId: 'needs' },
-      { categoryId: 'cat_housing',   bucketId: 'needs' },
-      { categoryId: 'cat_transport', bucketId: 'needs' },
-      { categoryId: 'cat_health',    bucketId: 'needs' },
-      { categoryId: 'cat_beauty',    bucketId: 'wants' },
-      { categoryId: 'cat_shopping',  bucketId: 'wants' },
-      { categoryId: 'cat_dining',    bucketId: 'wants' },
-      { categoryId: 'cat_savings',   bucketId: 'savings' },
-      { categoryId: 'cat_invest',    bucketId: 'savings' },
-    ],
-  },
-  default: {
-    id: 'default',
-    label: 'Mặc định',
-    categories: EXPENSE_CATEGORIES.map((c) => ({
-      categoryId: c.id,
-      bucketId: c.defaultBucket,
-    })) as PersonaCategory[],
-  },
-};
-
-/** Derive persona from gender + date of birth */
-export function derivePersonaId(
-  gender: 'male' | 'female' | 'other' | null,
-  dateOfBirth: string | null,
-): PersonaId {
-  if (!gender || !dateOfBirth) return 'default';
-  const age = new Date().getFullYear() - new Date(dateOfBirth).getFullYear();
-  const isStudent = age < 25;
-  if (gender === 'male')   return isStudent ? 'student_male'   : 'young_professional_male';
-  if (gender === 'female') return isStudent ? 'student_female' : 'young_professional_female';
-  return 'default';
-}
 
 // ─── In-memory store ─────────────────────────────────────────────────────────
 
@@ -103,26 +21,19 @@ let _nextId = 1;
 
 function makeId() { return `cc_${_nextId++}`; }
 
-/** Seed customer_categories from persona (called during onboarding) */
-export function seedFromPersona(
-  customerId: string,
-  gender: 'male' | 'female' | 'other' | null,
-  dateOfBirth: string | null,
-): CustomerCategory[] {
-  const personaId = derivePersonaId(gender, dateOfBirth);
-  const persona = PERSONA_MAP[personaId];
+/** Seed customer_categories with every system expense category (called during onboarding) */
+export function seedDefaultCategories(customerId: string): CustomerCategory[] {
   const now = new Date().toISOString();
 
   // Remove existing entries for this customer before re-seeding
   _store = _store.filter((c) => c.customerId !== customerId);
 
-  const seeded: CustomerCategory[] = persona.categories.map((pc) => ({
+  const seeded: CustomerCategory[] = EXPENSE_CATEGORIES.map((c) => ({
     id: makeId(),
     customerId,
-    categoryId: pc.categoryId,
-    bucketId: pc.bucketId,
-    source: 'persona' as const,
-    isActive: true,
+    categoryId: c.id,
+    bucketId: c.defaultBucket,
+    source: 'system' as const,
     createdAt: now,
     updatedAt: now,
   }));
@@ -135,12 +46,12 @@ export function seedFromPersona(
 
 export async function getCustomerCategories(customerId: string): Promise<CustomerCategory[]> {
   await delay();
-  let rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+  let rows = _store.filter((c) => c.customerId === customerId);
   // Lazy default-seed so an already-onboarded (or demo) customer never has an empty set.
-  // Real onboarding calls seedFromPersona(gender, dob) up front; this only fires as a fallback.
+  // Real onboarding calls seedDefaultCategories() up front; this only fires as a fallback.
   if (rows.length === 0) {
-    seedFromPersona(customerId, null, null);
-    rows = _store.filter((c) => c.customerId === customerId && c.isActive);
+    seedDefaultCategories(customerId);
+    rows = _store.filter((c) => c.customerId === customerId);
   }
   return rows;
 }
@@ -159,11 +70,16 @@ export async function moveBucket(payload: MoveBucketPayload): Promise<CustomerCa
   return { ...entry };
 }
 
-export async function deactivateCustomerCategory(id: string): Promise<void> {
+/** Persist every staged drag-and-drop move in one round trip ("Lưu thay đổi"). */
+export async function bulkMoveBucket(payloads: MoveBucketPayload[]): Promise<CustomerCategory[]> {
   await delay();
-  const entry = _store.find((c) => c.id === id);
-  if (entry) {
-    entry.isActive = false;
+  const updated: CustomerCategory[] = [];
+  for (const payload of payloads) {
+    const entry = _store.find((c) => c.id === payload.customerCategoryId);
+    if (!entry) continue;
+    entry.bucketId = payload.targetBucket;
     entry.updatedAt = new Date().toISOString();
+    updated.push({ ...entry });
   }
+  return updated;
 }

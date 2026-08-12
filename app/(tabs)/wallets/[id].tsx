@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
   ActivityIndicator, Alert,
 } from 'react-native';
+import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
@@ -10,14 +11,22 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useWalletById, useSyncSepayWallet } from '@/hooks/useWallets';
+import {
+  useWalletById,
+  useSyncSepayWallet,
+  useDeleteWallet,
+  useSepayLinks,
+  useUnlinkSepayAccount,
+} from '@/hooks/useWallets';
 import { useTransactions } from '@/hooks';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
+import { getApiErrorMessage, BUSINESS_RULE_MESSAGES_VI } from '@/utils/errors';
 import type { Transaction } from '@/types';
 
 const S = {
   back: 'arrow_back',
   edit: 'edit',
+  delete: 'delete',
   basic: 'Ví cơ bản',
   linked: 'Ví liên kết',
   balance: 'Số dư',
@@ -28,7 +37,29 @@ const S = {
   syncing: 'Đang đồng bộ',
   syncBtn: 'Đồng bộ ngay',
   syncSuccess: 'Đồng bộ thành công',
+  deleteTitle: 'Xóa ví?',
+  deleteCancel: 'Hủy',
+  deleteConfirm: 'Xóa',
+  deleteErrorTitle: 'Không thể xóa ví',
+  relinkBanner: 'Kết nối ngân hàng đã hết hạn. Vui lòng liên kết lại để tiếp tục đồng bộ.',
+  unlinkBtn: 'Ngắt kết nối',
+  unlinkTitle: 'Ngắt kết nối ngân hàng?',
+  unlinkMsg: 'Ví sẽ chuyển về ví thường và không còn tự động đồng bộ giao dịch. Lịch sử giao dịch đã có sẽ được giữ lại.',
+  unlinkCancel: 'Hủy',
+  unlinkConfirm: 'Ngắt kết nối',
+  unlinkErrorTitle: 'Không thể ngắt kết nối',
+  unlinkError: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
 };
+
+function getWalletDeleteErrorMessage(err: unknown): string {
+  // Real backend: 422 { code }. Mock: a plain Error whose message IS the code
+  // (see mock/wallets.ts deleteWallet). Both wallet_has_transactions/last_wallet
+  // live in the shared BUSINESS_RULE_MESSAGES_VI map now, not a local duplicate.
+  const code = isAxiosError(err)
+    ? (err.response?.data as { code?: string } | undefined)?.code
+    : (err as Error | undefined)?.message;
+  return (code && BUSINESS_RULE_MESSAGES_VI[code]) || 'Không thể xóa ví. Vui lòng thử lại.';
+}
 
 function formatVND(n: number): string {
   return n.toLocaleString('vi-VN') + 'đ';
@@ -39,6 +70,9 @@ export default function WalletDetailScreen() {
   const router = useRouter();
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const sepaySyncMutation = useSyncSepayWallet();
+  const deleteWalletMutation = useDeleteWallet();
+  const { data: sepayLinks } = useSepayLinks();
+  const unlinkMutation = useUnlinkSepayAccount();
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -53,6 +87,51 @@ export default function WalletDetailScreen() {
   }, [wallet, router]);
 
   const isSyncing = sepaySyncMutation.isPending;
+  const isDeleting = deleteWalletMutation.isPending;
+
+  const handleEditPress = useCallback(() => {
+    if (!id) return;
+    router.push({ pathname: '/(tabs)/wallets/edit/[id]', params: { id } });
+  }, [id, router]);
+
+  const handleDeletePress = useCallback(() => {
+    if (!id || isDeleting) return;
+    Alert.alert(
+      S.deleteTitle,
+      `Bạn có chắc muốn xóa ví "${wallet?.name ?? ''}"? Hành động này không thể hoàn tác.`,
+      [
+        { text: S.deleteCancel, style: 'cancel' },
+        {
+          text: S.deleteConfirm,
+          style: 'destructive',
+          onPress: () => {
+            deleteWalletMutation.mutate(id, {
+              onSuccess: () => router.back(),
+              onError: (err) => Alert.alert(S.deleteErrorTitle, getWalletDeleteErrorMessage(err)),
+            });
+          },
+        },
+      ],
+    );
+  }, [id, isDeleting, wallet, deleteWalletMutation, router]);
+
+  const handleUnlink = useCallback(() => {
+    if (!id || unlinkMutation.isPending) return;
+    Alert.alert(S.unlinkTitle, S.unlinkMsg, [
+      { text: S.unlinkCancel, style: 'cancel' },
+      {
+        text: S.unlinkConfirm,
+        style: 'destructive',
+        onPress: () => {
+          unlinkMutation.mutate(id, {
+            onSuccess: () => { refetch(); refetchTx(); },
+            onError: (err) =>
+              Alert.alert(S.unlinkErrorTitle, getApiErrorMessage(err, S.unlinkError)),
+          });
+        },
+      },
+    ]);
+  }, [id, unlinkMutation, refetch, refetchTx]);
 
   const handleSync = useCallback(() => {
     if (!id || isSyncing) return;
@@ -65,8 +144,8 @@ export default function WalletDetailScreen() {
         refetch();
         refetchTx();
       },
-      onError: (err: any) => {
-        Alert.alert('Lỗi đồng bộ', err?.message ?? 'Không thể đồng bộ giao dịch.');
+      onError: (err) => {
+        Alert.alert('Lỗi đồng bộ', getApiErrorMessage(err, 'Không thể đồng bộ giao dịch.'));
       },
     });
   }, [id, isSyncing, sepaySyncMutation, refetch, refetchTx]);
@@ -75,22 +154,47 @@ export default function WalletDetailScreen() {
   if (isError || !wallet) return <ErrorState message={(error as Error)?.message ?? 'Không tìm thấy ví'} onRetry={refetch} />;
 
   const syncStatus = wallet.linkedMetadata?.syncStatus;
+  const linkStatus = sepayLinks?.find((l) => l.walletId === id);
+  const relinkRequired = wallet.type === 'linked' && linkStatus?.relinkRequired === true;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{wallet.name}</Text>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}>
-          <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleEditPress}>
+            <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.headerBtn}
+            onPress={handleDeletePress}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={COLORS.error} />
+            ) : (
+              <MaterialIcon name={S.delete} size={22} color={COLORS.error} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); refetchTx(); }} tintColor={COLORS.primary} />}>
+
+        {/* Relink-required banner */}
+        {relinkRequired && (
+          <View style={styles.relinkBanner}>
+            <MaterialIcon name="warning" size={18} color={COLORS.error} />
+            <Text style={styles.relinkBannerText}>{S.relinkBanner}</Text>
+          </View>
+        )}
 
         {/* Balance card */}
         <View style={styles.balanceCard}>
@@ -132,6 +236,23 @@ export default function WalletDetailScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Unlink button for linked wallets */}
+        {wallet.type === 'linked' && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.unlinkBtn, unlinkMutation.isPending && styles.syncBtnDisabled]}
+            onPress={handleUnlink}
+            disabled={unlinkMutation.isPending}
+          >
+            {unlinkMutation.isPending ? (
+              <ActivityIndicator size="small" color={COLORS.error} />
+            ) : (
+              <MaterialIcon name="link_off" size={18} color={COLORS.error} />
+            )}
+            <Text style={styles.unlinkBtnText}>{S.unlinkBtn}</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Transaction history */}
         <Text style={styles.sectionLabel}>{S.history}</Text>
         {txLoading ? (
@@ -158,6 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary, textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[3] },
@@ -178,5 +300,19 @@ const styles = StyleSheet.create({
   },
   syncBtnDisabled: { opacity: 0.6 },
   syncBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
+  unlinkBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING[2], backgroundColor: 'transparent', borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.error}50`,
+    paddingVertical: SPACING[3], paddingHorizontal: SPACING[5],
+  },
+  unlinkBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.error },
+  relinkBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+    backgroundColor: `${COLORS.error}15`, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.error}30`,
+    padding: SPACING[3],
+  },
+  relinkBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 16 },
   sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
 });

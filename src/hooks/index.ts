@@ -11,6 +11,8 @@ export {
   useLinkSepayAccount,
   useLinkSepayWithToken,
   useSyncSepayWallet,
+  useSepayLinks,
+  useUnlinkSepayAccount,
 } from './useWallets';
 export {
   useTransactions,
@@ -76,12 +78,17 @@ export {
 } from './useAuth';
 export { useBootstrapSession } from './useBootstrapSession';
 export { useRules, useCreateRule } from './useRules';
-export { useCustomerCategories, useMoveBucket } from './useCustomerCategories';
+export {
+  useCustomerCategories,
+  useMoveBucket,
+  useBulkMoveBucket,
+} from './useCustomerCategories';
 export {
   useCustomCategories,
   useCreateCustomCategory,
   useDeleteCustomCategory,
   useUpdateCustomCategoryBucket,
+  useBulkUpdateCustomCategoryBucket,
 } from './useCustomCategories';
 export { useCategoryVisual } from './useCategoryVisual';
 export {

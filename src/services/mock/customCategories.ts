@@ -68,3 +68,24 @@ export async function updateCustomCategoryBucket(
   entry.updatedAt = new Date().toISOString();
   return { ...entry };
 }
+
+export interface BulkBucketMove {
+  id: string;
+  bucketId: BucketType;
+}
+
+/** Persist every staged drag-and-drop move in one round trip ("Lưu thay đổi"). */
+export async function bulkUpdateCustomCategoryBucket(
+  moves: BulkBucketMove[],
+): Promise<CustomCategory[]> {
+  await delay();
+  const updated: CustomCategory[] = [];
+  for (const move of moves) {
+    const entry = _store.find((c) => c.id === move.id);
+    if (!entry) continue;
+    entry.bucketId = move.bucketId;
+    entry.updatedAt = new Date().toISOString();
+    updated.push({ ...entry });
+  }
+  return updated;
+}

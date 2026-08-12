@@ -27,6 +27,7 @@ export const queryKeys = {
     detail: (id: string | undefined) => [...queryKeys.wallets.all(), id] as const,
     transactions: (walletId: string, query: Record<string, unknown> | null) =>
       [...queryKeys.wallets.all(), walletId, 'transactions', query] as const,
+    sepayLinks: () => [...queryKeys.wallets.all(), 'sepay-links'] as const,
   },
   transactions: {
     all: () => ['transactions'] as const,
@@ -50,6 +51,8 @@ export const queryKeys = {
   goals: {
     all: () => ['goals'] as const,
     detail: (id: string | undefined) => [...queryKeys.goals.all(), id] as const,
+    contributions: (id: string | undefined) =>
+      [...queryKeys.goals.all(), id, 'contributions'] as const,
   },
   reports: {
     all: () => ['reports'] as const,

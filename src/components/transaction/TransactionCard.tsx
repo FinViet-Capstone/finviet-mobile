@@ -10,7 +10,12 @@ export interface TransactionCardProps {
   transaction: Transaction;
   /** Wallet display name, resolved by the caller (keeps this presentational). */
   walletName?: string;
-  onPress?: () => void;
+  /**
+   * Takes the transaction so callers can pass a stable useCallback reference
+   * (e.g. `onPress={handleTxPress}`) instead of a per-row inline closure —
+   * required for React.memo below to actually skip re-renders.
+   */
+  onPress?: (transaction: Transaction) => void;
 }
 
 /**
@@ -48,7 +53,11 @@ function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
  * name. Income amounts are green with a + prefix; expenses are unsigned (per the
  * Transactions design).
  */
-export function TransactionCard({ transaction: tx, walletName = '', onPress }: TransactionCardProps) {
+export const TransactionCard = React.memo(function TransactionCard({
+  transaction: tx,
+  walletName = '',
+  onPress,
+}: TransactionCardProps) {
   const {
     iconName,
     iconColor,
@@ -63,7 +72,7 @@ export function TransactionCard({ transaction: tx, walletName = '', onPress }: T
   return (
     <TouchableOpacity
       style={[styles.txRow, isUncategorized && styles.txRowUncat]}
-      onPress={onPress}
+      onPress={() => onPress?.(tx)}
       activeOpacity={0.75}
     >
       <View style={[styles.txIcon, { backgroundColor: iconBg }]}>
@@ -91,7 +100,7 @@ export function TransactionCard({ transaction: tx, walletName = '', onPress }: T
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
   txRow: {

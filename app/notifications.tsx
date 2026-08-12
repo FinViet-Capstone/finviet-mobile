@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -65,23 +66,23 @@ function notifIcon(type: NotificationType): string {
   }
 }
 
-function notifIconColor(type: NotificationType): string {
+function notifIconColor(type: NotificationType, colors: ThemeColors): string {
   switch (type) {
-    case 'budget_alert': return COLORS.error;
-    case 'weekly_report': return COLORS.primary;
-    case 'goal_milestone': return COLORS.tertiary;
-    case 'announcement': return COLORS.secondary;
-    default: return COLORS.onSurfaceVariant;
+    case 'budget_alert': return colors.error;
+    case 'weekly_report': return colors.primary;
+    case 'goal_milestone': return colors.tertiary;
+    case 'announcement': return colors.secondary;
+    default: return colors.onSurfaceVariant;
   }
 }
 
-function notifIconBg(type: NotificationType): string {
+function notifIconBg(type: NotificationType, colors: ThemeColors): string {
   switch (type) {
-    case 'budget_alert': return `${COLORS.errorContainer}30`;
-    case 'weekly_report': return `${COLORS.primaryContainer}20`;
-    case 'goal_milestone': return `${COLORS.tertiaryContainer}20`;
-    case 'announcement': return `${COLORS.secondaryContainer}20`;
-    default: return COLORS.surfaceVariant;
+    case 'budget_alert': return `${colors.errorContainer}30`;
+    case 'weekly_report': return `${colors.primaryContainer}20`;
+    case 'goal_milestone': return `${colors.tertiaryContainer}20`;
+    case 'announcement': return `${colors.secondaryContainer}20`;
+    default: return colors.surfaceVariant;
   }
 }
 
@@ -102,15 +103,17 @@ function notifEntityRoute(
 
 // ─── Notification row ─────────────────────────────────────────────────────────
 
-function NotifRow({
+const NotifRow = React.memo(function NotifRow({
   item,
   onPress,
 }: {
   item: AppNotification;
   onPress: (item: AppNotification) => void;
 }) {
-  const iconColor = notifIconColor(item.type);
-  const iconBg = notifIconBg(item.type);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const iconColor = notifIconColor(item.type, colors);
+  const iconBg = notifIconBg(item.type, colors);
   const isWeeklyReport = item.type === 'weekly_report';
 
   return (
@@ -128,7 +131,7 @@ function NotifRow({
 
       <View style={styles.notifContent}>
         <View style={styles.notifTitleRow}>
-          <Text style={[styles.notifTitle, item.type === 'budget_alert' && { color: COLORS.error }]}
+          <Text style={[styles.notifTitle, item.type === 'budget_alert' && { color: colors.error }]}
             numberOfLines={1}>
             {item.title ?? ''}
           </Text>
@@ -145,7 +148,7 @@ function NotifRow({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Filter type ──────────────────────────────────────────────────────────────
 
@@ -155,6 +158,8 @@ type FilterKey = 'all' | NotificationType;
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: notifications = [], isLoading, isError, error, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -193,7 +198,7 @@ export default function NotificationsScreen() {
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
     <Text style={styles.sectionHeader}>{section.title}</Text>
-  ), []);
+  ), [styles]);
 
   const keyExtractor = useCallback((item: AppNotification) => item.id, []);
 
@@ -206,8 +211,9 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={() => router.back()}>
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
+        <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
+          <MaterialIcon name="arrow_back" size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         {hasUnread ? (
@@ -247,7 +253,7 @@ export default function NotificationsScreen() {
       {/* Notification list */}
       {sections.length === 0 ? (
         <View style={styles.emptyState}>
-          <MaterialIcon name="notifications_off" size={48} color={COLORS.outlineVariant} />
+          <MaterialIcon name="notifications_off" size={48} color={colors.outlineVariant} />
           <Text style={styles.emptyTitle}>{S.empty}</Text>
           <Text style={styles.emptyHint}>{S.emptyHint}</Text>
         </View>
@@ -260,7 +266,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.primary} />
+            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.primary} />
           }
         />
       )}
@@ -270,8 +276,9 @@ export default function NotificationsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,7 +290,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
+    color: colors.primary,
     flex: 1,
     textAlign: 'center',
   },
@@ -295,7 +302,7 @@ const styles = StyleSheet.create({
   readAllText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   filtersWrap: {
     paddingHorizontal: SPACING[4],
@@ -310,21 +317,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[1] + 2,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   chipActive: {
-    backgroundColor: `${COLORS.primary}20`,
-    borderColor: `${COLORS.primary}40`,
+    backgroundColor: `${colors.primary}20`,
+    borderColor: `${colors.primary}40`,
   },
   chipText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   chipTextActive: {
-    color: COLORS.primary,
+    color: colors.primary,
   },
   listContent: {
     paddingHorizontal: SPACING[4],
@@ -334,7 +341,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.outline,
+    color: colors.outline,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginTop: SPACING[4],
@@ -344,16 +351,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SPACING[3],
-    backgroundColor: `${COLORS.surfaceContainer}66`,
+    backgroundColor: `${colors.surfaceContainer}66`,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: `${COLORS.white}08`,
+    borderColor: `${colors.white}08`,
     marginBottom: SPACING[2],
     overflow: 'hidden',
   },
   notifRowUnread: {
-    borderColor: `${COLORS.primary}20`,
+    borderColor: `${colors.primary}20`,
   },
   unreadDot: {
     position: 'absolute',
@@ -362,8 +369,8 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 4,
@@ -382,32 +389,32 @@ const styles = StyleSheet.create({
   notifTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     flex: 1,
   },
   aiBadge: {
     paddingHorizontal: SPACING[2],
     paddingVertical: 2,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}15`,
+    backgroundColor: `${colors.primary}15`,
     borderWidth: 1,
-    borderColor: `${COLORS.primary}30`,
+    borderColor: `${colors.primary}30`,
   },
   aiBadgeText: {
     fontSize: 10,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
+    color: colors.primary,
     letterSpacing: 0.5,
   },
   notifBody: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginBottom: SPACING[2],
   },
   notifTime: {
     fontSize: 11,
-    color: COLORS.outline,
+    color: colors.outline,
   },
   emptyState: {
     flex: 1,
@@ -419,12 +426,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   emptyHint: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
   },
-});
+  });
+}

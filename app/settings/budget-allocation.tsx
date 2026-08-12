@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   View,
@@ -13,13 +13,18 @@ import { CustomSlider } from '@/components/common/CustomSlider';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import {
   useEffectiveIncomeAllocation,
   useScheduledIncomeAllocation,
   useScheduleIncomeAllocationChange,
 } from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ActiveField = 'income' | 'needs' | 'wants' | 'savings' | null;
+type LockedBucket = 'needs' | 'wants' | 'savings' | null;
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -32,10 +37,15 @@ const S = {
   incomeLabel: 'Thu nhập khả dụng',
   incomeUnit: '/tháng',
   incomePlaceholder: 'Nhập thu nhập',
+  incomeEditHint: 'Chạm để sửa · Áp dụng từ tháng tới',
+  incomeInvalid: 'Thu nhập phải lớn hơn 0',
   resetDefault: 'Dùng mặc định 50/30/20',
   totalValid: 'Tổng: 100%',
   totalInvalid: (n: number) => `Tổng: ${n}% — phải bằng 100%`,
   saveSuccess: 'Đã lên lịch — thay đổi sẽ áp dụng từ tháng tới.',
+  lockLabel: (bucket: string) => `Khóa ${bucket}`,
+  unlockLabel: (bucket: string) => `Bỏ khóa ${bucket}`,
+  editPctLabel: (bucket: string, pct: number) => `Sửa ${bucket}, hiện tại ${pct} phần trăm`,
   buckets: {
     needs: { label: 'Thiết yếu', hint: 'Nhà ở, ăn uống, đi lại' },
     wants: { label: 'Mong muốn', hint: 'Mua sắm, giải trí' },
@@ -58,6 +68,10 @@ function nextMonthDate(): Date {
   return new Date(now.getFullYear(), now.getMonth() + 1, 1);
 }
 
+function clampPct(n: number): number {
+  return Math.min(100, Math.max(0, n));
+}
+
 // ─── Bucket card ──────────────────────────────────────────────────────────────
 
 function BucketCard({
@@ -68,6 +82,10 @@ function BucketCard({
   pct,
   amount,
   onChangePct,
+  isLocked,
+  onToggleLock,
+  onPressPct,
+  onMeasured,
 }: {
   label: string;
   hint: string;
@@ -76,9 +94,16 @@ function BucketCard({
   pct: number;
   amount: number;
   onChangePct: (v: number) => void;
+  isLocked: boolean;
+  onToggleLock: () => void;
+  onPressPct: () => void;
+  onMeasured?: (y: number) => void;
 }) {
   return (
-    <View style={[styles.bucketCard, { borderColor: `${color}30` }]}>
+    <View
+      style={[styles.bucketCard, { borderColor: `${color}30` }]}
+      onLayout={(e) => onMeasured?.(e.nativeEvent.layout.y)}
+    >
       <View style={styles.bucketTop}>
         <View style={styles.bucketLeft}>
           <View style={[styles.bucketIcon, { backgroundColor: `${color}20` }]}>
@@ -90,7 +115,34 @@ function BucketCard({
           </View>
         </View>
         <View style={styles.bucketRight}>
-          <Text style={[styles.bucketPct, { color }]}>{pct}%</Text>
+          <View style={styles.bucketRightTop}>
+            <TouchableOpacity
+              onPress={onToggleLock}
+              style={styles.lockBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isLocked }}
+              accessibilityLabel={isLocked ? S.unlockLabel(label) : S.lockLabel(label)}
+            >
+              <MaterialIcon
+                name={isLocked ? 'lock' : 'lock_open'}
+                size={14}
+                color={isLocked ? color : COLORS.onSurfaceVariant}
+                filled={isLocked}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={isLocked ? 1 : 0.6}
+              disabled={isLocked}
+              onPress={onPressPct}
+              style={styles.bucketPctRow}
+              accessibilityRole="button"
+              accessibilityLabel={S.editPctLabel(label, pct)}
+            >
+              <Text style={[styles.bucketPct, { color }, isLocked && styles.bucketPctDisabled]}>{pct}%</Text>
+              {!isLocked && <MaterialIcon name="edit" size={12} color={color} />}
+            </TouchableOpacity>
+          </View>
           <Text style={styles.bucketAmount}>{formatVND(amount)}</Text>
         </View>
       </View>
@@ -104,6 +156,7 @@ function BucketCard({
         minimumTrackTintColor={color}
         maximumTrackTintColor={COLORS.surfaceVariant}
         thumbTintColor={color}
+        disabled={isLocked}
       />
     </View>
   );
@@ -121,8 +174,12 @@ export default function BudgetAllocationScreen() {
   const [wants, setWants] = useState(30);
   const [savings, setSavings] = useState(20);
   const [incomeRaw, setIncomeRaw] = useState('');
-  const [incomeFocused, setIncomeFocused] = useState(false);
+  const [activeField, setActiveField] = useState<ActiveField>(null);
+  const [pctRaw, setPctRaw] = useState('');
+  const [lockedBucket, setLockedBucket] = useState<LockedBucket>(null);
   const [seeded, setSeeded] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldOffsets = useRef<Partial<Record<'needs' | 'wants' | 'savings', number>>>({});
 
   // Seed the editable "next month" draft once: from an already-scheduled draft
   // if the customer already changed their mind once, else from what's currently
@@ -139,51 +196,134 @@ export default function BudgetAllocationScreen() {
     }
   }, [seeded, currentLoading, scheduledLoading, scheduled, current]);
 
-  const parsedIncome = parseInt(incomeRaw || '0', 10);
-  const income = parsedIncome > 0 ? parsedIncome : (current?.monthlyIncome ?? 0);
+  const income = parseInt(incomeRaw || '0', 10);
+  const isIncomeValid = income > 0;
   const total = needs + wants + savings;
-  const isValid = total === 100;
+  const isValid = total === 100 && isIncomeValid;
 
   const needsAmount = Math.round((needs / 100) * income);
   const wantsAmount = Math.round((wants / 100) * income);
   const savingsAmount = Math.round((savings / 100) * income);
 
-  const handleIncomeNumberPress = useCallback((key: string) => {
-    setIncomeRaw((prev) => {
-      if (key === '000') return prev === '' ? '' : prev + '000';
-      return prev + key;
-    });
+  const openField = useCallback((field: Exclude<ActiveField, null>) => {
+    // A locked bucket's own % is fixed — editing it requires unlocking first.
+    if (field !== 'income' && field === lockedBucket) return;
+    setPctRaw('');
+    setActiveField(field);
+    // Income is always visible near the top already; buckets are stacked
+    // below it, so scroll the tapped one clear of the bottom-anchored keypad.
+    if (field !== 'income') {
+      const y = fieldOffsets.current[field];
+      if (y !== undefined) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - SPACING[4]), animated: true });
+      }
+    }
+  }, [lockedBucket]);
+
+  const handleKeypadNumberPress = useCallback((key: string) => {
+    if (activeField === 'income') {
+      setIncomeRaw((prev) => {
+        if (key === '000') return prev === '' ? '' : prev + '000';
+        return prev + key;
+      });
+    } else if (activeField) {
+      setPctRaw((prev) => {
+        if (key === '000') return prev;
+        const next = prev + key;
+        return next.length > 3 ? prev : next;
+      });
+    }
+  }, [activeField]);
+
+  const handleKeypadBackspace = useCallback(() => {
+    if (activeField === 'income') setIncomeRaw((prev) => prev.slice(0, -1));
+    else setPctRaw((prev) => prev.slice(0, -1));
+  }, [activeField]);
+
+  const handleKeypadClear = useCallback(() => {
+    if (activeField === 'income') setIncomeRaw('');
+    else setPctRaw('');
+  }, [activeField]);
+
+  const handleKeypadClose = useCallback(() => {
+    setActiveField(null);
+    setPctRaw('');
   }, []);
 
-  const handleIncomeBackspace = useCallback(() => setIncomeRaw((prev) => prev.slice(0, -1)), []);
-  const handleIncomeClear = useCallback(() => setIncomeRaw(''), []);
-
   const handleNeeds = useCallback((v: number) => {
+    if (lockedBucket === 'needs') return; // defensive; its slider/% are already disabled
+    if (lockedBucket === 'wants') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - wants);
+      setNeeds(clampedV);
+      setSavings(100 - wants - clampedV);
+      return;
+    }
+    if (lockedBucket === 'savings') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - savings);
+      setNeeds(clampedV);
+      setWants(100 - savings - clampedV);
+      return;
+    }
     setNeeds(v);
     const rem = 100 - v;
     const wRatio = wants / (wants + savings) || 0.6;
     setWants(Math.round(rem * wRatio));
     setSavings(rem - Math.round(rem * wRatio));
-  }, [wants, savings]);
+  }, [wants, savings, lockedBucket]);
 
   const handleWants = useCallback((v: number) => {
+    if (lockedBucket === 'wants') return;
+    if (lockedBucket === 'needs') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - needs);
+      setWants(clampedV);
+      setSavings(100 - needs - clampedV);
+      return;
+    }
+    if (lockedBucket === 'savings') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - savings);
+      setWants(clampedV);
+      setNeeds(100 - savings - clampedV);
+      return;
+    }
     setWants(v);
     const rem = 100 - v;
     const nRatio = needs / (needs + savings) || 0.7;
     setNeeds(Math.round(rem * nRatio));
     setSavings(rem - Math.round(rem * nRatio));
-  }, [needs, savings]);
+  }, [needs, savings, lockedBucket]);
 
   const handleSavings = useCallback((v: number) => {
+    if (lockedBucket === 'savings') return;
+    if (lockedBucket === 'needs') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - needs);
+      setSavings(clampedV);
+      setWants(100 - needs - clampedV);
+      return;
+    }
+    if (lockedBucket === 'wants') {
+      const clampedV = Math.min(Math.max(v, 0), 100 - wants);
+      setSavings(clampedV);
+      setNeeds(100 - wants - clampedV);
+      return;
+    }
     setSavings(v);
     const rem = 100 - v;
     const nRatio = needs / (needs + wants) || 0.625;
     setNeeds(Math.round(rem * nRatio));
     setWants(rem - Math.round(rem * nRatio));
-  }, [needs, wants]);
+  }, [needs, wants, lockedBucket]);
+
+  const handleKeypadDone = useCallback(() => {
+    if (activeField === 'needs') handleNeeds(clampPct(parseInt(pctRaw || '0', 10)));
+    else if (activeField === 'wants') handleWants(clampPct(parseInt(pctRaw || '0', 10)));
+    else if (activeField === 'savings') handleSavings(clampPct(parseInt(pctRaw || '0', 10)));
+    setActiveField(null);
+    setPctRaw('');
+  }, [activeField, pctRaw, handleNeeds, handleWants, handleSavings]);
 
   const handleReset = useCallback(() => {
     setNeeds(50); setWants(30); setSavings(20);
+    setLockedBucket(null);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -202,13 +342,14 @@ export default function BudgetAllocationScreen() {
     }
   }, [isValid, income, needs, wants, savings, scheduleChange, router]);
 
-  if (currentLoading) return <LoadingSpinner />;
+  if (currentLoading || scheduledLoading || !seeded) return <LoadingSpinner />;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
@@ -218,7 +359,10 @@ export default function BudgetAllocationScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, activeField !== null && { paddingBottom: NUMPAD_HEIGHT }]}
         showsVerticalScrollIndicator={false}>
 
         {/* Current month — read-only, locked */}
@@ -244,15 +388,25 @@ export default function BudgetAllocationScreen() {
         {/* Income — tappable to edit via numpad */}
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.incomeCard, incomeFocused && styles.incomeCardFocused]}
-          onPress={() => setIncomeFocused(true)}
+          style={[
+            styles.incomeCard,
+            activeField === 'income' && styles.incomeCardFocused,
+            !isIncomeValid && styles.incomeCardInvalid,
+          ]}
+          onPress={() => openField('income')}
+          accessibilityRole="button"
+          accessibilityLabel={S.incomeEditHint}
         >
           <Text style={styles.incomeLabel}>{S.incomeLabel}</Text>
-          <Text style={styles.incomeAmount}>
-            {parsedIncome > 0
-              ? parsedIncome.toLocaleString('vi-VN') + 'đ'
-              : income > 0 ? formatVND(income) : S.incomePlaceholder}
-            <Text style={styles.incomeUnit}>{S.incomeUnit}</Text>
+          <View style={styles.incomeAmountRow}>
+            <Text style={styles.incomeAmount}>
+              {income > 0 ? formatVND(income) : S.incomePlaceholder}
+              <Text style={styles.incomeUnit}>{S.incomeUnit}</Text>
+            </Text>
+            <MaterialIcon name="edit" size={14} color={COLORS.primary} />
+          </View>
+          <Text style={[styles.incomeEditHintText, !isIncomeValid && styles.incomeInvalidText]}>
+            {isIncomeValid ? S.incomeEditHint : S.incomeInvalid}
           </Text>
           <TouchableOpacity activeOpacity={0.7} style={styles.resetBtn} onPress={handleReset}>
             <MaterialIcon name="auto_awesome" size={16} color={COLORS.primary} filled />
@@ -263,15 +417,27 @@ export default function BudgetAllocationScreen() {
         {/* Bucket sliders */}
         <BucketCard label={S.buckets.needs.label} hint={S.buckets.needs.hint}
           icon="home" color={COLORS.primary}
-          pct={needs} amount={needsAmount} onChangePct={handleNeeds} />
+          pct={needs} amount={needsAmount} onChangePct={handleNeeds}
+          isLocked={lockedBucket === 'needs'}
+          onToggleLock={() => setLockedBucket((prev) => (prev === 'needs' ? null : 'needs'))}
+          onPressPct={() => openField('needs')}
+          onMeasured={(y) => { fieldOffsets.current.needs = y; }} />
 
         <BucketCard label={S.buckets.wants.label} hint={S.buckets.wants.hint}
           icon="shopping_bag" color={COLORS.secondary}
-          pct={wants} amount={wantsAmount} onChangePct={handleWants} />
+          pct={wants} amount={wantsAmount} onChangePct={handleWants}
+          isLocked={lockedBucket === 'wants'}
+          onToggleLock={() => setLockedBucket((prev) => (prev === 'wants' ? null : 'wants'))}
+          onPressPct={() => openField('wants')}
+          onMeasured={(y) => { fieldOffsets.current.wants = y; }} />
 
         <BucketCard label={S.buckets.savings.label} hint={S.buckets.savings.hint}
           icon="savings" color={COLORS.tertiary}
-          pct={savings} amount={savingsAmount} onChangePct={handleSavings} />
+          pct={savings} amount={savingsAmount} onChangePct={handleSavings}
+          isLocked={lockedBucket === 'savings'}
+          onToggleLock={() => setLockedBucket((prev) => (prev === 'savings' ? null : 'savings'))}
+          onPressPct={() => openField('savings')}
+          onMeasured={(y) => { fieldOffsets.current.savings = y; }} />
       </ScrollView>
 
       {/* Total validation pill */}
@@ -285,12 +451,12 @@ export default function BudgetAllocationScreen() {
       </View>
 
       <NumericKeypad
-        visible={incomeFocused}
-        onClose={() => setIncomeFocused(false)}
-        onNumberPress={handleIncomeNumberPress}
-        onBackspace={handleIncomeBackspace}
-        onClear={handleIncomeClear}
-        onDone={() => setIncomeFocused(false)}
+        visible={activeField !== null}
+        onClose={handleKeypadClose}
+        onNumberPress={handleKeypadNumberPress}
+        onBackspace={handleKeypadBackspace}
+        onClear={handleKeypadClear}
+        onDone={handleKeypadDone}
       />
     </SafeAreaView>
   );
@@ -342,9 +508,15 @@ const styles = StyleSheet.create({
   incomeCardFocused: {
     borderColor: COLORS.primary,
   },
+  incomeCardInvalid: {
+    borderColor: COLORS.error,
+  },
   incomeLabel: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
+  incomeAmountRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
   incomeAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
   incomeUnit: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.normal, color: COLORS.onSurfaceVariant },
+  incomeEditHintText: { fontSize: 11, color: COLORS.primary },
+  incomeInvalidText: { color: COLORS.error },
   resetBtn: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],
@@ -365,7 +537,11 @@ const styles = StyleSheet.create({
   bucketLabel: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold },
   bucketHint: { fontSize: 11, color: COLORS.onSurfaceVariant, marginTop: 2 },
   bucketRight: { alignItems: 'flex-end' },
+  bucketRightTop: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
+  lockBtn: { padding: 2 },
+  bucketPctRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   bucketPct: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold },
+  bucketPctDisabled: { opacity: 0.5 },
   bucketAmount: { fontSize: 11, color: COLORS.onSurfaceVariant },
   slider: { width: '100%', height: 32 },
   // Total pill

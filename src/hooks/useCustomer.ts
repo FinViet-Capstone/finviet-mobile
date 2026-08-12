@@ -14,7 +14,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Customer } from '@/types';
-import { updateProfile } from '@/services';
+import { updateProfile, updateProfileSettings, USE_MOCK } from '@/services';
+import { updateMockCustomer } from '@/services/mock/user';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -83,6 +84,8 @@ export interface UpdatePreferencesInput {
   theme?: 'light' | 'dark' | 'system';
   defaultCurrency?: string;
   notifications?: Partial<{ budget: boolean; report: boolean; goals: boolean }>;
+  /** [warningPct, exceededPct] for budget_alert notifications. */
+  notifBudgetThresholds?: [number, number];
 }
 
 export const useUpdatePreferences = () => {
@@ -91,8 +94,7 @@ export const useUpdatePreferences = () => {
   const currentCustomer = useAuthStore((s) => s.customer);
   return useMutation({
     mutationFn: async (patch: UpdatePreferencesInput) => {
-      await delay();
-      updateCustomer({
+      const merged = {
         ...(patch.language !== undefined ? { language: patch.language } : {}),
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
         ...(patch.defaultCurrency !== undefined
@@ -106,8 +108,28 @@ export const useUpdatePreferences = () => {
               },
             }
           : {}),
+        ...(patch.notifBudgetThresholds !== undefined
+          ? { notifBudgetThresholds: patch.notifBudgetThresholds }
+          : {}),
         updatedAt: new Date().toISOString(),
-      });
+      };
+
+      // theme + notifBudgetThresholds are real, backend-persisted settings
+      // (PATCH /profile/settings — swapped mock/real by the services barrel
+      // like everything else). language/defaultCurrency/notifications have no
+      // backend counterpart yet and stay local-only (mock store below, every
+      // mode) so a preference survives a logout/login instead of resetting.
+      if (patch.theme !== undefined || patch.notifBudgetThresholds !== undefined) {
+        await updateProfileSettings({
+          theme: patch.theme,
+          notifBudgetThresholds: patch.notifBudgetThresholds,
+        });
+      } else {
+        await delay();
+      }
+
+      updateCustomer(merged);
+      if (USE_MOCK) updateMockCustomer(merged);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.user.all() }),
   });

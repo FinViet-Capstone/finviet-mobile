@@ -19,11 +19,15 @@ import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { useLinkSepayWithToken } from '@/hooks/useWallets';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { USE_MOCK, API_BASE_URL } from '@/lib/env';
+import { getApiErrorMessage } from '@/utils/errors';
 
 const S = {
   title: 'Liên kết SePay',
   heading: 'Nhập API token SePay',
   hint: 'Lấy token tại my.sepay.vn → Công ty → Cấu hình API (API Access). Token dùng để đồng bộ giao dịch từ tài khoản ngân hàng đã kết nối.',
+  mockWarning: 'Liên kết SePay luôn gọi máy chủ thật, kể cả khi ứng dụng đang ở chế độ dữ liệu mẫu (mock) — cần một máy chủ .NET đang chạy để dùng tính năng này.',
+  noBackendError: 'Chưa cấu hình địa chỉ máy chủ thật (EXPO_PUBLIC_API_BASE_URL trống). Tính năng liên kết SePay cần một máy chủ .NET đang chạy — không thể dùng ở chế độ dữ liệu mẫu.',
   tokenLabel: 'API Token',
   tokenPlaceholder: 'Dán token của bạn vào đây',
   accountLabel: 'Số tài khoản (không bắt buộc)',
@@ -34,6 +38,7 @@ const S = {
   errorTitle: 'Liên kết thất bại',
   retry: 'Thử lại',
   done: 'Xong',
+  linkError: 'Không thể liên kết tài khoản SePay.',
 };
 
 type Phase = 'input' | 'linking' | 'success' | 'error';
@@ -51,6 +56,17 @@ export default function LinkSepayTokenScreen() {
   const handleLink = useCallback(() => {
     const trimmed = token.trim();
     if (!trimmed) return;
+
+    // SePay's OAuth2/token linking always hits the real backend — it bypasses
+    // USE_MOCK entirely (an OAuth flow can't be meaningfully mocked). Fail fast
+    // with a clear reason instead of letting a request against an empty
+    // baseURL surface as a cryptic network error.
+    if (!API_BASE_URL) {
+      setErrorMessage(S.noBackendError);
+      setPhase('error');
+      return;
+    }
+
     setPhase('linking');
 
     linkMutation.mutate(
@@ -60,8 +76,10 @@ export default function LinkSepayTokenScreen() {
           setSyncCount(result.transactionsSynced);
           setPhase('success');
         },
-        onError: (err: any) => {
-          setErrorMessage(err?.message ?? 'Không thể liên kết tài khoản SePay.');
+        onError: (err: unknown) => {
+          // The backend explains *why* in the error envelope's `message`; Axios's own
+          // err.message is only "Request failed with status code 400".
+          setErrorMessage(getApiErrorMessage(err, S.linkError));
           setPhase('error');
         },
       },
@@ -75,6 +93,8 @@ export default function LinkSepayTokenScreen() {
           activeOpacity={0.7}
           style={styles.headerBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
         >
           <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
         </TouchableOpacity>
@@ -94,6 +114,13 @@ export default function LinkSepayTokenScreen() {
               </View>
               <Text style={styles.heading}>{S.heading}</Text>
               <Text style={styles.hint}>{S.hint}</Text>
+
+              {USE_MOCK && (
+                <View style={styles.mockWarningBox}>
+                  <MaterialIcon name="info" size={16} color={COLORS.secondary} />
+                  <Text style={styles.mockWarningText}>{S.mockWarning}</Text>
+                </View>
+              )}
 
               <Text style={styles.fieldLabel}>{S.tokenLabel}</Text>
               <TextInput
@@ -188,6 +215,13 @@ const styles = StyleSheet.create({
   iconWrap: { alignItems: 'center', marginBottom: SPACING[2] },
   heading: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, textAlign: 'center' },
   hint: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: SPACING[2] },
+  mockWarningBox: {
+    flexDirection: 'row', gap: SPACING[2], alignItems: 'flex-start',
+    backgroundColor: `${COLORS.secondary}15`, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: `${COLORS.secondary}30`,
+    padding: SPACING[3], marginBottom: SPACING[2],
+  },
+  mockWarningText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.secondary, lineHeight: 16 },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
   input: {
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
@@ -202,7 +236,9 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
     backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[4], marginTop: SPACING[4],
+    // paddingHorizontal matters in the success/error phases: statusWrap centers its
+    // children, so the button shrinks to its content instead of filling the width.
+    paddingVertical: SPACING[4], paddingHorizontal: SPACING[6], marginTop: SPACING[4],
   },
   primaryBtnDisabled: { opacity: 0.5 },
   primaryBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },

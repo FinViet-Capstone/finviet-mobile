@@ -19,6 +19,7 @@ interface CustomSliderProps {
   minimumTrackTintColor?: string;
   maximumTrackTintColor?: string;
   thumbTintColor?: string;
+  disabled?: boolean;
   style?: ViewStyle;
 }
 
@@ -61,6 +62,7 @@ export function CustomSlider({
   minimumTrackTintColor = DEFAULT_MIN_COLOR,
   maximumTrackTintColor = DEFAULT_MAX_COLOR,
   thumbTintColor = DEFAULT_THUMB_COLOR,
+  disabled = false,
   style,
 }: CustomSliderProps) {
   const trackWidth = useSharedValue(0);
@@ -101,6 +103,7 @@ export function CustomSlider({
   );
 
   const pan = Gesture.Pan()
+    .enabled(!disabled)
     .onBegin(() => {
       startX.value = thumbX.value;
     })
@@ -128,7 +131,7 @@ export function CustomSlider({
 
   // ── Tap on track to jump ──────────────────────────────────────────────────
 
-  const tap = Gesture.Tap().onEnd((e) => {
+  const tap = Gesture.Tap().enabled(!disabled).onEnd((e) => {
     const newX = clamp(e.x, 0, trackWidth.value);
     const pct = trackWidth.value > 0 ? newX / trackWidth.value : 0;
     let rawValue = minimumValue + pct * range;
@@ -156,7 +159,10 @@ export function CustomSlider({
 
   return (
     <GestureDetector gesture={composed}>
-      <View style={[styles.container, style]} onLayout={handleLayout}>
+      <View
+        style={[styles.container, style, disabled && styles.disabledContainer]}
+        onLayout={handleLayout}
+      >
         {/* Track background (unfilled) */}
         <View style={[styles.track, { backgroundColor: maximumTrackTintColor }]}>
           {/* Track filled */}
@@ -192,6 +198,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     position: 'relative',
+  },
+  disabledContainer: {
+    opacity: 0.45,
   },
   track: {
     height: TRACK_HEIGHT,

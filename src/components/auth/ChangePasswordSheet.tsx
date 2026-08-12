@@ -22,7 +22,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
@@ -36,26 +35,10 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-
-const schema = z
-  .object({
-    currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
-    newPassword: z
-      .string()
-      .min(1, 'Vui lòng nhập mật khẩu mới')
-      .min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu mới'),
-  })
-  .refine((d) => d.newPassword === d.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
-    path: ['confirmPassword'],
-  })
-  .refine((d) => d.newPassword !== d.currentPassword, {
-    message: 'Mật khẩu mới phải khác mật khẩu hiện tại',
-    path: ['newPassword'],
-  });
-
-type FormValues = z.infer<typeof schema>;
+import {
+  changePasswordSchema as schema,
+  type ChangePasswordInput as FormValues,
+} from '@/validators/auth.schema';
 
 export interface ChangePasswordSheetProps {
   visible: boolean;

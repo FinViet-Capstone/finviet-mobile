@@ -52,17 +52,22 @@ B. Categories & Bucket System (Needs/Wants/Savings)
   Di chuyển, Sức khỏe, Giáo dục, Gửi tiền gia đình), 4 Wants (Giải trí, Làm đẹp, Mua sắm, Ăn
   ngoài), 3 Savings (Tiết kiệm, Đầu tư, and an auto-only `cat_savings_goal` never shown in
   manual pickers), 5 Income categories (no bucket), plus `cat_uncategorized`.
-- Onboarding seeds each customer's own category set based on a **persona** derived from
-  gender + age (`student_male`/`student_female`/`young_professional_male`/
-  `young_professional_female`/`default`), each persona activating a fixed hardcoded subset of
-  categories.
-- Customers can hide/deactivate a category (`CustomerCategory.isActive`); the mock service
-  currently only implements deactivation — there is no reactivation path yet.
-- Categories can be dragged between Needs and Wants; the **Savings bucket is locked in both
-  directions** — the move-bucket logic explicitly rejects moving a category into savings or
-  out of it, and the UI hides the move affordance for savings rows entirely.
-- Missing a category → a `CategoryRequest` (requested name, type, suggested bucket, notes,
-  status `pending`/`approved`/`rejected`) that an admin reviews outside this app.
+- Onboarding seeds each customer's own category set with **every system expense category** at
+  its default bucket — a uniform full-catalog seed, not a persona-derived subset. (Persona-based
+  seeding — gender/age → one of 5 fixed category subsets — was removed; the team decided months
+  ago to drop it, and gender/date-of-birth collection at onboarding is kept only for future
+  analytics, no longer feeding category selection.)
+- There is no category deactivation feature: a customer cannot hide a category from budgets
+  or pickers. This existed as a data-layer function with no UI entry point and no reactivation
+  path at any layer, and was removed entirely (2026-08-08) rather than finished.
+- Categories can be dragged freely between all three buckets, **including Savings** — a
+  category is not locked into Savings once assigned, nor barred from being moved into it.
+  This was reversed from an earlier "Savings is locked" design (per
+  `context/fe-plan-2026-07-revamp.md` item 5, confirmed with BE: savings was never actually
+  locked server-side either).
+- There is no category-request feature: a user cannot ask an admin to add a custom category.
+  This was deliberately removed (decided months ago, per the team) — no admin-approval UI
+  ever existed for it, and no trace of it remains in the codebase.
 
 C. Budgets & Pacing
 - Two distinct, both-implemented budgeting mechanisms:
@@ -117,8 +122,8 @@ F. Notifications
 
 G. Settings & Utilities
 - Real, routed screens under `app/settings/`: profile/preferences home, budget-allocation
-  sliders (needs/wants/savings %), category bucket management, category requests, data export,
-  account deletion, and subscription management.
+  sliders (needs/wants/savings %), category bucket management, data export, account deletion,
+  and subscription management.
 
 ## Data
 ---
@@ -127,7 +132,9 @@ implements them.
 
 ### Customer
 - id, email, passwordHash/googleId, displayName, avatarUrl
-- gender ('male'|'female'|'other'), dateOfBirth — used for persona-based category seeding
+- gender ('male'|'female'|'other'), dateOfBirth — collected and persisted at onboarding;
+  reserved for future analytics, not currently consumed by any feature (persona-based category
+  seeding that used to derive from these fields was removed)
 - monthlyIncome, needsPct/wantsPct/savingsPct (default 50/30/20)
 - defaultCurrency, language ('vi'|'en'), theme ('light'|'dark'|'system')
 - isActive, emailVerified, onboardingDone, notifications settings, fcmToken
@@ -147,13 +154,9 @@ implements them.
 ### Category (global) / CustomerCategory (per-customer)
 - Category: id (slug, e.g. `cat_food`), nameVi, nameEn, icon, color, isSystem, sortOrder,
   type ('expense'|'income'), defaultBucket, autoOnly? (true only for `cat_savings_goal`)
-- CustomerCategory: id, customerId, categoryId, bucketId, source, isActive, createdAt,
-  updatedAt
-- Persona / PersonaCategory: gender+age → one of `student_male`/`student_female`/
-  `young_professional_male`/`young_professional_female`/`default`, each mapping to a fixed
-  category list used at onboarding
-- CategoryRequest: nameVi (requested), type, suggestedBucket, notes,
-  status ('pending'|'approved'|'rejected')
+- CustomerCategory: id, customerId, categoryId, bucketId, source, createdAt, updatedAt
+  (no `isActive` field — category deactivation was removed; see Features §B.)
+- (No `CategoryRequest` type exists — there is no category-request feature; see Features §B.)
 
 ### Budget
 - id, customerId, categoryId, monthlyLimit, resetDay, createdAt, updatedAt

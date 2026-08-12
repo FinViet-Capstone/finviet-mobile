@@ -13,9 +13,8 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
-import { useBudgets } from '@/hooks/useBudgets';
+import { useBudgets, useBudgetBuckets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
-import { useEffectiveIncomeAllocation } from '@/hooks/useIncomeAllocation';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
 import { useCustomerCategories } from '@/hooks/useCustomerCategories';
 import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
@@ -40,8 +39,6 @@ const S = {
   spent: 'Đã chi',
   of: '/',
   over: 'Vượt',
-  overLimit: 'vượt mức',
-  overGoal: 'Vượt chỉ tiêu',
   left: 'Còn lại',
   noLimit: 'Chưa có hạn mức',
   months: [
@@ -148,26 +145,35 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
   const icon = getBucketIcon(summary.bucket);
   const label = getBucketLabel(summary.bucket);
   const isSavings = summary.bucket === 'savings';
-  const isOver = summary.percentage > 100;
-  // Savings: vượt mục tiêu = TỐT (xanh). Needs/Wants: vượt ngân sách = XẤU (đỏ).
-  const isGoodOver = isSavings && isOver;
-  const isBadOver = !isSavings && isOver;
-  const isOverAllocated = !isSavings && summary.allocationCap > 0 && summary.monthlyLimit > summary.allocationCap;
-  const barColor = isBadOver ? COLORS.error : isGoodOver ? COLORS.tertiary : color;
+  const isGoodOver = isSavings && summary.percentage > 100;
+
+  // Needs/Wants: color the whole card by spend pace alone so status reads at
+  // a glance — a text badge here ("vượt mức") gets clipped at this card's
+  // width and was unreadable. Savings keeps the documented neutral-below-
+  // target scheme (exceeding a savings target is good, not bad, unlike
+  // overspending Needs/Wants; below target it stays neutral gray, no tint at
+  // all — never warning/danger).
+  const statusColor = isGoodOver
+    ? COLORS.tertiary
+    : isSavings
+    ? null
+    : summary.percentage > 80
+    ? COLORS.budget.danger
+    : summary.percentage > 60
+    ? COLORS.budget.warning
+    : COLORS.budget.safe;
+
+  const displayColor = statusColor ?? color;
   const barWidth = Math.min(summary.percentage, 100);
 
   return (
-    <View style={[styles.bucketCard, isBadOver && { borderColor: COLORS.error }, isGoodOver && { borderColor: COLORS.tertiary }]}>
+    <View style={[styles.bucketCard, statusColor && { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}60` }]}>
       <View style={styles.bucketCardTop}>
         <Text style={[styles.bucketLabel, { color }]}>{label}</Text>
-        {isGoodOver
-          ? <View style={styles.overGoalBadge}><Text style={styles.overGoalText}>{S.overGoal}</Text></View>
-          : isOverAllocated
-          ? <View style={styles.overAllocBadge}><Text style={styles.overAllocText}>{S.overLimit}</Text></View>
-          : <MaterialIcon name={icon} size={16} color={color} />}
+        <MaterialIcon name={icon} size={16} color={displayColor} />
       </View>
       <View style={styles.bucketAmounts}>
-        <Text style={[styles.bucketSpent, isBadOver && { color: COLORS.error }, isGoodOver && { color: COLORS.tertiary }]}>
+        <Text style={[styles.bucketSpent, { color: displayColor }]}>
           {formatVND(summary.spent)}
         </Text>
         <Text style={styles.bucketLimit}>
@@ -178,7 +184,7 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
         <View
           style={[
             styles.bucketBarFill,
-            { width: `${barWidth}%` as any, backgroundColor: barColor },
+            { width: `${barWidth}%` as any, backgroundColor: displayColor },
           ]}
         />
       </View>
@@ -267,15 +273,16 @@ export default function BudgetsScreen() {
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<BucketType>>(new Set());
 
   const selectedRange = useMemo(() => monthRange(year, month), [year, month]);
-  const selectedMonthKey = useMemo(
-    () => `${year}-${String(month + 1).padStart(2, '0')}`,
-    [year, month],
-  );
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
   const { data: customerCats = [] } = useCustomerCategories();
-  const { data: effectiveAllocation } = useEffectiveIncomeAllocation(selectedMonthKey);
+  // Sourced from the same server-side per-month bucket resolution the pacing
+  // numbers already use (not Customer.needsPct/etc, and not the income-
+  // allocation "effective" lookup, which only resolves the *current* month
+  // against the real backend) — so a past month keeps showing whatever was
+  // actually in effect then, in both mock and real mode.
+  const { data: bucketAllocation } = useBudgetBuckets(selectedRange);
 
   // Per-customer category set grouped by the customer's (possibly overridden) bucket.
   // Replaces the global EXPENSE_CATEGORIES-by-defaultBucket grouping so jar moves stick.
@@ -292,15 +299,11 @@ export default function BudgetsScreen() {
     return result;
   }, [customerCats]);
 
-  // Resolved through the income/allocation history (mock/incomeAllocation.ts) for
-  // the *viewed* month, not Customer.needsPct/etc — those stop updating once a
-  // change is scheduled for next month, and a past month must keep showing
-  // whatever was actually in effect then.
-  const income = effectiveAllocation?.monthlyIncome ?? 0;
+  const income = bucketAllocation?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {
-    needs: (effectiveAllocation?.needsPct ?? 50) / 100,
-    wants: (effectiveAllocation?.wantsPct ?? 30) / 100,
-    savings: (effectiveAllocation?.savingsPct ?? 20) / 100,
+    needs: bucketAllocation?.buckets.find((b) => b.bucket === 'needs')?.allocationPct ?? 0.5,
+    wants: bucketAllocation?.buckets.find((b) => b.bucket === 'wants')?.allocationPct ?? 0.3,
+    savings: bucketAllocation?.buckets.find((b) => b.bucket === 'savings')?.allocationPct ?? 0.2,
   };
 
   const totalDays = daysInMonth(year, month);
@@ -372,6 +375,7 @@ export default function BudgetsScreen() {
         <Text style={styles.headerTitle}>{S.title}</Text>
         <TouchableOpacity
           activeOpacity={0.7}
+          style={styles.headerBtn}
           onPress={() => router.push({ pathname: '/settings/budget-allocation' })}
         >
           <MaterialIcon name={S.settings} size={24} color={COLORS.primary} />
@@ -542,6 +546,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.primary,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleWrap: {
     paddingHorizontal: SPACING[4],
@@ -815,31 +825,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.primary,
-  },
-  overAllocBadge: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.secondary}20`,
-    borderWidth: 1,
-    borderColor: `${COLORS.secondary}40`,
-  },
-  overAllocText: {
-    fontSize: 10,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.secondary,
-  },
-  overGoalBadge: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.tertiary}20`,
-    borderWidth: 1,
-    borderColor: `${COLORS.tertiary}40`,
-  },
-  overGoalText: {
-    fontSize: 10,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.tertiary,
   },
 });

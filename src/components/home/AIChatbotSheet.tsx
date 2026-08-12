@@ -325,7 +325,8 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
                 <MaterialIcon name="auto_awesome" size={18} color={COLORS.primary} filled />
                 <Text style={styles.headerTitleText}>{S.title}</Text>
               </View>
-              <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={onClose}>
+              <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={onClose}
+                accessibilityRole="button" accessibilityLabel="Đóng">
                 <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
               </TouchableOpacity>
             </View>

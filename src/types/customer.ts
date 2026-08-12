@@ -49,9 +49,9 @@ export interface Customer {
   googleId: string | null;
   displayName: string;
   avatarUrl: string | null;
-  /** Customer gender; null until onboarding. Drives the persona category seed. */
+  /** Customer gender; null until onboarding. Collected for analytics only. */
   gender: Gender | null;
-  /** Date of birth "YYYY-MM-DD"; null until onboarding. Age → persona. */
+  /** Date of birth "YYYY-MM-DD"; null until onboarding. Collected for analytics only. */
   dateOfBirth: string | null;
   /** Estimated monthly income in whole VND; null until set during onboarding */
   monthlyIncome: number | null;
@@ -66,6 +66,8 @@ export interface Customer {
   /** False until the user clicks the verification link in their inbox. Soft gate -- onboarding still runs. */
   emailVerified: boolean;
   notifications: NotificationSettings;
+  /** [warningPct, exceededPct] for budget_alert notifications. Default [80, 100]. */
+  notifBudgetThresholds: [number, number];
   /** Firebase Cloud Messaging device token for push notifications */
   fcmToken: string | null;
   onboardingDone: boolean;

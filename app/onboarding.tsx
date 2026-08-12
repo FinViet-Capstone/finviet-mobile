@@ -84,10 +84,7 @@ export default function OnboardingScreen() {
           type: state.walletType,
           balance,
         }),
-        seedCategories.mutateAsync({
-          gender: state.gender,
-          dateOfBirth: state.dateOfBirth,
-        }),
+        seedCategories.mutateAsync(),
       ]);
 
       updateCustomer({ displayName: fullName, monthlyIncome: income });

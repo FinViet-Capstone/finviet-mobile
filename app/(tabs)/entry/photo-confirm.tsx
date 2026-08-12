@@ -20,10 +20,9 @@ import {
   SPACING,
 } from "@/constants/theme";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
-import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { CATEGORIES } from "@/constants/categories";
-import { getCategoryIcon } from "@/constants/categoryIcons";
+import { CategoryPickerSheet } from "@/components/categories";
 import { formatVND } from "@/utils/formatters";
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
@@ -386,7 +385,12 @@ export default function PhotoConfirmScreen() {
 
   const handleConfirmAll = useCallback(async () => {
     const wallets = walletsData?.wallets ?? [];
-    const primary = wallets[0];
+    // Photo entries can only target basic wallets — bank-linked wallets are
+    // read-only (their transactions come from provider sync), and the API
+    // rejects writes to them. There's no wallet picker in this flow yet, so
+    // this just needs to skip past any linked wallet rather than blindly
+    // using wallets[0].
+    const primary = wallets.find((w) => w.type !== "linked");
     if (!primary) {
       Alert.alert(S.noWallet, S.noWalletMsg);
       return;
@@ -442,6 +446,8 @@ export default function PhotoConfirmScreen() {
             activeOpacity={0.7}
             style={styles.headerBtn}
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
           >
             <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
           </TouchableOpacity>
@@ -461,6 +467,8 @@ export default function PhotoConfirmScreen() {
           activeOpacity={0.7}
           style={styles.headerBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
         >
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
@@ -521,51 +529,14 @@ export default function PhotoConfirmScreen() {
       </View>
 
       {/* Category picker sheet */}
-      <DraggableSheet
+      <CategoryPickerSheet
         visible={editingIdx !== null}
         onClose={() => setEditingIdx(null)}
-      >
-        <View style={styles.catSheetContent}>
-          <Text style={styles.catSheetTitle}>{S.pickCategory}</Text>
-          <FlatList
-            data={[...CATEGORIES]}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const selected =
-                editingIdx !== null && rows[editingIdx]?.categoryId === item.id;
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[styles.catRow, selected && styles.catRowSelected]}
-                  onPress={() => handleCategorySelect(item.id)}
-                >
-                  <View
-                    style={[
-                      styles.catIconWrap,
-                      { backgroundColor: `${item.color}25` },
-                    ]}
-                  >
-                    <MaterialIcon
-                      name={getCategoryIcon(item.icon)}
-                      size={16}
-                      color={item.color}
-                    />
-                  </View>
-                  <Text style={styles.catRowText}>{item.nameVi}</Text>
-                  {selected && (
-                    <MaterialIcon
-                      name="check"
-                      size={18}
-                      color={COLORS.primary}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </DraggableSheet>
+        title={S.pickCategory}
+        entryType="expense"
+        selectedCategoryId={editingIdx !== null ? rows[editingIdx]?.categoryId : undefined}
+        onSelect={handleCategorySelect}
+      />
     </SafeAreaView>
   );
 }
@@ -758,40 +729,4 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.onPrimary,
   },
-
-  // Category sheet
-  catSheetContent: {
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[8],
-    maxHeight: "70%",
-  },
-  catSheetTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    marginBottom: SPACING[3],
-  },
-  catRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING[3],
-    paddingVertical: SPACING[3],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  catRowSelected: {
-    backgroundColor: `${COLORS.primaryContainer}22`,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[2],
-    borderBottomWidth: 0,
-    marginVertical: SPACING[1],
-  },
-  catIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  catRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
 });

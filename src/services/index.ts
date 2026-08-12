@@ -129,10 +129,13 @@ export const createGoal = goalsImpl.createGoal;
 export const updateGoal = goalsImpl.updateGoal;
 export const deleteGoal = goalsImpl.deleteGoal;
 export const addGoalContribution = goalsImpl.addGoalContribution;
+export const getContributionsByGoalId = goalsImpl.getContributionsByGoalId;
+export const withdrawFromGoal = goalsImpl.withdrawFromGoal;
 export type {
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
+  WithdrawGoalInput,
 } from './mock/goals';
 
 // ─── Customer categories (bucket model) ───────────────────────────────────────
@@ -141,9 +144,8 @@ const customerCategoriesImpl = USE_MOCK
   : realCustomerCategories;
 export const getCustomerCategories = customerCategoriesImpl.getCustomerCategories;
 export const moveBucket = customerCategoriesImpl.moveBucket;
-export const seedFromPersona = customerCategoriesImpl.seedFromPersona;
-export const deactivateCustomerCategory =
-  customerCategoriesImpl.deactivateCustomerCategory;
+export const bulkMoveBucket = customerCategoriesImpl.bulkMoveBucket;
+export const seedDefaultCategories = customerCategoriesImpl.seedDefaultCategories;
 export type { MoveBucketPayload } from './mock/customerCategories';
 
 // ─── Custom categories (customer-created, user-picked icon) ───────────────────
@@ -152,7 +154,8 @@ export const getCustomCategories = customCategoriesImpl.getCustomCategories;
 export const createCustomCategory = customCategoriesImpl.createCustomCategory;
 export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
 export const updateCustomCategoryBucket = customCategoriesImpl.updateCustomCategoryBucket;
-export type { CreateCustomCategoryInput } from './mock/customCategories';
+export const bulkUpdateCustomCategoryBucket = customCategoriesImpl.bulkUpdateCustomCategoryBucket;
+export type { CreateCustomCategoryInput, BulkBucketMove } from './mock/customCategories';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
 const reportsImpl = USE_MOCK ? mockReports : realReports;
@@ -202,6 +205,7 @@ export const changePassword = authImpl.changePassword;
 export const logout = authImpl.logout;
 export const getProfile = authImpl.getProfile;
 export const updateProfile = authImpl.updateProfile;
+export const updateProfileSettings = authImpl.updateProfileSettings;
 export const uploadAvatar = authImpl.uploadAvatar;
 export const deleteAccount = authImpl.deleteAccount;
 
@@ -210,5 +214,6 @@ export type {
   MockRegisterInput,
   MockChangePasswordInput,
   UpdateProfileInput,
+  UpdateProfileSettingsInput,
   ResetPasswordInput,
 } from './mock/auth';

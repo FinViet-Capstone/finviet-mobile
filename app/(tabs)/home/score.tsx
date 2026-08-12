@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -25,6 +25,7 @@ const S = {
   noScoreSubtitle: 'Cần thêm dữ liệu chi tiêu để tính điểm.',
   quickReview: 'Đánh giá nhanh',
   aiAnalysis: 'Phân tích chi tiết AI',
+  aiUnavailable: 'Chưa có nhận xét AI cho giai đoạn này.',
   howScore: 'Cách tính điểm',
   scaleGood: 'Tốt',
   scaleAvg: 'Trung bình',
@@ -56,7 +57,8 @@ function ScaleRow({ color, label, range }: { color: string; label: string; range
 
 export default function SpendingScoreDetail() {
   const router = useRouter();
-  const { data: score, isLoading } = useSpendingScore('weekly');
+  const { view } = useLocalSearchParams<{ view?: 'weekly' | 'monthly' }>();
+  const { data: score, isLoading } = useSpendingScore(view === 'monthly' ? 'monthly' : 'weekly');
   const [chatOpen, setChatOpen] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
@@ -98,7 +100,7 @@ export default function SpendingScoreDetail() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{S.quickReview}</Text>
           <View style={[styles.reasonCard, { borderLeftColor: accentColor }]}>
-            <Text style={styles.reasonText}>{score.reasonVi}</Text>
+            <Text style={styles.reasonText}>{score.reasonVi ?? S.aiUnavailable}</Text>
           </View>
         </View>
 
@@ -107,7 +109,7 @@ export default function SpendingScoreDetail() {
           <Text style={styles.sectionTitle}>{S.aiAnalysis}</Text>
           <View style={styles.commentaryCard}>
             <MaterialIcon name="auto_awesome" size={16} color={COLORS.primary} />
-            <Text style={styles.commentaryText}>{score.commentaryVi}</Text>
+            <Text style={styles.commentaryText}>{score.commentaryVi ?? S.aiUnavailable}</Text>
           </View>
         </View>
 
@@ -135,7 +137,8 @@ export default function SpendingScoreDetail() {
 function Header({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.header}>
-      <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}>
+      <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}
+        accessibilityRole="button" accessibilityLabel="Quay lại">
         <MaterialIcon name="arrow_back" size={24} color={COLORS.onSurface} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>{S.title}</Text>

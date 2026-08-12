@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,10 +21,12 @@ import {
 import { useWeeklyReport } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
+import { AIChatbotSheet } from '@/components/home/AIChatbotSheet';
 
 export default function WeeklyReportScreen() {
   const router = useRouter();
   const { data: report, isLoading } = useWeeklyReport();
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
   if (!report) {
@@ -81,7 +83,7 @@ export default function WeeklyReportScreen() {
 
         <TouchableOpacity
           style={styles.advisorCta}
-          onPress={() => router.push('/(tabs)/home/advisor')}
+          onPress={() => setChatOpen(true)}
           activeOpacity={0.85}
         >
           <Text style={styles.advisorIcon}>🤖</Text>
@@ -98,6 +100,8 @@ export default function WeeklyReportScreen() {
           Báo cáo được tạo bởi AI dựa trên dữ liệu chi tiêu của bạn. Nội dung có thể chưa hoàn toàn chính xác.
         </Text>
       </ScrollView>
+
+      <AIChatbotSheet visible={chatOpen} onClose={() => setChatOpen(false)} />
     </SafeAreaView>
   );
 }

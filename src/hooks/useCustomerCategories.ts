@@ -13,7 +13,8 @@ import type { CustomerCategory } from '@/types/category';
 import {
   getCustomerCategories,
   moveBucket,
-  seedFromPersona,
+  bulkMoveBucket,
+  seedDefaultCategories,
   type MoveBucketPayload,
 } from '@/services';
 
@@ -37,22 +38,52 @@ export const useCustomerCategories = () => {
 export const useMoveBucket = () => {
   const qc = useQueryClient();
   const customerId = useAuthStore((s) => s.customer?.id ?? null);
+  const key = queryKeys.customerCategories(customerId);
   return useMutation({
     mutationFn: (payload: MoveBucketPayload) => moveBucket(payload),
+    // Optimistic update — the drag-and-drop UI needs the new bucket to show
+    // immediately, not after the invalidate→refetch round trip resolves.
+    onMutate: async (payload) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<CustomerCategory[]>(key);
+      qc.setQueryData<CustomerCategory[]>(key, (old) =>
+        old?.map((c) =>
+          c.id === payload.customerCategoryId
+            ? { ...c, bucketId: payload.targetBucket }
+            : c,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _payload, context) => {
+      if (context?.previous) qc.setQueryData(key, context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+};
+
+// ─── Mutation: bulk move bucket ("Lưu thay đổi") ─────────────────────────────
+
+/** Persist every staged drag-and-drop move for system categories in one round trip. */
+export const useBulkMoveBucket = () => {
+  const qc = useQueryClient();
+  const customerId = useAuthStore((s) => s.customer?.id ?? null);
+  return useMutation({
+    mutationFn: (payloads: MoveBucketPayload[]) => bulkMoveBucket(payloads),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) }),
   });
 };
 
-// ─── Mutation: seed from persona (onboarding) ──────────────────────────────────
+// ─── Mutation: seed default categories (onboarding) ─────────────────────────────
 
 export const useSeedCategories = () => {
   const qc = useQueryClient();
   const customerId = useAuthStore((s) => s.customer?.id ?? null);
   return useMutation({
-    mutationFn: async (input: { gender: 'male' | 'female' | 'other' | null; dateOfBirth: string | null }) => {
+    mutationFn: async () => {
       if (!customerId) return [];
-      return seedFromPersona(customerId, input.gender, input.dateOfBirth);
+      return seedDefaultCategories(customerId);
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) }),

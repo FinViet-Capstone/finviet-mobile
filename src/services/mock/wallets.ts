@@ -54,10 +54,16 @@ export interface CreateWalletInput {
 
 export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
   await delay();
+  const trimmedName = input.name.trim();
+  const isDuplicate = getAllWallets().some(
+    (w) => !w.isDeleted && w.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+  );
+  if (isDuplicate) throw new Error('duplicate_name');
+
   const wallet: Wallet = {
     id: genId(),
     customerId: USER_ID,
-    name: input.name.trim(),
+    name: trimmedName,
     type: input.type,
     balance: input.balance,
     isDeleted: false,
@@ -94,6 +100,18 @@ export async function updateWallet(
 
 export async function deleteWallet(id: string): Promise<void> {
   await delay();
+
+  // Mirror the real backend's "can't delete your only wallet" rule (see the
+  // last_wallet mapping in wallets/[id].tsx). Deliberately NOT also guarding on
+  // "has transactions": this app's soft-delete design intentionally allows
+  // deleting a wallet with history (its past transactions keep working, showing
+  // "Ví đã xóa" as the wallet name — see transactions/index.tsx) — blocking that
+  // outright would contradict already-working, intended behavior.
+  const visible = getAllWallets().filter((w) => !w.isDeleted);
+  if (visible.length <= 1 && visible.some((w) => w.id === id)) {
+    throw new Error('last_wallet');
+  }
+
   // Soft-delete: flip the flag, preserve transactions linked to this wallet.
   setWallets(
     getAllWallets().map((w) =>

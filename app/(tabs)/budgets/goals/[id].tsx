@@ -19,9 +19,15 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { WalletPickerSheet } from '@/components/transaction/WalletPickerSheet';
-import { useGoalById, useAddContribution, useDeleteGoal } from '@/hooks/useGoals';
+import {
+  useGoalById,
+  useAddContribution,
+  useDeleteGoal,
+  useGoalContributions,
+  useWithdrawFromGoal,
+} from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
-import type { SavingsGoalWithProgress } from '@/types/goal';
+import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +62,14 @@ const S = {
   deleteConfirmMsg: 'Bạn có chắc muốn xoá mục tiêu này không? Hành động này không thể hoàn tác.',
   deleteConfirm: 'Xoá',
   noHistory: 'Chưa có lần nào đóng góp',
+  withdraw: 'Rút tiền',
+  withdrawTitle: 'Rút tiền tiết kiệm',
+  destLabel: 'Ví nhận tiền',
+  destPlaceholder: 'Chọn ví nhận tiền',
+  errOverSaved: (s: string) => `Vượt số tiền đã tiết kiệm (${s})`,
+  availableSaved: (s: string) => `Đã tiết kiệm: ${s}`,
+  historyContribNote: 'Nạp tiền tiết kiệm',
+  historyWithdrawNote: 'Rút tiền tiết kiệm',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -266,14 +280,201 @@ function ContributionSheet({
   );
 }
 
+// ─── Withdraw Sheet ───────────────────────────────────────────────────────────
+
+function WithdrawSheet({
+  visible,
+  goal,
+  onClose,
+}: {
+  visible: boolean;
+  goal: SavingsGoalWithProgress;
+  onClose: () => void;
+}) {
+  const withdraw = useWithdrawFromGoal();
+  const { data: walletData } = useWallets();
+  const [amountRaw, setAmountRaw] = useState('');
+  const [note, setNote] = useState('');
+  const [walletPickerVisible, setWalletPickerVisible] = useState(false);
+  const [amountFocused, setAmountFocused] = useState(true);
+  useEffect(() => { if (visible) setAmountFocused(true); }, [visible]);
+
+  // Only basic wallets can receive a withdrawal — crediting a bank-linked wallet
+  // would desync it from the real account, same restriction as contributions.
+  const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== 'linked');
+  const totalBasicBalance = basicWallets.reduce((s, w) => s + w.balance, 0);
+
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible) return;
+    const preferred = goal.fundingWalletId
+      && basicWallets.some((w) => w.id === goal.fundingWalletId)
+      ? goal.fundingWalletId
+      : basicWallets[0]?.id ?? null;
+    setSelectedWalletId(preferred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const destWallet = selectedWalletId
+    ? basicWallets.find((w) => w.id === selectedWalletId)
+    : undefined;
+
+  const parsedAmount = parseInt(amountRaw || '0', 10);
+  const amountDisplay = parsedAmount > 0 ? parsedAmount.toLocaleString('vi-VN') + 'đ' : '';
+
+  const overSaved = parsedAmount > goal.currentAmount;
+  const hasError = parsedAmount > 0 && overSaved;
+  const canSave =
+    !!amountRaw && parsedAmount > 0 && !hasError
+    && !!selectedWalletId && !withdraw.isPending;
+
+  const handleNumberPress = useCallback((key: string) => {
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleClear = useCallback(() => setAmountRaw(''), []);
+
+  const handleSave = useCallback(async () => {
+    if (!canSave || !selectedWalletId) return;
+    await withdraw.mutateAsync({
+      goalId: goal.id,
+      input: {
+        amount: parsedAmount,
+        walletId: selectedWalletId,
+        note: note.trim() || undefined,
+      },
+    });
+    setAmountRaw(''); setNote('');
+    onClose();
+  }, [canSave, parsedAmount, note, selectedWalletId, goal.id, withdraw, onClose]);
+
+  return (
+    <>
+    <DraggableSheet visible={visible} onClose={onClose}>
+      <View style={[styles.sheet, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}>
+        <Text style={styles.sheetTitle}>{S.withdrawTitle}</Text>
+
+        <Text style={styles.fieldLabel}>{S.destLabel}</Text>
+        {basicWallets.length === 0 ? (
+          <View style={styles.zeroBalanceBox}>
+            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <Text style={styles.zeroBalanceText}>{S.noBasicWallet}</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.walletSelectRow}
+            onPress={() => { setAmountFocused(false); setWalletPickerVisible(true); }}
+          >
+            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.primary} />
+            <Text style={[styles.walletSelectText, !destWallet && styles.amountPlaceholder]}>
+              {destWallet ? destWallet.name : S.destPlaceholder}
+            </Text>
+            {destWallet ? (
+              <Text style={styles.walletSelectBalance}>{formatFull(destWallet.balance)}</Text>
+            ) : null}
+            <MaterialIcon name="expand_more" size={20} color={COLORS.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.amountDisplay, hasError && styles.amountDisplayError]}
+          onPress={() => setAmountFocused(true)}
+        >
+          <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
+            {amountDisplay || S.amountPlaceholder}
+          </Text>
+        </TouchableOpacity>
+        {hasError ? (
+          <Text style={styles.errorText}>{S.errOverSaved(formatFull(goal.currentAmount))}</Text>
+        ) : (
+          <Text style={styles.helperText}>{S.availableSaved(formatFull(goal.currentAmount))}</Text>
+        )}
+
+        <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
+        <TextInput
+          style={styles.noteInput}
+          value={note}
+          onChangeText={setNote}
+          placeholder={S.notePlaceholder}
+          placeholderTextColor={COLORS.onSurfaceVariant}
+          onFocus={() => setAmountFocused(false)}
+          returnKeyType="done"
+        />
+
+        <View style={styles.sheetActions}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+            <Text style={styles.cancelText}>{S.cancel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}
+            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            onPress={handleSave} disabled={!canSave}>
+            {withdraw.isPending
+              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              : <Text style={styles.saveText}>{S.save}</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </DraggableSheet>
+    <NumericKeypad
+      visible={visible && amountFocused}
+      onClose={() => setAmountFocused(false)}
+      onNumberPress={handleNumberPress}
+      onBackspace={handleBackspace}
+      onClear={handleClear}
+      onDone={() => setAmountFocused(false)}
+    />
+    <WalletPickerSheet
+      visible={walletPickerVisible}
+      wallets={basicWallets}
+      selectedWalletId={selectedWalletId}
+      totalBalance={totalBasicBalance}
+      onSelect={(id) => { setSelectedWalletId(id); setWalletPickerVisible(false); }}
+      onClose={() => setWalletPickerVisible(false)}
+    />
+    </>
+  );
+}
+
+// ─── History Row ──────────────────────────────────────────────────────────────
+
+function HistoryRow({ item }: { item: GoalContribution }) {
+  const isWithdrawal = item.type === 'withdrawal';
+  const label = item.note || (isWithdrawal ? S.historyWithdrawNote : S.historyContribNote);
+  return (
+    <View style={styles.historyRow}>
+      <MaterialIcon
+        name={isWithdrawal ? 'arrow_upward' : 'savings'}
+        size={18}
+        color={isWithdrawal ? COLORS.error : COLORS.primary}
+      />
+      <View style={styles.historyRowText}>
+        <Text style={styles.historyRowLabel} numberOfLines={1}>{label}</Text>
+        <Text style={styles.historyRowDate}>{formatDate(item.contributedAt)}</Text>
+      </View>
+      <Text style={[styles.historyRowAmount, isWithdrawal && styles.historyRowAmountNegative]}>
+        {isWithdrawal ? '-' : '+'}{formatFull(item.amount)}
+      </Text>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: goal, isLoading, isError, error, refetch } = useGoalById(id);
+  const { data: contributions } = useGoalContributions(id);
   const deleteGoal = useDeleteGoal();
   const [contribVisible, setContribVisible] = useState(false);
+  const [withdrawVisible, setWithdrawVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
 
   const handleDelete = useCallback(async () => {
@@ -294,7 +495,8 @@ export default function GoalDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -366,23 +568,39 @@ export default function GoalDetailScreen() {
           )}
         </View>
 
-        {/* Add contribution button */}
-        {!goal.isCompleted && (
-          <TouchableOpacity activeOpacity={0.7} style={styles.addContribBtn}
-            onPress={() => setContribVisible(true)}>
-            <MaterialIcon name="add" size={20} color={COLORS.onPrimary} />
-            <Text style={styles.addContribText}>{S.addContrib}</Text>
-          </TouchableOpacity>
-        )}
+        {/* Add contribution / withdraw buttons */}
+        <View style={styles.actionsRow}>
+          {!goal.isCompleted && (
+            <TouchableOpacity activeOpacity={0.7} style={styles.addContribBtn}
+              onPress={() => setContribVisible(true)}>
+              <MaterialIcon name="add" size={20} color={COLORS.onPrimary} />
+              <Text style={styles.addContribText}>{S.addContrib}</Text>
+            </TouchableOpacity>
+          )}
+          {goal.currentAmount > 0 && (
+            <TouchableOpacity activeOpacity={0.7} style={styles.withdrawBtn}
+              onPress={() => setWithdrawVisible(true)}>
+              <MaterialIcon name="arrow_upward" size={20} color={COLORS.primary} />
+              <Text style={styles.withdrawText}>{S.withdraw}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Empty history placeholder */}
+        {/* Contribution / withdrawal history */}
         <View style={styles.historySection}>
           <Text style={styles.historyLabel}>Lịch sử đóng góp</Text>
-          <Text style={styles.historyEmpty}>{S.noHistory}</Text>
+          {contributions && contributions.length > 0 ? (
+            [...contributions]
+              .sort((a, b) => b.contributedAt.localeCompare(a.contributedAt))
+              .map((item) => <HistoryRow key={item.id} item={item} />)
+          ) : (
+            <Text style={styles.historyEmpty}>{S.noHistory}</Text>
+          )}
         </View>
       </ScrollView>
 
       <ContributionSheet visible={contribVisible} goal={goal} onClose={() => setContribVisible(false)} />
+      <WithdrawSheet visible={withdrawVisible} goal={goal} onClose={() => setWithdrawVisible(false)} />
 
       {/* Delete confirm */}
       <Modal visible={deleteVisible} transparent animationType="fade" onRequestClose={() => setDeleteVisible(false)}>
@@ -447,17 +665,33 @@ const styles = StyleSheet.create({
   monthlyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
   monthlyText: { fontSize: FONT_SIZE.sm, color: COLORS.primary, fontWeight: FONT_WEIGHT.medium },
   deadlineFull: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  // Add contrib button
+  // Add contrib / withdraw buttons
+  actionsRow: { flexDirection: 'row', gap: SPACING[3] },
   addContribBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: SPACING[2], backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
     height: 56,
   },
   addContribText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  withdrawBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING[2], borderRadius: BORDER_RADIUS.lg, height: 56,
+    borderWidth: 1, borderColor: COLORS.primary,
+  },
+  withdrawText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
   // History
   historySection: { gap: SPACING[2] },
   historyLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
   historyEmpty: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
+  historyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
+    paddingVertical: SPACING[2], borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+  },
+  historyRowText: { flex: 1, gap: 2 },
+  historyRowLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: COLORS.onSurface },
+  historyRowDate: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  historyRowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
+  historyRowAmountNegative: { color: COLORS.error },
   // Sheet
   sheet: {
     paddingHorizontal: SPACING[4],

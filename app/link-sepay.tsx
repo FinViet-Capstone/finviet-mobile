@@ -2,16 +2,20 @@
  * link-sepay.tsx — SePay OAuth2 bank-link flow.
  *
  * Flow:
- *  1. Open SePay OAuth2 authorize URL in a WebView.
- *  2. User logs in to SePay and authorizes our app.
- *  3. SePay redirects back to our redirect URI with `?code=...`.
- *  4. We capture the code and send it to POST /wallets/sepay/link.
- *  5. Backend exchanges code for tokens, creates wallet, syncs transactions.
- *  6. Navigate back to wallets with the new linked wallet.
+ *  1. Fetch the authorize URL + a signed `state` token from the backend
+ *     (GET /wallets/sepay/authorize-url) — the backend owns ClientId/
+ *     RedirectUri config, so the client never constructs this URL itself.
+ *  2. Open that URL in a WebView.
+ *  3. User logs in to SePay and authorizes our app.
+ *  4. SePay redirects back to the backend-registered redirect URI with `?code=...`.
+ *  5. We capture the code and send it + `state` to POST /wallets/sepay/link.
+ *  6. Backend validates `state`, exchanges code for tokens, creates wallet,
+ *     syncs transactions.
+ *  7. Navigate back to wallets with the new linked wallet.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
@@ -19,46 +23,12 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { queryKeys } from '@/lib/queryKeys';
-import { linkSepayAccount } from '@/services/real/sepay';
+import { linkSepayAccount, getSepayAuthorizeUrl } from '@/services/real/sepay';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
-import { API_BASE_URL } from '@/lib/env';
 
-type Phase = 'webview' | 'completing' | 'success' | 'error';
+type Phase = 'loading' | 'webview' | 'completing' | 'success' | 'error';
 
 const DEFAULT_ERROR = 'Không liên kết được tài khoản SePay. Vui lòng thử lại.';
-
-// SePay OAuth2 configuration.
-// In production these would come from env vars; for the demo the backend holds the
-// client_id / client_secret. The frontend only needs the authorize URL.
-const SEPAY_AUTHORIZE_URL = 'https://my.sepay.vn/oauth/authorize';
-
-// Build the redirect URI that matches what's registered with SePay.
-// The backend callback endpoint: POST /api/wallets/sepay/callback (if we had one),
-// but since SePay supports standard redirect, we use a deep link or the backend URL.
-function getSepayRedirectUri(): string {
-  // Use the API base URL as the redirect URI base.
-  const base = (API_BASE_URL ?? '').replace(/\/api\/?$/, '');
-  return `${base}/api/wallets/sepay/callback`;
-}
-
-function buildAuthorizeUrl(): string {
-  // The client_id is configured server-side. For the demo, we use the redirect_uri
-  // that matches the backend registration. The user can paste these in .env.
-  const clientId = process.env.EXPO_PUBLIC_SEPAY_CLIENT_ID ?? '';
-  const redirectUri = getSepayRedirectUri();
-  const scope = 'profile bank-account:read transaction:read';
-  const state = Math.random().toString(36).slice(2);
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope,
-    state,
-  });
-
-  return `${SEPAY_AUTHORIZE_URL}?${params.toString()}`;
-}
 
 function extractCode(url: string): string | null {
   const match = url.match(/[?&]code=([^&]+)/);
@@ -69,11 +39,28 @@ export default function LinkSepayScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const settledRef = useRef(false);
-  const [phase, setPhase] = useState<Phase>('webview');
+  const stateRef = useRef<string | undefined>(undefined);
+  const [phase, setPhase] = useState<Phase>('loading');
   const [errorMessage, setErrorMessage] = useState(DEFAULT_ERROR);
   const [syncCount, setSyncCount] = useState(0);
+  const [authorizeUrl, setAuthorizeUrl] = useState<string | null>(null);
 
-  const authorizeUrl = buildAuthorizeUrl();
+  const fetchAuthorizeUrl = useCallback(async () => {
+    setPhase('loading');
+    try {
+      const result = await getSepayAuthorizeUrl();
+      stateRef.current = result.state;
+      setAuthorizeUrl(result.authorizeUrl);
+      setPhase('webview');
+    } catch (err: any) {
+      setErrorMessage(err?.message ?? DEFAULT_ERROR);
+      setPhase('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAuthorizeUrl();
+  }, [fetchAuthorizeUrl]);
 
   const handleCodeCaptured = useCallback(async (code: string) => {
     if (settledRef.current) return;
@@ -81,7 +68,7 @@ export default function LinkSepayScreen() {
     setPhase('completing');
 
     try {
-      const result = await linkSepayAccount(code);
+      const result = await linkSepayAccount(code, undefined, stateRef.current);
       setSyncCount(result.transactionsSynced);
       setPhase('success');
 
@@ -109,9 +96,9 @@ export default function LinkSepayScreen() {
 
   const handleRetry = useCallback(() => {
     settledRef.current = false;
-    setPhase('webview');
     setErrorMessage(DEFAULT_ERROR);
-  }, []);
+    fetchAuthorizeUrl();
+  }, [fetchAuthorizeUrl]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -121,6 +108,8 @@ export default function LinkSepayScreen() {
           activeOpacity={0.7}
           style={styles.headerBtn}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
         >
           <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
         </TouchableOpacity>
@@ -128,7 +117,14 @@ export default function LinkSepayScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      {phase === 'webview' && (
+      {phase === 'loading' && (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.statusSubtitle}>Đang chuẩn bị liên kết...</Text>
+        </View>
+      )}
+
+      {phase === 'webview' && authorizeUrl && (
         <WebView
           source={{ uri: authorizeUrl }}
           style={styles.webview}

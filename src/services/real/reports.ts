@@ -84,7 +84,10 @@ const VERDICT_VI: Record<ScoreColor, string> = {
 
 function toSpendingScore(dto: SpendingScoreDto, view: 'weekly' | 'monthly'): SpendingScore {
   const color = toColor(dto.colorBadge);
-  const comment = dto.comment ?? '';
+  // Backend returns comment: null when the AI provider was unavailable — keep that
+  // as null (not '') so the FE's `??` fallback text actually renders instead of
+  // silently showing a blank box.
+  const comment = dto.comment && dto.comment.trim().length > 0 ? dto.comment : null;
   return {
     id: `score_${dto.periodType}_${dto.periodStart}`,
     customerId: '',

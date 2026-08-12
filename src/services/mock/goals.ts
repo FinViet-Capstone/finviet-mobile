@@ -119,6 +119,7 @@ let CONTRIBUTIONS: GoalContribution[] = GOALS.filter((g) => g.currentAmount > 0)
     id: `contrib_seed_${g.id}`,
     goalId: g.id,
     amount: g.currentAmount,
+    type: 'contribution' as const,
     contributedAt: g.createdAt,
     note: 'Số dư ban đầu',
   }),
@@ -136,6 +137,14 @@ export function getGoalById(id: string): SavingsGoalWithProgress | undefined {
 
 export function getContributionsByGoalId(goalId: string): GoalContribution[] {
   return CONTRIBUTIONS.filter((c) => c.goalId === goalId);
+}
+
+/** currentAmount = Σ contributions − Σ withdrawals (single source of truth). */
+function computeCurrentAmount(goalId: string): number {
+  return CONTRIBUTIONS.filter((c) => c.goalId === goalId).reduce(
+    (sum, c) => sum + (c.type === 'withdrawal' ? -c.amount : c.amount),
+    0,
+  );
 }
 
 // ─── Writes ────────────────────────────────────────────────────────────────────
@@ -187,6 +196,7 @@ export async function createGoal(
       id: genContribId(),
       goalId: goal.id,
       amount: initial,
+      type: 'contribution',
       contributedAt: nowIso(),
       transactionId: tx.id,
     };
@@ -236,10 +246,13 @@ export async function deleteGoal(id: string): Promise<void> {
   const goal = GOALS.find((g) => g.id === id);
   if (!goal) throw new Error('Goal not found');
 
-  // Reverse every contribution that has a linked transaction
+  // Reverse every contribution that has a linked transaction. deleteTransactionSync
+  // restores balance on whichever wallet the transaction itself was posted to, so
+  // goal.fundingWalletId (which may be unset, e.g. for goals with no preset funding
+  // wallet) is irrelevant here — gating on it left real debits unreversed.
   const goalContribs = CONTRIBUTIONS.filter((c) => c.goalId === id);
   for (const contrib of goalContribs) {
-    if (contrib.transactionId && goal.fundingWalletId) {
+    if (contrib.transactionId) {
       // Delete the transaction and restore wallet balance
       deleteTransactionSync(contrib.transactionId);
     }
@@ -262,7 +275,9 @@ export interface AddContributionInput {
 /**
  * Add a goal contribution.
  * - Guards: amount must be > 0, ≤ remaining, and ≤ wallet balance (if funded).
- * - If fundingWalletId set: creates a cat_savings_goal expense tx, links it.
+ * - Funding wallet = input.fundingWalletId (picked in the contribution sheet),
+ *   falling back to the goal's preset fundingWalletId. If either is set: creates
+ *   a cat_savings_goal expense tx, links it.
  * - currentAmount = Σ contributions (single source of truth).
  */
 export async function addGoalContribution(
@@ -283,9 +298,16 @@ export async function addGoalContribution(
     throw new Error('amount_exceeds_remaining');
   }
 
+  // The wallet actually picked in the contribution sheet takes priority over the
+  // goal's preset funding wallet (goals created without one — the common case,
+  // since the create-goal form never collects fundingWalletId — would otherwise
+  // skip both the balance guard and the debit transaction below, letting
+  // currentAmount rise with no real money ever leaving a wallet).
+  const fundingWalletId = input.fundingWalletId ?? goal.fundingWalletId;
+
   // Guard: cannot contribute more than wallet balance
-  if (goal.fundingWalletId) {
-    const wallet = getWalletById(goal.fundingWalletId);
+  if (fundingWalletId) {
+    const wallet = getWalletById(fundingWalletId);
     if (wallet && input.amount > wallet.balance) {
       throw new Error('insufficient_balance');
     }
@@ -293,9 +315,9 @@ export async function addGoalContribution(
 
   let transactionId: string | undefined;
 
-  if (goal.fundingWalletId) {
+  if (fundingWalletId) {
     const tx = createTransactionSync({
-      walletId: goal.fundingWalletId,
+      walletId: fundingWalletId,
       categoryId: 'cat_savings_goal',
       amount: input.amount,
       type: 'expense',
@@ -312,17 +334,74 @@ export async function addGoalContribution(
     id: genContribId(),
     goalId,
     amount: input.amount,
+    type: 'contribution',
     contributedAt: nowIso(),
     note: input.note,
     transactionId,
   };
   CONTRIBUTIONS = [...CONTRIBUTIONS, contrib];
 
-  // currentAmount = Σ all contributions (single source of truth)
-  const totalContributed = CONTRIBUTIONS
-    .filter((c) => c.goalId === goalId)
-    .reduce((sum, c) => sum + c.amount, 0);
+  const totalContributed = computeCurrentAmount(goalId);
+  const merged = {
+    ...goal,
+    currentAmount: totalContributed,
+    isCompleted: totalContributed >= goal.targetAmount,
+    updatedAt: nowIso(),
+  };
+  const after = recomputeProgress(merged);
+  GOALS = GOALS.map((g) => (g.id === goalId ? after : g));
+  return after;
+}
 
+export interface WithdrawGoalInput {
+  amount: number;
+  walletId: string;
+  note?: string;
+}
+
+/**
+ * Withdraw part of a goal's saved amount back into a wallet.
+ * - Guards: amount must be > 0 and ≤ the goal's currentAmount.
+ * - Always credits `input.walletId` (an income transaction on cat_savings_goal,
+ *   the mirror image of a contribution's expense) — withdrawal has no notion of
+ *   a "preset" wallet the way contributions fall back to goal.fundingWalletId.
+ * - currentAmount = Σ contributions − Σ withdrawals (see computeCurrentAmount).
+ *   A withdrawal can drop a completed goal back to incomplete.
+ */
+export async function withdrawFromGoal(
+  goalId: string,
+  input: WithdrawGoalInput,
+): Promise<SavingsGoalWithProgress> {
+  await delay();
+  const goal = GOALS.find((g) => g.id === goalId);
+  if (!goal) throw new Error('Goal not found');
+
+  if (input.amount <= 0) throw new Error('invalid_amount');
+  if (input.amount > goal.currentAmount) throw new Error('amount_exceeds_saved');
+
+  const tx = createTransactionSync({
+    walletId: input.walletId,
+    categoryId: 'cat_savings_goal',
+    amount: input.amount,
+    type: 'income',
+    description: `Rút mục tiêu: ${goal.name}`,
+    merchant: null,
+    transactionDate: todayIso(),
+    entryMethod: 'manual',
+  });
+
+  const contrib: GoalContribution = {
+    id: genContribId(),
+    goalId,
+    amount: input.amount,
+    type: 'withdrawal',
+    contributedAt: nowIso(),
+    note: input.note,
+    transactionId: tx.id,
+  };
+  CONTRIBUTIONS = [...CONTRIBUTIONS, contrib];
+
+  const totalContributed = computeCurrentAmount(goalId);
   const merged = {
     ...goal,
     currentAmount: totalContributed,

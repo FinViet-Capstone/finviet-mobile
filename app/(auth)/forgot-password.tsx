@@ -12,12 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
-import { useForgotPassword } from '@/hooks';
+import { useForgotPassword, useResetPassword, useLogin } from '@/hooks';
 import {
   COLORS,
   SPACING,
@@ -26,19 +26,13 @@ import {
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
-
-// ---------------------------------------------------------------------------
-// Validation schema
-// ---------------------------------------------------------------------------
-
-const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email không được để trống')
-    .email('Địa chỉ email không hợp lệ'),
-});
-
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  RESET_CODE_LENGTH as CODE_LENGTH,
+  type ForgotPasswordInput as ForgotPasswordFormValues,
+  type ResetPasswordInput as ResetPasswordFormValues,
+} from '@/validators/auth.schema';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -49,8 +43,11 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const forgotMutation = useForgotPassword();
+  const resetMutation = useResetPassword();
+  const loginMutation = useLogin();
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [showPw, setShowPw] = useState(false);
 
   const {
     control,
@@ -60,6 +57,15 @@ export default function ForgotPasswordScreen() {
   } = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
+  });
+
+  const {
+    control: resetControl,
+    handleSubmit: handleResetSubmit,
+    formState: { errors: resetErrors },
+  } = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { code: '', newPassword: '', confirmPassword: '' },
   });
 
   useEffect(() => {
@@ -92,16 +98,33 @@ export default function ForgotPasswordScreen() {
     router.replace('/(auth)');
   };
 
-  const handleEnterCode = () => {
-    router.push({
-      pathname: '/(auth)/reset-password',
-      params: { email: submittedEmail ?? getValues('email') },
-    });
+  const onSubmitReset = (data: ResetPasswordFormValues) => {
+    resetMutation.mutate(
+      { token: data.code, newPassword: data.newPassword, confirmPassword: data.confirmPassword },
+      {
+        onSuccess: () => {
+          const email = submittedEmail ?? getValues('email');
+          if (email) {
+            loginMutation.mutate(
+              { email, password: data.newPassword },
+              {
+                onSuccess: (user) =>
+                  router.replace(user.onboardingDone ? '/(tabs)/home' : '/onboarding'),
+                onError: () => router.replace('/(auth)'),
+              },
+            );
+          } else {
+            router.replace('/(auth)');
+          }
+        },
+      },
+    );
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const submitted = submittedEmail !== null;
+  const resetBusy = resetMutation.isPending || loginMutation.isPending;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -112,7 +135,7 @@ export default function ForgotPasswordScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           showsVerticalScrollIndicator={false}
         >
           {/* ── Top navigation bar ──────────────────────────────────────── */}
@@ -147,7 +170,7 @@ export default function ForgotPasswordScreen() {
           {/* ── Card ────────────────────────────────────────────────────── */}
           <View style={styles.card}>
             {submitted ? (
-              /* ── Success state ── */
+              /* ── Success state: enter code + new password inline ── */
               <View style={styles.successContent}>
                 <View style={styles.successIconWrap}>
                   <Text style={styles.successIcon}>📬</Text>
@@ -160,11 +183,88 @@ export default function ForgotPasswordScreen() {
                   <Text style={styles.successHighlight}>1 giờ</Text>.
                 </Text>
 
-                <AuthErrorBanner error={forgotMutation.error} />
+                <AuthErrorBanner
+                  error={resetMutation.error ?? loginMutation.error ?? forgotMutation.error}
+                />
+
+                <Controller
+                  control={resetControl}
+                  name="code"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      label="Mã xác minh"
+                      placeholder="VD: A1B2C3"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      maxLength={CODE_LENGTH}
+                      value={value}
+                      onChangeText={(t) =>
+                        onChange(t.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH))
+                      }
+                      onBlur={onBlur}
+                      error={resetErrors.code?.message}
+                      containerStyle={styles.fieldSpacing}
+                      editable={!resetBusy}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={resetControl}
+                  name="newPassword"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      label="Mật khẩu mới"
+                      placeholder="Tối thiểu 8 ký tự"
+                      secureTextEntry={!showPw}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={resetErrors.newPassword?.message}
+                      rightIcon={
+                        <TouchableOpacity
+                          onPress={() => setShowPw((p) => !p)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialIcon
+                            name={showPw ? 'visibility_off' : 'visibility'}
+                            size={20}
+                            color={COLORS.onSurfaceVariant}
+                          />
+                        </TouchableOpacity>
+                      }
+                      containerStyle={styles.fieldSpacing}
+                      editable={!resetBusy}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={resetControl}
+                  name="confirmPassword"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      label="Xác nhận mật khẩu"
+                      placeholder="Nhập lại mật khẩu mới"
+                      secureTextEntry={!showPw}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={resetErrors.confirmPassword?.message}
+                      containerStyle={styles.fieldSpacing}
+                      editable={!resetBusy}
+                    />
+                  )}
+                />
 
                 <Button
-                  title="Nhập mã đặt lại"
-                  onPress={handleEnterCode}
+                  title="Đặt lại mật khẩu"
+                  onPress={handleResetSubmit(onSubmitReset)}
+                  loading={resetBusy}
                   style={styles.backLoginButton}
                 />
 
@@ -198,6 +298,13 @@ export default function ForgotPasswordScreen() {
                     </Text>
                   </Text>
                 </TouchableOpacity>
+
+                {cooldown === 0 && !forgotMutation.isPending ? (
+                  <Text style={styles.waitHint}>
+                    Vẫn chưa thấy email? Kiểm tra lại chính tả địa chỉ email bạn đã nhập,
+                    hoặc tạo tài khoản mới nếu bạn chưa đăng ký.
+                  </Text>
+                ) : null}
               </View>
             ) : (
               /* ── Form state ── */
@@ -357,6 +464,7 @@ const styles = StyleSheet.create({
 
   // Fields
   fieldSpacing: {
+    alignSelf: 'stretch',
     marginBottom: SPACING[5],
   },
   fieldIcon: {
@@ -427,5 +535,12 @@ const styles = StyleSheet.create({
   },
   disabledLink: {
     color: COLORS.outline,
+  },
+  waitHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: SPACING[3],
   },
 });
