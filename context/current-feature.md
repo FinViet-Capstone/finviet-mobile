@@ -13,7 +13,9 @@ preview — device-specific chrome like gesture-nav insets only reproduces on-de
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-In progress — implemented, awaiting on-device verification (APK)
+Completed — merged to `dev` without on-device verification (user's explicit call, 2026-08-12);
+type-check clean and lint 0 errors, but not yet confirmed against the actual Xiaomi Pad 5
+gesture-nav overlap this fix targets
 
 ## Goals
 
@@ -78,3 +80,5 @@ build config work) were left untouched and not included in this fix's commit.
   `app/(tabs)/_layout.tsx` to add `useSafeAreaInsets().bottom` into `tabBarStyle.height` and
   `paddingBottom` instead of hardcoding `64`/`10`, matching the existing safe-area-inset pattern
   used elsewhere in the repo.
+- 2026-08-12 — User opted to merge to `dev` without on-device verification first (type-check +
+  lint were clean). Merged via PR per branch protection (no direct push/merge allowed).
