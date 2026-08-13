@@ -1,63 +1,48 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Feat: wire the AI chat to the backend's **real multi-session** endpoints. `src/services/real/reports.ts`
-was written against the older flat-history contract and fabricates a single synthetic session
-(`DEFAULT_SESSION_ID = 'default'`); `finviet-be` has had real chat sessions since commit `c83a331`
-(2026-08-12).
+Feat: footnote on bank-linked wallets explaining that their balance mirrors the bank
+(`Số dư đồng bộ từ ngân hàng`), so a synced transaction that leaves the balance unchanged
+no longer reads as a bug.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-In Progress — implemented and verified against a live API; merging into `dev` now
+Completed — merged into `dev` together with `feature/real-chat-sessions`
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Backend endpoints now available and unused by the app (verified directly against
-  `finviet-be/src/FinViet.Api/Controllers/AiController.cs` and `Infrastructure/Services/AiChatService.cs`,
-  not the markdown reference):
-  - `GET /ai/chat/sessions` → `ChatSessionResponse[]`, ordered by `lastMessageAt ?? createdAt` desc
-  - `POST /ai/chat/sessions` `{ title?, historyEnabled? }` → creates a non-default session
-  - `PATCH`/`DELETE /ai/chat/sessions/{id}` (rename / soft-delete)
-  - `GET /ai/chat/history?sessionId=&limit=` — per-session, not flat
-  - `POST /ai/chat` now takes `{ sessionId?, question }`
-- Replace the synthetic-session code in `real/reports.ts` with the real endpoints:
-  `getChatSessions()` hits `/ai/chat/sessions` instead of folding flat history into one fake row;
-  `getChatSessionMessages(id)` passes `sessionId` through; `sendChatMessage()` gains an optional
-  `sessionId`; `toChatMessage()` uses the DTO's real `sessionId` instead of the `'default'` constant.
-- Add `createChatSession(title?)`. Needed because `AiChatService.ResolveSessionAsync` treats a null
-  `sessionId` as "the one default session" (`SessionId == customerId`, `IsDefault = true`) — it never
-  opens a new one. Without an explicit create, the "+ new chat" button would keep writing into the
-  same default session and the history drawer would never grow, which is the bug being fixed.
-- Session **title is the preview**: the backend has no first-message-preview column and
-  `NormalizeTitle(null)` yields the literal `"Cuộc trò chuyện mới"` for every session. The app
-  therefore titles a session with its opening question (truncated to the backend's 120-char limit),
-  so `ChatSession.previewText` stays meaningful — matching the mock's documented semantics.
-- `ChatSession.messageCount` becomes optional: `ChatSessionResponse` carries no count and there is no
-  per-session count endpoint, so filling it would mean fetching every session's history (N+1). The
-  history drawer omits the "N tin nhắn" suffix when it's absent rather than showing a fabricated `0`.
-- Keep mock ⇄ real swappable: `mock/reports.ts` gets the same `createChatSession` and the same
-  optional-`sessionId` signatures, otherwise the `USE_MOCK ? mock : real` union in the barrel stops
-  being callable with the new arguments.
-- Out of scope: rename/delete session UI (`PATCH`/`DELETE` stay unwired — no UI exists for them),
-  `historyEnabled` toggling, and the new `citations`/`limitations`/`dataPeriod` fields on
-  `ChatMessageResponse` (the FE `ChatMessage` type has nowhere to put them).
+- Observed on a real SePay-linked wallet: it holds a synced `+10.000đ` income transaction yet
+  shows `0đ`, and the wallets total does not move either. Not a bug — `TotalBalance` is a plain
+  `wallets.Sum(x => x.Balance)` (`WalletService.cs:62`), and a linked wallet's balance is
+  assigned from what SePay reports (`link.Wallet.Balance = latestBalance ?? …`), never derived
+  from the imported rows. The bank is the source of truth for balance; importing transactions
+  and updating balance are two separate paths.
+- The same money therefore reads two ways: the Wallets screen shows no change, while Reports
+  and Budgets — which sum the `transactions` table — do count it. Nothing in the UI explains
+  the discrepancy, so it looks broken.
+- Add a footnote under the balance on `app/(tabs)/wallets/[id].tsx`, rendered only when
+  `wallet.type === 'linked'`: **"Số dư đồng bộ từ ngân hàng"**. Styled dimmer than the existing
+  type row (`COLORS.outline`) so it reads as a footnote rather than a second status line.
+- Out of scope, deliberately: the deeper half of this problem is that
+  `Balance = latestBalance ?? 0m` makes "SePay reported no balance" and "the balance really is
+  zero" indistinguishable. Showing `—` instead of `0đ` for the unknown case is the better fix
+  but needs a backend change to signal the difference, so it stays a separate task.
+- Also out of scope: the wallets list screen. The footnote goes on the detail screen only,
+  where a user who notices the discrepancy actually goes to investigate.
 
 ## Notes
 
 <!-- Any extra notes -->
-Ordering caveat: the session is created *before* the AI answer is requested, so a failed AI call can
-leave an empty session in the drawer (title set, `lastMessageAt` null). The alternative — send first,
-create after — is worse: a null `sessionId` writes the exchange into the default session, which is
-exactly the behaviour being removed.
+Verified against live data on 2026-08-14: wallets `SePay - Vietcombank` 8.175.000đ + `Tinder`
+1.000.000đ + `SePay - Sacombank` 0đ = total 9.175.000đ, with the `+10.000đ` (`sepay:73531578`)
+sitting on the Sacombank wallet contributing exactly 0 to that total, while August income across
+the `transactions` table totals 5.210.000đ including it.
 
-`GET /ai/chat/history` with no `sessionId` still resolves to the default session, so the existing
-`getChatHistory()` / `useChatHistory()` pair keeps working unchanged.
-
-Local `dev` was 16 commits behind `origin/dev` when this branch was cut; none of those commits touch
-`services/`, `hooks/useReports.ts` or `AIChatbotSheet.tsx` (they are tab-bar / numpad / contrast UI
-fixes), so there is no conflict risk.
+Branched from `dev`, independent of `feature/real-chat-sessions` — the two touch no common source
+files. Both are now merged into `dev`; the only merge conflicts were in this document and in the
+`src/services/index.ts` header comment, where the CSV-extraction work landed on `dev` in parallel.
 
 ## History
 
@@ -131,3 +116,15 @@ fixes), so there is no conflict risk.
   belongs in `finviet-be` (give the assistant row a later timestamp, or add a secondary sort key)
   and is filed separately. Re-verified: 18/18 assertions pass, type-check clean, lint clean on
   changed files, 112/112 Jest tests pass. Test sessions created during the run were deleted (204).
+- 2026-08-14 — Diagnosed the linked-wallet balance question against live data rather than
+  assuming: confirmed by code and by DB query that a linked balance mirrors SePay and is never
+  summed from transactions, so a footnote is the honest fix rather than "correcting" a balance
+  that is behaving as designed. Implemented on `feature/linked-wallet-balance-note` (commit
+  `95442d2`): the `Số dư đồng bộ từ ngân hàng` line on the wallet detail screen, shown only for
+  linked wallets. type-check clean, lint 0 errors on the changed file, 112/112 Jest tests pass.
+- 2026-08-14 — Merged both `feature/real-chat-sessions` and
+  `feature/linked-wallet-balance-note` into `dev` (which had moved 19 commits ahead in the
+  meantime, including the CSV-extraction wiring). Conflicts were confined to this document and
+  the `src/services/index.ts` header comment; both resolved by combining rather than picking a
+  side, so the CSV work's history and its "wired to real" claims survive intact. Re-verified on
+  the merge result: type-check clean, 112/112 Jest tests pass. Not pushed.
