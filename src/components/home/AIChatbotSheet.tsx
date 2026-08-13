@@ -23,7 +23,12 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
-import { useChatSessions, useChatSessionMessages, useSendChatMessage } from '@/hooks/useReports';
+import {
+  useChatSessions,
+  useChatSessionMessages,
+  useCreateChatSession,
+  useSendChatMessage,
+} from '@/hooks/useReports';
 import type { ChatSession } from '@/types/ai';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -190,10 +195,14 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
   const [isListening, setIsListening] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  // The conversation being written to. Null = nothing opened yet, so the next
+  // message starts a new session rather than falling into the default one.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
 
   const { data: sessions = [] } = useChatSessions();
   const { data: sessionMessages } = useChatSessionMessages(loadingSessionId);
+  const createSession = useCreateChatSession();
   const sendChat = useSendChatMessage();
 
   const translateY = useSharedValue(0);
@@ -235,6 +244,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
       timestamp: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     }));
     setMessages(converted);
+    setActiveSessionId(loadingSessionId);
     setLoadingSessionId(null);
     setHistoryOpen(false);
   }, [sessionMessages, loadingSessionId]);
@@ -245,6 +255,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 
   const handleNewChat = useCallback(() => {
     setMessages(INITIAL_MESSAGES);
+    setActiveSessionId(null);
     setHistoryOpen(false);
   }, []);
 
@@ -259,7 +270,15 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
     scrollToBottom();
 
     try {
-      const reply = await sendChat.mutateAsync(trimmed);
+      // A conversation that hasn't been opened yet gets a real session titled with
+      // the question starting it — that title is what the history drawer previews.
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        sessionId = (await createSession.mutateAsync(trimmed)).sessionId;
+        setActiveSessionId(sessionId);
+      }
+
+      const reply = await sendChat.mutateAsync({ question: trimmed, sessionId });
       const aiMsg: Message = {
         id: reply.id || genId(),
         role: 'ai',
@@ -281,7 +300,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
       setIsTyping(false);
       scrollToBottom();
     }
-  }, [scrollToBottom, sendChat, isTyping]);
+  }, [scrollToBottom, sendChat, createSession, activeSessionId, isTyping]);
 
   const handleChip = useCallback((chip: string) => {
     handleSend(chip);
@@ -354,7 +373,11 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
                       </View>
                       <View style={styles.sessionInfo}>
                         <Text style={styles.sessionPreview} numberOfLines={1}>{session.previewText}</Text>
-                        <Text style={styles.sessionMeta}>{dateStr} · {S.messages(session.messageCount)}</Text>
+                        <Text style={styles.sessionMeta}>
+                          {session.messageCount === undefined
+                            ? dateStr
+                            : `${dateStr} · ${S.messages(session.messageCount)}`}
+                        </Text>
                       </View>
                       <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
                     </TouchableOpacity>

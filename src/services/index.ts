@@ -8,12 +8,11 @@
  * so the swap needs zero hook/screen changes.
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), reports/AI (spending score, weekly
- * report, chat history), notifications, rules, SMS extraction, and SePay
- * bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend),
- * photo/receipt OCR extraction (no backend — only SMS + CSV parsing exist
- * server-side), and custom-category creation (no BE endpoint yet — see
- * real/customCategories.ts).
+ * categories (buckets and customer-created ones), reports/AI (spending score,
+ * weekly report, multi-session chat), notifications, rules, SMS extraction, and
+ * SePay bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend)
+ * and photo/receipt OCR extraction — POST /extract/photo exists but its OCR
+ * provider is an unwired scaffold that answers 503.
  */
 
 import { USE_MOCK } from '@/lib/env';
@@ -164,6 +163,7 @@ export const getWeeklyReport = reportsImpl.getWeeklyReport;
 export const getChatHistory = reportsImpl.getChatHistory;
 export const getChatSessions = reportsImpl.getChatSessions;
 export const getChatSessionMessages = reportsImpl.getChatSessionMessages;
+export const createChatSession = reportsImpl.createChatSession;
 export const sendChatMessage = reportsImpl.sendChatMessage;
 export const generateWeeklyReport = reportsImpl.generateWeeklyReport;
 export const previewCategorization = reportsImpl.previewCategorization;

@@ -77,8 +77,11 @@ export interface ChatSession {
   previewText: string;
   /** ISO 8601 timestamp of most recent message */
   lastMessageAt: string;
-  /** Total message count in the session */
-  messageCount: number;
+  /**
+   * Total message count in the session. Optional: the backend's ChatSessionResponse
+   * carries no count, and deriving one would mean fetching every session's history.
+   */
+  messageCount?: number;
 }
 
 // -------------------------------------------------------------------------
