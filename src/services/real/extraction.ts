@@ -4,20 +4,23 @@
  * Mirrors src/services/mock/extraction.ts so the barrel can swap mock ⇄ real.
  *
  * Backend: api/extract/* (ExtractController), ApiResponse<T> envelope.
- *   - POST /extract/sms  { text }  → ExtractResponse { rows[], totalScanned, skipped, errors }
+ *   - POST /extract/sms  { text }                       → ExtractResponse { rows[], totalScanned, skipped, errors }
+ *   - POST /extract/csv  multipart: file, maxRows?       → ExtractResponse (same shape)
  *
- * The screen consumes a SINGLE PhotoExtractionResult (one candidate transaction),
- * while the backend returns an array of parsed rows. We map the first recognised
- * row onto that shape. Amount/date/merchant are parsed deterministically server-
- * side, so they carry high confidence when present; the category is the only AI
- * guess, so its confidence comes from the row's model score.
+ * The SMS screen consumes a SINGLE PhotoExtractionResult (one candidate
+ * transaction), while the backend returns an array of parsed rows — we map
+ * the first recognised row onto that shape. Amount/date/merchant are parsed
+ * deterministically server-side, so they carry high confidence when present;
+ * the category is the only AI guess, so its confidence comes from the row's
+ * model score. CSV extraction surfaces the full row array instead (the
+ * review-list UX needs every row, not just the first).
  *
  * There is NO backend photo/OCR endpoint (the backend parses SMS text and CSV/XLSX
  * statements, not receipt images), so extractFromPhoto stays on the mock.
  */
 
 import { api, unwrap } from '@/lib/api';
-import type { PhotoExtractionResult } from '@/types/extraction';
+import type { CsvExtractionResult, PhotoExtractionResult } from '@/types/extraction';
 
 // Photo/receipt OCR has no backend counterpart — keep the mock implementation.
 export { extractFromPhoto } from '@/services/mock/extraction';
@@ -77,4 +80,52 @@ export async function extractFromSMS(text: string): Promise<PhotoExtractionResul
   const data = unwrap<ExtractResponseDto>(res);
   const first = data.rows?.[0];
   return first ? toExtractionResult(first) : EMPTY_RESULT;
+}
+
+// ─── CSV / XLSX extraction ────────────────────────────────────────────────────
+
+function toCsvRow(row: ExtractedRowDto): CsvExtractionResult['rows'][number] {
+  return {
+    amount: row.amount ?? 0,
+    type: (row.type ?? '').toUpperCase() === 'INCOME' ? 'income' : 'expense',
+    merchant: row.merchant ?? row.description ?? null,
+    transactionDate: (row.transactionDate ?? '').slice(0, 10),
+    categoryId: row.categoryId ?? null,
+    categoryName: row.categoryName ?? null,
+    confidence: row.categoryId ? (row.confidence ?? 0) : null,
+  };
+}
+
+/**
+ * POST /extract/csv — multipart upload of a bank-statement export (.csv,
+ * .xlsx, .xls). Parse-only, nothing persisted server-side; the caller still
+ * confirms/imports each row via the normal createTransaction flow.
+ */
+export async function extractFromCsv(
+  fileUri: string,
+  fileName: string,
+  maxRows?: number,
+): Promise<CsvExtractionResult> {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  const mime =
+    ext === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : ext === 'xls'
+        ? 'application/vnd.ms-excel'
+        : 'text/csv';
+  const form = new FormData();
+  // React Native FormData file part shape ({ uri, name, type }).
+  form.append('file', { uri: fileUri, name: fileName, type: mime } as unknown as Blob);
+  if (maxRows != null) form.append('maxRows', String(maxRows));
+
+  const res = await api.post('/extract/csv', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  const data = unwrap<ExtractResponseDto>(res);
+  return {
+    rows: (data.rows ?? []).map(toCsvRow),
+    totalScanned: data.totalScanned,
+    skipped: data.skipped,
+    errors: data.errors ?? [],
+  };
 }

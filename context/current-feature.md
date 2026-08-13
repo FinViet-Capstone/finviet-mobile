@@ -1,84 +1,111 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: bottom tab bar is covered/clipped by the Android gesture-navigation home indicator on a
-Xiaomi Pad 5 device (real APK deploy, not the Expo Go / browser preview). Reported by the user
-via a screenshot of the "Chấm Điểm Ví" (Spending Score detail) screen showing the tab icons
-sitting flush against — and partially obscured by — the system home-indicator pill.
 
-**Note:** going forward, verification for fixes in this project happens by building/deploying
-an APK to a physical Android device (per user instruction 2026-08-12), not just browser
-preview — device-specific chrome like gesture-nav insets only reproduces on-device.
+Wire CSV import (`app/(tabs)/entry/csv-import.tsx`) to the backend's real
+`POST /extract/csv` endpoint instead of parsing files entirely client-side,
+and correct stale "AI is mock-only" framing in `context/project-spec.md` (the
+real AI wiring — spending score, weekly report, chat — already exists in
+`src/services/real/reports.ts` and is fully functional once
+`EXPO_PUBLIC_USE_MOCK=false`; nothing to build there). Companion backend work
+in `finviet-be`: documented two previously-undocumented health/status
+endpoints and removed a resolved TODO doc. This session also sets up local
+device testing against the backend over LAN.
+
+Google OAuth wiring (`googleOAuth()` → Firebase → `POST /auth/google-login`)
+is part of the same planning round but is a separate, larger effort — needs
+Firebase project files (`google-services.json` /
+`GoogleService-Info.plist`) and a custom dev-client rebuild, so it is tracked
+here but sequenced after CSV/docs land.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — merged to `dev` without on-device verification (user's explicit call, 2026-08-12);
-type-check clean and lint 0 errors, but not yet confirmed against the actual Xiaomi Pad 5
-gesture-nav overlap this fix targets
+
+Completed — awaiting commit approval (Google OAuth remains out of scope for
+this branch, blocked on Firebase project files from the user)
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Root cause: `app/(tabs)/_layout.tsx:33-39` hardcodes `tabBarStyle.height: 64` and
-  `paddingBottom: 10`. React Navigation's bottom-tabs normally auto-includes the bottom
-  safe-area inset in the tab bar's height, but once you supply *any* custom `height` that
-  auto-inclusion is bypassed — the bar is sized to exactly 64px regardless of the device's
-  gesture-nav inset, so on a device with a tall inset (Xiaomi Pad 5) the system home-indicator
-  overlaps the tab bar's bottom edge/icons.
-- Fix: read `useSafeAreaInsets()` in `TabLayout` and add `insets.bottom` into both
-  `tabBarStyle.height` and `paddingBottom`, matching the pattern already used elsewhere in this
-  repo (`app/(tabs)/entry/photo.tsx`, `src/components/common/DraggableSheet.tsx`, etc.) instead
-  of hardcoding a fixed pixel value.
-- Out of scope: broader safe-area audit of other screens; the `EntryTabButton`'s `top: -20`
-  offset (unaffected, relative to the now-taller bar).
+
+- `src/services/mock/extraction.ts` / `src/services/real/extraction.ts`: add
+  `extractFromCsv`, mirroring the existing SMS/photo pattern but returning
+  multiple rows (the backend's `POST /extract/csv` returns
+  `ExtractResponse.rows[]`, not a single result).
+- `src/services/index.ts`: export `extractFromCsv` through the `USE_MOCK`
+  branch; update the header comment to list CSV as wired-real.
+- New `src/hooks/useExtractFromCsv.ts` mirroring `useExtractFromSMS.ts`.
+- `app/(tabs)/entry/csv-import.tsx`: replace the local
+  `parseCsvContent`/`parseCsvLine`/header-matching logic with a call to the
+  new hook; map backend rows to the existing `ParsedRow[]` UI state; keep
+  client-side duplicate detection (UI-only concern) and keep
+  `suggestCategoryFromMerchant` only as a fallback when the backend returns
+  no `categoryId`.
+- `context/project-spec.md` Features §E: correct the claim that AI is
+  "currently static mock content" — the real backend-wired path already
+  exists and works once `USE_MOCK=false`.
+- `.env.local`: point at the local backend over LAN for this session's
+  device testing (gitignored, no commit needed).
+- Out of scope for this branch: Google OAuth (separate, larger effort — see
+  above), photo/receipt OCR (backend endpoint exists but always 503s, no FE
+  work unblocked), subscriptions (no backend).
 
 ## Notes
 
 <!-- Any extra notes -->
-Confirmed via `Grep` that `useSafeAreaInsets` is an established pattern in this codebase (6
-existing usages), not a new dependency. Branched `fix/tabbar-safe-area-inset` off `dev` (khoi
-and dev are at the same commit `6cd59b5`). Pre-existing uncommitted changes to
-`app.json`/`package.json`/`package-lock.json` on the `khoi` branch (unrelated, in-progress EAS
-build config work) were left untouched and not included in this fix's commit.
+
+- Full investigation (comparing `finviet-be` controllers/docs against
+  `finviet-mobile`'s `src/services/{mock,real}` mock⇄real swap) found almost
+  the entire backend surface already wired to real — wallets, transactions,
+  budgets, goals, categories, notifications, rules, SePay, and reports/AI are
+  all real. CSV extraction was the one genuine unwired-but-working endpoint.
+- Backend AI provider is switching from local Ollama to Gemini (Google AI
+  Studio key, user pasting it in directly on the backend side) — no FE
+  impact, the mobile app only ever talks to `/ai/*`, never the model
+  provider. Just means `finviet-be/docs/ollama-setup.md` won't be what's used
+  for this session's AI verification.
+- Testing this session: physical device over LAN. Machine's LAN IP at the
+  time of writing: `10.3.73.232` (re-check with `ipconfig` if it changes,
+  matching this repo's existing `.env.local` convention).
+- No commit or push without explicit user permission.
 
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
-- 2026-08-10 — Prior feature (`fix/budgets-goals-toggle-format`): fixed the Ngân sách ↔ Mục
-  tiêu tiết kiệm toggle feeling like page navigation — added a slide transition, synced
-  header/toggle styling between the two routes, added a back button, equalized header heights,
-  and fixed the "+ Tạo mục tiêu" button's `onPrimary`-on-`inversePrimary` contrast bug. Verified
-  on device across two rounds of feedback, merged to `dev`.
-- 2026-08-10 — Documented and branched (`fix/entry-inverseprimary-contrast`) off `dev` to
-  follow up on the same `inversePrimary`+`onPrimary` contrast bug found in two more screens.
-  Implemented: `csv-import.tsx`'s `confirmText` color + both `ActivityIndicator` spinner
-  colors changed `onPrimary` → `onBackground`; `sms.tsx`'s two `arrow_forward` icon colors
-  changed `onPrimary` → `onSurface` (matching their already-correct sibling text color).
-  type-check clean, lint 0 errors (95 pre-existing warnings, unrelated), 72/72 tests pass.
-- 2026-08-10 — User verified on device: CSV-import and SMS-paste buttons are now legible.
-  Both features merged to `dev`.
-- 2026-08-10 — Documented and branched (`fix/numpad-stuck-close-modal`) off `dev` for the
-  recurring "keypad stuck half-closed" bug. Diagnosed root cause (stale module-scope
-  `Dimensions.get('window')` used as the close-animation target in `NumericKeypad.tsx`) and
-  implemented the fix (native `<Modal animationType="slide">` replacing the custom
-  `translateY`/`Dimensions` animation, matching the pattern already used by `AIChatbotSheet.tsx`
-  / `ChangePasswordSheet.tsx`). type-check clean, lint 0 errors (84 pre-existing warnings,
-  unrelated), 72/72 tests pass.
-- 2026-08-10 — User verified on device: keypad now closes fully on checkmark tap, no more
-  stuck half-open panel.
-- 2026-08-10 — Documented and branched (`fix/merchant-search-placeholder`) off `dev` for the
-  English "merchant" loanword leaking into the Transactions search placeholder. Fixed
-  `app/(tabs)/transactions/index.tsx:275` to read "Tìm theo tên người nhận...", matching the
-  "Người nhận" term already used on the transaction-detail, SMS-entry, and photo-entry screens.
-  type-check clean, lint 0 errors (84 pre-existing warnings, unrelated).
-- 2026-08-10 — User verified on device: search placeholder now shows the Vietnamese term.
-  Merged to `dev`.
-- 2026-08-12 — Documented and branched (`fix/tabbar-safe-area-inset`) off `dev` for the bottom
-  tab bar being clipped by the Xiaomi Pad 5's Android gesture-navigation home indicator (reported
-  via a screenshot of the Spending Score screen, real APK deploy). Fixed
-  `app/(tabs)/_layout.tsx` to add `useSafeAreaInsets().bottom` into `tabBarStyle.height` and
-  `paddingBottom` instead of hardcoding `64`/`10`, matching the existing safe-area-inset pattern
-  used elsewhere in the repo.
-- 2026-08-12 — User opted to merge to `dev` without on-device verification first (type-check +
-  lint were clean). Merged via PR per branch protection (no direct push/merge allowed).
+
+- 2026-08-13 — Started. Branch `feature/csv-extraction-wiring` created from
+  `dev` (pre-existing uncommitted `app.json`/`eas.json`/`package.json`
+  EAS-build-config WIP on `dev` carried over untouched — it's needed for this
+  same session's LAN `http://` testing via `expo-build-properties`'
+  `usesCleartextTraffic`).
+- 2026-08-13 — Implemented CSV wiring: `CsvExtractionRow`/`CsvExtractionResult`
+  types added to `src/types/extraction.ts`; `extractFromCsv` added to
+  `mock/extraction.ts` (canned 2-row sample) and `real/extraction.ts`
+  (multipart `POST /extract/csv`, reusing the existing `ExtractedRowDto`
+  mapper pattern extended to a full array); exported through
+  `src/services/index.ts` (also fixed a stale header-comment claim that
+  custom-category creation was mock-only — `real/customCategories.ts` already
+  implements it against a real endpoint); new `src/hooks/useExtractFromCsv.ts`
+  added to the hooks barrel; `app/(tabs)/entry/csv-import.tsx` reworked to
+  call the new hook instead of its former ~150-line client-side CSV parser
+  (`parseCsvContent`/`parseCsvLine`/header-matching/`normalizeDate`/
+  `normalizeAmount` all removed), keeping only client-side duplicate
+  detection and the merchant-rule fallback for rows the backend's AI
+  couldn't categorize; updated the `aiBadge` copy since categorization is now
+  real AI, not just saved-rule matching.
+- 2026-08-13 — Corrected stale "AI is mock-only" claims in
+  `context/project-spec.md` (intro paragraph, Features §A extraction-methods
+  bullet, Features §E, Tech Stack `USE_MOCK` bullet) — the real AI/reports
+  path (`src/services/real/reports.ts`) and CSV extraction are both fully
+  wired to the backend already; only photo-OCR (backend endpoint exists but
+  no real OCR provider, always 503) and subscriptions (no backend) remain
+  mock-only.
+- 2026-08-13 — Set `.env.local` for this session's physical-device-over-LAN
+  testing: `EXPO_PUBLIC_USE_MOCK=false`,
+  `EXPO_PUBLIC_API_BASE_URL=http://10.3.73.232:5122/api` (gitignored, no
+  commit). `npm run type-check` clean, `npm run lint` 0 errors / 84
+  pre-existing warnings (none newly introduced — verified none touch the
+  changed files beyond one pre-existing warning on an untouched effect in
+  `csv-import.tsx`). Awaiting commit approval; on-device verification is the
+  user's to do (no device access in this environment).

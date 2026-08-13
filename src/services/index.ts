@@ -8,12 +8,12 @@
  * so the swap needs zero hook/screen changes.
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), reports/AI (spending score, weekly
- * report, chat history), notifications, rules, SMS extraction, and SePay
- * bank-linking (see real/sepay.ts). Still mock: subscriptions (no backend),
- * photo/receipt OCR extraction (no backend — only SMS + CSV parsing exist
- * server-side), and custom-category creation (no BE endpoint yet — see
- * real/customCategories.ts).
+ * categories (customer category buckets), custom categories, reports/AI
+ * (spending score, weekly report, chat history), notifications, rules, SMS
+ * extraction, CSV/XLSX extraction, and SePay bank-linking (see real/sepay.ts).
+ * Still mock: subscriptions (no backend) and photo/receipt OCR extraction (a
+ * backend endpoint exists but has no real OCR provider wired in yet — always
+ * responds 503).
  */
 
 import { USE_MOCK } from '@/lib/env';
@@ -177,11 +177,13 @@ export const getUnreadNotifications = notificationsImpl.getUnreadNotifications;
 export const markNotificationRead = notificationsImpl.markNotificationRead;
 export const markAllNotificationsRead = notificationsImpl.markAllNotificationsRead;
 
-// ─── Photo / SMS Extraction ─────────────────────────────────────────────────────
-// SMS → real /extract/sms; photo/receipt OCR has no backend, so real re-exports the mock.
+// ─── Photo / SMS / CSV Extraction ────────────────────────────────────────────────
+// SMS → real /extract/sms; CSV → real /extract/csv; photo/receipt OCR has no
+// working backend provider yet, so real re-exports the mock.
 const extractionImpl = USE_MOCK ? mockExtraction : realExtraction;
 export const extractFromPhoto = extractionImpl.extractFromPhoto;
 export const extractFromSMS = extractionImpl.extractFromSMS;
+export const extractFromCsv = extractionImpl.extractFromCsv;
 
 // ─── Rules (merchant → category auto-classification) ────────────────────────────
 const rulesImpl = USE_MOCK ? mockRules : realRules;
