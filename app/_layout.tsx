@@ -14,12 +14,32 @@ import { useAuthStore } from '@/stores/authStore';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { initSentry, captureException } from '@/lib/sentry';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://b26adbc3b815c2b9fd62db860e8ebc62@o4511073418215424.ingest.de.sentry.io/4511904839893072',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 // Runs once at module load, before the first render — no-ops if
 // EXPO_PUBLIC_SENTRY_DSN is unset.
 initSentry();
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   // Registered under the exact family name MaterialIcon expects, so the
   // ligature-based <MaterialIcon name="wallet" /> renders glyphs, not text.
   const [fontsLoaded, fontError] = useFonts({
@@ -58,7 +78,7 @@ export default function RootLayout() {
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
