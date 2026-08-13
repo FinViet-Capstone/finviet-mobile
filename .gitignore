@@ -40,3 +40,5 @@ Thumbs.db
 
 scripts/
 docs/qa/FinViet_Test_Report.xlsx
+
+.env.local
