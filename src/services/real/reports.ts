@@ -6,14 +6,24 @@
  * Backend: api/ai/* (AiController), ApiResponse<T> envelope.
  *   - GET  /ai/score?period=WEEKLY|MONTHLY  → SpendingScoreResult
  *   - GET  /ai/reports                      → WeeklyReportResponse[]  (history, newest handling below)
- *   - GET  /ai/chat/history?limit           → ChatMessageResponse[]
+ *   - GET  /ai/chat/sessions                → ChatSessionResponse[]   (newest activity first)
+ *   - POST /ai/chat/sessions                → ChatSessionResponse
+ *   - GET  /ai/chat/history?sessionId&limit → ChatMessageResponse[]
+ *   - POST /ai/chat  { sessionId?, question } → ChatMessageResponse
  *
  * Backend gaps vs the mock contract:
  *   - The score endpoint returns a single Vietnamese `comment`; the mock split this
  *     into verdict/reason/commentary. We derive a short verdict from the colour band
  *     and reuse the comment for the reason + full commentary.
- *   - The backend has NO chat "session" concept — history is a flat list. We surface
- *     the whole history under one synthetic session so the session views keep working.
+ *   - ChatSessionResponse has no message count and no per-session count endpoint, so
+ *     `messageCount` is left undefined rather than costing an N+1 history fetch.
+ *   - It has no first-message preview either, and the server titles an untitled session
+ *     "Cuộc trò chuyện mới". We title a session with its opening question instead, which
+ *     makes `title` the preview the session list wants.
+ *
+ * Omitting `sessionId` anywhere below targets the customer's single *default* session
+ * (AiChatService.ResolveSessionAsync creates it on demand) — it never opens a new one,
+ * which is why starting a fresh conversation goes through createChatSession().
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -28,8 +38,8 @@ import type {
   CategorizationSource,
 } from '@/types';
 
-// Synthetic session id — the backend keeps a single flat history per customer.
-const DEFAULT_SESSION_ID = 'default';
+/** `AiChatService.NormalizeTitle` rejects anything longer with a 400. */
+const MAX_SESSION_TITLE_LENGTH = 120;
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
 
@@ -58,9 +68,21 @@ interface WeeklyReportDto {
 
 interface ChatMessageDto {
   messageId: string;
+  sessionId: string;
   senderType: string; // "USER" | "AI"
   content: string;
   timestamp: string | null;
+}
+
+interface ChatSessionDto {
+  sessionId: string;
+  title: string;
+  historyEnabled: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** null until the session's first exchange lands. */
+  lastMessageAt: string | null;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -120,8 +142,19 @@ function toChatMessage(dto: ChatMessageDto): ChatMessage {
     customerId: '',
     role: (dto.senderType ?? '').toUpperCase() === 'AI' ? 'assistant' : 'user',
     content: dto.content,
-    sessionId: DEFAULT_SESSION_ID,
+    sessionId: dto.sessionId,
     createdAt: dto.timestamp ?? '',
+  };
+}
+
+function toChatSession(dto: ChatSessionDto): ChatSession {
+  return {
+    sessionId: dto.sessionId,
+    customerId: '',
+    previewText: dto.title,
+    // A session with no messages yet has lastMessageAt null — fall back so the
+    // drawer still renders a date instead of "Invalid Date".
+    lastMessageAt: dto.lastMessageAt ?? dto.updatedAt ?? dto.createdAt,
   };
 }
 
@@ -153,48 +186,65 @@ export async function getWeeklyReport(): Promise<WeeklyReport | null> {
 
 // ─── Chat ───────────────────────────────────────────────────────────────────
 
-async function fetchChatHistory(limit = 50): Promise<ChatMessage[]> {
-  const res = await api.get('/ai/chat/history', { params: { limit } });
-  return unwrap<ChatMessageDto[]>(res).map(toChatMessage);
+const ROLE_ORDER: Record<ChatMessage['role'], number> = { user: 0, assistant: 1 };
+
+async function fetchChatHistory(sessionId?: string, limit = 50): Promise<ChatMessage[]> {
+  const res = await api.get('/ai/chat/history', {
+    params: sessionId ? { sessionId, limit } : { limit },
+  });
+  // AiChatService.CompleteTurnAsync stamps both halves of an exchange with the same
+  // CreatedAt, and the query only orders by that column — so the answer can come back
+  // ahead of its own question. Break the tie by role. Timestamps mix `Z` and `+07:00`
+  // offsets, so compare parsed values, not strings.
+  return unwrap<ChatMessageDto[]>(res)
+    .map(toChatMessage)
+    .sort((a, b) => {
+      const byTime = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      return byTime !== 0 ? byTime : ROLE_ORDER[a.role] - ROLE_ORDER[b.role];
+    });
 }
 
+/** Flat history of the default session (see the omitted-sessionId note up top). */
 export function getChatHistory(): Promise<ChatMessage[]> {
   return fetchChatHistory();
 }
 
-/**
- * The backend keeps a single flat history (no sessions). We fold it into one
- * synthetic session so the session-list UI keeps rendering; an empty history
- * yields no sessions.
- */
 export async function getChatSessions(): Promise<ChatSession[]> {
-  const history = await fetchChatHistory();
-  if (history.length === 0) return [];
-  const firstUser = history.find((m) => m.role === 'user');
-  const last = history[history.length - 1];
-  return [
-    {
-      sessionId: DEFAULT_SESSION_ID,
-      customerId: '',
-      previewText: firstUser?.content ?? history[0].content,
-      lastMessageAt: last.createdAt,
-      messageCount: history.length,
-    },
-  ];
+  const res = await api.get('/ai/chat/sessions');
+  return unwrap<ChatSessionDto[]>(res).map(toChatSession);
 }
 
-export function getChatSessionMessages(_sessionId: string): Promise<ChatMessage[]> {
-  // Only one (synthetic) session exists — return the full history regardless of id.
-  return fetchChatHistory();
+export function getChatSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+  return fetchChatHistory(sessionId);
+}
+
+/**
+ * POST /ai/chat/sessions — open a conversation of its own. `title` is what the
+ * session list shows as its preview, so callers pass the opening question.
+ */
+export async function createChatSession(title?: string): Promise<ChatSession> {
+  const trimmed = title?.trim().slice(0, MAX_SESSION_TITLE_LENGTH);
+  const res = await api.post('/ai/chat/sessions', {
+    title: trimmed && trimmed.length > 0 ? trimmed : null,
+  });
+  return toChatSession(unwrap<ChatSessionDto>(res));
 }
 
 /**
  * POST /ai/chat — send a question and get the assistant's reply. The RAG pipeline
  * can be slow, so allow a generous timeout. Returns only the AI message; the caller
- * already knows the user's question.
+ * already knows the user's question. Without `sessionId` the exchange lands in the
+ * default session.
  */
-export async function sendChatMessage(question: string): Promise<ChatMessage> {
-  const res = await api.post('/ai/chat', { question }, { timeout: 120_000 });
+export async function sendChatMessage(
+  question: string,
+  sessionId?: string,
+): Promise<ChatMessage> {
+  const res = await api.post(
+    '/ai/chat',
+    { question, sessionId: sessionId ?? null },
+    { timeout: 120_000 },
+  );
   return toChatMessage(unwrap<ChatMessageDto>(res));
 }
 

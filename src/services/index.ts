@@ -9,7 +9,7 @@
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
  * categories (customer category buckets), custom categories, reports/AI
- * (spending score, weekly report, chat history), notifications, rules, SMS
+ * (spending score, weekly report, multi-session chat), notifications, rules, SMS
  * extraction, CSV/XLSX extraction, and SePay bank-linking (see real/sepay.ts).
  * Still mock: subscriptions (no backend) and photo/receipt OCR extraction (a
  * backend endpoint exists but has no real OCR provider wired in yet — always
@@ -164,6 +164,7 @@ export const getWeeklyReport = reportsImpl.getWeeklyReport;
 export const getChatHistory = reportsImpl.getChatHistory;
 export const getChatSessions = reportsImpl.getChatSessions;
 export const getChatSessionMessages = reportsImpl.getChatSessionMessages;
+export const createChatSession = reportsImpl.createChatSession;
 export const sendChatMessage = reportsImpl.sendChatMessage;
 export const generateWeeklyReport = reportsImpl.generateWeeklyReport;
 export const previewCategorization = reportsImpl.previewCategorization;

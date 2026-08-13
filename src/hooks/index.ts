@@ -52,6 +52,7 @@ export {
   useChatHistory,
   useChatSessions,
   useChatSessionMessages,
+  useCreateChatSession,
   useSendChatMessage,
   useGenerateWeeklyReport,
 } from './useReports';
