@@ -1,4 +1,4 @@
-import type { PhotoExtractionResult } from '@/types/extraction';
+import type { CsvExtractionResult, PhotoExtractionResult } from '@/types/extraction';
 
 export function extractFromPhoto(_uri: string): Promise<PhotoExtractionResult> {
   return new Promise((resolve) => {
@@ -40,5 +40,47 @@ export function extractFromSMS(_text: string): Promise<PhotoExtractionResult> {
         },
       });
     }, 900);
+  });
+}
+
+/**
+ * Mock CSV extraction. Real version posts the file to a backend endpoint that
+ * parses rows and runs AI categorization per row. Ignores the input file and
+ * returns a fixed sample so the review-list UX can be exercised without a
+ * real bank export on hand.
+ */
+export function extractFromCsv(
+  _fileUri: string,
+  _fileName: string,
+  _maxRows?: number,
+): Promise<CsvExtractionResult> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        rows: [
+          {
+            amount: 45_000,
+            type: 'expense',
+            merchant: 'Cà phê Highlands',
+            transactionDate: new Date().toISOString().split('T')[0],
+            categoryId: 'cat_food',
+            categoryName: 'Ăn uống',
+            confidence: 0.86,
+          },
+          {
+            amount: 12_000_000,
+            type: 'income',
+            merchant: 'Lương tháng',
+            transactionDate: new Date().toISOString().split('T')[0],
+            categoryId: null,
+            categoryName: null,
+            confidence: null,
+          },
+        ],
+        totalScanned: 2,
+        skipped: 0,
+        errors: [],
+      });
+    }, 1200);
   });
 }

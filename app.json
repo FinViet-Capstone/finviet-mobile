@@ -5,11 +5,11 @@
     "scheme": "finviet",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/to-do-list.png",
+    "icon": "./assets/finviet-icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/to-do-list.png",
+      "image": "./assets/finviet-vertical.png",
       "resizeMode": "contain",
       "backgroundColor": "#1A6B3C"
     },
@@ -24,11 +24,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/to-do-list.png",
+        "foregroundImage": "./assets/finviet-icon.png",
         "backgroundColor": "#1A6B3C"
       },
       "package": "com.finviet.mobile",
-      "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -61,7 +60,15 @@
       ],
       "expo-router",
       "expo-secure-store",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {},

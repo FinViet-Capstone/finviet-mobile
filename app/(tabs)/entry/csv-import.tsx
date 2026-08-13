@@ -18,7 +18,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryPickerSheet } from '@/components/categories';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
-import { useRules } from '@/hooks';
+import { useRules, useExtractFromCsv } from '@/hooks';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import type { Wallet, Transaction, Rule } from '@/types';
@@ -34,7 +34,7 @@ const S = {
   uploadIcon: 'cloud_upload',
   templateBtn: 'Tải file mẫu .csv',
   templateIcon: 'download',
-  aiBadge: 'Tự động gợi ý danh mục dựa trên quy tắc đã lưu',
+  aiBadge: 'Tự động gợi ý danh mục bằng AI',
   aiBadgeIcon: 'auto_awesome',
   guideTitle: 'Hướng dẫn xuất file',
   guideHelp: 'help',
@@ -84,70 +84,12 @@ interface ParsedRow {
 }
 
 // ─── CSV parsing ──────────────────────────────────────────────────────────────
-// Header-based, not a real spreadsheet parser — good enough for the common
-// single-sheet bank/e-wallet export shape, not arbitrary CSV/Excel dialects.
-
-/** Splits one CSV line into fields, honoring double-quoted fields with embedded commas. */
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; }
-        else inQuotes = false;
-      } else cur += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ',') { result.push(cur); cur = ''; }
-    else cur += c;
-  }
-  result.push(cur);
-  return result;
-}
+// Parsing itself happens server-side (POST /extract/csv, handles .csv/.xlsx/.xls
+// and runs AI categorization per row). This screen only maps the response onto
+// its ParsedRow UI state and applies a merchant-rule fallback when the AI
+// couldn't suggest a category.
 
 const BOM_CHAR = String.fromCharCode(0xfeff);
-const COMBINING_DIACRITICS = /[̀-ͯ]/g;
-
-function splitCsvLines(text: string): string[] {
-  const stripped = text.startsWith(BOM_CHAR) ? text.slice(1) : text;
-  return stripped.split(/\r\n|\n|\r/).filter((l) => l.trim().length > 0);
-}
-
-/** Lowercases and strips Vietnamese diacritics so header matching is accent-insensitive. */
-function normalizeHeader(s: string): string {
-  return s.normalize('NFD').replace(COMBINING_DIACRITICS, '').replace(/đ/gi, 'd').toLowerCase().trim();
-}
-
-const DATE_HEADERS = ['ngay', 'date', 'thoi gian'];
-const DESC_HEADERS = ['noi dung', 'dien giai', 'description', 'mo ta', 'chi tiet'];
-const AMOUNT_HEADERS = ['so tien', 'amount', 'gia tri'];
-const DEBIT_HEADERS = ['ghi no', 'debit', 'phat sinh no'];
-const CREDIT_HEADERS = ['ghi co', 'credit', 'phat sinh co'];
-
-function findColumn(header: string[], candidates: string[]): number {
-  return header.findIndex((h) => candidates.some((c) => h.includes(c)));
-}
-
-/** Accepts "2026-08-01", "01/08/2026", "01-08-2026" (with or without a trailing time). */
-function normalizeDate(raw: string): string | null {
-  const trimmed = raw.trim().split(/\s+/)[0];
-  let m = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return null;
-}
-
-/** Strips currency symbols/thousand-separators; keeps a leading minus sign. */
-function normalizeAmount(raw: string): number {
-  const isNegative = /^\s*-|^\s*\(.*\)\s*$/.test(raw);
-  const digits = raw.replace(/[^\d]/g, '');
-  const n = parseInt(digits, 10);
-  if (!Number.isFinite(n)) return 0;
-  return isNegative ? -n : n;
-}
 
 /** Longest-keyword-wins substring match against the customer's saved merchant rules. */
 function suggestCategoryFromMerchant(merchant: string, rules: Rule[]): string | null {
@@ -159,70 +101,6 @@ function suggestCategoryFromMerchant(merchant: string, rules: Rule[]): string | 
     }
   }
   return best?.categoryId ?? null;
-}
-
-interface CsvParseOutcome {
-  rows: ParsedRow[];
-  /** Header row didn't contain a recognizable date or amount column at all. */
-  missingColumns: boolean;
-}
-
-function parseCsvContent(text: string, rules: Rule[], existingTx: Transaction[]): CsvParseOutcome {
-  const lines = splitCsvLines(text);
-  if (lines.length < 2) return { rows: [], missingColumns: true };
-
-  const header = parseCsvLine(lines[0]).map(normalizeHeader);
-  const dateIdx = findColumn(header, DATE_HEADERS);
-  const descIdx = findColumn(header, DESC_HEADERS);
-  const amountIdx = findColumn(header, AMOUNT_HEADERS);
-  const debitIdx = findColumn(header, DEBIT_HEADERS);
-  const creditIdx = findColumn(header, CREDIT_HEADERS);
-
-  if (dateIdx < 0 || (amountIdx < 0 && debitIdx < 0 && creditIdx < 0)) {
-    return { rows: [], missingColumns: true };
-  }
-
-  const rows: ParsedRow[] = [];
-  lines.slice(1).forEach((line, i) => {
-    const cols = parseCsvLine(line);
-    const date = normalizeDate(cols[dateIdx] ?? '');
-    const merchant = (descIdx >= 0 ? cols[descIdx] : '')?.trim() || 'Không rõ nội dung';
-
-    let amount = 0;
-    let type: 'expense' | 'income' = 'expense';
-    if (debitIdx >= 0 || creditIdx >= 0) {
-      const debit = debitIdx >= 0 ? Math.abs(normalizeAmount(cols[debitIdx] ?? '')) : 0;
-      const credit = creditIdx >= 0 ? Math.abs(normalizeAmount(cols[creditIdx] ?? '')) : 0;
-      if (credit > 0) { amount = credit; type = 'income'; } else { amount = debit; type = 'expense'; }
-    } else {
-      const raw = normalizeAmount(cols[amountIdx] ?? '');
-      amount = Math.abs(raw);
-      // No sign in the source column defaults to expense — the far more common
-      // case in a personal transaction export. The sample template shows a
-      // signed column so a real bank export usually disambiguates this.
-      type = raw < 0 ? 'expense' : raw > 0 ? 'income' : 'expense';
-    }
-
-    if (!date || amount <= 0) return;
-
-    const isDuplicate = existingTx.some(
-      (t) => t.transactionDate === date && t.amount === amount
-        && (t.merchant ?? '').toLowerCase() === merchant.toLowerCase(),
-    );
-
-    rows.push({
-      id: `csv_${i}_${date}_${amount}`,
-      date,
-      merchant,
-      amount,
-      type,
-      suggestedCategoryId: type === 'expense' ? suggestCategoryFromMerchant(merchant, rules) : null,
-      isDuplicate,
-      selected: !isDuplicate,
-    });
-  });
-
-  return { rows, missingColumns: false };
 }
 
 function formatVND(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
@@ -289,6 +167,7 @@ export default function CsvImportScreen() {
   const { data: existingTx } = useTransactions();
   const { data: rules } = useRules();
   const createTx = useCreateTransaction();
+  const extractCsv = useExtractFromCsv();
 
   const wallets = (walletsData as any)?.wallets ?? (Array.isArray(walletsData) ? walletsData : []) as Wallet[];
 
@@ -314,7 +193,13 @@ export default function CsvImportScreen() {
     let result: DocumentPicker.DocumentPickerResult;
     try {
       result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel'],
+        type: [
+          'text/csv',
+          'text/comma-separated-values',
+          'text/plain',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ],
         copyToCacheDirectory: true,
       });
     } catch {
@@ -322,30 +207,44 @@ export default function CsvImportScreen() {
       return;
     }
     if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
 
     setIsParsing(true);
     try {
-      const text = await new File(result.assets[0].uri).text();
-      const { rows: parsed, missingColumns } = parseCsvContent(
-        text,
-        rules ?? [],
-        (existingTx ?? []) as Transaction[],
-      );
-      if (missingColumns) {
-        Alert.alert(S.parseErrorTitle, S.parseErrorNoColumns);
-        return;
-      }
-      if (parsed.length === 0) {
+      const response = await extractCsv.mutateAsync({
+        fileUri: asset.uri,
+        fileName: asset.name ?? 'statement.csv',
+      });
+      if (response.rows.length === 0) {
         Alert.alert(S.parseErrorTitle, S.parseErrorNoRows);
         return;
       }
+      const existing = (existingTx ?? []) as Transaction[];
+      const parsed: ParsedRow[] = response.rows.map((row, i) => {
+        const merchant = row.merchant || 'Không rõ nội dung';
+        const isDuplicate = existing.some(
+          (t) => t.transactionDate === row.transactionDate && t.amount === row.amount
+            && (t.merchant ?? '').toLowerCase() === merchant.toLowerCase(),
+        );
+        return {
+          id: `csv_${i}_${row.transactionDate}_${row.amount}`,
+          date: row.transactionDate,
+          merchant,
+          amount: row.amount,
+          type: row.type,
+          suggestedCategoryId:
+            row.categoryId ?? (row.type === 'expense' ? suggestCategoryFromMerchant(merchant, rules ?? []) : null),
+          isDuplicate,
+          selected: !isDuplicate,
+        };
+      });
       setRows(parsed);
-    } catch {
-      Alert.alert(S.parseErrorTitle, S.pickerError);
+    } catch (err) {
+      Alert.alert(S.parseErrorTitle, getApiErrorMessage(err, S.pickerError));
     } finally {
       setIsParsing(false);
     }
-  }, [rules, existingTx]);
+  }, [extractCsv, rules, existingTx]);
 
   const handleDownloadTemplate = useCallback(async () => {
     try {

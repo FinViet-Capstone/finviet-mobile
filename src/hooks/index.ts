@@ -63,6 +63,7 @@ export {
 } from './useNotifications';
 export { useExtractFromPhoto } from './useExtractFromPhoto';
 export { useExtractFromSMS } from './useExtractFromSMS';
+export { useExtractFromCsv } from './useExtractFromCsv';
 export {
   useLogin,
   useRegister,
