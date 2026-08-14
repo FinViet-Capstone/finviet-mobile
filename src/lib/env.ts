@@ -23,5 +23,11 @@ if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
   );
 }
 
-/** Sentry DSN. Empty disables crash reporting (e.g. local dev). */
-export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
+// Default DSN for this project's Sentry instance; EXPO_PUBLIC_SENTRY_DSN
+// overrides it per-environment. Set the env var to '' explicitly (not just
+// omit it) if crash reporting must be disabled, e.g. local dev.
+const DEFAULT_SENTRY_DSN =
+  'https://b26adbc3b815c2b9fd62db860e8ebc62@o4511073418215424.ingest.de.sentry.io/4511904839893072';
+
+/** Sentry DSN. Empty disables crash reporting. */
+export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? DEFAULT_SENTRY_DSN;

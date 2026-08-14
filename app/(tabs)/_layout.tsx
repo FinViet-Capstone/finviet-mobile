@@ -15,6 +15,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       onPress={onPress}
       activeOpacity={0.85}
       style={styles.entryWrapper}
+      accessibilityLabel="Thêm giao dịch"
     >
       <View style={styles.entryButton}>
         <MaterialIcon name="add" color={colors.onPrimary} size={28} />

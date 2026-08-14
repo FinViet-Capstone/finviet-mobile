@@ -29,9 +29,9 @@ import {
   useWithdrawFromGoal,
 } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
-import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
 import { getApiErrorMessage } from '@/utils/errors';
 import { executeGoalWithdrawal } from '@/utils/goalWithdrawal';
+import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +57,7 @@ const S = {
   noBasicWallet: 'Bạn chưa có ví cơ bản nào để trích tiền.',
   save: 'Lưu',
   cancel: 'Huỷ',
+  saveError: 'Không thể lưu. Hãy thử lại.',
   available: (s: string) => `Số dư khả dụng: ${s}`,
   errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
   errOverRemaining: (s: string) => `Vượt số tiền còn thiếu (${s})`,
@@ -177,16 +178,20 @@ function ContributionSheet({
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
-    await addContrib.mutateAsync({
-      goalId: goal.id,
-      input: {
-        amount: parsedAmount,
-        note: note.trim() || undefined,
-        fundingWalletId: selectedWalletId ?? undefined,
-      },
-    });
-    setAmountRaw(''); setNote('');
-    onClose();
+    try {
+      await addContrib.mutateAsync({
+        goalId: goal.id,
+        input: {
+          amount: parsedAmount,
+          note: note.trim() || undefined,
+          fundingWalletId: selectedWalletId ?? undefined,
+        },
+      });
+      setAmountRaw(''); setNote('');
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.saveError));
+    }
   }, [canSave, parsedAmount, note, selectedWalletId, goal.id, addContrib, onClose]);
 
   return (
@@ -583,7 +588,13 @@ export default function GoalDetailScreen() {
         {goal.isDeleted ? (
           <View style={styles.headerBtn} />
         ) : (
-          <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleArchivePress}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.headerBtn}
+            onPress={handleArchivePress}
+            accessibilityRole="button"
+            accessibilityLabel={S.archiveConfirm}
+          >
             <MaterialIcon name="archive" size={22} color={COLORS.onSurfaceVariant} />
           </TouchableOpacity>
         )}

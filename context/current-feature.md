@@ -7,7 +7,8 @@ keeping dashboard percentages bounded, and preserving both transaction direction
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-In Progress — physical-device follow-up on branch `fix/saving-goal-archive-navigation`
+Completed — implementation and post-merge verification passed on branch
+`fix/saving-goal-archive-navigation`; physical-device acceptance remains pending.
 
 ## Goals
 
@@ -60,7 +61,16 @@ In Progress — physical-device follow-up on branch `fix/saving-goal-archive-nav
   `git diff --check` is clean. An unrestricted related-test command also traversed stale
   `.claude/worktrees` and failed only against their obsolete duplicate goal tests; the workspace-
   restricted suite above passed the current source. iOS/Android physical-device acceptance remains
-  pending; no commit, push, deployment, database operation, or protected environment-file change run.
+  pending; no deployment, database operation, or protected environment-file change run.
+- The merged `dev` registration/Sentry diagnosis and Maestro work remain preserved in History. The
+  registration fix was verified against the deployed `/api` route, and Sentry initialization was
+  consolidated so explicit captures no longer depend on an unset-only configuration path.
+- 2026-08-15 — Merged latest `origin/dev` into the saving-goal branch and resolved the three
+  conflicts by retaining archived-goal/navigation/withdrawal behavior together with `dev`'s goal
+  mutation error feedback, accessibility label, registration/Sentry changes, onboarding allocation
+  controls, and Maestro flows/history. Post-merge verification: TypeScript clean; resolved goal-file
+  ESLint clean; `npx eslint app src` has 0 errors / 86 pre-existing warnings; restricted Jest passes
+  14 suites / 94 tests; staged and working-tree `git diff --check` clean.
 
 ## History
 
@@ -146,3 +156,57 @@ In Progress — physical-device follow-up on branch `fix/saving-goal-archive-nav
   the `src/services/index.ts` header comment; both resolved by combining rather than picking a
   side, so the CSV work's history and its "wired to real" claims survive intact. Re-verified on
   the merge result: type-check clean, 112/112 Jest tests pass. Not pushed.
+- 2026-08-14 — User reported registration failing against the deployed backend
+  (`https://finviet-be-7t8w.onrender.com`) with no visible error and nothing in Sentry.
+  Diagnosed via two parallel Explore investigations rather than guessing: confirmed live
+  against the backend that `.env.local`'s `EXPO_PUBLIC_API_BASE_URL` was missing the `/api`
+  prefix (unlike `eas.json`'s already-correct `preview`/`production` values), so every
+  real-backend call 404'd with an empty body and no JSON envelope — explaining both the
+  generic "Đã có lỗi xảy ra" banner and, separately, why Sentry never saw it: the app's
+  `captureException` (used by the query client's global `onError` and the root
+  `ErrorBoundary`) gated on `EXPO_PUBLIC_SENTRY_DSN`, which was never set anywhere despite
+  `app/_layout.tsx` also unconditionally running a second, disconnected hardcoded
+  `Sentry.init(...)` — so the SDK was alive but every explicit capture call was a permanent
+  no-op in every build, not just this one. Fixed both: appended `/api` to `.env.local`, and
+  consolidated Sentry init onto a single path by defaulting `SENTRY_DSN`
+  (`src/lib/env.ts`) to the previously-hardcoded DSN, moving the full init config into
+  `initSentry()` (`src/lib/sentry.ts`), and deleting the duplicate raw `Sentry.init(...)`
+  block from `app/_layout.tsx`. type-check clean, lint 0 errors (84 pre-existing warnings
+  untouched), 72/72 Jest tests pass.
+- 2026-08-14 — User asked to leave Maestro flows running overnight against a real backend to
+  catch bugs. Built two flows (`.maestro/flows/happy-path.yaml`,
+  `exception-and-boundary-path.yaml`, shared `subflows/login.yaml`) run through Expo Go
+  (`host.exp.exponent`) rather than the installed `com.finviet.mobile` dev-client build — that
+  build predates the `expo-secure-store` native dependency and crashes on every launch, and a
+  rebuild wasn't something to do unilaterally. Added `accessibilityLabel` to a handful of
+  icon-only controls (`+` entry tab, `NumericKeypad` backspace/Done, goal-detail delete) so
+  Maestro could target them — closes a real a11y gap the project's own coding standards call
+  for, not just a test convenience. Added a self-healing PowerShell runner
+  (`scripts/maestro-overnight.ps1`, gitignored under the existing `scripts/` rule) that
+  relaunches the emulator/Metro if either dies mid-run. The emulator crashed and needed manual
+  or self-healing recovery four separate times over the course of the night — a recurring
+  instability worth investigating separately, not chased further here.
+- 2026-08-14 — Live testing surfaced two real, verified app bugs (not test-script issues):
+  (1) **Unhandled goal-mutation errors**: all four mutation handlers in the goals feature
+  (`NewGoalSheet.handleSave`, `ContributionSheet.handleSave`, `WithdrawSheet.handleSave`,
+  `handleDelete` — `app/(tabs)/budgets/goals/index.tsx` and `[id].tsx`) called
+  `await x.mutateAsync(...)` with no try/catch; a failed request (confirmed via a Sentry issue,
+  `AxiosError: Request failed with status code 400`, `onunhandledrejection`) threw straight
+  past the cleanup/close code, leaving the sheet stuck open with old values and zero feedback —
+  this is what caused goal creation to look "stuck" in Maestro runs before the fix. Fixed all
+  four to match the existing `getApiErrorMessage(err, fallback) + Alert.alert` pattern already
+  used in `entry/manual.tsx`. (2) **Onboarding allocation missing lock/edit**: user reported
+  `OnboardingAllocation.tsx` (onboarding step 2) has no lock-bucket or tap-to-edit-number
+  controls, unlike `app/settings/budget-allocation.tsx` — confirmed these are two fully
+  separate implementations, not a shared component. Added the same lock-toggle +
+  tap-to-edit-via-numpad UX to onboarding, reusing the settings screen's clamped-redistribution
+  behavior when a bucket is locked. (3) **Not fixed — out of scope for this repo**: user also
+  found the Budgets screen showing a bucket cap 100x too large (e.g. 1.050M instead of
+  10.5M for a 42%-of-25M allocation). Traced to `real/budgets.ts`'s `getBudgetBuckets` being a
+  pure passthrough of the backend's `allocationCap` field (`{ ...dto }`, no client math) — the
+  mock implementation correctly divides `needsPct` by 100 before multiplying by income, so this
+  is a `finviet-be` backend bug (using the raw whole-number percent instead of the fraction),
+  not fixable from this repo. Reported with an exact repro for whoever owns that repo.
+  type-check clean; lint clean on all changed files (pre-existing warnings elsewhere
+  untouched). Not fully re-verified live end-to-end after the last emulator crash — worth a
+  fresh Maestro pass next session before trusting these fixes fully.
