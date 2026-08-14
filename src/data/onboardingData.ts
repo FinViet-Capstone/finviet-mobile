@@ -95,6 +95,9 @@ export const ONBOARDING_STRINGS = {
     defaultButton: 'Dùng mặc định 50/30/20',
     validationSuccess: 'Tổng phân bổ: 100% (Hợp lệ)',
     button: 'Tiếp theo',
+    lockLabel: (bucket: string) => `Khóa ${bucket}`,
+    unlockLabel: (bucket: string) => `Bỏ khóa ${bucket}`,
+    editPctLabel: (bucket: string, pct: number) => `Sửa ${bucket}, hiện tại ${pct} phần trăm`,
   },
   categories: {
     title: 'Danh mục chi tiêu của bạn',

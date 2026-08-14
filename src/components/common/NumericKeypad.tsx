@@ -118,6 +118,7 @@ export function NumericKeypad({
               <Pressable
                 style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
                 onPress={onBackspace}
+                accessibilityLabel="Xoá số cuối"
               >
                 <MaterialIcon name="backspace" size={24} color={colors.secondary} />
               </Pressable>
@@ -143,6 +144,7 @@ export function NumericKeypad({
               <Pressable
                 style={({ pressed }) => [styles.doneKey, pressed && styles.doneKeyPressed]}
                 onPress={onDone}
+                accessibilityLabel="Xong"
               >
                 <MaterialIcon name="check_circle" size={36} color={colors.onPrimary} filled />
               </Pressable>

@@ -1,0 +1,98 @@
+appId: host.exp.exponent
+---
+# Reusable login subflow — invoked via `runFlow` from top-level flows.
+#
+# Targets Expo Go (host.exp.exponent), not the installed com.finviet.mobile
+# dev-client build — that build predates the expo-secure-store native
+# dependency and crashes on every launch ("Cannot find native module
+# 'ExpoSecureStore'"). Building a fresh dev-client APK is the user's own call
+# to make, not something to do silently here, so Expo Go (which already has
+# the standard Expo SDK native modules linked) is the pragmatic path tonight.
+#
+# clearState wipes Expo Go's own storage each time (incl. any persisted auth
+# token), so every cycle deterministically starts at a real logged-out state
+# and actually exercises login — not just skips it because a previous
+# cycle's session was still cached. openLink jumps straight back into the
+# project's bundle afterward, skipping Expo Go's home/library screen.
+- launchApp:
+    clearState: true
+- openLink: "exp://10.0.2.2:8081"
+# Don't wait on the auth screen's own text (e.g. the tagline) — a cleared
+# Expo Go install shows two one-time overlays stacked on top of it (the
+# Android notification-permission system dialog, then Expo Go's own
+# "developer menu" tooltip), and Maestro's visibility check treats text
+# obscured underneath a modal as not-visible even though it's pixel-visible
+# (dimmed) in a screenshot. Wait on the top overlay instead — its appearance
+# reliably signals the real bundle has finished loading. Generous timeout: a
+# cleared Expo Go re-downloads the bundle from Metro from scratch each time,
+# and can also pause for a "new update available, downloading..." OTA check.
+- extendedWaitUntil:
+    visible: "DENY"
+    timeout: 60000
+    optional: true
+- tapOn:
+    text: "DENY"
+    optional: true
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# "Continue" only dismisses the tooltip — the actual dev menu (Reload / Go
+# Home / Show developer action button / …) it was introducing stays open
+# underneath. The Android back gesture closes it, but overshoots: it also
+# pops out of the loaded project entirely (our app has no back-stack yet, so
+# back lands on Expo Go's own home/library screen). Re-entering via openLink
+# is simpler than hunting for a backdrop-tap coordinate to dismiss just the
+# menu. The permission dialog can retrigger on this fresh mount; the dev
+# menu tooltip won't (Expo Go remembers "seen" across this same install).
+- back
+- openLink: "exp://10.0.2.2:8081"
+- extendedWaitUntil:
+    visible: "DENY"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: "DENY"
+    optional: true
+# Real registered account (not the seeded demo@finviet.local — that one
+# doesn't exist on the Render deployment's DB). Form fields default to the
+# demo credentials, so clear each one before typing the real ones.
+- tapOn: "demo@finviet.local"
+- eraseText
+- inputText: "khoicongviec@gmail.com"
+- tapOn: "Nhập mật khẩu"
+- eraseText
+- inputText: "Password123"
+- tapOn:
+    text: "Đăng nhập"
+    index: 1
+# Render's free tier spins the backend down when idle and can take 30-60s+
+# to wake on the first request after a gap — confirmed live (the login
+# button's own loading spinner was still spinning when the default wait
+# gave up). Generous timeout covers a cold wake; a warm backend still
+# returns almost immediately, so this doesn't slow down the common case.
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 90000
+- assertVisible: "Home"
+# Expo Go (not the real app) logs a console.error about push notifications
+# being unsupported there since SDK 53. LogBox surfaces this two ways: a
+# full-screen "Console Error" overlay (has a "Dismiss" button), or — if it's
+# already been minimized once — a small persistent toast banner pinned over
+# the bottom tab bar, which has no text and can intercept taps meant for the
+# "+" tab underneath it. Handle both: text-based Dismiss for the full-screen
+# case, then a coordinate tap on the toast's close (X) button, sized against
+# this emulator's fixed 1280x2856 resolution.
+- extendedWaitUntil:
+    visible: "Dismiss"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "Dismiss"
+    optional: true
+- tapOn:
+    point: "92%,94%"
+    optional: true
