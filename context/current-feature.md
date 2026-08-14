@@ -1,53 +1,76 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: registration against the deployed backend failed silently, with no error reaching
-Sentry — two independent root causes.
+Fix: complete saving-goal archive verification by netting withdrawals in Savings progress,
+keeping dashboard percentages bounded, and preserving both transaction directions in Calendar.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — fix implemented and verified locally. See History for the follow-on Maestro
-overnight-testing effort and the two real bugs it surfaced (one fixed here, one filed against
-`finviet-be`).
+Completed — implementation and post-merge verification passed on branch
+`fix/saving-goal-archive-navigation`; physical-device acceptance remains pending.
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Root cause 1: `.env.local`'s `EXPO_PUBLIC_API_BASE_URL` pointed at
-  `https://finviet-be-7t8w.onrender.com` with no `/api` suffix, so every real-backend call
-  (register included) hit a nonexistent route and got back an empty-body 404 — no JSON
-  envelope, so `toAuthError` (`src/services/real/auth.ts:62-90`) fell through to a generic
-  `AuthError('unknown')`, rendered as "Đã có lỗi xảy ra" with no diagnostic value.
-  `eas.json`'s `preview`/`production` profiles already had the correct `/api`-suffixed URL —
-  this only broke local/dev-client runs using `.env.local`. Fixed by appending `/api`.
-- Root cause 2 (why Sentry never saw it either): `app/_layout.tsx` had two disconnected
-  Sentry setups — an unconditional hardcoded `Sentry.init(...)` and a separate
-  `initSentry()` (from `src/lib/sentry.ts`) gated on `EXPO_PUBLIC_SENTRY_DSN`, which is
-  never set anywhere (not `.env.local`, not `.env.example`, not any `eas.json` profile). The
-  app's actual capture call sites (`captureException`, wired into
-  `src/lib/queryClient.ts`'s `QueryCache`/`MutationCache` `onError` and the root
-  `ErrorBoundary`) gate on that same empty var, so every explicit capture was a permanent
-  no-op in every build — including cloud `preview`/`production` builds, not just this local
-  one. Fixed by folding the hardcoded DSN into `src/lib/env.ts` as `SENTRY_DSN`'s default
-  (overridable via `EXPO_PUBLIC_SENTRY_DSN`, including explicit `''` to disable), moving the
-  full init config (replay/feedback integrations, `sendDefaultPii`, `enableLogs`) into
-  `initSentry()`, and deleting the duplicate raw `Sentry.init(...)` block from
-  `app/_layout.tsx`.
-- Out of scope, deliberately: `SENTRY_AUTH_TOKEN`/sourcemap-upload wiring in `eas.json`
-  (separate from runtime error capture); Android cleartext / iOS ATS settings (not
-  implicated — backend is HTTPS); the register payload/DTO shape (verified to already match
-  the backend's `RegisterRequest` exactly).
+- Stop the Budgets tab from retaining a saving-goal detail route after the user leaves the tab;
+  Back actions and successful archive navigation use explicit destinations instead of relying on
+  incidental nested-stack history.
+- A goal with money cannot be archived. The user must first use the existing withdrawal flow and
+  choose the basic wallet that receives the entire remaining amount.
+- After the balance reaches zero, DELETE archives rather than reverses financial activity. The
+  backend preserves contribution/withdrawal ledger rows and their transactions; archived goals
+  appear in a collapsed `Đã lưu trữ` section with read-only detail/history.
+- Prevent the white 404 retry screen after archive by updating the active and archived caches
+  before dismissing the detail route, without refetching the just-archived active resource.
+- Align nullable deadlines, icon/deletion/timestamps, archived queries, 404 handling, encoded
+  path IDs, PATCH semantics, and in-flight idempotency keys across mock and real services.
+- Cover the regressions with focused tests. Restore/unarchive, permanent purge, fixed-wallet
+  reassignment, and deadline clearing remain out of scope.
 
 ## Notes
 
 <!-- Any extra notes -->
-Diagnosed via two parallel read-only investigations (one tracing the registration request
-path, one tracing build/env config and Sentry init), including live read-only probes against
-the deployed backend (`GET/POST .../auth/register` vs. `.../api/auth/register`) that confirmed
-the missing `/api` prefix as the exact cause of the empty-body 404. Landed in two separate
-commits on `chore/maestro-overnight-flows` (kept apart from the Maestro-testing work below —
-unrelated fixes, per the "one feature/fix per commit" convention).
+- Cross-repo backend work is on `D:/SEP490/newestbe/finviet-be`, branch
+  `fix/saving-goal-archive`, based on the clean committed Gemini feature state.
+- `hd.env.local` is an untracked review input only and must remain uncommitted.
+- No commit, push, merge, or branch deletion without explicit permission.
+- 2026-08-14 — Started after tracing the post-delete 404 to broad `goals.all()` invalidation
+  while the deleted detail remained mounted. Backend source confirmed DELETE physically reversed
+  wallets and removed transactions/ledger; approved replacement is zero-balance soft archive plus
+  read-only archived-goal history.
+- 2026-08-15 — Physical-device follow-up implemented: Savings progress now subtracts saving-goal
+  withdrawal income and clamps at zero; the Home percentage badge/bar clamp to 100%; the real
+  transaction service fetches every backend page at the supported 100-row size; Calendar retains
+  separate gross income/expense traces; and saving-goal withdrawal rows have direction-correct copy.
+  Added focused tests for derivation, display bounds, pagination, Calendar aggregation, and row
+  visuals. Verification: TypeScript clean; changed-file ESLint clean (pre-existing warnings only);
+  13 Jest suites / 87 tests pass; mobile and backend `git diff --check` clean. Backend Application
+  tests pass 200/200 and the solution plus integration-test project compile. Live integration and
+  physical-device acceptance remain pending; no commit, push, deployment, or database operation run.
+- 2026-08-15 — Fixed the next physical-device findings: archive-triggered `Rút toàn bộ` now waits
+  for the native alert interaction to finish before mounting the sheet, displays mutation failures
+  without closing the sheet, retains the pending/idempotency single-flight guard, and advances a
+  successful full withdrawal to the existing explicit archive confirmation. Calendar now derives
+  complete seven-cell weeks and renders each week as a fixed flex row, so Sunday cannot wrap out of
+  its column; August 2026 places day 1 under Saturday and day 2 under Sunday. Added focused tests for
+  full/partial/error withdrawal outcomes, duplicate in-flight calls, Saturday/Sunday alignment,
+  Sunday-start months, and trailing week cells. Verification: TypeScript clean; changed-file ESLint
+  has 0 errors / 4 pre-existing warnings; `npx eslint app src` has 0 errors / 87 pre-existing
+  warnings; focused tests pass 9/9; the restricted full suite passes 14 suites / 94 tests; and
+  `git diff --check` is clean. An unrestricted related-test command also traversed stale
+  `.claude/worktrees` and failed only against their obsolete duplicate goal tests; the workspace-
+  restricted suite above passed the current source. iOS/Android physical-device acceptance remains
+  pending; no deployment, database operation, or protected environment-file change run.
+- The merged `dev` registration/Sentry diagnosis and Maestro work remain preserved in History. The
+  registration fix was verified against the deployed `/api` route, and Sentry initialization was
+  consolidated so explicit captures no longer depend on an unset-only configuration path.
+- 2026-08-15 — Merged latest `origin/dev` into the saving-goal branch and resolved the three
+  conflicts by retaining archived-goal/navigation/withdrawal behavior together with `dev`'s goal
+  mutation error feedback, accessibility label, registration/Sentry changes, onboarding allocation
+  controls, and Maestro flows/history. Post-merge verification: TypeScript clean; resolved goal-file
+  ESLint clean; `npx eslint app src` has 0 errors / 86 pre-existing warnings; restricted Jest passes
+  14 suites / 94 tests; staged and working-tree `git diff --check` clean.
 
 ## History
 

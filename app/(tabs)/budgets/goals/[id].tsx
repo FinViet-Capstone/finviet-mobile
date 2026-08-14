@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,13 +30,13 @@ import {
 } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
 import { getApiErrorMessage } from '@/utils/errors';
+import { executeGoalWithdrawal } from '@/utils/goalWithdrawal';
 import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
 const S = {
   back: 'arrow_back',
-  delete: 'delete',
   progress: 'Tiến độ',
   target: 'Mục tiêu',
   saved: 'Đã tiết kiệm',
@@ -57,14 +58,20 @@ const S = {
   save: 'Lưu',
   cancel: 'Huỷ',
   saveError: 'Không thể lưu. Hãy thử lại.',
-  deleteError: 'Không thể xoá. Hãy thử lại.',
   available: (s: string) => `Số dư khả dụng: ${s}`,
   errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
   errOverRemaining: (s: string) => `Vượt số tiền còn thiếu (${s})`,
   zeroBalance: (name: string) => `Ví ${name} đã hết số dư. Vui lòng chọn ví khác.`,
-  deleteConfirmTitle: 'Xoá mục tiêu?',
-  deleteConfirmMsg: 'Bạn có chắc muốn xoá mục tiêu này không? Hành động này không thể hoàn tác.',
-  deleteConfirm: 'Xoá',
+  archiveTitle: 'Lưu trữ mục tiêu?',
+  archiveMsg: 'Mục tiêu sẽ chuyển vào mục Đã lưu trữ. Lịch sử đóng góp và giao dịch vẫn được giữ nguyên.',
+  archiveConfirm: 'Lưu trữ',
+  withdrawBeforeArchiveTitle: 'Rút hết tiền trước khi lưu trữ',
+  withdrawBeforeArchiveMsg:
+    'Hãy rút toàn bộ số tiền còn lại về một ví thường. Sau khi số dư mục tiêu bằng 0đ, bạn có thể lưu trữ mục tiêu.',
+  withdrawAll: 'Rút toàn bộ',
+  archiveError: 'Không thể lưu trữ mục tiêu. Vui lòng thử lại.',
+  archived: 'Đã lưu trữ',
+  noDeadline: 'Không có thời hạn',
   noHistory: 'Chưa có lần nào đóng góp',
   withdraw: 'Rút tiền',
   withdrawTitle: 'Rút tiền tiết kiệm',
@@ -74,6 +81,7 @@ const S = {
   availableSaved: (s: string) => `Đã tiết kiệm: ${s}`,
   historyContribNote: 'Nạp tiền tiết kiệm',
   historyWithdrawNote: 'Rút tiền tiết kiệm',
+  withdrawError: 'Không thể rút tiền tiết kiệm. Vui lòng thử lại.',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,12 +96,14 @@ function formatFull(n: number): string {
   return n.toLocaleString('vi-VN') + 'đ';
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return S.noDeadline;
   const d = new Date(iso);
   return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
-function daysUntil(iso: string): number {
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000));
 }
 
@@ -293,11 +303,15 @@ function ContributionSheet({
 function WithdrawSheet({
   visible,
   goal,
+  withdrawAll,
   onClose,
+  onSuccess,
 }: {
   visible: boolean;
   goal: SavingsGoalWithProgress;
+  withdrawAll?: boolean;
   onClose: () => void;
+  onSuccess: (wasWithdrawAll: boolean) => void;
 }) {
   const withdraw = useWithdrawFromGoal();
   const { data: walletData } = useWallets();
@@ -305,7 +319,11 @@ function WithdrawSheet({
   const [note, setNote] = useState('');
   const [walletPickerVisible, setWalletPickerVisible] = useState(false);
   const [amountFocused, setAmountFocused] = useState(true);
-  useEffect(() => { if (visible) setAmountFocused(true); }, [visible]);
+  useEffect(() => {
+    if (!visible) return;
+    setAmountRaw(withdrawAll ? String(goal.currentAmount) : '');
+    setAmountFocused(!withdrawAll);
+  }, [goal.currentAmount, visible, withdrawAll]);
 
   // Only basic wallets can receive a withdrawal — crediting a bank-linked wallet
   // would desync it from the real account, same restriction as contributions.
@@ -348,21 +366,38 @@ function WithdrawSheet({
 
   const handleSave = useCallback(async () => {
     if (!canSave || !selectedWalletId) return;
-    try {
-      await withdraw.mutateAsync({
+
+    await executeGoalWithdrawal({
+      mutate: () => withdraw.mutateAsync({
         goalId: goal.id,
         input: {
           amount: parsedAmount,
           walletId: selectedWalletId,
           note: note.trim() || undefined,
         },
-      });
-      setAmountRaw(''); setNote('');
-      onClose();
-    } catch (err) {
-      Alert.alert('', getApiErrorMessage(err, S.saveError));
-    }
-  }, [canSave, parsedAmount, note, selectedWalletId, goal.id, withdraw, onClose]);
+      }),
+      wasWithdrawAll: !!withdrawAll,
+      onSuccess: (wasWithdrawAll) => {
+        setAmountRaw('');
+        setNote('');
+        onClose();
+        onSuccess(wasWithdrawAll);
+      },
+      onError: (withdrawError) => {
+        Alert.alert('', getApiErrorMessage(withdrawError, S.withdrawError));
+      },
+    });
+  }, [
+    canSave,
+    parsedAmount,
+    note,
+    selectedWalletId,
+    goal.id,
+    withdraw,
+    withdrawAll,
+    onClose,
+    onSuccess,
+  ]);
 
   return (
     <>
@@ -487,17 +522,42 @@ export default function GoalDetailScreen() {
   const deleteGoal = useDeleteGoal();
   const [contribVisible, setContribVisible] = useState(false);
   const [withdrawVisible, setWithdrawVisible] = useState(false);
+  const [isArchiveWithdrawal, setIsArchiveWithdrawal] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
 
+  const openArchiveWithdrawal = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
+      setIsArchiveWithdrawal(true);
+      setWithdrawVisible(true);
+    });
+  }, []);
+
+  const handleArchivePress = useCallback(() => {
+    if (!goal || goal.isDeleted) return;
+
+    if (goal.currentAmount > 0) {
+      Alert.alert(S.withdrawBeforeArchiveTitle, S.withdrawBeforeArchiveMsg, [
+        { text: S.cancel, style: 'cancel' },
+        { text: S.withdrawAll, onPress: openArchiveWithdrawal },
+      ]);
+      return;
+    }
+
+    setDeleteVisible(true);
+  }, [goal, openArchiveWithdrawal]);
+
+  const handleWithdrawSuccess = useCallback((wasWithdrawAll: boolean) => {
+    if (wasWithdrawAll) setDeleteVisible(true);
+  }, []);
+
   const handleDelete = useCallback(async () => {
-    if (!id) return;
+    if (!id || deleteGoal.isPending) return;
     try {
       await deleteGoal.mutateAsync(id);
       setDeleteVisible(false);
-      router.back();
-    } catch (err) {
-      setDeleteVisible(false);
-      Alert.alert('', getApiErrorMessage(err, S.deleteError));
+      router.dismissTo('/(tabs)/budgets/goals');
+    } catch (archiveError) {
+      Alert.alert('', getApiErrorMessage(archiveError, S.archiveError));
     }
   }, [id, deleteGoal, router]);
 
@@ -512,7 +572,8 @@ export default function GoalDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}
+          onPress={() => router.dismissTo('/(tabs)/budgets/goals')}
           accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
         </TouchableOpacity>
@@ -524,9 +585,19 @@ export default function GoalDetailScreen() {
           )}
           <Text style={styles.headerTitle} numberOfLines={1}>{goal.name}</Text>
         </View>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => setDeleteVisible(true)} accessibilityLabel={S.deleteConfirmTitle}>
-          <MaterialIcon name={S.delete} size={22} color={COLORS.onSurfaceVariant} />
-        </TouchableOpacity>
+        {goal.isDeleted ? (
+          <View style={styles.headerBtn} />
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.headerBtn}
+            onPress={handleArchivePress}
+            accessibilityRole="button"
+            accessibilityLabel={S.archiveConfirm}
+          >
+            <MaterialIcon name="archive" size={22} color={COLORS.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
@@ -539,14 +610,23 @@ export default function GoalDetailScreen() {
 
           <View style={styles.progressRow}>
             <Text style={[styles.pctText, { color: barCol }]}>{pct.toFixed(0)}%</Text>
-            {goal.isCompleted ? (
+            {goal.isDeleted ? (
+              <View style={styles.archivedBadge}>
+                <MaterialIcon name="archive" size={14} color={COLORS.onSurfaceVariant} />
+                <Text style={styles.archivedBadgeText}>{S.archived}</Text>
+              </View>
+            ) : goal.isCompleted ? (
               <View style={styles.completedBadge}>
                 <MaterialIcon name="check_circle" size={14} color={COLORS.tertiary} />
                 <Text style={styles.completedBadgeText}>{S.completed}</Text>
               </View>
             ) : (
               <Text style={styles.deadlineText}>
-                {days <= 30 ? S.daysLeft(days) : S.monthsLeft(goal.monthsRemaining)}
+                {days === null
+                  ? S.noDeadline
+                  : days <= 30
+                    ? S.daysLeft(days)
+                    : S.monthsLeft(goal.monthsRemaining)}
               </Text>
             )}
           </View>
@@ -574,7 +654,7 @@ export default function GoalDetailScreen() {
             </View>
           </View>
 
-          {!goal.isCompleted && (
+          {!goal.isCompleted && !goal.isDeleted && (
             <View style={styles.monthlyRow}>
               <MaterialIcon name="savings" size={16} color={COLORS.primary} />
               <Text style={styles.monthlyText}>
@@ -586,22 +666,27 @@ export default function GoalDetailScreen() {
         </View>
 
         {/* Add contribution / withdraw buttons */}
-        <View style={styles.actionsRow}>
-          {!goal.isCompleted && (
-            <TouchableOpacity activeOpacity={0.7} style={styles.addContribBtn}
-              onPress={() => setContribVisible(true)}>
-              <MaterialIcon name="add" size={20} color={COLORS.onPrimary} />
-              <Text style={styles.addContribText}>{S.addContrib}</Text>
-            </TouchableOpacity>
-          )}
-          {goal.currentAmount > 0 && (
-            <TouchableOpacity activeOpacity={0.7} style={styles.withdrawBtn}
-              onPress={() => setWithdrawVisible(true)}>
-              <MaterialIcon name="arrow_upward" size={20} color={COLORS.primary} />
-              <Text style={styles.withdrawText}>{S.withdraw}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {!goal.isDeleted && (
+          <View style={styles.actionsRow}>
+            {!goal.isCompleted && (
+              <TouchableOpacity activeOpacity={0.7} style={styles.addContribBtn}
+                onPress={() => setContribVisible(true)}>
+                <MaterialIcon name="add" size={20} color={COLORS.onPrimary} />
+                <Text style={styles.addContribText}>{S.addContrib}</Text>
+              </TouchableOpacity>
+            )}
+            {goal.currentAmount > 0 && (
+              <TouchableOpacity activeOpacity={0.7} style={styles.withdrawBtn}
+                onPress={() => {
+                  setIsArchiveWithdrawal(false);
+                  setWithdrawVisible(true);
+                }}>
+                <MaterialIcon name="arrow_upward" size={20} color={COLORS.primary} />
+                <Text style={styles.withdrawText}>{S.withdraw}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Contribution / withdrawal history */}
         <View style={styles.historySection}>
@@ -617,22 +702,34 @@ export default function GoalDetailScreen() {
       </ScrollView>
 
       <ContributionSheet visible={contribVisible} goal={goal} onClose={() => setContribVisible(false)} />
-      <WithdrawSheet visible={withdrawVisible} goal={goal} onClose={() => setWithdrawVisible(false)} />
+      <WithdrawSheet
+        visible={withdrawVisible}
+        goal={goal}
+        withdrawAll={isArchiveWithdrawal}
+        onClose={() => {
+          setWithdrawVisible(false);
+          setIsArchiveWithdrawal(false);
+        }}
+        onSuccess={handleWithdrawSuccess}
+      />
 
       {/* Delete confirm */}
       <Modal visible={deleteVisible} transparent animationType="fade" onRequestClose={() => setDeleteVisible(false)}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setDeleteVisible(false)} />
         <View style={styles.confirmDialog}>
-          <Text style={styles.confirmTitle}>{S.deleteConfirmTitle}</Text>
-          <Text style={styles.confirmMsg}>{S.deleteConfirmMsg}</Text>
+          <Text style={styles.confirmTitle}>{S.archiveTitle}</Text>
+          <Text style={styles.confirmMsg}>{S.archiveMsg}</Text>
           <View style={styles.confirmActions}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => setDeleteVisible(false)}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn}
+              onPress={() => setDeleteVisible(false)} disabled={deleteGoal.isPending}>
               <Text style={styles.cancelText}>{S.cancel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} style={styles.deleteBtn} onPress={handleDelete}>
+            <TouchableOpacity activeOpacity={0.7}
+              style={[styles.deleteBtn, deleteGoal.isPending && styles.saveBtnDisabled]}
+              onPress={handleDelete} disabled={deleteGoal.isPending}>
               {deleteGoal.isPending
                 ? <ActivityIndicator size="small" color={COLORS.onError} />
-                : <Text style={styles.deleteText}>{S.deleteConfirm}</Text>}
+                : <Text style={styles.deleteText}>{S.archiveConfirm}</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -672,6 +769,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
   },
   completedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: COLORS.tertiary },
+  archivedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.surfaceVariant, paddingHorizontal: SPACING[2],
+    paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
+  },
+  archivedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
   barTrack: { height: 6, backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   statsRow: { flexDirection: 'row', alignItems: 'center' },

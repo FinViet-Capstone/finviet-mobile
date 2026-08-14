@@ -39,11 +39,14 @@ export {
 } from './useIncomeAllocation';
 export {
   useGoals,
+  useArchivedGoals,
   useGoalById,
+  useGoalContributions,
   useCreateGoal,
   useUpdateGoal,
   useDeleteGoal,
   useAddContribution,
+  useWithdrawFromGoal,
 } from './useGoals';
 export { useBucketSpend, type BucketSpend } from './useBucketSpend';
 export {

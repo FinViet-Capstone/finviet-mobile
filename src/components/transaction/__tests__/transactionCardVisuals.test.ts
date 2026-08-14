@@ -64,6 +64,23 @@ describe('getTransactionCardVisuals', () => {
     expect(v.iconColor).toBe(COLORS.tertiary);
     expect(v.title).toBe('Nạp mục tiêu: Du lịch');
     expect(v.subtitle).toBe('Tiết kiệm mục tiêu');
+    expect(v.amountPrefix).toBe('');
+  });
+
+  it('goal withdrawal remains a named credit instead of looking like a contribution', () => {
+    const v = getTransactionCardVisuals(
+      tx({
+        categoryId: 'cat_savings_goal',
+        description: 'Rút mục tiêu: Du lịch',
+        type: 'income',
+      }),
+    );
+
+    expect(v.iconName).toBe('savings');
+    expect(v.title).toBe('Rút mục tiêu: Du lịch');
+    expect(v.subtitle).toBe('Rút tiền mục tiêu');
+    expect(v.amountPrefix).toBe('+');
+    expect(v.amountColor).toBe(COLORS.tertiary);
   });
 
   it('expense prefers merchant, then description, for its title', () => {

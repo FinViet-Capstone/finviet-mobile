@@ -6,6 +6,11 @@ import { formatVND } from '@/utils/formatters';
 
 const TICK_COUNT = 10;
 
+export function getDisplayedPercentage(spent: number, limit: number): number {
+  if (limit <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((spent / limit) * 100)));
+}
+
 function getPctColor(spent: number, limit: number, goalMode = false): string {
   if (limit === 0) return COLORS.budget.safe;
   const pct = (spent / limit) * 100;
@@ -34,7 +39,9 @@ export interface BudgetOverviewCardProps {
 }
 
 function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number; activeColor: string }) {
-  const activeTicks = limit > 0 ? Math.min(TICK_COUNT, Math.round((spent / limit) * TICK_COUNT)) : 0;
+  const activeTicks = Math.round(
+    (getDisplayedPercentage(spent, limit) / 100) * TICK_COUNT,
+  );
   return (
     <View style={styles.tickRow}>
       {Array.from({ length: TICK_COUNT }, (_, i) => (
@@ -51,7 +58,7 @@ function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number
 }
 
 function PctBadge({ spent, limit, goalMode }: { spent: number; limit: number; goalMode?: boolean }) {
-  const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+  const pct = getDisplayedPercentage(spent, limit);
   const color = getPctColor(spent, limit, goalMode);
   return (
     <View style={[styles.pctBadge, { backgroundColor: `${color}26` }]}>
