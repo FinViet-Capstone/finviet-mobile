@@ -20,7 +20,7 @@ export function newIdempotencyKey(): string {
   });
 }
 
-/** Axios config fragment carrying a fresh idempotency key. */
-export function idempotentConfig() {
-  return { headers: { 'Idempotency-Key': newIdempotencyKey() } };
+/** Axios config fragment carrying a caller-owned or fresh idempotency key. */
+export function idempotentConfig(idempotencyKey = newIdempotencyKey()) {
+  return { headers: { 'Idempotency-Key': idempotencyKey } };
 }

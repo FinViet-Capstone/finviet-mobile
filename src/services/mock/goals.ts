@@ -1,7 +1,7 @@
 import type { SavingsGoalWithProgress, GoalContribution } from '../../types';
 import { getWalletById } from './wallets';
 import { USER_ID, WALLET_IDS } from './walletStore';
-import { createTransactionSync, deleteTransactionSync } from './transactions';
+import { createTransactionSync } from './transactions';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,12 +19,45 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const IDEMPOTENT_RESULTS = new Map<
+  string,
+  { payload: string; result: SavingsGoalWithProgress }
+>();
+
+function getIdempotentResult(
+  scope: string,
+  idempotencyKey: string | undefined,
+  input: unknown,
+): SavingsGoalWithProgress | undefined {
+  if (!idempotencyKey) return undefined;
+
+  const cached = IDEMPOTENT_RESULTS.get(`${scope}:${idempotencyKey}`);
+  if (!cached) return undefined;
+  if (cached.payload !== JSON.stringify(input)) throw new Error('idempotency_key_reused');
+  return cached.result;
+}
+
+function storeIdempotentResult(
+  scope: string,
+  idempotencyKey: string | undefined,
+  input: unknown,
+  result: SavingsGoalWithProgress,
+): void {
+  if (!idempotencyKey) return;
+  IDEMPOTENT_RESULTS.set(`${scope}:${idempotencyKey}`, {
+    payload: JSON.stringify(input),
+    result,
+  });
+}
+
 function todayIso(): string {
   return nowIso().split('T')[0];
 }
 
 /** Whole months between two YYYY-MM-DD strings (clamped to ≥1). */
-function monthsBetween(fromIso: string, toIso: string): number {
+function monthsBetween(fromIso: string, toIso: string | null): number {
+  if (!toIso) return 1;
+
   const from = new Date(fromIso);
   const to = new Date(toIso);
   const months =
@@ -112,23 +145,23 @@ let GOALS: SavingsGoalWithProgress[] = [
 // Seed one contribution per goal so that currentAmount = Σ contributions holds for
 // the seed data too. Without this, adding a contribution to a seed goal would
 // recompute currentAmount = Σ (just the new one) and COLLAPSE the seeded balance.
-// Seed contributions have no transactionId (the seed savings were never tracked as
-// real transactions / never deducted a wallet) — so deleteGoal won't try to reverse them.
+// Seed contributions have no transactionId because their initial savings were never
+// tracked as real transactions or deducted from a wallet.
 let CONTRIBUTIONS: GoalContribution[] = GOALS.filter((g) => g.currentAmount > 0).map(
   (g) => ({
     id: `contrib_seed_${g.id}`,
     goalId: g.id,
     amount: g.currentAmount,
     type: 'contribution' as const,
-    contributedAt: g.createdAt,
+    contributedAt: g.createdAt ?? nowIso(),
     note: 'Số dư ban đầu',
   }),
 );
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
 
-export function getGoals(): SavingsGoalWithProgress[] {
-  return GOALS.filter((g) => !g.isDeleted);
+export function getGoals(archived = false): SavingsGoalWithProgress[] {
+  return GOALS.filter((g) => g.isDeleted === archived);
 }
 
 export function getGoalById(id: string): SavingsGoalWithProgress | undefined {
@@ -160,8 +193,12 @@ export interface CreateGoalInput {
 
 export async function createGoal(
   input: CreateGoalInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
   await delay();
+  const cached = getIdempotentResult('create', idempotencyKey, input);
+  if (cached) return cached;
+
   const initial = input.initialAmount ?? 0;
   const base = {
     id: genId(),
@@ -169,7 +206,7 @@ export async function createGoal(
     name: input.name.trim(),
     iconEmoji: input.iconEmoji,
     targetAmount: input.targetAmount,
-    currentAmount: initial,
+    currentAmount: 0,
     deadline: input.deadline,
     fundingWalletId: input.fundingWalletId,
     isCompleted: false,
@@ -177,32 +214,41 @@ export async function createGoal(
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  const goal = recomputeProgress(base);
-  GOALS = [...GOALS, goal];
+  let transactionId: string | undefined;
 
   if (initial > 0 && input.fundingWalletId) {
-    // Create the savings goal contribution transaction
     const tx = createTransactionSync({
       walletId: input.fundingWalletId,
       categoryId: 'cat_savings_goal',
       amount: initial,
       type: 'expense',
-      description: `Nạp mục tiêu: ${goal.name}`,
+      description: `Nạp mục tiêu: ${base.name}`,
       merchant: null,
       transactionDate: todayIso(),
       entryMethod: 'manual',
     });
-    const contrib: GoalContribution = {
+    transactionId = tx.id;
+  }
+
+  if (initial > 0) {
+    const contribution: GoalContribution = {
       id: genContribId(),
-      goalId: goal.id,
+      goalId: base.id,
       amount: initial,
       type: 'contribution',
       contributedAt: nowIso(),
-      transactionId: tx.id,
+      note: 'Số dư ban đầu',
+      transactionId,
     };
-    CONTRIBUTIONS = [...CONTRIBUTIONS, contrib];
+    CONTRIBUTIONS = [...CONTRIBUTIONS, contribution];
   }
 
+  const goal = recomputeProgress({
+    ...base,
+    currentAmount: computeCurrentAmount(base.id),
+  });
+  GOALS = [...GOALS, goal];
+  storeIdempotentResult('create', idempotencyKey, input, goal);
   return goal;
 }
 
@@ -210,7 +256,6 @@ export interface UpdateGoalInput {
   name?: string;
   targetAmount?: number;
   deadline?: string;
-  fundingWalletId?: string;
 }
 
 export async function updateGoal(
@@ -218,7 +263,7 @@ export async function updateGoal(
   patch: UpdateGoalInput,
 ): Promise<SavingsGoalWithProgress> {
   await delay();
-  const before = GOALS.find((g) => g.id === id);
+  const before = GOALS.find((g) => g.id === id && !g.isDeleted);
   if (!before) throw new Error('Goal not found');
 
   const merged = {
@@ -226,9 +271,6 @@ export async function updateGoal(
     ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
     ...(patch.targetAmount !== undefined ? { targetAmount: patch.targetAmount } : {}),
     ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),
-    ...(patch.fundingWalletId !== undefined
-      ? { fundingWalletId: patch.fundingWalletId }
-      : {}),
     updatedAt: nowIso(),
   };
   const after = recomputeProgress(merged);
@@ -236,30 +278,12 @@ export async function updateGoal(
   return after;
 }
 
-/**
- * Delete goal = reverse all contributions atomically.
- * Refunds wallet balance + deletes linked transactions for each contribution.
- * Contrast with Complete: completed goals keep their transactions.
- */
+/** Archive a zero-balance goal while preserving its complete financial ledger. */
 export async function deleteGoal(id: string): Promise<void> {
   await delay();
-  const goal = GOALS.find((g) => g.id === id);
+  const goal = GOALS.find((g) => g.id === id && !g.isDeleted);
   if (!goal) throw new Error('Goal not found');
-
-  // Reverse every contribution that has a linked transaction. deleteTransactionSync
-  // restores balance on whichever wallet the transaction itself was posted to, so
-  // goal.fundingWalletId (which may be unset, e.g. for goals with no preset funding
-  // wallet) is irrelevant here — gating on it left real debits unreversed.
-  const goalContribs = CONTRIBUTIONS.filter((c) => c.goalId === id);
-  for (const contrib of goalContribs) {
-    if (contrib.transactionId) {
-      // Delete the transaction and restore wallet balance
-      deleteTransactionSync(contrib.transactionId);
-    }
-  }
-
-  // Remove contributions from store
-  CONTRIBUTIONS = CONTRIBUTIONS.filter((c) => c.goalId !== id);
+  if (goal.currentAmount !== 0) throw new Error('goal_balance_must_be_withdrawn');
 
   GOALS = GOALS.map((g) =>
     g.id === id ? { ...g, isDeleted: true, updatedAt: nowIso() } : g,
@@ -283,9 +307,17 @@ export interface AddContributionInput {
 export async function addGoalContribution(
   goalId: string,
   input: AddContributionInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
   await delay();
-  const goal = GOALS.find((g) => g.id === goalId);
+  const cached = getIdempotentResult(
+    `contribute:${goalId}`,
+    idempotencyKey,
+    input,
+  );
+  if (cached) return cached;
+
+  const goal = GOALS.find((g) => g.id === goalId && !g.isDeleted);
   if (!goal) throw new Error('Goal not found');
 
   // Guard: amount must be positive
@@ -350,6 +382,7 @@ export async function addGoalContribution(
   };
   const after = recomputeProgress(merged);
   GOALS = GOALS.map((g) => (g.id === goalId ? after : g));
+  storeIdempotentResult(`contribute:${goalId}`, idempotencyKey, input, after);
   return after;
 }
 
@@ -371,9 +404,17 @@ export interface WithdrawGoalInput {
 export async function withdrawFromGoal(
   goalId: string,
   input: WithdrawGoalInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
   await delay();
-  const goal = GOALS.find((g) => g.id === goalId);
+  const cached = getIdempotentResult(
+    `withdraw:${goalId}`,
+    idempotencyKey,
+    input,
+  );
+  if (cached) return cached;
+
+  const goal = GOALS.find((g) => g.id === goalId && !g.isDeleted);
   if (!goal) throw new Error('Goal not found');
 
   if (input.amount <= 0) throw new Error('invalid_amount');
@@ -410,5 +451,6 @@ export async function withdrawFromGoal(
   };
   const after = recomputeProgress(merged);
   GOALS = GOALS.map((g) => (g.id === goalId ? after : g));
+  storeIdempotentResult(`withdraw:${goalId}`, idempotencyKey, input, after);
   return after;
 }

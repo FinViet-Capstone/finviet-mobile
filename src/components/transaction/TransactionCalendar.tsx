@@ -2,7 +2,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
 import { formatVNDCompact } from '@/utils/formatters';
-import type { DayCell } from '@/hooks/useMonthlyTransactions';
+import {
+  buildCalendarWeeks,
+  type DayCell,
+} from '@/hooks/useMonthlyTransactions';
 
 const VI_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
 
@@ -14,24 +17,14 @@ export interface TransactionCalendarProps {
   onDayPress: (cell: DayCell) => void;
 }
 
-/** Month calendar grid: per-day net amount, uncategorized dot, today/selected. */
+/** Month calendar grid: per-day income/expense traces, uncategorized dot, today/selected. */
 export function TransactionCalendar({
   dayCells,
   selectedISO,
   leadingBlanks,
   onDayPress,
 }: TransactionCalendarProps) {
-  // Leading days (tháng trước) + trailing days (tháng sau) — chỉ hiển thị, mờ.
-  const first = dayCells[0];
-  let leadNums: number[] = [];
-  let trailNums: number[] = [];
-  if (first) {
-    const [y, m] = first.iso.split('-').map(Number); // m = tháng 1-based
-    const prevLast = new Date(y, m - 1, 0).getDate();
-    leadNums = Array.from({ length: leadingBlanks }, (_, i) => prevLast - leadingBlanks + 1 + i);
-    const trailing = (7 - ((leadingBlanks + dayCells.length) % 7)) % 7;
-    trailNums = Array.from({ length: trailing }, (_, i) => i + 1);
-  }
+  const weeks = buildCalendarWeeks(dayCells, leadingBlanks);
 
   return (
     <View style={styles.calendarCard}>
@@ -45,51 +38,62 @@ export function TransactionCalendar({
       </View>
 
       {/* Day grid */}
-      <View style={styles.grid}>
-        {leadNums.map((n, i) => (
-          <View key={`lead${i}`} style={styles.cell}>
-            <View style={styles.dayCircle}>
-              <Text style={[styles.dayNumber, styles.adjacentDay]}>{n}</Text>
-            </View>
-          </View>
-        ))}
-        {dayCells.map((cell) => {
-          const isSelected = cell.iso === selectedISO;
-          const amtColor = cell.net >= 0 ? COLORS.tertiary : COLORS.error;
-          return (
-            <TouchableOpacity
-              key={cell.iso}
-              style={styles.cell}
-              onPress={() => onDayPress(cell)}
-              activeOpacity={0.75}
-            >
-              <View style={[
-                styles.dayCircle,
-                isSelected && styles.dayCircleSelected,
-                cell.isToday && !isSelected && styles.dayCircleToday,
-              ]}>
-                <Text style={[
-                  styles.dayNumber,
-                  isSelected && { color: COLORS.onPrimary, fontWeight: FONT_WEIGHT.bold },
-                  cell.isToday && !isSelected && { color: COLORS.primary },
-                ]}>
-                  {cell.day}
-                </Text>
-                {cell.hasUncategorized && <View style={styles.uncatDot} />}
-              </View>
-              {cell.hasActivity && (
-                <Text style={[styles.dayAmt, { color: amtColor }]} numberOfLines={1}>
-                  {formatVNDCompact(Math.abs(cell.net))}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-        {trailNums.map((n, i) => (
-          <View key={`trail${i}`} style={styles.cell}>
-            <View style={styles.dayCircle}>
-              <Text style={[styles.dayNumber, styles.adjacentDay]}>{n}</Text>
-            </View>
+      <View>
+        {weeks.map((week, weekIndex) => (
+          <View key={`week-${weekIndex}`} style={styles.weekRow}>
+            {week.map((gridCell) => {
+              const cell = gridCell.current;
+              if (!cell) {
+                return (
+                  <View key={gridCell.key} style={styles.cell}>
+                    <View style={styles.dayCircle}>
+                      <Text style={[styles.dayNumber, styles.adjacentDay]}>
+                        {gridCell.day}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              }
+
+              const isSelected = cell.iso === selectedISO;
+              return (
+                <TouchableOpacity
+                  key={gridCell.key}
+                  style={styles.cell}
+                  onPress={() => onDayPress(cell)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[
+                    styles.dayCircle,
+                    isSelected && styles.dayCircleSelected,
+                    cell.isToday && !isSelected && styles.dayCircleToday,
+                  ]}>
+                    <Text style={[
+                      styles.dayNumber,
+                      isSelected && { color: COLORS.onPrimary, fontWeight: FONT_WEIGHT.bold },
+                      cell.isToday && !isSelected && { color: COLORS.primary },
+                    ]}>
+                      {cell.day}
+                    </Text>
+                    {cell.hasUncategorized && <View style={styles.uncatDot} />}
+                  </View>
+                  {cell.hasActivity && (
+                    <View style={styles.dayAmounts}>
+                      {cell.income > 0 && (
+                        <Text style={[styles.dayAmt, { color: COLORS.tertiary }]} numberOfLines={1}>
+                          +{formatVNDCompact(cell.income)}
+                        </Text>
+                      )}
+                      {cell.expense > 0 && (
+                        <Text style={[styles.dayAmt, { color: COLORS.error }]} numberOfLines={1}>
+                          −{formatVNDCompact(cell.expense)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ))}
       </View>
@@ -109,18 +113,17 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[1],
   },
   dowLabel: {
-    width: '14.285714%',
+    flex: 1,
     textAlign: 'center',
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onSurfaceVariant,
   },
-  grid: {
+  weekRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
   },
   cell: {
-    width: '14.285714%',
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 2,
   },
@@ -157,10 +160,15 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: COLORS.secondary,
   },
-  dayAmt: {
-    fontSize: 9,
-    fontWeight: FONT_WEIGHT.medium,
+  dayAmounts: {
+    alignItems: 'center',
+    minHeight: 20,
     marginTop: 2,
+  },
+  dayAmt: {
+    fontSize: 8,
+    fontWeight: FONT_WEIGHT.medium,
+    lineHeight: 10,
     textAlign: 'center',
   },
 });

@@ -83,6 +83,7 @@ export default function TabLayout() {
         name="budgets"
         options={{
           title: 'Ngân sách',
+          popToTopOnBlur: true,
           tabBarIcon: ({ color }) => (
             <TabBarIcon icon="pie_chart" color={color} size={24} />
           ),

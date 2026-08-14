@@ -97,8 +97,8 @@ export default function HomeScreen() {
     [walletData],
   );
 
-  // Spend per bucket — shared derivation (all expense tx grouped by defaultBucket),
-  // identical to the Budgets tab. Includes spend in categories with no budget set.
+  // Progress per bucket — shared derivation, identical to the Budgets tab.
+  // Savings nets goal-withdrawal income against expense contributions.
   const { needs: needsSpent, wants: wantsSpent, savings: savingsSpent } = bucketSpend;
 
   // Bucket denominator = allocation cap (income × bucket %), matching the Budgets
@@ -114,7 +114,11 @@ export default function HomeScreen() {
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);
     if (activeGoals.length === 0) return null;
-    return activeGoals.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())[0];
+    return activeGoals.sort((a, b) => {
+      if (!a.deadline) return b.deadline ? 1 : 0;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    })[0];
   }, [goals]);
 
   const uncategorizedCount = useMemo(() => {

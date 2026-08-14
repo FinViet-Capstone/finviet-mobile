@@ -10,7 +10,8 @@ export interface SavingsGoalCardProps {
   readonly goal: SavingsGoalWithProgress | null | undefined;
 }
 
-function daysUntil(deadlineIso: string): number {
+function daysUntil(deadlineIso: string | null): number | null {
+  if (!deadlineIso) return null;
   const now = new Date();
   const deadline = new Date(deadlineIso);
   const diff = deadline.getTime() - now.getTime();
@@ -35,14 +36,16 @@ export function SavingsGoalCard({ goal }: SavingsGoalCardProps) {
         <Text style={styles.title}>Mục tiêu tiết kiệm</Text>
         <View style={styles.deadlineBadge}>
           <MaterialIcon name="timer" size={13} color={COLORS.secondary} />
-          <Text style={styles.deadlineText}>Còn {days} ngày</Text>
+          <Text style={styles.deadlineText}>
+            {days === null ? 'Không có thời hạn' : `Còn ${days} ngày`}
+          </Text>
         </View>
       </View>
 
       <View style={styles.goalRow}>
         <View style={styles.iconWrapper}>
           <Text style={styles.iconEmoji}>
-            {(goal as unknown as { iconEmoji?: string }).iconEmoji ?? '🎯'}
+            {goal.iconEmoji ?? '🎯'}
           </Text>
         </View>
         <View style={styles.goalInfo}>

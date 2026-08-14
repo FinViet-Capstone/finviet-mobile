@@ -79,21 +79,23 @@ function resolveText(
   category: Category,
   walletName: string,
 ): Pick<TransactionCardVisuals, 'title' | 'subtitle'> {
-  // Goal-contribution title: "Nạp mục tiêu: {name from description}"
+  const isGoalWithdrawal = isGoalContrib && tx.type === 'income';
   const goalName =
     isGoalContrib && tx.description
-      ? tx.description.replace(/^Nạp mục tiêu:\s*/i, '')
+      ? tx.description.replace(/^(?:Nạp|Rút) mục tiêu:\s*/i, '')
       : null;
 
   const title = isTransfer
     ? tx.description || 'Chuyển quỹ'
     : isGoalContrib
-    ? `Nạp mục tiêu: ${goalName ?? ''}`
+    ? `${isGoalWithdrawal ? 'Rút' : 'Nạp'} mục tiêu: ${goalName ?? ''}`
     : tx.merchant ?? tx.description ?? (isUncategorized ? 'Chưa phân loại' : 'Giao dịch');
   const subtitle = isTransfer
     ? tx.type === 'transfer_out'
       ? 'Chuyển đi'
       : 'Nhận về'
+    : isGoalWithdrawal
+    ? 'Rút tiền mục tiêu'
     : isGoalContrib
     ? 'Tiết kiệm mục tiêu'
     : isUncategorized

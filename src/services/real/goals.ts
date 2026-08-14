@@ -15,6 +15,7 @@
  *     required walletId below.
  */
 
+import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
 import type { SavingsGoalWithProgress, GoalContribution } from '@/types';
@@ -42,6 +43,9 @@ interface SavingGoalDto {
   isCompleted: boolean;
   monthlySavingNeeded: number | null;
   monthsRemaining: number | null;
+  isDeleted: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 // ─── Mapper ─────────────────────────────────────────────────────────────────
@@ -54,12 +58,12 @@ function toGoal(dto: SavingGoalDto): SavingsGoalWithProgress {
     iconEmoji: dto.iconEmoji ?? undefined,
     targetAmount: dto.targetAmount,
     currentAmount: dto.currentAmount,
-    deadline: dto.deadline ?? '',
+    deadline: dto.deadline,
     fundingWalletId: dto.fundingWalletId ?? undefined,
     isCompleted: dto.isCompleted,
-    isDeleted: false,
-    createdAt: '',
-    updatedAt: '',
+    isDeleted: dto.isDeleted,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
     progressPercentage: dto.progressPercent,
     remainingAmount: dto.remainingAmount,
     requiredMonthlySaving: dto.monthlySavingNeeded ?? 0,
@@ -69,16 +73,23 @@ function toGoal(dto: SavingGoalDto): SavingsGoalWithProgress {
 
 // ─── Reads ──────────────────────────────────────────────────────────────────
 
-export async function getGoals(): Promise<SavingsGoalWithProgress[]> {
-  const res = await api.get('/saving-goals');
+export async function getGoals(
+  archived = false,
+): Promise<SavingsGoalWithProgress[]> {
+  const res = await api.get('/saving-goals', { params: { archived } });
   return unwrap<SavingGoalDto[]>(res).map(toGoal);
 }
 
 export async function getGoalById(
   id: string,
 ): Promise<SavingsGoalWithProgress | undefined> {
-  const res = await api.get(`/saving-goals/${id}`);
-  return toGoal(unwrap<SavingGoalDto>(res));
+  try {
+    const res = await api.get(`/saving-goals/${encodeURIComponent(id)}`);
+    return toGoal(unwrap<SavingGoalDto>(res));
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return undefined;
+    throw error;
+  }
 }
 
 interface SavingGoalContributionDto {
@@ -107,7 +118,9 @@ function toContribution(dto: SavingGoalContributionDto): GoalContribution {
 export async function getContributionsByGoalId(
   goalId: string,
 ): Promise<GoalContribution[]> {
-  const res = await api.get(`/saving-goals/${goalId}/contributions`);
+  const res = await api.get(
+    `/saving-goals/${encodeURIComponent(goalId)}/contributions`,
+  );
   return unwrap<SavingGoalContributionDto[]>(res).map(toContribution);
 }
 
@@ -115,6 +128,7 @@ export async function getContributionsByGoalId(
 
 export async function createGoal(
   input: CreateGoalInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
   const res = await api.post('/saving-goals', {
     goalName: input.name.trim(),
@@ -123,7 +137,7 @@ export async function createGoal(
     deadline: input.deadline || null,
     initialAmount: input.initialAmount ?? null,
     fundingWalletId: input.fundingWalletId ?? null,
-  }, idempotentConfig());
+  }, idempotentConfig(idempotencyKey));
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
@@ -131,27 +145,32 @@ export async function updateGoal(
   id: string,
   patch: UpdateGoalInput,
 ): Promise<SavingsGoalWithProgress> {
-  const res = await api.patch(`/saving-goals/${id}`, {
+  const res = await api.patch(`/saving-goals/${encodeURIComponent(id)}`, {
     ...(patch.name !== undefined ? { goalName: patch.name.trim() } : {}),
     ...(patch.targetAmount !== undefined ? { targetAmount: patch.targetAmount } : {}),
-    ...(patch.deadline !== undefined ? { deadline: patch.deadline || null } : {}),
+    ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),
   });
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
 export async function deleteGoal(id: string): Promise<void> {
-  await api.delete(`/saving-goals/${id}`);
+  await api.delete(`/saving-goals/${encodeURIComponent(id)}`);
 }
 
 export async function addGoalContribution(
   goalId: string,
   input: AddContributionInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
-  const res = await api.post(`/saving-goals/${goalId}/contribute`, {
-    amount: input.amount,
-    fundingWalletId: input.fundingWalletId ?? null,
-    note: input.note?.trim() || null,
-  }, idempotentConfig());
+  const res = await api.post(
+    `/saving-goals/${encodeURIComponent(goalId)}/contribute`,
+    {
+      amount: input.amount,
+      fundingWalletId: input.fundingWalletId ?? null,
+      note: input.note?.trim() || null,
+    },
+    idempotentConfig(idempotencyKey),
+  );
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
@@ -164,11 +183,16 @@ export async function addGoalContribution(
 export async function withdrawFromGoal(
   goalId: string,
   input: WithdrawGoalInput,
+  idempotencyKey?: string,
 ): Promise<SavingsGoalWithProgress> {
-  const res = await api.post(`/saving-goals/${goalId}/withdraw`, {
-    amount: input.amount,
-    walletId: input.walletId,
-    note: input.note?.trim() || null,
-  }, idempotentConfig());
+  const res = await api.post(
+    `/saving-goals/${encodeURIComponent(goalId)}/withdraw`,
+    {
+      amount: input.amount,
+      walletId: input.walletId,
+      note: input.note?.trim() || null,
+    },
+    idempotentConfig(idempotencyKey),
+  );
   return toGoal(unwrap<SavingGoalDto>(res));
 }

@@ -50,9 +50,10 @@ export const queryKeys = {
   },
   goals: {
     all: () => ['goals'] as const,
-    detail: (id: string | undefined) => [...queryKeys.goals.all(), id] as const,
+    list: (archived: boolean) => [...queryKeys.goals.all(), 'list', archived] as const,
+    detail: (id: string | undefined) => [...queryKeys.goals.all(), 'detail', id] as const,
     contributions: (id: string | undefined) =>
-      [...queryKeys.goals.all(), id, 'contributions'] as const,
+      [...queryKeys.goals.all(), 'detail', id, 'contributions'] as const,
   },
   reports: {
     all: () => ['reports'] as const,

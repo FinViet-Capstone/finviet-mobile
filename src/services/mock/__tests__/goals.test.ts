@@ -1,10 +1,8 @@
 /**
- * Regression tests for the savings-goal contribution/deletion bug: a goal created
- * without a preset fundingWalletId (the only path the UI's "new goal" form offers)
- * used to (a) never actually debit the wallet picked in the contribution sheet, and
- * (b) even when a transaction did exist, deleteGoal skipped reversing it because it
- * incorrectly required goal.fundingWalletId to be set. Each test gets a fresh copy
- * of both modules (jest.resetModules) since they hold mutable module-level state.
+ * Regression tests for savings-goal money movement and archive integrity. A goal
+ * contribution must debit the explicitly selected wallet; archive must require a
+ * zero balance and preserve the complete ledger and generated transactions. Each
+ * test gets fresh module state through jest.resetModules().
  */
 
 import { WALLET_IDS } from '@/services/mock/walletStore';
@@ -59,13 +57,11 @@ describe('mock goals service — contribution/deletion wallet integrity', () => 
     ).rejects.toThrow('insufficient_balance');
   });
 
-  it('refunds the wallet and removes the transaction when a contributed-to goal is deleted', async () => {
-    // require (not import) so this re-resolves fresh module state after resetModules()
+  it('requires a full withdrawal before archive and preserves the complete ledger', async () => {
     const goals = require('@/services/mock/goals');
     const wallets = require('@/services/mock/wallets');
 
     const before = wallets.getWalletById(WALLET_IDS.BANK)!.balance;
-
     const goal = await goals.createGoal({
       name: 'Du lịch Đà Lạt',
       targetAmount: 10_000_000,
@@ -75,14 +71,30 @@ describe('mock goals service — contribution/deletion wallet integrity', () => 
       amount: 1_000_000,
       fundingWalletId: WALLET_IDS.BANK,
     });
-    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before - 1_000_000);
 
+    await expect(goals.deleteGoal(goal.id)).rejects.toThrow(
+      'goal_balance_must_be_withdrawn',
+    );
+    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before - 1_000_000);
+    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(1);
+
+    await goals.withdrawFromGoal(goal.id, {
+      amount: 1_000_000,
+      walletId: WALLET_IDS.BANK,
+    });
     await goals.deleteGoal(goal.id);
 
-    // The debit is fully reversed — this is the bug: it used to stay lost because
-    // deleteGoal required goal.fundingWalletId (unset here) before reversing.
     expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before);
-    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(0);
+    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(2);
+    expect(goals.getGoals(false).some((item: { id: string }) => item.id === goal.id)).toBe(false);
+    expect(goals.getGoals(true).some((item: { id: string }) => item.id === goal.id)).toBe(true);
+    expect(goals.getGoalById(goal.id)?.isDeleted).toBe(true);
+    await expect(
+      goals.addGoalContribution(goal.id, {
+        amount: 1,
+        fundingWalletId: WALLET_IDS.BANK,
+      }),
+    ).rejects.toThrow('Goal not found');
   });
 });
 
@@ -182,12 +194,11 @@ describe('mock goals service — withdrawFromGoal', () => {
     expect(after.currentAmount).toBe(800_000);
   });
 
-  it('deleteGoal nets out correctly after both a contribution and a withdrawal', async () => {
+  it('does not alter wallets or history when a zero-balance goal is archived', async () => {
     const goals = require('@/services/mock/goals');
     const wallets = require('@/services/mock/wallets');
 
     const before = wallets.getWalletById(WALLET_IDS.BANK)!.balance;
-
     const goal = await goals.createGoal({
       name: 'Du lịch Phú Quốc',
       targetAmount: 10_000_000,
@@ -197,12 +208,72 @@ describe('mock goals service — withdrawFromGoal', () => {
       amount: 3_000_000,
       fundingWalletId: WALLET_IDS.BANK,
     });
-    await goals.withdrawFromGoal(goal.id, { amount: 1_000_000, walletId: WALLET_IDS.BANK });
-    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before - 2_000_000);
+    await goals.withdrawFromGoal(goal.id, {
+      amount: 3_000_000,
+      walletId: WALLET_IDS.BANK,
+    });
+
+    const walletBeforeArchive = wallets.getWalletById(WALLET_IDS.BANK)!.balance;
+    const historyBeforeArchive = goals.getContributionsByGoalId(goal.id);
+    expect(walletBeforeArchive).toBe(before);
 
     await goals.deleteGoal(goal.id);
 
-    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(before);
-    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(0);
+    expect(wallets.getWalletById(WALLET_IDS.BANK)!.balance).toBe(walletBeforeArchive);
+    expect(goals.getContributionsByGoalId(goal.id)).toEqual(historyBeforeArchive);
+    await expect(
+      goals.withdrawFromGoal(goal.id, { amount: 1, walletId: WALLET_IDS.BANK }),
+    ).rejects.toThrow('Goal not found');
+    await expect(goals.deleteGoal(goal.id)).rejects.toThrow('Goal not found');
+  });
+
+  it('records an initial contribution without a wallet and reaches zero after withdrawal', async () => {
+    const goals = require('@/services/mock/goals');
+
+    const goal = await goals.createGoal({
+      name: 'Quỹ tiền mặt cũ',
+      targetAmount: 1_000_000,
+      initialAmount: 500_000,
+      deadline: '2027-01-01',
+    });
+    expect(goal.currentAmount).toBe(500_000);
+    expect(goals.getContributionsByGoalId(goal.id)).toMatchObject([
+      { amount: 500_000, type: 'contribution', transactionId: undefined },
+    ]);
+
+    const withdrawn = await goals.withdrawFromGoal(goal.id, {
+      amount: 500_000,
+      walletId: WALLET_IDS.CASH,
+    });
+    expect(withdrawn.currentAmount).toBe(0);
+    await expect(goals.deleteGoal(goal.id)).resolves.toBeUndefined();
+    expect(goals.getContributionsByGoalId(goal.id)).toHaveLength(2);
+  });
+
+  it('deduplicates create, contribution, and withdrawal replays by idempotency key', async () => {
+    const goals = require('@/services/mock/goals');
+    const wallets = require('@/services/mock/wallets');
+
+    const input = {
+      name: 'Quỹ idempotency',
+      targetAmount: 2_000_000,
+      deadline: '2027-01-01',
+    };
+    const firstGoal = await goals.createGoal(input, 'create-key');
+    const replayedGoal = await goals.createGoal(input, 'create-key');
+    expect(replayedGoal.id).toBe(firstGoal.id);
+
+    const before = wallets.getWalletById(WALLET_IDS.CASH)!.balance;
+    const contribution = { amount: 1_000_000, fundingWalletId: WALLET_IDS.CASH };
+    await goals.addGoalContribution(firstGoal.id, contribution, 'contribute-key');
+    await goals.addGoalContribution(firstGoal.id, contribution, 'contribute-key');
+    expect(wallets.getWalletById(WALLET_IDS.CASH)!.balance).toBe(before - 1_000_000);
+    expect(goals.getContributionsByGoalId(firstGoal.id)).toHaveLength(1);
+
+    const withdrawal = { amount: 1_000_000, walletId: WALLET_IDS.CASH };
+    await goals.withdrawFromGoal(firstGoal.id, withdrawal, 'withdraw-key');
+    await goals.withdrawFromGoal(firstGoal.id, withdrawal, 'withdraw-key');
+    expect(wallets.getWalletById(WALLET_IDS.CASH)!.balance).toBe(before);
+    expect(goals.getContributionsByGoalId(firstGoal.id)).toHaveLength(2);
   });
 });

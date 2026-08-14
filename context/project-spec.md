@@ -87,10 +87,12 @@ C. Budgets & Pacing
     `uncategorizedWarning` when uncategorized spend exceeds 10%. **Known inconsistency:** the
     bucket share used here is a hardcoded 50/30/20 constant, not the customer's actual
     configurable `needsPct`/`wantsPct`/`savingsPct` fields — worth reconciling later.
-- Savings-bucket rendering is genuinely different from Needs/Wants: `BudgetOverviewCard`'s
-  `getPctColor(..., goalMode)` renders the savings row green once spend (i.e. saved amount)
-  reaches 100% of its target, and neutral gray (never red) below that — exceeding a savings
-  target is good, unlike overspending Needs/Wants which turns amber/red.
+- Savings-bucket rendering is genuinely different from Needs/Wants: its monthly progress is
+  expense assigned to Savings minus `cat_savings_goal` withdrawal income, clamped at zero. The
+  transaction history still keeps the gross contribution expense and withdrawal income as separate
+  directional records. `BudgetOverviewCard` renders the Savings row green once the raw amount reaches
+  its target and neutral gray (never red) below it; its displayed badge/bar are capped at 100%, while
+  the amount remains truthful when the target is exceeded.
 
 D. Savings Goals
 - Named goals (`targetAmount`, `currentAmount`, optional `deadline`, optional
@@ -102,9 +104,11 @@ D. Savings Goals
   wallet is set — rejects amount exceeding that wallet's balance. A successful contribution
   creates a real `Transaction` (`categoryId: 'cat_savings_goal'`, `type: 'expense'`) and debits
   the wallet through the same balance-adjustment path as any other transaction.
-  `currentAmount` is always recomputed as the true sum of contributions; the goal flips
-  `isCompleted` once contributions reach the target. Deleting a goal reverses every linked
-  contribution's transaction and restores the wallet balance.
+  `currentAmount` is always recomputed as the true sum of contributions minus withdrawals; the
+  goal flips `isCompleted` once contributions reach the target. Archiving is allowed only after
+  the customer explicitly withdraws the full balance to a selected basic wallet. It then
+  soft-deletes the zero-balance goal while preserving every ledger row and generated transaction;
+  archived goals remain readable in the app's read-only `Đã lưu trữ` section.
 
 E. AI Spending Score, Weekly Report & Advisor Chat
 - `SpendingScore` (`view: 'weekly'|'monthly'`, `score`, `color: 'green'|'amber'|'red'`,

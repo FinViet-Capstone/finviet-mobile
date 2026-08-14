@@ -1,48 +1,66 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Feat: footnote on bank-linked wallets explaining that their balance mirrors the bank
-(`Số dư đồng bộ từ ngân hàng`), so a synced transaction that leaves the balance unchanged
-no longer reads as a bug.
+Fix: complete saving-goal archive verification by netting withdrawals in Savings progress,
+keeping dashboard percentages bounded, and preserving both transaction directions in Calendar.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — merged into `dev` together with `feature/real-chat-sessions`
+In Progress — physical-device follow-up on branch `fix/saving-goal-archive-navigation`
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Observed on a real SePay-linked wallet: it holds a synced `+10.000đ` income transaction yet
-  shows `0đ`, and the wallets total does not move either. Not a bug — `TotalBalance` is a plain
-  `wallets.Sum(x => x.Balance)` (`WalletService.cs:62`), and a linked wallet's balance is
-  assigned from what SePay reports (`link.Wallet.Balance = latestBalance ?? …`), never derived
-  from the imported rows. The bank is the source of truth for balance; importing transactions
-  and updating balance are two separate paths.
-- The same money therefore reads two ways: the Wallets screen shows no change, while Reports
-  and Budgets — which sum the `transactions` table — do count it. Nothing in the UI explains
-  the discrepancy, so it looks broken.
-- Add a footnote under the balance on `app/(tabs)/wallets/[id].tsx`, rendered only when
-  `wallet.type === 'linked'`: **"Số dư đồng bộ từ ngân hàng"**. Styled dimmer than the existing
-  type row (`COLORS.outline`) so it reads as a footnote rather than a second status line.
-- Out of scope, deliberately: the deeper half of this problem is that
-  `Balance = latestBalance ?? 0m` makes "SePay reported no balance" and "the balance really is
-  zero" indistinguishable. Showing `—` instead of `0đ` for the unknown case is the better fix
-  but needs a backend change to signal the difference, so it stays a separate task.
-- Also out of scope: the wallets list screen. The footnote goes on the detail screen only,
-  where a user who notices the discrepancy actually goes to investigate.
+- Stop the Budgets tab from retaining a saving-goal detail route after the user leaves the tab;
+  Back actions and successful archive navigation use explicit destinations instead of relying on
+  incidental nested-stack history.
+- A goal with money cannot be archived. The user must first use the existing withdrawal flow and
+  choose the basic wallet that receives the entire remaining amount.
+- After the balance reaches zero, DELETE archives rather than reverses financial activity. The
+  backend preserves contribution/withdrawal ledger rows and their transactions; archived goals
+  appear in a collapsed `Đã lưu trữ` section with read-only detail/history.
+- Prevent the white 404 retry screen after archive by updating the active and archived caches
+  before dismissing the detail route, without refetching the just-archived active resource.
+- Align nullable deadlines, icon/deletion/timestamps, archived queries, 404 handling, encoded
+  path IDs, PATCH semantics, and in-flight idempotency keys across mock and real services.
+- Cover the regressions with focused tests. Restore/unarchive, permanent purge, fixed-wallet
+  reassignment, and deadline clearing remain out of scope.
 
 ## Notes
 
 <!-- Any extra notes -->
-Verified against live data on 2026-08-14: wallets `SePay - Vietcombank` 8.175.000đ + `Tinder`
-1.000.000đ + `SePay - Sacombank` 0đ = total 9.175.000đ, with the `+10.000đ` (`sepay:73531578`)
-sitting on the Sacombank wallet contributing exactly 0 to that total, while August income across
-the `transactions` table totals 5.210.000đ including it.
-
-Branched from `dev`, independent of `feature/real-chat-sessions` — the two touch no common source
-files. Both are now merged into `dev`; the only merge conflicts were in this document and in the
-`src/services/index.ts` header comment, where the CSV-extraction work landed on `dev` in parallel.
+- Cross-repo backend work is on `D:/SEP490/newestbe/finviet-be`, branch
+  `fix/saving-goal-archive`, based on the clean committed Gemini feature state.
+- `hd.env.local` is an untracked review input only and must remain uncommitted.
+- No commit, push, merge, or branch deletion without explicit permission.
+- 2026-08-14 — Started after tracing the post-delete 404 to broad `goals.all()` invalidation
+  while the deleted detail remained mounted. Backend source confirmed DELETE physically reversed
+  wallets and removed transactions/ledger; approved replacement is zero-balance soft archive plus
+  read-only archived-goal history.
+- 2026-08-15 — Physical-device follow-up implemented: Savings progress now subtracts saving-goal
+  withdrawal income and clamps at zero; the Home percentage badge/bar clamp to 100%; the real
+  transaction service fetches every backend page at the supported 100-row size; Calendar retains
+  separate gross income/expense traces; and saving-goal withdrawal rows have direction-correct copy.
+  Added focused tests for derivation, display bounds, pagination, Calendar aggregation, and row
+  visuals. Verification: TypeScript clean; changed-file ESLint clean (pre-existing warnings only);
+  13 Jest suites / 87 tests pass; mobile and backend `git diff --check` clean. Backend Application
+  tests pass 200/200 and the solution plus integration-test project compile. Live integration and
+  physical-device acceptance remain pending; no commit, push, deployment, or database operation run.
+- 2026-08-15 — Fixed the next physical-device findings: archive-triggered `Rút toàn bộ` now waits
+  for the native alert interaction to finish before mounting the sheet, displays mutation failures
+  without closing the sheet, retains the pending/idempotency single-flight guard, and advances a
+  successful full withdrawal to the existing explicit archive confirmation. Calendar now derives
+  complete seven-cell weeks and renders each week as a fixed flex row, so Sunday cannot wrap out of
+  its column; August 2026 places day 1 under Saturday and day 2 under Sunday. Added focused tests for
+  full/partial/error withdrawal outcomes, duplicate in-flight calls, Saturday/Sunday alignment,
+  Sunday-start months, and trailing week cells. Verification: TypeScript clean; changed-file ESLint
+  has 0 errors / 4 pre-existing warnings; `npx eslint app src` has 0 errors / 87 pre-existing
+  warnings; focused tests pass 9/9; the restricted full suite passes 14 suites / 94 tests; and
+  `git diff --check` is clean. An unrestricted related-test command also traversed stale
+  `.claude/worktrees` and failed only against their obsolete duplicate goal tests; the workspace-
+  restricted suite above passed the current source. iOS/Android physical-device acceptance remains
+  pending; no commit, push, deployment, database operation, or protected environment-file change run.
 
 ## History
 
