@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,6 +28,7 @@ import {
   useWithdrawFromGoal,
 } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
+import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -54,6 +56,8 @@ const S = {
   noBasicWallet: 'Bạn chưa có ví cơ bản nào để trích tiền.',
   save: 'Lưu',
   cancel: 'Huỷ',
+  saveError: 'Không thể lưu. Hãy thử lại.',
+  deleteError: 'Không thể xoá. Hãy thử lại.',
   available: (s: string) => `Số dư khả dụng: ${s}`,
   errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
   errOverRemaining: (s: string) => `Vượt số tiền còn thiếu (${s})`,
@@ -164,16 +168,20 @@ function ContributionSheet({
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
-    await addContrib.mutateAsync({
-      goalId: goal.id,
-      input: {
-        amount: parsedAmount,
-        note: note.trim() || undefined,
-        fundingWalletId: selectedWalletId ?? undefined,
-      },
-    });
-    setAmountRaw(''); setNote('');
-    onClose();
+    try {
+      await addContrib.mutateAsync({
+        goalId: goal.id,
+        input: {
+          amount: parsedAmount,
+          note: note.trim() || undefined,
+          fundingWalletId: selectedWalletId ?? undefined,
+        },
+      });
+      setAmountRaw(''); setNote('');
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.saveError));
+    }
   }, [canSave, parsedAmount, note, selectedWalletId, goal.id, addContrib, onClose]);
 
   return (
@@ -340,16 +348,20 @@ function WithdrawSheet({
 
   const handleSave = useCallback(async () => {
     if (!canSave || !selectedWalletId) return;
-    await withdraw.mutateAsync({
-      goalId: goal.id,
-      input: {
-        amount: parsedAmount,
-        walletId: selectedWalletId,
-        note: note.trim() || undefined,
-      },
-    });
-    setAmountRaw(''); setNote('');
-    onClose();
+    try {
+      await withdraw.mutateAsync({
+        goalId: goal.id,
+        input: {
+          amount: parsedAmount,
+          walletId: selectedWalletId,
+          note: note.trim() || undefined,
+        },
+      });
+      setAmountRaw(''); setNote('');
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.saveError));
+    }
   }, [canSave, parsedAmount, note, selectedWalletId, goal.id, withdraw, onClose]);
 
   return (
@@ -479,9 +491,14 @@ export default function GoalDetailScreen() {
 
   const handleDelete = useCallback(async () => {
     if (!id) return;
-    await deleteGoal.mutateAsync(id);
-    setDeleteVisible(false);
-    router.back();
+    try {
+      await deleteGoal.mutateAsync(id);
+      setDeleteVisible(false);
+      router.back();
+    } catch (err) {
+      setDeleteVisible(false);
+      Alert.alert('', getApiErrorMessage(err, S.deleteError));
+    }
   }, [id, deleteGoal, router]);
 
   if (isLoading) return <LoadingSpinner />;
@@ -507,7 +524,7 @@ export default function GoalDetailScreen() {
           )}
           <Text style={styles.headerTitle} numberOfLines={1}>{goal.name}</Text>
         </View>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => setDeleteVisible(true)}>
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => setDeleteVisible(true)} accessibilityLabel={S.deleteConfirmTitle}>
           <MaterialIcon name={S.delete} size={22} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
       </View>

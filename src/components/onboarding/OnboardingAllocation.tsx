@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { CustomSlider } from '@/components/common/CustomSlider';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, ALLOCATION_PRESETS } from '@/data/onboardingData';
+
+type BucketKey = 'essential' | 'wants' | 'savings';
 
 export interface OnboardingAllocationProps {
   readonly allocations: {
@@ -32,22 +36,35 @@ export function OnboardingAllocation({
 }: OnboardingAllocationProps) {
   const income = parseFloat(monthlyIncome.replace(/\./g, '')) || 15000000;
 
+  const [lockedBucket, setLockedBucket] = useState<BucketKey | null>(null);
+  const [activeField, setActiveField] = useState<BucketKey | null>(null);
+  const [pctRaw, setPctRaw] = useState('');
+
   const calculateAmount = (percentage: number): string => {
     const amount = (income * percentage) / 100;
     return amount.toLocaleString('vi-VN').replace(/,/g, '.') + 'đ';
   };
 
-  const handleSliderChange = (key: 'essential' | 'wants' | 'savings', newValue: number) => {
+  const handleSliderChange = useCallback((key: BucketKey, newValue: number) => {
+    if (key === lockedBucket) return; // the locked bucket's own share is fixed
     const rounded = Math.round(newValue);
-    const currentTotal = allocations.essential + allocations.wants + allocations.savings;
     const otherKeys = (['essential', 'wants', 'savings'] as const).filter(k => k !== key);
-
-    // Calculate how much needs to be redistributed
-    const delta = rounded - allocations[key];
-    const remaining = currentTotal - rounded;
-
-    // Distribute the remaining percentage to the other two buckets proportionally
     const [key1, key2] = otherKeys;
+
+    if (lockedBucket === key1 || lockedBucket === key2) {
+      // One of the other two buckets is locked: clamp the dragged value
+      // against the locked share, and give the entire remainder to the
+      // other (unlocked) bucket rather than splitting proportionally.
+      const lockedValue = allocations[lockedBucket];
+      const freeKey = lockedBucket === key1 ? key2 : key1;
+      const clamped = Math.min(Math.max(rounded, 0), 100 - lockedValue);
+      onChangeAllocation(key, clamped);
+      onChangeAllocation(freeKey, 100 - lockedValue - clamped);
+      return;
+    }
+
+    // No lock: redistribute proportionally between the other two, as before.
+    const remaining = 100 - rounded;
     const total1and2 = allocations[key1] + allocations[key2];
 
     if (total1and2 === 0) {
@@ -65,14 +82,42 @@ export function OnboardingAllocation({
     }
 
     onChangeAllocation(key, rounded);
-  };
+  }, [allocations, lockedBucket, onChangeAllocation]);
+
+  const openField = useCallback((key: BucketKey) => {
+    if (key === lockedBucket) return;
+    setPctRaw('');
+    setActiveField(key);
+  }, [lockedBucket]);
+
+  const handleKeypadNumberPress = useCallback((key: string) => {
+    setPctRaw((prev) => {
+      if (key === '000') return prev;
+      const next = prev + key;
+      return next.length > 3 ? prev : next;
+    });
+  }, []);
+
+  const handleKeypadBackspace = useCallback(() => setPctRaw((prev) => prev.slice(0, -1)), []);
+  const handleKeypadClear = useCallback(() => setPctRaw(''), []);
+  const handleKeypadClose = useCallback(() => { setActiveField(null); setPctRaw(''); }, []);
+
+  const handleKeypadDone = useCallback(() => {
+    if (activeField) {
+      const clamped = Math.min(100, Math.max(0, parseInt(pctRaw || '0', 10)));
+      handleSliderChange(activeField, clamped);
+    }
+    setActiveField(null);
+    setPctRaw('');
+  }, [activeField, pctRaw, handleSliderChange]);
 
   const isValid = allocations.essential + allocations.wants + allocations.savings === 100;
 
   return (
+    <>
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, activeField !== null && { paddingBottom: NUMPAD_HEIGHT }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -98,7 +143,7 @@ export function OnboardingAllocation({
       {/* Allocation Cards */}
       <View style={styles.cardsContainer}>
         {ALLOCATION_PRESETS.map((preset) => {
-          const key = preset.id as keyof typeof allocations;
+          const key = preset.id as BucketKey;
           const percentage = allocations[key];
           const colorMap = {
             primary: COLORS.primary,
@@ -106,6 +151,7 @@ export function OnboardingAllocation({
             tertiary: COLORS.tertiary,
           };
           const color = colorMap[preset.color as keyof typeof colorMap];
+          const isLocked = key === lockedBucket;
 
           return (
             <View
@@ -123,7 +169,40 @@ export function OnboardingAllocation({
                 <View style={styles.cardInfo}>
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardTitle}>{preset.name}</Text>
-                    <Text style={[styles.percentage, { color }]}>{percentage}%</Text>
+                    <View style={styles.pctControls}>
+                      <TouchableOpacity
+                        onPress={() => setLockedBucket((prev) => (prev === key ? null : key))}
+                        style={styles.lockBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isLocked }}
+                        accessibilityLabel={
+                          isLocked
+                            ? ONBOARDING_STRINGS.allocation.unlockLabel(preset.name)
+                            : ONBOARDING_STRINGS.allocation.lockLabel(preset.name)
+                        }
+                      >
+                        <MaterialIcon
+                          name={isLocked ? 'lock' : 'lock_open'}
+                          size={14}
+                          color={isLocked ? color : COLORS.onSurfaceVariant}
+                          filled={isLocked}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={isLocked ? 1 : 0.6}
+                        disabled={isLocked}
+                        onPress={() => openField(key)}
+                        style={styles.pctRow}
+                        accessibilityRole="button"
+                        accessibilityLabel={ONBOARDING_STRINGS.allocation.editPctLabel(preset.name, percentage)}
+                      >
+                        <Text style={[styles.percentage, { color }, isLocked && styles.percentageDisabled]}>
+                          {percentage}%
+                        </Text>
+                        {!isLocked && <MaterialIcon name="edit" size={12} color={color} />}
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.cardDetails}>
@@ -142,6 +221,7 @@ export function OnboardingAllocation({
                     minimumTrackTintColor={color}
                     maximumTrackTintColor={`${COLORS.outline}33`}
                     thumbTintColor={color}
+                    disabled={isLocked}
                   />
                 </View>
               </View>
@@ -172,6 +252,15 @@ export function OnboardingAllocation({
         </TouchableOpacity>
       </View>
     </ScrollView>
+    <NumericKeypad
+      visible={activeField !== null}
+      onClose={handleKeypadClose}
+      onNumberPress={handleKeypadNumberPress}
+      onBackspace={handleKeypadBackspace}
+      onClear={handleKeypadClear}
+      onDone={handleKeypadDone}
+    />
+    </>
   );
 }
 
@@ -263,7 +352,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     marginBottom: 4,
   },
   cardTitle: {
@@ -274,6 +363,22 @@ const styles = StyleSheet.create({
   percentage: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
+  },
+  percentageDisabled: {
+    opacity: 0.5,
+  },
+  pctControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
+  },
+  lockBtn: {
+    padding: 2,
+  },
+  pctRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   cardDetails: {
     flexDirection: 'row',

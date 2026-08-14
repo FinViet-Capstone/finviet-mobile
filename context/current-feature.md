@@ -1,48 +1,53 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Feat: footnote on bank-linked wallets explaining that their balance mirrors the bank
-(`Số dư đồng bộ từ ngân hàng`), so a synced transaction that leaves the balance unchanged
-no longer reads as a bug.
+Fix: registration against the deployed backend failed silently, with no error reaching
+Sentry — two independent root causes.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — merged into `dev` together with `feature/real-chat-sessions`
+Completed — fix implemented and verified locally. See History for the follow-on Maestro
+overnight-testing effort and the two real bugs it surfaced (one fixed here, one filed against
+`finviet-be`).
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Observed on a real SePay-linked wallet: it holds a synced `+10.000đ` income transaction yet
-  shows `0đ`, and the wallets total does not move either. Not a bug — `TotalBalance` is a plain
-  `wallets.Sum(x => x.Balance)` (`WalletService.cs:62`), and a linked wallet's balance is
-  assigned from what SePay reports (`link.Wallet.Balance = latestBalance ?? …`), never derived
-  from the imported rows. The bank is the source of truth for balance; importing transactions
-  and updating balance are two separate paths.
-- The same money therefore reads two ways: the Wallets screen shows no change, while Reports
-  and Budgets — which sum the `transactions` table — do count it. Nothing in the UI explains
-  the discrepancy, so it looks broken.
-- Add a footnote under the balance on `app/(tabs)/wallets/[id].tsx`, rendered only when
-  `wallet.type === 'linked'`: **"Số dư đồng bộ từ ngân hàng"**. Styled dimmer than the existing
-  type row (`COLORS.outline`) so it reads as a footnote rather than a second status line.
-- Out of scope, deliberately: the deeper half of this problem is that
-  `Balance = latestBalance ?? 0m` makes "SePay reported no balance" and "the balance really is
-  zero" indistinguishable. Showing `—` instead of `0đ` for the unknown case is the better fix
-  but needs a backend change to signal the difference, so it stays a separate task.
-- Also out of scope: the wallets list screen. The footnote goes on the detail screen only,
-  where a user who notices the discrepancy actually goes to investigate.
+- Root cause 1: `.env.local`'s `EXPO_PUBLIC_API_BASE_URL` pointed at
+  `https://finviet-be-7t8w.onrender.com` with no `/api` suffix, so every real-backend call
+  (register included) hit a nonexistent route and got back an empty-body 404 — no JSON
+  envelope, so `toAuthError` (`src/services/real/auth.ts:62-90`) fell through to a generic
+  `AuthError('unknown')`, rendered as "Đã có lỗi xảy ra" with no diagnostic value.
+  `eas.json`'s `preview`/`production` profiles already had the correct `/api`-suffixed URL —
+  this only broke local/dev-client runs using `.env.local`. Fixed by appending `/api`.
+- Root cause 2 (why Sentry never saw it either): `app/_layout.tsx` had two disconnected
+  Sentry setups — an unconditional hardcoded `Sentry.init(...)` and a separate
+  `initSentry()` (from `src/lib/sentry.ts`) gated on `EXPO_PUBLIC_SENTRY_DSN`, which is
+  never set anywhere (not `.env.local`, not `.env.example`, not any `eas.json` profile). The
+  app's actual capture call sites (`captureException`, wired into
+  `src/lib/queryClient.ts`'s `QueryCache`/`MutationCache` `onError` and the root
+  `ErrorBoundary`) gate on that same empty var, so every explicit capture was a permanent
+  no-op in every build — including cloud `preview`/`production` builds, not just this local
+  one. Fixed by folding the hardcoded DSN into `src/lib/env.ts` as `SENTRY_DSN`'s default
+  (overridable via `EXPO_PUBLIC_SENTRY_DSN`, including explicit `''` to disable), moving the
+  full init config (replay/feedback integrations, `sendDefaultPii`, `enableLogs`) into
+  `initSentry()`, and deleting the duplicate raw `Sentry.init(...)` block from
+  `app/_layout.tsx`.
+- Out of scope, deliberately: `SENTRY_AUTH_TOKEN`/sourcemap-upload wiring in `eas.json`
+  (separate from runtime error capture); Android cleartext / iOS ATS settings (not
+  implicated — backend is HTTPS); the register payload/DTO shape (verified to already match
+  the backend's `RegisterRequest` exactly).
 
 ## Notes
 
 <!-- Any extra notes -->
-Verified against live data on 2026-08-14: wallets `SePay - Vietcombank` 8.175.000đ + `Tinder`
-1.000.000đ + `SePay - Sacombank` 0đ = total 9.175.000đ, with the `+10.000đ` (`sepay:73531578`)
-sitting on the Sacombank wallet contributing exactly 0 to that total, while August income across
-the `transactions` table totals 5.210.000đ including it.
-
-Branched from `dev`, independent of `feature/real-chat-sessions` — the two touch no common source
-files. Both are now merged into `dev`; the only merge conflicts were in this document and in the
-`src/services/index.ts` header comment, where the CSV-extraction work landed on `dev` in parallel.
+Diagnosed via two parallel read-only investigations (one tracing the registration request
+path, one tracing build/env config and Sentry init), including live read-only probes against
+the deployed backend (`GET/POST .../auth/register` vs. `.../api/auth/register`) that confirmed
+the missing `/api` prefix as the exact cause of the empty-body 404. Landed in two separate
+commits on `chore/maestro-overnight-flows` (kept apart from the Maestro-testing work below —
+unrelated fixes, per the "one feature/fix per commit" convention).
 
 ## History
 
@@ -128,3 +133,57 @@ files. Both are now merged into `dev`; the only merge conflicts were in this doc
   the `src/services/index.ts` header comment; both resolved by combining rather than picking a
   side, so the CSV work's history and its "wired to real" claims survive intact. Re-verified on
   the merge result: type-check clean, 112/112 Jest tests pass. Not pushed.
+- 2026-08-14 — User reported registration failing against the deployed backend
+  (`https://finviet-be-7t8w.onrender.com`) with no visible error and nothing in Sentry.
+  Diagnosed via two parallel Explore investigations rather than guessing: confirmed live
+  against the backend that `.env.local`'s `EXPO_PUBLIC_API_BASE_URL` was missing the `/api`
+  prefix (unlike `eas.json`'s already-correct `preview`/`production` values), so every
+  real-backend call 404'd with an empty body and no JSON envelope — explaining both the
+  generic "Đã có lỗi xảy ra" banner and, separately, why Sentry never saw it: the app's
+  `captureException` (used by the query client's global `onError` and the root
+  `ErrorBoundary`) gated on `EXPO_PUBLIC_SENTRY_DSN`, which was never set anywhere despite
+  `app/_layout.tsx` also unconditionally running a second, disconnected hardcoded
+  `Sentry.init(...)` — so the SDK was alive but every explicit capture call was a permanent
+  no-op in every build, not just this one. Fixed both: appended `/api` to `.env.local`, and
+  consolidated Sentry init onto a single path by defaulting `SENTRY_DSN`
+  (`src/lib/env.ts`) to the previously-hardcoded DSN, moving the full init config into
+  `initSentry()` (`src/lib/sentry.ts`), and deleting the duplicate raw `Sentry.init(...)`
+  block from `app/_layout.tsx`. type-check clean, lint 0 errors (84 pre-existing warnings
+  untouched), 72/72 Jest tests pass.
+- 2026-08-14 — User asked to leave Maestro flows running overnight against a real backend to
+  catch bugs. Built two flows (`.maestro/flows/happy-path.yaml`,
+  `exception-and-boundary-path.yaml`, shared `subflows/login.yaml`) run through Expo Go
+  (`host.exp.exponent`) rather than the installed `com.finviet.mobile` dev-client build — that
+  build predates the `expo-secure-store` native dependency and crashes on every launch, and a
+  rebuild wasn't something to do unilaterally. Added `accessibilityLabel` to a handful of
+  icon-only controls (`+` entry tab, `NumericKeypad` backspace/Done, goal-detail delete) so
+  Maestro could target them — closes a real a11y gap the project's own coding standards call
+  for, not just a test convenience. Added a self-healing PowerShell runner
+  (`scripts/maestro-overnight.ps1`, gitignored under the existing `scripts/` rule) that
+  relaunches the emulator/Metro if either dies mid-run. The emulator crashed and needed manual
+  or self-healing recovery four separate times over the course of the night — a recurring
+  instability worth investigating separately, not chased further here.
+- 2026-08-14 — Live testing surfaced two real, verified app bugs (not test-script issues):
+  (1) **Unhandled goal-mutation errors**: all four mutation handlers in the goals feature
+  (`NewGoalSheet.handleSave`, `ContributionSheet.handleSave`, `WithdrawSheet.handleSave`,
+  `handleDelete` — `app/(tabs)/budgets/goals/index.tsx` and `[id].tsx`) called
+  `await x.mutateAsync(...)` with no try/catch; a failed request (confirmed via a Sentry issue,
+  `AxiosError: Request failed with status code 400`, `onunhandledrejection`) threw straight
+  past the cleanup/close code, leaving the sheet stuck open with old values and zero feedback —
+  this is what caused goal creation to look "stuck" in Maestro runs before the fix. Fixed all
+  four to match the existing `getApiErrorMessage(err, fallback) + Alert.alert` pattern already
+  used in `entry/manual.tsx`. (2) **Onboarding allocation missing lock/edit**: user reported
+  `OnboardingAllocation.tsx` (onboarding step 2) has no lock-bucket or tap-to-edit-number
+  controls, unlike `app/settings/budget-allocation.tsx` — confirmed these are two fully
+  separate implementations, not a shared component. Added the same lock-toggle +
+  tap-to-edit-via-numpad UX to onboarding, reusing the settings screen's clamped-redistribution
+  behavior when a bucket is locked. (3) **Not fixed — out of scope for this repo**: user also
+  found the Budgets screen showing a bucket cap 100x too large (e.g. 1.050M instead of
+  10.5M for a 42%-of-25M allocation). Traced to `real/budgets.ts`'s `getBudgetBuckets` being a
+  pure passthrough of the backend's `allocationCap` field (`{ ...dto }`, no client math) — the
+  mock implementation correctly divides `needsPct` by 100 before multiplying by income, so this
+  is a `finviet-be` backend bug (using the raw whole-number percent instead of the fraction),
+  not fixable from this repo. Reported with an exact repro for whoever owns that repo.
+  type-check clean; lint clean on all changed files (pre-existing warnings elsewhere
+  untouched). Not fully re-verified live end-to-end after the last emulator crash — worth a
+  fresh Maestro pass next session before trusting these fixes fully.

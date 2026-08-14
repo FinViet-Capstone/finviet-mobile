@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { useGoals, useCreateGoal } from '@/hooks/useGoals';
+import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ const S = {
   deadlineLabel: 'Thời hạn',
   save: 'Tạo mục tiêu',
   cancel: 'Huỷ',
+  saveError: 'Không thể lưu. Hãy thử lại.',
   months: [
     'Tháng 1','Tháng 2','Tháng 3','Tháng 4',
     'Tháng 5','Tháng 6','Tháng 7','Tháng 8',
@@ -114,13 +117,17 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 
   const handleSave = useCallback(async () => {
     if (!name.trim() || !parsedTarget || !deadline.match(/^\d{4}-\d{2}-\d{2}$/)) return;
-    await createGoal.mutateAsync({
-      name: name.trim(),
-      targetAmount: parsedTarget,
-      deadline,
-    });
-    setName(''); setTargetRaw(''); setDeadline(isoDaysFromNow(90)); setTargetFocused(false);
-    onClose();
+    try {
+      await createGoal.mutateAsync({
+        name: name.trim(),
+        targetAmount: parsedTarget,
+        deadline,
+      });
+      setName(''); setTargetRaw(''); setDeadline(isoDaysFromNow(90)); setTargetFocused(false);
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.saveError));
+    }
   }, [name, parsedTarget, deadline, createGoal, onClose]);
 
   const isValid = name.trim() && targetRaw && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
