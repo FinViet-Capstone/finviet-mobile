@@ -321,8 +321,8 @@ export default function BudgetsScreen() {
     const bucketTypes: BucketType[] = ['needs', 'wants', 'savings'];
     return bucketTypes.map((bucket) => {
       const cats = categoriesByBucket[bucket];
-      // Spend = ALL expense in the bucket (incl. unbudgeted categories), shared
-      // with Home via useBucketSpend — not just the budgeted categories' spend.
+      // Progress includes every bucket expense (including unbudgeted categories);
+      // Savings also nets goal withdrawals. Shared with Home via useBucketSpend.
       const spent = bucketSpend[bucket];
       const monthlyLimit = cats.reduce((s, c) => s + (budgetMap[c.id]?.monthlyLimit ?? 0), 0);
       const cap = Math.round(income * bucketPct[bucket]);

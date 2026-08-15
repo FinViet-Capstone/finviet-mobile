@@ -79,6 +79,8 @@ export const BUSINESS_RULE_MESSAGES_VI: Record<string, string> = {
 
   // ─── Saving Goals ───────────────────────────────────────────────────────────
   goal_remaining_exceeded: 'Số tiền vượt quá số tiền còn thiếu để đạt mục tiêu.',
+  goal_balance_must_be_withdrawn:
+    'Hãy rút hết số tiền còn lại về ví thường trước khi lưu trữ mục tiêu.',
   goal_ledger_invalid: 'Lịch sử đóng góp của mục tiêu này không hợp lệ nên không thể xóa.',
   goal_wallet_missing: 'Ví dùng để nạp tiền cho mục tiêu này không còn tồn tại.',
   goal_ledger_reversal_insufficient_balance:

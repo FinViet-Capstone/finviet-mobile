@@ -15,7 +15,7 @@ export interface TransactionFilters {
   /** When true, returns only transactions with categoryId === null */
   uncategorizedOnly?: boolean;
   /**
-   * When true, filters out cat_savings_goal expense transactions.
+   * When true, filters out all cat_savings_goal transactions.
    * Use for "pure spend" views (Budgets bucket spend, spending reports).
    * Default false — goal contributions appear in the full transaction history.
    */

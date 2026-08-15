@@ -151,7 +151,7 @@ export function getSpendingScore(view: 'weekly' | 'monthly' = 'weekly'): Spendin
   return view === 'monthly' ? MOCK_SPENDING_SCORE_MONTHLY : MOCK_SPENDING_SCORE_WEEKLY;
 }
 
-export function getWeeklyReport(): WeeklyReport {
+export function getWeeklyReport(_reportId?: string): WeeklyReport {
   return MOCK_WEEKLY_REPORT;
 }
 
@@ -227,8 +227,26 @@ export function getChatSessionMessages(sessionId: string): ChatMessage[] {
 
 const delay = (ms = 900) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** Mock: open a new conversation, newest-first like the backend orders them. */
+export async function createChatSession(title?: string): Promise<ChatSession> {
+  await delay(200);
+  const session: ChatSession = {
+    sessionId: `session_${Date.now()}`,
+    customerId: USER_ID,
+    previewText: title?.trim() || 'Cuộc trò chuyện mới',
+    lastMessageAt: new Date().toISOString(),
+    messageCount: 0,
+  };
+  MOCK_CHAT_SESSIONS.unshift(session);
+  SESSION_MAP[session.sessionId] = [];
+  return session;
+}
+
 /** Mock chat: echo a canned advisory reply after a short delay. */
-export async function sendChatMessage(question: string): Promise<ChatMessage> {
+export async function sendChatMessage(
+  question: string,
+  sessionId?: string,
+): Promise<ChatMessage> {
   await delay();
   return {
     id: `msg_${Date.now()}`,
@@ -237,7 +255,7 @@ export async function sendChatMessage(question: string): Promise<ChatMessage> {
     content:
       `Đây là phản hồi mẫu cho câu hỏi "${question.slice(0, 60)}". ` +
       'Kết nối backend để nhận phân tích tài chính thực tế.',
-    sessionId: 'default',
+    sessionId: sessionId ?? 'default',
     createdAt: new Date().toISOString(),
   };
 }

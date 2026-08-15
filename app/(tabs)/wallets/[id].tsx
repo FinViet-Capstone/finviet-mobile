@@ -30,6 +30,9 @@ const S = {
   basic: 'Ví cơ bản',
   linked: 'Ví liên kết',
   balance: 'Số dư',
+  // Linked-wallet balances mirror what the bank reports, so they don't move with
+  // each synced transaction — say so instead of letting it look like a bug.
+  balanceSynced: 'Số dư đồng bộ từ ngân hàng',
   history: 'LỊCH SỬ GIAO DỊCH',
   empty: 'Chưa có giao dịch nào',
   syncOk: 'Đã đồng bộ',
@@ -215,6 +218,9 @@ export default function WalletDetailScreen() {
               </Text>
             )}
           </View>
+          {wallet.type === 'linked' && (
+            <Text style={styles.balanceNote}>{S.balanceSynced}</Text>
+          )}
         </View>
 
         {/* Sync button for linked wallets */}
@@ -292,6 +298,8 @@ const styles = StyleSheet.create({
   balanceAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
   typeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
   typeText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  // Dimmer than typeText so it reads as a footnote, not a second status line.
+  balanceNote: { fontSize: FONT_SIZE.xs, color: COLORS.outline, textAlign: 'center' },
   syncText: { fontSize: FONT_SIZE.xs },
   syncBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

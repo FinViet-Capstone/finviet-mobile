@@ -27,6 +27,7 @@ import {
   useGoals,
   useCustomer,
   useEffectiveIncomeAllocation,
+  useUnreadNotifications,
 } from '@/hooks';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -81,6 +82,7 @@ export default function HomeScreen() {
   const { data: monthTx } = useTransactions(monthRange);
   const bucketSpend = useBucketSpend(monthRange);
   const { data: recentTx } = useRecentTransactions(5);
+  const { data: unreadNotifications = [] } = useUnreadNotifications();
 
   // ── Banner animation ────────────────────────────────────────────────────────
   const bannerOpacity = useSharedValue(0);
@@ -97,8 +99,8 @@ export default function HomeScreen() {
     [walletData],
   );
 
-  // Spend per bucket — shared derivation (all expense tx grouped by defaultBucket),
-  // identical to the Budgets tab. Includes spend in categories with no budget set.
+  // Progress per bucket — shared derivation, identical to the Budgets tab.
+  // Savings nets goal-withdrawal income against expense contributions.
   const { needs: needsSpent, wants: wantsSpent, savings: savingsSpent } = bucketSpend;
 
   // Bucket denominator = allocation cap (income × bucket %), matching the Budgets
@@ -114,7 +116,11 @@ export default function HomeScreen() {
   const topGoal = useMemo((): SavingsGoalWithProgress | null => {
     const activeGoals = (goals ?? []).filter((g) => !g.isCompleted && !g.isDeleted);
     if (activeGoals.length === 0) return null;
-    return activeGoals.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())[0];
+    return activeGoals.sort((a, b) => {
+      if (!a.deadline) return b.deadline ? 1 : 0;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    })[0];
   }, [goals]);
 
   const uncategorizedCount = useMemo(() => {
@@ -168,8 +174,17 @@ export default function HomeScreen() {
           onPress={() => router.push('/notifications')}
           activeOpacity={0.8}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Thông báo, ${unreadNotifications.length} chưa đọc`}
         >
           <MaterialIcon name="notifications" size={22} color={COLORS.outline} />
+          {unreadNotifications.length > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>
+                {unreadNotifications.length > 99 ? '99+' : unreadNotifications.length}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -295,6 +310,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -SPACING[1],
+    right: -SPACING[1],
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: SPACING[1],
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.error,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  unreadBadgeText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.onError,
   },
   scroll: {
     flex: 1,

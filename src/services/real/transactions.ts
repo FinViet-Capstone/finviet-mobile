@@ -15,8 +15,8 @@
  *     backend field at all and are silently dropped either way.
  *   - The server filter vocabulary is coarse (INCOME/EXPENSE/TRANSFER), so the
  *     finer mock filters (uncategorizedOnly transfer-exclusion, hideGoalContributions,
- *     transfer_in/out subtype) are re-applied client-side on the fetched page to
- *     keep behaviour identical to the mock.
+ *     transfer_in/out subtype) are re-applied client-side after fetching every
+ *     server page to keep behaviour identical to the mock.
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -31,9 +31,9 @@ import type {
   TransactionSummary,
 } from '@/services/mock/transactions';
 
-// A page big enough that the client-side refinements below see the full set the
-// way the mock (which held everything in memory) did.
-const MAX_PAGE_SIZE = 500;
+// Maximum page size accepted by the backend. Calendar queries may span multiple
+// pages; fetch all of them before applying the mock-compatible refinements.
+const PAGE_SIZE = 100;
 
 // ─── Backend DTO shapes ───────────────────────────────────────────────────────
 
@@ -122,21 +122,32 @@ function toServerType(type?: TransactionType): string | undefined {
 export async function getTransactions(
   filters?: TransactionFilters,
 ): Promise<Transaction[]> {
-  const params: Record<string, unknown> = {
-    page: 1,
-    pageSize: MAX_PAGE_SIZE,
-  };
-  if (filters?.walletId !== undefined) params.walletId = filters.walletId;
-  if (filters?.startDate !== undefined) params.from = filters.startDate;
-  if (filters?.endDate !== undefined) params.to = filters.endDate;
-  if (filters?.uncategorizedOnly === true) params.uncategorizedOnly = true;
-  else if (filters?.categoryId !== undefined) params.categoryId = filters.categoryId;
+  const baseParams: Record<string, unknown> = { pageSize: PAGE_SIZE };
+  if (filters?.walletId !== undefined) baseParams.walletId = filters.walletId;
+  if (filters?.startDate !== undefined) baseParams.from = filters.startDate;
+  if (filters?.endDate !== undefined) baseParams.to = filters.endDate;
+  if (filters?.uncategorizedOnly === true) baseParams.uncategorizedOnly = true;
+  else if (filters?.categoryId !== undefined) baseParams.categoryId = filters.categoryId;
   const serverType = toServerType(filters?.type);
-  if (serverType) params.type = serverType;
+  if (serverType) baseParams.type = serverType;
 
-  const res = await api.get('/transactions', { params });
-  const paged = unwrap<PagedDto<TransactionDto>>(res);
-  let rows = (paged.items ?? []).map(toTransaction);
+  const firstResponse = await api.get('/transactions', {
+    params: { ...baseParams, page: 1 },
+  });
+  const firstPage = unwrap<PagedDto<TransactionDto>>(firstResponse);
+  const totalPages = Math.max(1, firstPage.totalPages ?? 1);
+  const remainingPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, async (_, index) => {
+      const response = await api.get('/transactions', {
+        params: { ...baseParams, page: index + 2 },
+      });
+      return unwrap<PagedDto<TransactionDto>>(response);
+    }),
+  );
+
+  let rows = [firstPage, ...remainingPages].flatMap((page) =>
+    (page.items ?? []).map(toTransaction),
+  );
 
   // Re-apply the mock's finer semantics client-side so the swap is transparent.
   if (filters?.type !== undefined) {

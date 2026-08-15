@@ -13,11 +13,13 @@ auto-sync wallets) and layers an "AI Spending Score," AI-labeled weekly reports,
 chatbot advisor on top — all in Vietnamese. **Current implementation status:** the app's UI,
 navigation, wallets/transactions/budgets/goals/categories data layer, and entry flows are
 real, working logic against an in-memory mock service layer (swappable to a real REST API per
-domain via a `USE_MOCK` flag). The "AI" layer (spending score, weekly report, chatbot) is
-currently **static mock content** — two hardcoded score objects and canned report/chat text —
-not yet backed by a live formula or LLM call. The product intent (per CLAUDE.md's own tagline:
-"AI-Powered Personal Finance Tracker and Spending Advisor") is for that layer to become real;
-that work has not landed in this codebase yet.
+domain via a `USE_MOCK` flag). The "AI" layer (spending score, weekly report, chatbot) has a
+**mock fallback** (two hardcoded score objects and canned report/chat text, used when
+`USE_MOCK=true`) but is also **fully wired to the real backend** (`src/services/real/reports.ts`
+→ `/ai/score`, `/ai/reports`, `/ai/chat`, backed by an LLM/RAG pipeline) — set
+`EXPO_PUBLIC_USE_MOCK=false` and it computes real scores/reports/chat replies from the
+customer's actual data, matching the "AI-Powered Personal Finance Tracker and Spending Advisor"
+tagline. The mock objects remain the dev-mode fallback, not the shipped behavior.
 
 ## Users
 ---
@@ -40,8 +42,11 @@ A. Wallets & Multi-Method Transaction Entry
 - Four entry methods behind a single "+" tab chooser, matching the real `EntryMethod` union
   (`'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste'`): **Manual** (no AI assist),
   **SMS paste** (extraction preview), **Photo/receipt scan** (batch up to 5, review-list UX),
-  **CSV import** (bank export). Photo-based OCR extraction is mock-only in this codebase (no
-  backend call).
+  **CSV import** (bank export, multi-row review-list UX). SMS and CSV extraction both call a
+  real backend endpoint (`POST /extract/sms`, `POST /extract/csv`) with genuine AI
+  categorization when `USE_MOCK=false`. Photo-based OCR extraction stays mock-only in this
+  codebase — a backend endpoint exists (`POST /extract/photo`) but has no real OCR provider
+  wired in yet, so it always responds 503.
 - Internal wallet-to-wallet transfers create two linked `Transaction` records
   (`type: 'transfer_out'`/`'transfer_in'`) sharing a real `transferPairId`; deleting either leg
   deletes both and reverses both wallet balances. (There is no "pending cash-withdrawal
@@ -82,10 +87,12 @@ C. Budgets & Pacing
     `uncategorizedWarning` when uncategorized spend exceeds 10%. **Known inconsistency:** the
     bucket share used here is a hardcoded 50/30/20 constant, not the customer's actual
     configurable `needsPct`/`wantsPct`/`savingsPct` fields — worth reconciling later.
-- Savings-bucket rendering is genuinely different from Needs/Wants: `BudgetOverviewCard`'s
-  `getPctColor(..., goalMode)` renders the savings row green once spend (i.e. saved amount)
-  reaches 100% of its target, and neutral gray (never red) below that — exceeding a savings
-  target is good, unlike overspending Needs/Wants which turns amber/red.
+- Savings-bucket rendering is genuinely different from Needs/Wants: its monthly progress is
+  expense assigned to Savings minus `cat_savings_goal` withdrawal income, clamped at zero. The
+  transaction history still keeps the gross contribution expense and withdrawal income as separate
+  directional records. `BudgetOverviewCard` renders the Savings row green once the raw amount reaches
+  its target and neutral gray (never red) below it; its displayed badge/bar are capped at 100%, while
+  the amount remains truthful when the target is exceeded.
 
 D. Savings Goals
 - Named goals (`targetAmount`, `currentAmount`, optional `deadline`, optional
@@ -97,23 +104,34 @@ D. Savings Goals
   wallet is set — rejects amount exceeding that wallet's balance. A successful contribution
   creates a real `Transaction` (`categoryId: 'cat_savings_goal'`, `type: 'expense'`) and debits
   the wallet through the same balance-adjustment path as any other transaction.
-  `currentAmount` is always recomputed as the true sum of contributions; the goal flips
-  `isCompleted` once contributions reach the target. Deleting a goal reverses every linked
-  contribution's transaction and restores the wallet balance.
+  `currentAmount` is always recomputed as the true sum of contributions minus withdrawals; the
+  goal flips `isCompleted` once contributions reach the target. Archiving is allowed only after
+  the customer explicitly withdraws the full balance to a selected basic wallet. It then
+  soft-deletes the zero-balance goal while preserving every ledger row and generated transaction;
+  archived goals remain readable in the app's read-only `Đã lưu trữ` section.
 
 E. AI Spending Score, Weekly Report & Advisor Chat
 - `SpendingScore` (`view: 'weekly'|'monthly'`, `score`, `color: 'green'|'amber'|'red'`,
-  `verdictVi`, `reasonVi`, `commentaryVi`) is the intended shape, and the weekly/monthly toggle
-  is a real code branch — **but today it selects between two hardcoded literal objects**
-  (score 72/green for weekly, 54/amber for monthly) rather than computing anything from the
-  customer's actual transactions/budgets. The monthly object's Vietnamese commentary text even
-  narrates sub-scores (e.g. "điểm tiết kiệm 68/100") as prose, but no such sub-score fields or
-  formulas exist in the type or the computation.
-- Weekly reports and the advisor chatbot are likewise static: canned Vietnamese report text
-  and a templated echo reply, not a real LLM call.
+  `verdictVi`, `reasonVi`, `commentaryVi`) is real end to end when `USE_MOCK=false`:
+  `real/reports.ts` calls `GET /ai/score?period=WEEKLY|MONTHLY`, which computes a genuine score
+  from the customer's transactions/budgets and returns a `colorBadge` + Vietnamese `comment`.
+  The mock fallback (used only when `USE_MOCK=true`) still selects between two hardcoded literal
+  objects (score 72/green for weekly, 54/amber for monthly) — that's a dev convenience, not the
+  shipped behavior. Note the backend returns a single `comment` string, not separate
+  verdict/reason/commentary fields — the FE derives a short verdict from the color band and
+  reuses the comment for the rest; when the AI provider is unavailable the backend returns
+  `comment: null`, which the FE shows as fallback text rather than a blank box.
+- Weekly reports (`GET /ai/reports`, `POST /ai/reports/generate`) and the advisor chatbot
+  (`POST /ai/chat`, `GET /ai/chat/history`) are likewise real — genuine LLM-backed Vietnamese
+  narratives/replies, not canned text, once `USE_MOCK=false`. The backend keeps a single flat
+  chat history per customer (no server-side "session" concept); the FE folds it into one
+  synthetic session so the existing session-list UI keeps working. The mock versions (canned
+  report text, templated echo reply) remain only the `USE_MOCK=true` dev fallback.
 - UI-wise this is a real, built feature (score card with weekly/monthly toggle, a score-detail
-  screen, and a bottom-sheet chat) — it is the computation/generation behind it that is not
-  yet implemented.
+  screen, and a bottom-sheet chat), and as of this doc's last update the computation/generation
+  behind it is real too — the only thing gating it from "live" is the `USE_MOCK` flag and a
+  running backend with an AI provider configured (the backend is mid-switch from local Ollama
+  to Gemini/Google AI Studio as its provider — a backend-side config change, no FE impact).
 
 F. Notifications
 - `AppNotification` types: `budget_alert`, `weekly_report`, `goal_milestone`, `announcement`,
@@ -214,8 +232,10 @@ implements them.
 - A `USE_MOCK` toggle in `src/services/index.ts` swaps each domain between
   `src/services/mock/*` and `src/services/real/*` with identical function signatures — this
   swap is already implemented for wallets/transactions/budgets/goals/customer-categories/
-  notifications/rules/SMS-extraction and bank-linking (SePay only); photo-OCR
-  extraction and the AI score/report/chat layer remain mock-only.
+  notifications/rules/SMS-extraction/CSV-extraction/AI score-report-chat and bank-linking
+  (SePay only); photo-OCR extraction and subscriptions are the only domains that remain
+  mock-only (no backend endpoint for subscriptions; a backend photo-OCR endpoint exists but has
+  no real OCR provider wired in, so it always 503s).
 - Backend is a separate repo not present in this codebase — this app only assumes a REST API
   reachable at `EXPO_PUBLIC_API_BASE_URL`; no specific backend technology is asserted here.
 

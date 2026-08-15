@@ -39,19 +39,24 @@ export {
 } from './useIncomeAllocation';
 export {
   useGoals,
+  useArchivedGoals,
   useGoalById,
+  useGoalContributions,
   useCreateGoal,
   useUpdateGoal,
   useDeleteGoal,
   useAddContribution,
+  useWithdrawFromGoal,
 } from './useGoals';
 export { useBucketSpend, type BucketSpend } from './useBucketSpend';
+export { useAiPreferences, useUpdateAiPreferences } from './useAiPreferences';
 export {
   useSpendingScore,
   useWeeklyReport,
   useChatHistory,
   useChatSessions,
   useChatSessionMessages,
+  useCreateChatSession,
   useSendChatMessage,
   useGenerateWeeklyReport,
 } from './useReports';
@@ -63,6 +68,7 @@ export {
 } from './useNotifications';
 export { useExtractFromPhoto } from './useExtractFromPhoto';
 export { useExtractFromSMS } from './useExtractFromSMS';
+export { useExtractFromCsv } from './useExtractFromCsv';
 export {
   useLogin,
   useRegister,

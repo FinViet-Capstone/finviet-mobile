@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,7 +20,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
-import { useGoals, useCreateGoal } from '@/hooks/useGoals';
+import { useArchivedGoals, useCreateGoal, useGoals } from '@/hooks/useGoals';
+import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ const S = {
   daysLeft: (n: number) => `Còn ${n} ngày`,
   monthsLeft: (n: number) => `Còn ${n} tháng`,
   completed: 'Hoàn thành',
+  archived: 'Đã lưu trữ',
+  noDeadline: 'Không có thời hạn',
   needsPerMonth: (n: string) => `Cần ${n}/tháng`,
   newGoalTitle: 'Tạo mục tiêu mới',
   nameLabel: 'Tên mục tiêu',
@@ -43,6 +47,7 @@ const S = {
   deadlineLabel: 'Thời hạn',
   save: 'Tạo mục tiêu',
   cancel: 'Huỷ',
+  saveError: 'Không thể lưu. Hãy thử lại.',
   months: [
     'Tháng 1','Tháng 2','Tháng 3','Tháng 4',
     'Tháng 5','Tháng 6','Tháng 7','Tháng 8',
@@ -58,7 +63,8 @@ function formatVND(amount: number): string {
   return amount.toLocaleString('vi-VN');
 }
 
-function daysUntil(isoDate: string): number {
+function daysUntil(isoDate: string | null): number {
+  if (!isoDate) return Number.POSITIVE_INFINITY;
   const diff = new Date(isoDate).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
@@ -74,7 +80,9 @@ function isoDaysFromNow(days: number): string {
 }
 
 function deadlineBadge(goal: SavingsGoalWithProgress): { label: string; color: string; bg: string } {
+  if (goal.isDeleted) return { label: S.archived, color: COLORS.onSurfaceVariant, bg: COLORS.surfaceVariant };
   if (goal.isCompleted) return { label: S.completed, color: COLORS.tertiary, bg: `${COLORS.tertiary}20` };
+  if (!goal.deadline) return { label: S.noDeadline, color: COLORS.onSurfaceVariant, bg: COLORS.surfaceVariant };
   const days = daysUntil(goal.deadline);
   if (days <= 30) return { label: S.daysLeft(days), color: COLORS.secondary, bg: `${COLORS.secondary}20` };
   return { label: S.monthsLeft(goal.monthsRemaining), color: COLORS.onSurfaceVariant, bg: COLORS.surfaceVariant };
@@ -114,13 +122,17 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 
   const handleSave = useCallback(async () => {
     if (!name.trim() || !parsedTarget || !deadline.match(/^\d{4}-\d{2}-\d{2}$/)) return;
-    await createGoal.mutateAsync({
-      name: name.trim(),
-      targetAmount: parsedTarget,
-      deadline,
-    });
-    setName(''); setTargetRaw(''); setDeadline(isoDaysFromNow(90)); setTargetFocused(false);
-    onClose();
+    try {
+      await createGoal.mutateAsync({
+        name: name.trim(),
+        targetAmount: parsedTarget,
+        deadline,
+      });
+      setName(''); setTargetRaw(''); setDeadline(isoDaysFromNow(90)); setTargetFocused(false);
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.saveError));
+    }
   }, [name, parsedTarget, deadline, createGoal, onClose]);
 
   const isValid = name.trim() && targetRaw && deadline.match(/^\d{4}-\d{2}-\d{2}$/);
@@ -257,7 +269,14 @@ function GoalCard({ goal, onPress }: { goal: SavingsGoalWithProgress; onPress: (
 export default function GoalsScreen() {
   const router = useRouter();
   const { data: goals = [], isLoading, isError, error, refetch } = useGoals();
+  const {
+    data: archivedGoals = [],
+    isError: isArchivedError,
+    error: archivedError,
+    refetch: refetchArchived,
+  } = useArchivedGoals();
   const [newGoalVisible, setNewGoalVisible] = useState(false);
+  const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
   const activeGoals = useMemo(() =>
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && !g.isCompleted)
@@ -272,14 +291,25 @@ export default function GoalsScreen() {
     router.push({ pathname: '/(tabs)/budgets/goals/[id]', params: { id: goal.id } });
   }, [router]);
 
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetch(), refetchArchived()]);
+  }, [refetch, refetchArchived]);
+
   if (isLoading) return <LoadingSpinner />;
-  if (isError) return <ErrorState message={(error as Error)?.message} onRetry={refetch} />;
+  if (isError || isArchivedError)
+    return (
+      <ErrorState
+        message={((error ?? archivedError) as Error)?.message}
+        onRetry={handleRefresh}
+      />
+    );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
+        <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}
+          onPress={() => router.dismissTo('/(tabs)/budgets')}
           accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
         </TouchableOpacity>
@@ -295,7 +325,7 @@ export default function GoalsScreen() {
       <View style={styles.toggleWrap}>
         <View style={styles.toggle}>
           <TouchableOpacity activeOpacity={0.7} style={styles.toggleOption}
-            onPress={() => router.back()}>
+            onPress={() => router.dismissTo('/(tabs)/budgets')}>
             <Text style={styles.toggleTextInactive}>{S.tabBudget}</Text>
           </TouchableOpacity>
           <View style={[styles.toggleOption, styles.toggleOptionActive]}>
@@ -306,7 +336,7 @@ export default function GoalsScreen() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.primary} />}>
+        refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} tintColor={COLORS.primary} />}>
 
         {activeGoals.length === 0 && completedGoals.length === 0 ? (
           <View style={styles.emptyState}>
@@ -330,6 +360,32 @@ export default function GoalsScreen() {
                 ))}
               </>
             )}
+          </>
+        )}
+
+        {archivedGoals.length > 0 && (
+          <>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.archivedHeader}
+              onPress={() => setIsArchivedExpanded((value) => !value)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isArchivedExpanded }}
+            >
+              <View style={styles.archivedHeaderLabel}>
+                <MaterialIcon name="archive" size={16} color={COLORS.onSurfaceVariant} />
+                <Text style={styles.archivedHeaderText}>{S.archived}</Text>
+                <Text style={styles.archivedCount}>{archivedGoals.length}</Text>
+              </View>
+              <MaterialIcon
+                name={isArchivedExpanded ? 'expand_less' : 'expand_more'}
+                size={20}
+                color={COLORS.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+            {isArchivedExpanded && archivedGoals.map((goal) => (
+              <GoalCard key={goal.id} goal={goal} onPress={() => handleGoalPress(goal)} />
+            ))}
           </>
         )}
       </ScrollView>
@@ -375,6 +431,18 @@ const styles = StyleSheet.create({
     marginTop: SPACING[2],
   },
   sectionDividerText: { fontSize: FONT_SIZE.xs, color: COLORS.tertiary, fontWeight: FONT_WEIGHT.semibold },
+  archivedHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: SPACING[3], borderTopWidth: 1, borderTopColor: COLORS.surfaceVariant,
+    marginTop: SPACING[2],
+  },
+  archivedHeaderLabel: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
+  archivedHeaderText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.semibold },
+  archivedCount: {
+    minWidth: 22, paddingHorizontal: SPACING[1], paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full, backgroundColor: COLORS.surfaceVariant,
+    fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, textAlign: 'center',
+  },
   // Goal card
   goalCard: {
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.xl,

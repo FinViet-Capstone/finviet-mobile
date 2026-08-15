@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import TabBarIcon from '@/components/common/TabBarIcon';
@@ -14,6 +15,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
       onPress={onPress}
       activeOpacity={0.85}
       style={styles.entryWrapper}
+      accessibilityLabel="Thêm giao dịch"
     >
       <View style={styles.entryButton}>
         <MaterialIcon name="add" color={colors.onPrimary} size={28} />
@@ -24,6 +26,7 @@ function EntryTabButton({ onPress }: BottomTabBarButtonProps) {
 
 export default function TabLayout() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -33,8 +36,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: `${colors.surfaceContainer}E6`,
           borderTopColor: `${colors.outlineVariant}66`,
-          height: 64,
-          paddingBottom: 10,
+          height: 64 + insets.bottom,
+          paddingBottom: 10 + insets.bottom,
           paddingTop: 4,
         },
         tabBarLabelStyle: {
@@ -81,6 +84,7 @@ export default function TabLayout() {
         name="budgets"
         options={{
           title: 'Ngân sách',
+          popToTopOnBlur: true,
           tabBarIcon: ({ color }) => (
             <TabBarIcon icon="pie_chart" color={color} size={24} />
           ),

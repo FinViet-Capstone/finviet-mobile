@@ -1,0 +1,181 @@
+appId: host.exp.exponent
+---
+# Deliberate invalid input / edge cases: are failures caught and surfaced
+# correctly (specific error text, no crash, no silent bad write) rather than
+# just "didn't crash"? A failing assertion here is real bug signal.
+
+# ── Bad login: wrong password against the real registered account ──────────
+# Same dance as subflows/login.yaml (clearState wipes Expo Go's own storage,
+# so its one-time overlays reappear too) — see that file for why each step
+# is here. Real email (khoicongviec@gmail.com), deliberately wrong password.
+- launchApp:
+    clearState: true
+- openLink: "exp://10.0.2.2:8081"
+- extendedWaitUntil:
+    visible: "DENY"
+    timeout: 60000
+    optional: true
+- tapOn:
+    text: "DENY"
+    optional: true
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- back
+- openLink: "exp://10.0.2.2:8081"
+- extendedWaitUntil:
+    visible: "DENY"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: "DENY"
+    optional: true
+- tapOn: "demo@finviet.local"
+- eraseText
+- inputText: "khoicongviec@gmail.com"
+- tapOn: "Nhập mật khẩu"
+- eraseText
+- inputText: "WrongPassword123"
+- tapOn:
+    text: "Đăng nhập"
+    index: 1
+- assertVisible: "Quản lý tài chính thông minh"
+
+# ── Real login, to proceed with the rest of the boundary checks ────────────
+- runFlow: ../subflows/login.yaml
+
+# ── Zero-amount transaction must be rejected, not silently saved ───────────
+# Confirmed against src/app/(tabs)/entry/manual.tsx:52-56 (zod schema):
+# "Vui lòng nhập số tiền" is the invalid_type_error (amount isn't a number
+# at all — not reachable via the keypad, which always has a numeric value).
+# The keypad's unset state is a valid 0, which fails .positive() instead,
+# surfacing "Số tiền phải lớn hơn 0" — that's the one this test can reach.
+- tapOn: "Thêm giao dịch"
+- tapOn: "Nhập Thủ Công"
+- tapOn: "Xong"
+- tapOn: "Lưu"
+- assertVisible: "Số tiền phải lớn hơn 0"
+- tapOn: "Hủy"
+
+# ── Overdraft: amount far exceeding any realistic wallet balance ───────────
+- tapOn: "Thêm giao dịch"
+- tapOn: "Nhập Thủ Công"
+- tapOn: "9"
+- tapOn: "9"
+- tapOn: "9"
+- tapOn: "000"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn: "Lưu"
+- assertVisible: "Số dư ví không đủ"
+- tapOn: "Hủy"
+
+# ── Empty goal creation must not be creatable (save gate stays disabled) ───
+- tapOn: "Ngân sách"
+- tapOn: "Mục tiêu tiết kiệm"
+- tapOn: "Tạo mục tiêu"
+- assertVisible: "Tên mục tiêu"
+- tapOn:
+    text: "Tạo mục tiêu"
+    index: 1
+- assertVisible: "Tên mục tiêu"
+- tapOn: "Huỷ"
+
+# ── Scaffold: a small goal is needed to exercise contribution/withdrawal
+#    boundaries below — this write is expected to succeed (goal creation
+#    itself isn't what's being tested), and is cleaned up at the end. ──────
+- tapOn: "Tạo mục tiêu"
+- tapOn: "VD: Mua MacBook Pro"
+- inputText: "Maestro QA Boundary Goal"
+- tapOn: "Nhập số tiền"
+- tapOn: "5"
+- tapOn: "0"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn:
+    text: "Tạo mục tiêu"
+    index: 1
+- assertVisible: "Maestro QA Boundary Goal"
+- tapOn: "Maestro QA Boundary Goal"
+
+# ── Contribution exceeding wallet balance ───────────────────────────────────
+# extendedWaitUntil before each amount field below: the contribution/
+# withdrawal sheet slides up and needs a moment to settle before its fields
+# are tappable — confirmed live against happy-path.yaml, not guessed.
+- tapOn: "Thêm tiền tiết kiệm"
+- extendedWaitUntil:
+    visible: "Nhập số tiền"
+    timeout: 8000
+- tapOn: "Nhập số tiền"
+- tapOn: "9"
+- tapOn: "9"
+- tapOn: "9"
+- tapOn: "000"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn:
+    text: "Lưu"
+    index: 0
+- assertVisible: "Số dư ví không đủ"
+- tapOn: "Huỷ"
+
+# ── Contribution exceeding the goal's remaining target (target is 50.000đ,
+#    requesting 60.000đ — comfortably within any demo wallet balance but
+#    over what the goal still needs). ───────────────────────────────────────
+- tapOn: "Thêm tiền tiết kiệm"
+- extendedWaitUntil:
+    visible: "Nhập số tiền"
+    timeout: 8000
+- tapOn: "Nhập số tiền"
+- tapOn: "6"
+- tapOn: "0"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn:
+    text: "Lưu"
+    index: 0
+- assertVisible: "Vượt số tiền còn thiếu"
+- tapOn: "Huỷ"
+
+# ── Withdrawal exceeding saved amount: contribute 10.000đ for real first,
+#    then try to withdraw more than that. ───────────────────────────────────
+- tapOn: "Thêm tiền tiết kiệm"
+- extendedWaitUntil:
+    visible: "Nhập số tiền"
+    timeout: 8000
+- tapOn: "Nhập số tiền"
+- tapOn: "1"
+- tapOn: "0"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn:
+    text: "Lưu"
+    index: 0
+- assertVisible: "Đã tiết kiệm"
+- tapOn: "Rút tiền"
+- extendedWaitUntil:
+    visible: "Nhập số tiền"
+    timeout: 8000
+- tapOn: "Nhập số tiền"
+- tapOn: "5"
+- tapOn: "0"
+- tapOn: "000"
+- tapOn: "Xong"
+- tapOn:
+    text: "Lưu"
+    index: 0
+- assertVisible: "Vượt số tiền đã tiết kiệm"
+- tapOn: "Huỷ"
+
+# ── Cleanup the scaffold goal ───────────────────────────────────────────────
+- tapOn: "Xoá mục tiêu?"
+- assertVisible: "Xoá mục tiêu?"
+- tapOn: "Xoá"
+
+# ── Broken deep link: transaction id that doesn't exist ────────────────────
+- openLink: "finviet://transactions/nonexistent-txn-id-maestro-qa"
+- assertVisible: "Không tìm thấy giao dịch"

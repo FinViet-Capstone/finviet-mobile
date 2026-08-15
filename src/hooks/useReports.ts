@@ -5,11 +5,12 @@ import {
   getChatHistory,
   getChatSessions,
   getChatSessionMessages,
+  createChatSession,
   sendChatMessage,
   generateWeeklyReport,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, ChatSession } from '@/types';
 
 export const useSpendingScore = (view: 'weekly' | 'monthly' = 'weekly') =>
   useQuery({
@@ -18,10 +19,10 @@ export const useSpendingScore = (view: 'weekly' | 'monthly' = 'weekly') =>
     staleTime: STALE_TIME.long,
   });
 
-export const useWeeklyReport = () =>
+export const useWeeklyReport = (reportId?: string) =>
   useQuery({
-    queryKey: queryKeys.reports.weekly(),
-    queryFn: () => getWeeklyReport(),
+    queryKey: [...queryKeys.reports.weekly(), reportId ?? 'latest'] as const,
+    queryFn: () => getWeeklyReport(reportId),
     staleTime: STALE_TIME.long,
   });
 
@@ -47,17 +48,32 @@ export const useChatSessionMessages = (sessionId: string | null) =>
     staleTime: STALE_TIME.long,
   });
 
+/** Open a new conversation, titled with the question that starts it. */
+export const useCreateChatSession = () => {
+  const qc = useQueryClient();
+  return useMutation<ChatSession, Error, string | undefined>({
+    mutationFn: (title) => createChatSession(title),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...queryKeys.reports.all(), 'sessions'] });
+    },
+  });
+};
+
 /**
- * Send a chat question to the AI advisor. On success the flat chat history is
- * invalidated so the history drawer/session list pick up the new exchange.
+ * Send a chat question to the AI advisor. Omitting `sessionId` targets the default
+ * session. On success the chat history and session list are invalidated so the
+ * history drawer picks up the new exchange.
  */
 export const useSendChatMessage = () => {
   const qc = useQueryClient();
-  return useMutation<ChatMessage, Error, string>({
-    mutationFn: (question: string) => sendChatMessage(question),
-    onSuccess: () => {
+  return useMutation<ChatMessage, Error, { question: string; sessionId?: string }>({
+    mutationFn: ({ question, sessionId }) => sendChatMessage(question, sessionId),
+    onSuccess: (message) => {
       qc.invalidateQueries({ queryKey: queryKeys.reports.chat() });
       qc.invalidateQueries({ queryKey: [...queryKeys.reports.all(), 'sessions'] });
+      qc.invalidateQueries({
+        queryKey: [...queryKeys.reports.all(), 'session', message.sessionId],
+      });
     },
   });
 };

@@ -50,9 +50,10 @@ export const queryKeys = {
   },
   goals: {
     all: () => ['goals'] as const,
-    detail: (id: string | undefined) => [...queryKeys.goals.all(), id] as const,
+    list: (archived: boolean) => [...queryKeys.goals.all(), 'list', archived] as const,
+    detail: (id: string | undefined) => [...queryKeys.goals.all(), 'detail', id] as const,
     contributions: (id: string | undefined) =>
-      [...queryKeys.goals.all(), id, 'contributions'] as const,
+      [...queryKeys.goals.all(), 'detail', id, 'contributions'] as const,
   },
   reports: {
     all: () => ['reports'] as const,
@@ -60,9 +61,17 @@ export const queryKeys = {
     weekly: () => [...queryKeys.reports.all(), 'weekly'] as const,
     chat: () => [...queryKeys.reports.all(), 'chat'] as const,
   },
+  aiPreferences: {
+    all: () => ['ai-preferences'] as const,
+    detail: (customerId: string | null) =>
+      [...queryKeys.aiPreferences.all(), customerId, 'detail'] as const,
+  },
   notifications: {
     all: () => ['notifications'] as const,
-    unread: () => [...queryKeys.notifications.all(), 'unread'] as const,
+    list: (customerId: string | null) =>
+      [...queryKeys.notifications.all(), customerId, 'list'] as const,
+    unread: (customerId: string | null) =>
+      [...queryKeys.notifications.all(), customerId, 'unread'] as const,
   },
   rules: {
     all: () => ['rules'] as const,

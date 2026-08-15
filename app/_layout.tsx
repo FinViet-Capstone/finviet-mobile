@@ -7,19 +7,19 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { MaterialSymbolsOutlined_400Regular } from '@expo-google-fonts/material-symbols-outlined';
-import { setupNotifications } from '@/lib/notifications';
 import { queryClient } from '@/lib/queryClient';
 import { useBootstrapSession } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
 import { ThemeProvider } from '@/providers/ThemeProvider';
+import { NotificationProvider } from '@/providers/NotificationProvider';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { initSentry, captureException } from '@/lib/sentry';
+import * as Sentry from '@sentry/react-native';
 
-// Runs once at module load, before the first render — no-ops if
-// EXPO_PUBLIC_SENTRY_DSN is unset.
+// Runs once at module load, before the first render.
 initSentry();
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   // Registered under the exact family name MaterialIcon expects, so the
   // ligature-based <MaterialIcon name="wallet" /> renders glyphs, not text.
   const [fontsLoaded, fontError] = useFonts({
@@ -30,10 +30,6 @@ export default function RootLayout() {
   // so a reload doesn't flash the login screen.
   useBootstrapSession();
   const hydrated = useAuthStore((s) => s.hydrated);
-
-  useEffect(() => {
-    setupNotifications().catch(console.warn);
-  }, []);
 
   // Hold on the native splash until the icon font is ready (or has errored, in
   // which case we fall through) AND the session has been rehydrated.
@@ -46,19 +42,21 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <SafeAreaProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="onboarding" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
+            <NotificationProvider>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </NotificationProvider>
           </SafeAreaProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

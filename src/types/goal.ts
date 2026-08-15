@@ -5,12 +5,12 @@ export interface SavingsGoal {
   iconEmoji?: string;
   targetAmount: number;
   currentAmount: number;
-  deadline: string;
+  deadline: string | null;
   fundingWalletId?: string;
   isCompleted: boolean;
   isDeleted: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface SavingsGoalWithProgress extends SavingsGoal {
@@ -44,7 +44,6 @@ export interface UpdateGoalPayload {
   name?: string;
   targetAmount?: number;
   deadline?: string;
-  fundingWalletId?: string;
 }
 
 export interface AddContributionPayload {

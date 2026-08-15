@@ -8,7 +8,8 @@
  */
 
 import { useMemo } from 'react';
-import { useTransactions, useWallets } from '@/hooks';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useWallets } from '@/hooks/useWallets';
 import { isoDate, todayISO } from '@/utils/date';
 import type { Transaction } from '@/types';
 
@@ -21,10 +22,100 @@ export interface TxSection {
 export interface DayCell {
   iso: string;
   day: number;
+  income: number;
+  expense: number;
   net: number;
   hasActivity: boolean;
   hasUncategorized: boolean;
   isToday: boolean;
+}
+
+export interface CalendarGridCell {
+  key: string;
+  day: number;
+  current: DayCell | null;
+}
+
+export function buildCalendarWeeks(
+  dayCells: DayCell[],
+  leadingBlanks: number,
+): CalendarGridCell[][] {
+  const first = dayCells[0];
+  if (!first) return [];
+
+  const [year, month] = first.iso.split('-').map(Number);
+  const previousMonthLastDay = new Date(year, month - 1, 0).getDate();
+  const leadingCells = Array.from({ length: leadingBlanks }, (_, index) => ({
+    key: `previous-${previousMonthLastDay - leadingBlanks + index + 1}`,
+    day: previousMonthLastDay - leadingBlanks + index + 1,
+    current: null,
+  }));
+  const currentCells = dayCells.map((cell) => ({
+    key: cell.iso,
+    day: cell.day,
+    current: cell,
+  }));
+  const trailingCount = (7 - ((leadingCells.length + currentCells.length) % 7)) % 7;
+  const trailingCells = Array.from({ length: trailingCount }, (_, index) => ({
+    key: `next-${index + 1}`,
+    day: index + 1,
+    current: null,
+  }));
+  const cells = [...leadingCells, ...currentCells, ...trailingCells];
+
+  return Array.from(
+    { length: cells.length / 7 },
+    (_, index) => cells.slice(index * 7, index * 7 + 7),
+  );
+}
+
+export function buildDayCells(
+  transactions: Transaction[],
+  year: number,
+  monthIdx: number,
+): DayCell[] {
+  const dayMap = new Map<
+    string,
+    { income: number; expense: number; hasUncategorized: boolean }
+  >();
+
+  for (const transaction of transactions) {
+    if (
+      transaction.type === 'transfer_out' ||
+      transaction.type === 'transfer_in'
+    ) {
+      continue;
+    }
+
+    const current = dayMap.get(transaction.transactionDate) ?? {
+      income: 0,
+      expense: 0,
+      hasUncategorized: false,
+    };
+    if (transaction.type === 'income') current.income += transaction.amount;
+    else if (transaction.type === 'expense') current.expense += transaction.amount;
+    if (!transaction.categoryId) current.hasUncategorized = true;
+    dayMap.set(transaction.transactionDate, current);
+  }
+
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const today = todayISO();
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const iso = isoDate(year, monthIdx, index + 1);
+    const aggregate = dayMap.get(iso);
+    const income = aggregate?.income ?? 0;
+    const expense = aggregate?.expense ?? 0;
+    return {
+      iso,
+      day: index + 1,
+      income,
+      expense,
+      net: income - expense,
+      hasActivity: !!aggregate,
+      hasUncategorized: aggregate?.hasUncategorized ?? false,
+      isToday: iso === today,
+    };
+  });
 }
 
 /**
@@ -130,32 +221,10 @@ export function useMonthlyTransactions(
   }, [transactions]);
 
   // ── Calendar cells ───────────────────────────────────────────────────────
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-
-  const dayCells = useMemo((): DayCell[] => {
-    const dayMap = new Map<string, { net: number; hasUncategorized: boolean }>();
-    for (const tx of transactions) {
-      if (tx.type === 'transfer_out' || tx.type === 'transfer_in') continue;
-      const cur = dayMap.get(tx.transactionDate) ?? { net: 0, hasUncategorized: false };
-      if (tx.type === 'income') cur.net += tx.amount;
-      else cur.net -= tx.amount;
-      if (!tx.categoryId) cur.hasUncategorized = true;
-      dayMap.set(tx.transactionDate, cur);
-    }
-    const today = todayISO();
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const iso = isoDate(year, monthIdx, i + 1);
-      const agg = dayMap.get(iso);
-      return {
-        iso,
-        day: i + 1,
-        net: agg?.net ?? 0,
-        hasActivity: !!agg,
-        hasUncategorized: agg?.hasUncategorized ?? false,
-        isToday: iso === today,
-      };
-    });
-  }, [transactions, year, monthIdx, daysInMonth]);
+  const dayCells = useMemo(
+    () => buildDayCells(transactions, year, monthIdx),
+    [transactions, year, monthIdx],
+  );
 
   // First day offset (Monday = 0)
   const leadingBlanks = (new Date(year, monthIdx, 1).getDay() + 6) % 7;

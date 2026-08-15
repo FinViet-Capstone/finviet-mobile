@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "maestro": {
+      "type": "stdio",
+      "command": "maestro",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    },
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
+    }
+  }
+}
