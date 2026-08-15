@@ -135,6 +135,22 @@ let NOTIFICATIONS: AppNotification[] = [
 
 const delay = (ms = 200) => new Promise<void>((r) => setTimeout(r, ms));
 
+export interface RegisterNotificationDeviceInput {
+  token: string;
+  platform: 'ios' | 'android';
+  installationId: string;
+}
+
+export async function registerNotificationDevice(
+  _input: RegisterNotificationDeviceInput,
+): Promise<void> {
+  await delay();
+}
+
+export async function unregisterNotificationDevice(_installationId: string): Promise<void> {
+  await delay();
+}
+
 /** Returns all notifications sorted newest-first. */
 export function getNotifications(): AppNotification[] {
   return [...NOTIFICATIONS].sort((a, b) =>

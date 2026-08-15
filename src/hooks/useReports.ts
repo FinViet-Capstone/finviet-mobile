@@ -19,10 +19,10 @@ export const useSpendingScore = (view: 'weekly' | 'monthly' = 'weekly') =>
     staleTime: STALE_TIME.long,
   });
 
-export const useWeeklyReport = () =>
+export const useWeeklyReport = (reportId?: string) =>
   useQuery({
-    queryKey: queryKeys.reports.weekly(),
-    queryFn: () => getWeeklyReport(),
+    queryKey: [...queryKeys.reports.weekly(), reportId ?? 'latest'] as const,
+    queryFn: () => getWeeklyReport(reportId),
     staleTime: STALE_TIME.long,
   });
 

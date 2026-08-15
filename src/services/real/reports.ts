@@ -174,7 +174,12 @@ export async function getSpendingScore(
  * The mock returns a single "current" report; the backend returns the full
  * history. We surface the newest one so the report screen shows the latest week.
  */
-export async function getWeeklyReport(): Promise<WeeklyReport | null> {
+export async function getWeeklyReport(reportId?: string): Promise<WeeklyReport | null> {
+  if (reportId) {
+    const res = await api.get(`/ai/reports/${encodeURIComponent(reportId)}`);
+    return toWeeklyReport(unwrap<WeeklyReportDto>(res));
+  }
+
   const res = await api.get('/ai/reports');
   const reports = unwrap<WeeklyReportDto[]>(res) ?? [];
   if (reports.length === 0) return null;

@@ -1,76 +1,72 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: complete saving-goal archive verification by netting withdrawals in Savings progress,
-keeping dashboard percentages bounded, and preserving both transaction directions in Calendar.
+Feature: reliable notification delivery with foreground in-app banners, background/terminated
+OS push, unread visibility, and exact entity deep links.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — implementation and post-merge verification passed on branch
-`fix/saving-goal-archive-navigation`; physical-device acceptance remains pending.
+Implemented — automated mobile/backend verification passes; physical-device push acceptance and
+non-production EAS/provider credential setup remain before the feature can be marked completed.
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Stop the Budgets tab from retaining a saving-goal detail route after the user leaves the tab;
-  Back actions and successful archive navigation use explicit destinations instead of relying on
-  incidental nested-stack history.
-- A goal with money cannot be archived. The user must first use the existing withdrawal flow and
-  choose the basic wallet that receives the entire remaining amount.
-- After the balance reaches zero, DELETE archives rather than reverses financial activity. The
-  backend preserves contribution/withdrawal ledger rows and their transactions; archived goals
-  appear in a collapsed `Đã lưu trữ` section with read-only detail/history.
-- Prevent the white 404 retry screen after archive by updating the active and archived caches
-  before dismissing the detail route, without refetching the just-archived active resource.
-- Align nullable deadlines, icon/deletion/timestamps, archived queries, 404 handling, encoded
-  path IDs, PATCH semantics, and in-flight idempotency keys across mock and real services.
-- Cover the regressions with focused tests. Restore/unarchive, permanent purge, fixed-wallet
-  reassignment, and deadline clearing remain out of scope.
+- Register each authenticated app installation with the backend using its Expo push token,
+  platform, and stable installation identifier; unregister best-effort on logout/account change.
+- Show a queued, accessible in-app banner for notifications first observed while FinViet is open,
+  without replaying the customer's historical unread inbox after login.
+- Keep the Notification Center as the canonical durable inbox, add a visible unread count on the
+  Home bell, poll/refetch while foregrounded, and deduplicate push and polling arrivals by ID.
+- Mark a notification read and deep-link to its exact goal, budget, report, or wallet when either
+  the in-app banner or OS notification is tapped; fall back to Notification Center for invalid or
+  unsupported targets.
+- Suppress duplicate foreground OS presentation in favor of the custom banner while preserving
+  normal background/terminated push behavior through EAS/Expo Notifications.
+- Keep permission denial and push-provider failure non-fatal: persisted notification rows and the
+  foreground polling path must continue working.
+- Add focused contract, routing, queue/deduplication, listener, registration, cache, and badge tests.
+  Email/SMS channels, rich push actions/media, grouping, and per-device settings UI remain out of
+  scope.
 
 ## Notes
 
 <!-- Any extra notes -->
-- Cross-repo backend work is on `D:/SEP490/newestbe/finviet-be`, branch
-  `fix/saving-goal-archive`, based on the clean committed Gemini feature state.
-- `hd.env.local` is an untracked review input only and must remain uncommitted.
-- No commit, push, merge, or branch deletion without explicit permission.
-- 2026-08-14 — Started after tracing the post-delete 404 to broad `goals.all()` invalidation
-  while the deleted detail remained mounted. Backend source confirmed DELETE physically reversed
-  wallets and removed transactions/ledger; approved replacement is zero-balance soft archive plus
-  read-only archived-goal history.
-- 2026-08-15 — Physical-device follow-up implemented: Savings progress now subtracts saving-goal
-  withdrawal income and clamps at zero; the Home percentage badge/bar clamp to 100%; the real
-  transaction service fetches every backend page at the supported 100-row size; Calendar retains
-  separate gross income/expense traces; and saving-goal withdrawal rows have direction-correct copy.
-  Added focused tests for derivation, display bounds, pagination, Calendar aggregation, and row
-  visuals. Verification: TypeScript clean; changed-file ESLint clean (pre-existing warnings only);
-  13 Jest suites / 87 tests pass; mobile and backend `git diff --check` clean. Backend Application
-  tests pass 200/200 and the solution plus integration-test project compile. Live integration and
-  physical-device acceptance remain pending; no commit, push, deployment, or database operation run.
-- 2026-08-15 — Fixed the next physical-device findings: archive-triggered `Rút toàn bộ` now waits
-  for the native alert interaction to finish before mounting the sheet, displays mutation failures
-  without closing the sheet, retains the pending/idempotency single-flight guard, and advances a
-  successful full withdrawal to the existing explicit archive confirmation. Calendar now derives
-  complete seven-cell weeks and renders each week as a fixed flex row, so Sunday cannot wrap out of
-  its column; August 2026 places day 1 under Saturday and day 2 under Sunday. Added focused tests for
-  full/partial/error withdrawal outcomes, duplicate in-flight calls, Saturday/Sunday alignment,
-  Sunday-start months, and trailing week cells. Verification: TypeScript clean; changed-file ESLint
-  has 0 errors / 4 pre-existing warnings; `npx eslint app src` has 0 errors / 87 pre-existing
-  warnings; focused tests pass 9/9; the restricted full suite passes 14 suites / 94 tests; and
-  `git diff --check` is clean. An unrestricted related-test command also traversed stale
-  `.claude/worktrees` and failed only against their obsolete duplicate goal tests; the workspace-
-  restricted suite above passed the current source. iOS/Android physical-device acceptance remains
-  pending; no deployment, database operation, or protected environment-file change run.
-- The merged `dev` registration/Sentry diagnosis and Maestro work remain preserved in History. The
-  registration fix was verified against the deployed `/api` route, and Sentry initialization was
-  consolidated so explicit captures no longer depend on an unset-only configuration path.
-- 2026-08-15 — Merged latest `origin/dev` into the saving-goal branch and resolved the three
-  conflicts by retaining archived-goal/navigation/withdrawal behavior together with `dev`'s goal
-  mutation error feedback, accessibility label, registration/Sentry changes, onboarding allocation
-  controls, and Maestro flows/history. Post-merge verification: TypeScript clean; resolved goal-file
-  ESLint clean; `npx eslint app src` has 0 errors / 86 pre-existing warnings; restricted Jest passes
-  14 suites / 94 tests; staged and working-tree `git diff --check` clean.
+- Cross-repo backend work is in `D:/SEP490/newestbe/finviet-be` on the matching
+  `feature/notification-delivery` branch.
+- Backend persisted notification rows are the canonical source of truth. Push is a best-effort
+  delivery channel and must never roll back or replace the durable inbox row.
+- Use Expo push tokens end to end. EAS credentials bridge Expo Push Service to FCM/APNs; do not add
+  client-side Firebase topic subscription or commit Firebase/APNs/provider credentials.
+- Backend device registrations must support multiple installations per customer and remove invalid
+  tokens reported by the provider. The existing single `CustomerSetting.FcmToken` is not sufficient.
+- The mobile banner must be mounted at the authenticated root, respect safe-area insets, and clear
+  queue/cache state when the authenticated customer changes.
+- No commit, push, deployment, production database migration, credential change, or branch deletion
+  without explicit permission.
+- 2026-08-15 — Started after confirming the current app only requests notification permission: it
+  does not register an Expo token, install receive/response listeners, poll unread notifications,
+  show a global banner, or expose the unread count. Backend push is incomplete: customer-token push
+  is a no-op, topic publishers have no subscribed clients, and weekly-report push does not create a
+  durable Notification Center row.
+- 2026-08-15 — Implemented the mobile delivery lifecycle: authenticated Expo-token registration and
+  token-rotation handling with a stable SecureStore installation ID, best-effort unregister on
+  explicit logout, foreground unread polling, account-scoped TanStack Query caches, push/poll ID
+  deduplication, queued global safe-area banners, suppressed foreground OS presentation, unread Home
+  bell count, cold-start/foreground response handling, and one shared entity route resolver used by
+  banners, OS responses, and Notification Center. Weekly-report links can now load the exact report
+  ID; goal and wallet links open their detail routes, budget links open the Budgets tab because this
+  app has no budget-detail route, and invalid destinations fall back to Notification Center.
+- 2026-08-15 — Added focused routing, arrival, cache, real-service, and exact-report tests. Extracted
+  the pure arrival collector from `NotificationProvider` so its unit test no longer imports
+  `expo-notifications`; the SDK's Expo Go warning disappeared. Traced Jest's remaining open handles
+  to TanStack Query GC timers created by the cache tests and now clear their `QueryClient` after each
+  case; a full `--detectOpenHandles` run exits cleanly. Verified: TypeScript clean; full ESLint 0
+  errors / 85 warnings; focused notification lint clean; full mobile Jest 19/19 suites and 109/109
+  tests pass; backend notification tests 10/10, all Application tests
+  210/210, Domain tests 1/1, and solution build 0 warnings / 0 errors. No commit, push, deployment,
+  provider credential change, production migration, or physical-device acceptance was performed.
 
 ## History
 

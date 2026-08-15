@@ -151,7 +151,7 @@ export function getSpendingScore(view: 'weekly' | 'monthly' = 'weekly'): Spendin
   return view === 'monthly' ? MOCK_SPENDING_SCORE_MONTHLY : MOCK_SPENDING_SCORE_WEEKLY;
 }
 
-export function getWeeklyReport(): WeeklyReport {
+export function getWeeklyReport(_reportId?: string): WeeklyReport {
   return MOCK_WEEKLY_REPORT;
 }
 

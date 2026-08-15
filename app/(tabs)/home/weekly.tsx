@@ -7,9 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { MaterialIcon } from '@/components/common/MaterialIcon';
-
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   COLORS,
   SPACING,
@@ -25,7 +23,8 @@ import { AIChatbotSheet } from '@/components/home/AIChatbotSheet';
 
 export default function WeeklyReportScreen() {
   const router = useRouter();
-  const { data: report, isLoading } = useWeeklyReport();
+  const { reportId } = useLocalSearchParams<{ reportId?: string }>();
+  const { data: report, isLoading } = useWeeklyReport(reportId);
   const [chatOpen, setChatOpen] = useState(false);
 
   if (isLoading) return <LoadingSpinner />;

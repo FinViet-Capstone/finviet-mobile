@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { useNotifications, useMarkAllNotificationsRead, useMarkNotificationRead } from '@/hooks/useNotifications';
 import type { AppNotification, NotificationType } from '@/types/notification';
+import { notificationRoute } from '@/lib/notificationRouting';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -83,21 +84,6 @@ function notifIconBg(type: NotificationType, colors: ThemeColors): string {
     case 'goal_milestone': return `${colors.tertiaryContainer}20`;
     case 'announcement': return `${colors.secondaryContainer}20`;
     default: return colors.surfaceVariant;
-  }
-}
-
-function notifEntityRoute(
-  entityType: AppNotification['entityType'],
-  entityId: string | null,
-): string | null {
-  // FE derives the route from the typed entity link (robust to route renames).
-  switch (entityType) {
-    case 'goal':   return entityId ? `/(tabs)/budgets/goals/${entityId}` : '/(tabs)/budgets/goals';
-    case 'budget': return '/(tabs)/budgets';
-    case 'report': return '/(tabs)/home/weekly';
-    case 'wallet': return entityId ? `/(tabs)/wallets/${entityId}` : '/(tabs)/wallets';
-    case 'system': return null;
-    default:       return null;
   }
 }
 
@@ -184,8 +170,7 @@ export default function NotificationsScreen() {
 
   const handlePress = useCallback((item: AppNotification) => {
     if (!item.isRead) markRead.mutate(item.id);
-    const route = notifEntityRoute(item.entityType, item.entityId);
-    if (route) router.push(route as any);
+    router.push(notificationRoute(item));
   }, [markRead, router]);
 
   const handleMarkAllRead = useCallback(() => {
