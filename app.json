@@ -24,7 +24,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/finviet-icon.png",
+        "foregroundImage": "./assets/finviet-vertical.png",
         "backgroundColor": "#1A6B3C"
       },
       "package": "com.finviet.mobile",
