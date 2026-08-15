@@ -22,6 +22,7 @@ import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
 import { useLogout, useEffectiveIncomeAllocation, useUploadAvatar } from '@/hooks';
 import { getApiErrorMessage } from '@/utils/errors';
+import { AI_PREFERENCES_STRINGS } from '@/data/settingsScreensData';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -331,6 +332,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.app}</Text>
           <SectionCard>
+            <SettingsRow icon="auto_awesome" iconColor={colors.primary}
+              label={AI_PREFERENCES_STRINGS.settingsEntry}
+              onPress={() => router.push({ pathname: '/settings/ai-preferences' })} />
+            <Divider />
             <SettingsRow icon="dark_mode" label={S.rows.theme}
               value={themeValue}
               onPress={() => setThemePickerVisible(true)} />
