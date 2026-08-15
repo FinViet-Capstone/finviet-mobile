@@ -16,6 +16,7 @@ interface CustomSliderProps {
   step?: number;
   value: number;
   onValueChange: (value: number) => void;
+  onValueChangeEnd?: (value: number) => void;
   minimumTrackTintColor?: string;
   maximumTrackTintColor?: string;
   thumbTintColor?: string;
@@ -59,6 +60,7 @@ export function CustomSlider({
   step = 0,
   value,
   onValueChange,
+  onValueChangeEnd,
   minimumTrackTintColor = DEFAULT_MIN_COLOR,
   maximumTrackTintColor = DEFAULT_MAX_COLOR,
   thumbTintColor = DEFAULT_THUMB_COLOR,
@@ -102,6 +104,13 @@ export function CustomSlider({
     [onValueChange],
   );
 
+  const emitValueEnd = useCallback(
+    (v: number) => {
+      onValueChangeEnd?.(v);
+    },
+    [onValueChangeEnd],
+  );
+
   const pan = Gesture.Pan()
     .enabled(!disabled)
     .onBegin(() => {
@@ -127,6 +136,7 @@ export function CustomSlider({
 
       const snappedPct = (snappedValue - minimumValue) / range;
       thumbX.value = withSpring(snappedPct * trackWidth.value, THUMB_SPRING);
+      runOnJS(emitValueEnd)(snappedValue);
     });
 
   // ── Tap on track to jump ──────────────────────────────────────────────────
@@ -141,6 +151,7 @@ export function CustomSlider({
     const snappedPct = (rawValue - minimumValue) / range;
     thumbX.value = withSpring(snappedPct * trackWidth.value, THUMB_SPRING);
     runOnJS(emitValue)(rawValue);
+    runOnJS(emitValueEnd)(rawValue);
   });
 
   const composed = Gesture.Race(pan, tap);

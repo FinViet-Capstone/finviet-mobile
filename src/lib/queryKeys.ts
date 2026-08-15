@@ -61,6 +61,11 @@ export const queryKeys = {
     weekly: () => [...queryKeys.reports.all(), 'weekly'] as const,
     chat: () => [...queryKeys.reports.all(), 'chat'] as const,
   },
+  aiPreferences: {
+    all: () => ['ai-preferences'] as const,
+    detail: (customerId: string | null) =>
+      [...queryKeys.aiPreferences.all(), customerId, 'detail'] as const,
+  },
   notifications: {
     all: () => ['notifications'] as const,
     unread: () => [...queryKeys.notifications.all(), 'unread'] as const,

@@ -1,76 +1,55 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Fix: complete saving-goal archive verification by netting withdrawals in Savings progress,
-keeping dashboard percentages bounded, and preserving both transaction directions in Calendar.
+Feature: customer-facing AI behavior, history, report, RAG, and financial data-scope preferences.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Completed — implementation and post-merge verification passed on branch
-`fix/saving-goal-archive-navigation`; physical-device acceptance remains pending.
+Implemented — automated frontend verification passes; manual device acceptance remains before the
+feature is marked completed.
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Stop the Budgets tab from retaining a saving-goal detail route after the user leaves the tab;
-  Back actions and successful archive navigation use explicit destinations instead of relying on
-  incidental nested-stack history.
-- A goal with money cannot be archived. The user must first use the existing withdrawal flow and
-  choose the basic wallet that receives the entire remaining amount.
-- After the balance reaches zero, DELETE archives rather than reverses financial activity. The
-  backend preserves contribution/withdrawal ledger rows and their transactions; archived goals
-  appear in a collapsed `Đã lưu trữ` section with read-only detail/history.
-- Prevent the white 404 retry screen after archive by updating the active and archived caches
-  before dismissing the detail route, without refetching the just-archived active resource.
-- Align nullable deadlines, icon/deletion/timestamps, archived queries, 404 handling, encoded
-  path IDs, PATCH semantics, and in-flight idempotency keys across mock and real services.
-- Cover the regressions with focused tests. Restore/unarchive, permanent purge, fixed-wallet
-  reassignment, and deadline clearing remain out of scope.
+- Add a dedicated `Trợ lý AI & quyền riêng tư` screen under Settings backed by the authenticated
+  `GET/PATCH /api/profile/ai-preferences` endpoints.
+- Let the customer choose categorization mode: off, suggestion-only, or automatic application when
+  confidence is high; expose an accessible 50–100% threshold control in automatic mode.
+- Let the customer independently manage default chat history, scheduled weekly reports, RAG, and
+  whether AI context may use balances, transactions, budgets, saving goals, and reports.
+- Keep backend preferences as independent server state with mock/real service parity, centralized
+  query keys, TanStack Query hooks, optimistic rollback, and Vietnamese loading/error feedback.
+- Preserve the semantic difference between weekly-report generation and the existing report push
+  notification toggle. Backend AI behavior, algorithms, and notification settings are out of scope.
 
 ## Notes
 
 <!-- Any extra notes -->
-- Cross-repo backend work is on `D:/SEP490/newestbe/finviet-be`, branch
-  `fix/saving-goal-archive`, based on the clean committed Gemini feature state.
-- `hd.env.local` is an untracked review input only and must remain uncommitted.
-- No commit, push, merge, or branch deletion without explicit permission.
-- 2026-08-14 — Started after tracing the post-delete 404 to broad `goals.all()` invalidation
-  while the deleted detail remained mounted. Backend source confirmed DELETE physically reversed
-  wallets and removed transactions/ledger; approved replacement is zero-balance soft archive plus
-  read-only archived-goal history.
-- 2026-08-15 — Physical-device follow-up implemented: Savings progress now subtracts saving-goal
-  withdrawal income and clamps at zero; the Home percentage badge/bar clamp to 100%; the real
-  transaction service fetches every backend page at the supported 100-row size; Calendar retains
-  separate gross income/expense traces; and saving-goal withdrawal rows have direction-correct copy.
-  Added focused tests for derivation, display bounds, pagination, Calendar aggregation, and row
-  visuals. Verification: TypeScript clean; changed-file ESLint clean (pre-existing warnings only);
-  13 Jest suites / 87 tests pass; mobile and backend `git diff --check` clean. Backend Application
-  tests pass 200/200 and the solution plus integration-test project compile. Live integration and
-  physical-device acceptance remain pending; no commit, push, deployment, or database operation run.
-- 2026-08-15 — Fixed the next physical-device findings: archive-triggered `Rút toàn bộ` now waits
-  for the native alert interaction to finish before mounting the sheet, displays mutation failures
-  without closing the sheet, retains the pending/idempotency single-flight guard, and advances a
-  successful full withdrawal to the existing explicit archive confirmation. Calendar now derives
-  complete seven-cell weeks and renders each week as a fixed flex row, so Sunday cannot wrap out of
-  its column; August 2026 places day 1 under Saturday and day 2 under Sunday. Added focused tests for
-  full/partial/error withdrawal outcomes, duplicate in-flight calls, Saturday/Sunday alignment,
-  Sunday-start months, and trailing week cells. Verification: TypeScript clean; changed-file ESLint
-  has 0 errors / 4 pre-existing warnings; `npx eslint app src` has 0 errors / 87 pre-existing
-  warnings; focused tests pass 9/9; the restricted full suite passes 14 suites / 94 tests; and
-  `git diff --check` is clean. An unrestricted related-test command also traversed stale
-  `.claude/worktrees` and failed only against their obsolete duplicate goal tests; the workspace-
-  restricted suite above passed the current source. iOS/Android physical-device acceptance remains
-  pending; no deployment, database operation, or protected environment-file change run.
-- The merged `dev` registration/Sentry diagnosis and Maestro work remain preserved in History. The
-  registration fix was verified against the deployed `/api` route, and Sentry initialization was
-  consolidated so explicit captures no longer depend on an unset-only configuration path.
-- 2026-08-15 — Merged latest `origin/dev` into the saving-goal branch and resolved the three
-  conflicts by retaining archived-goal/navigation/withdrawal behavior together with `dev`'s goal
-  mutation error feedback, accessibility label, registration/Sentry changes, onboarding allocation
-  controls, and Maestro flows/history. Post-merge verification: TypeScript clean; resolved goal-file
-  ESLint clean; `npx eslint app src` has 0 errors / 86 pre-existing warnings; restricted Jest passes
-  14 suites / 94 tests; staged and working-tree `git diff --check` clean.
+- Backend contract verified directly in `D:/SEP490/newestbe/finviet-be`: missing rows return safe
+  defaults (`suggest_only`, threshold `0.85`, all booleans true), while PATCH is a partial first-write
+  upsert. The backend validates the three exact modes and threshold `> 0 && <= 1`.
+- The approved mobile UX restricts the high-confidence threshold control to 50–100% in 5% steps,
+  uses immediate updates per discrete control, and saves a slider value only when interaction ends.
+- Work is isolated on `feature/ai-preferences-settings`, created from `dev`; the separate completed
+  notification-delivery commit remains on its own branch.
+- No backend change, commit, push, deployment, production migration, credential change, or branch
+  deletion without explicit permission.
+- 2026-08-15 — Started after confirming the backend feature is complete but mobile has no matching
+  types, service functions, cache keys, hooks, route, or Settings entry.
+- 2026-08-15 — Implemented mock/real AI-preference services, authenticated customer-scoped TanStack
+  Query hooks with optimistic rollback, and the Settings route `/settings/ai-preferences`. The screen
+  exposes all three categorization modes, an auto-mode-only 50–100% threshold in 5% steps, independent
+  history/weekly-report/RAG controls, and five independent financial data-scope switches. Discrete
+  controls save immediately; the slider previews locally and PATCHes only after interaction ends.
+  Controls are temporarily disabled while saving to prevent overlapping updates, failed mutations
+  roll back and show Vietnamese feedback, and the shared slider now supports an optional
+  `onValueChangeEnd` callback without changing existing callers. Added the Settings entry and focused
+  mock/real service contract tests. Verified after the final account-scoped cache-key change: TypeScript
+  clean; ESLint over `app` and `src` has 0 errors / 89 pre-existing warnings; focused AI-preference
+  tests 5/5 and active-workspace Jest 99/99 pass; `git diff --check` clean. Manual device acceptance
+  was not performed. No commit, push, deployment, backend change, migration, or credential change was
+  performed.
 
 ## History
 

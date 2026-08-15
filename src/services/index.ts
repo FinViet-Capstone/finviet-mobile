@@ -9,7 +9,8 @@
  *
  * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
  * categories (customer category buckets), custom categories, reports/AI
- * (spending score, weekly report, multi-session chat), notifications, rules, SMS
+ * (spending score, weekly report, multi-session chat, customer AI preferences),
+ * notifications, rules, SMS
  * extraction, CSV/XLSX extraction, and SePay bank-linking (see real/sepay.ts).
  * Still mock: subscriptions (no backend) and photo/receipt OCR extraction (a
  * backend endpoint exists but has no real OCR provider wired in yet — always
@@ -36,6 +37,8 @@ import * as mockCustomCategories from './mock/customCategories';
 import * as realCustomCategories from './real/customCategories';
 import * as mockReports from './mock/reports';
 import * as realReports from './real/reports';
+import * as mockAiPreferences from './mock/aiPreferences';
+import * as realAiPreferences from './real/aiPreferences';
 import * as mockNotifications from './mock/notifications';
 import * as realNotifications from './real/notifications';
 import * as mockExtraction from './mock/extraction';
@@ -170,6 +173,16 @@ export const generateWeeklyReport = reportsImpl.generateWeeklyReport;
 export const previewCategorization = reportsImpl.previewCategorization;
 export const categorizeTransaction = reportsImpl.categorizeTransaction;
 export const overrideCategorization = reportsImpl.overrideCategorization;
+
+// ─── Customer AI preferences ──────────────────────────────────────────────────
+const aiPreferencesImpl = USE_MOCK ? mockAiPreferences : realAiPreferences;
+export const getAiPreferences = aiPreferencesImpl.getAiPreferences;
+export const updateAiPreferences = aiPreferencesImpl.updateAiPreferences;
+export type {
+  CategorizationMode,
+  AiPreferences,
+  UpdateAiPreferencesInput,
+} from './mock/aiPreferences';
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 const notificationsImpl = USE_MOCK ? mockNotifications : realNotifications;
