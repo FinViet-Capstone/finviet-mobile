@@ -188,8 +188,11 @@ export type {
 const notificationsImpl = USE_MOCK ? mockNotifications : realNotifications;
 export const getNotifications = notificationsImpl.getNotifications;
 export const getUnreadNotifications = notificationsImpl.getUnreadNotifications;
+export const registerNotificationDevice = notificationsImpl.registerNotificationDevice;
+export const unregisterNotificationDevice = notificationsImpl.unregisterNotificationDevice;
 export const markNotificationRead = notificationsImpl.markNotificationRead;
 export const markAllNotificationsRead = notificationsImpl.markAllNotificationsRead;
+export type { RegisterNotificationDeviceInput } from './mock/notifications';
 
 // ─── Photo / SMS / CSV Extraction ────────────────────────────────────────────────
 // SMS → real /extract/sms; CSV → real /extract/csv; photo/receipt OCR has no

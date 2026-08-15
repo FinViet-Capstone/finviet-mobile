@@ -9,7 +9,7 @@
  * here -- routing decisions stay in the screen so we don't double-navigate.
  */
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   login,
   register,
@@ -22,12 +22,15 @@ import {
   logout,
   uploadAvatar,
   deleteAccount,
+  unregisterNotificationDevice,
   type MockLoginInput,
   type MockRegisterInput,
   type MockChangePasswordInput,
   type ResetPasswordInput,
 } from '@/services';
 import { getRefreshToken } from '@/lib/mmkv';
+import { getNotificationInstallationId } from '@/lib/notificationStorage';
+import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
 import type { Customer } from '@/types';
 
@@ -81,12 +84,23 @@ export const useChangePassword = () =>
 
 export const useLogout = () => {
   const clearSession = useAuthStore((s) => s.clearSession);
+  const queryClient = useQueryClient();
   return useMutation<void, Error, void>({
-    // Best-effort server-side revoke, then always clear the local session.
+    // Device unregister and refresh-token revoke are both best effort; neither
+    // may keep the user signed in locally when the network is unavailable.
     mutationFn: async () => {
+      try {
+        const installationId = await getNotificationInstallationId();
+        await unregisterNotificationDevice(installationId);
+      } catch {
+        // The backend registration is reconciled on the next authenticated use.
+      }
       await logout(getRefreshToken() ?? '');
     },
-    onSettled: () => clearSession(),
+    onSettled: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.notifications.all() });
+      clearSession();
+    },
   });
 };
 

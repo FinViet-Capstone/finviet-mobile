@@ -1,55 +1,72 @@
 # Current Feature
 
 <!-- Feature name and short description -->
-Feature: customer-facing AI behavior, history, report, RAG, and financial data-scope preferences.
+Feature: reliable notification delivery with foreground in-app banners, background/terminated
+OS push, unread visibility, and exact entity deep links.
 
 ## Status
 
 <!-- Not Started | In Progress | Completed -->
-Implemented — automated frontend verification passes; manual device acceptance remains before the
-feature is marked completed.
+Implemented — automated mobile/backend verification passes; physical-device push acceptance and
+non-production EAS/provider credential setup remain before the feature can be marked completed.
 
 ## Goals
 
 <!-- Goals and requirements -->
-- Add a dedicated `Trợ lý AI & quyền riêng tư` screen under Settings backed by the authenticated
-  `GET/PATCH /api/profile/ai-preferences` endpoints.
-- Let the customer choose categorization mode: off, suggestion-only, or automatic application when
-  confidence is high; expose an accessible 50–100% threshold control in automatic mode.
-- Let the customer independently manage default chat history, scheduled weekly reports, RAG, and
-  whether AI context may use balances, transactions, budgets, saving goals, and reports.
-- Keep backend preferences as independent server state with mock/real service parity, centralized
-  query keys, TanStack Query hooks, optimistic rollback, and Vietnamese loading/error feedback.
-- Preserve the semantic difference between weekly-report generation and the existing report push
-  notification toggle. Backend AI behavior, algorithms, and notification settings are out of scope.
+- Register each authenticated app installation with the backend using its Expo push token,
+  platform, and stable installation identifier; unregister best-effort on logout/account change.
+- Show a queued, accessible in-app banner for notifications first observed while FinViet is open,
+  without replaying the customer's historical unread inbox after login.
+- Keep the Notification Center as the canonical durable inbox, add a visible unread count on the
+  Home bell, poll/refetch while foregrounded, and deduplicate push and polling arrivals by ID.
+- Mark a notification read and deep-link to its exact goal, budget, report, or wallet when either
+  the in-app banner or OS notification is tapped; fall back to Notification Center for invalid or
+  unsupported targets.
+- Suppress duplicate foreground OS presentation in favor of the custom banner while preserving
+  normal background/terminated push behavior through EAS/Expo Notifications.
+- Keep permission denial and push-provider failure non-fatal: persisted notification rows and the
+  foreground polling path must continue working.
+- Add focused contract, routing, queue/deduplication, listener, registration, cache, and badge tests.
+  Email/SMS channels, rich push actions/media, grouping, and per-device settings UI remain out of
+  scope.
 
 ## Notes
 
 <!-- Any extra notes -->
-- Backend contract verified directly in `D:/SEP490/newestbe/finviet-be`: missing rows return safe
-  defaults (`suggest_only`, threshold `0.85`, all booleans true), while PATCH is a partial first-write
-  upsert. The backend validates the three exact modes and threshold `> 0 && <= 1`.
-- The approved mobile UX restricts the high-confidence threshold control to 50–100% in 5% steps,
-  uses immediate updates per discrete control, and saves a slider value only when interaction ends.
-- Work is isolated on `feature/ai-preferences-settings`, created from `dev`; the separate completed
-  notification-delivery commit remains on its own branch.
-- No backend change, commit, push, deployment, production migration, credential change, or branch
-  deletion without explicit permission.
-- 2026-08-15 — Started after confirming the backend feature is complete but mobile has no matching
-  types, service functions, cache keys, hooks, route, or Settings entry.
-- 2026-08-15 — Implemented mock/real AI-preference services, authenticated customer-scoped TanStack
-  Query hooks with optimistic rollback, and the Settings route `/settings/ai-preferences`. The screen
-  exposes all three categorization modes, an auto-mode-only 50–100% threshold in 5% steps, independent
-  history/weekly-report/RAG controls, and five independent financial data-scope switches. Discrete
-  controls save immediately; the slider previews locally and PATCHes only after interaction ends.
-  Controls are temporarily disabled while saving to prevent overlapping updates, failed mutations
-  roll back and show Vietnamese feedback, and the shared slider now supports an optional
-  `onValueChangeEnd` callback without changing existing callers. Added the Settings entry and focused
-  mock/real service contract tests. Verified after the final account-scoped cache-key change: TypeScript
-  clean; ESLint over `app` and `src` has 0 errors / 89 pre-existing warnings; focused AI-preference
-  tests 5/5 and active-workspace Jest 99/99 pass; `git diff --check` clean. Manual device acceptance
-  was not performed. No commit, push, deployment, backend change, migration, or credential change was
-  performed.
+- Cross-repo backend work is in `D:/SEP490/newestbe/finviet-be` on the matching
+  `feature/notification-delivery` branch.
+- Backend persisted notification rows are the canonical source of truth. Push is a best-effort
+  delivery channel and must never roll back or replace the durable inbox row.
+- Use Expo push tokens end to end. EAS credentials bridge Expo Push Service to FCM/APNs; do not add
+  client-side Firebase topic subscription or commit Firebase/APNs/provider credentials.
+- Backend device registrations must support multiple installations per customer and remove invalid
+  tokens reported by the provider. The existing single `CustomerSetting.FcmToken` is not sufficient.
+- The mobile banner must be mounted at the authenticated root, respect safe-area insets, and clear
+  queue/cache state when the authenticated customer changes.
+- No commit, push, deployment, production database migration, credential change, or branch deletion
+  without explicit permission.
+- 2026-08-15 — Started after confirming the current app only requests notification permission: it
+  does not register an Expo token, install receive/response listeners, poll unread notifications,
+  show a global banner, or expose the unread count. Backend push is incomplete: customer-token push
+  is a no-op, topic publishers have no subscribed clients, and weekly-report push does not create a
+  durable Notification Center row.
+- 2026-08-15 — Implemented the mobile delivery lifecycle: authenticated Expo-token registration and
+  token-rotation handling with a stable SecureStore installation ID, best-effort unregister on
+  explicit logout, foreground unread polling, account-scoped TanStack Query caches, push/poll ID
+  deduplication, queued global safe-area banners, suppressed foreground OS presentation, unread Home
+  bell count, cold-start/foreground response handling, and one shared entity route resolver used by
+  banners, OS responses, and Notification Center. Weekly-report links can now load the exact report
+  ID; goal and wallet links open their detail routes, budget links open the Budgets tab because this
+  app has no budget-detail route, and invalid destinations fall back to Notification Center.
+- 2026-08-15 — Added focused routing, arrival, cache, real-service, and exact-report tests. Extracted
+  the pure arrival collector from `NotificationProvider` so its unit test no longer imports
+  `expo-notifications`; the SDK's Expo Go warning disappeared. Traced Jest's remaining open handles
+  to TanStack Query GC timers created by the cache tests and now clear their `QueryClient` after each
+  case; a full `--detectOpenHandles` run exits cleanly. Verified: TypeScript clean; full ESLint 0
+  errors / 85 warnings; focused notification lint clean; full mobile Jest 19/19 suites and 109/109
+  tests pass; backend notification tests 10/10, all Application tests
+  210/210, Domain tests 1/1, and solution build 0 warnings / 0 errors. No commit, push, deployment,
+  provider credential change, production migration, or physical-device acceptance was performed.
 
 ## History
 

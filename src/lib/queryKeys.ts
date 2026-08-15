@@ -68,7 +68,10 @@ export const queryKeys = {
   },
   notifications: {
     all: () => ['notifications'] as const,
-    unread: () => [...queryKeys.notifications.all(), 'unread'] as const,
+    list: (customerId: string | null) =>
+      [...queryKeys.notifications.all(), customerId, 'list'] as const,
+    unread: (customerId: string | null) =>
+      [...queryKeys.notifications.all(), customerId, 'unread'] as const,
   },
   rules: {
     all: () => ['rules'] as const,

@@ -4,9 +4,11 @@
  * Mirrors src/services/mock/notifications.ts so the barrel can swap mock ⇄ real.
  *
  * Backend: api/notifications/* (NotificationsController), ApiResponse<T> envelope.
- *   - GET   /notifications?unread=bool  → NotificationResponse[]
- *   - PATCH /notifications/{id}/read    → 200 / 404
- *   - POST  /notifications/read-all     → { count }
+ *   - GET    /notifications?unread=bool  → NotificationResponse[]
+ *   - PATCH  /notifications/{id}/read    → 200 / 404
+ *   - POST   /notifications/read-all     → { count }
+ *   - PUT    /notifications/devices      → register/rotate this installation
+ *   - DELETE /notifications/devices      → unregister this installation
  *
  * Reads are async here (HTTP) where the mock was synchronous — every consumer
  * goes through TanStack Query's queryFn, which awaits either shape.
@@ -89,6 +91,24 @@ export function getNotifications(): Promise<AppNotification[]> {
 
 export function getUnreadNotifications(): Promise<AppNotification[]> {
   return fetchNotifications(true);
+}
+
+// ─── Device registration ──────────────────────────────────────────────────────
+
+export interface RegisterNotificationDeviceInput {
+  token: string;
+  platform: 'ios' | 'android';
+  installationId: string;
+}
+
+export async function registerNotificationDevice(
+  input: RegisterNotificationDeviceInput,
+): Promise<void> {
+  await api.put('/notifications/devices', input);
+}
+
+export async function unregisterNotificationDevice(installationId: string): Promise<void> {
+  await api.delete('/notifications/devices', { data: { installationId } });
 }
 
 // ─── Writes ───────────────────────────────────────────────────────────────────
