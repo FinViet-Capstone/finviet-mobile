@@ -1,3 +1,61 @@
+export const AI_PREFERENCES_STRINGS = {
+  settingsEntry: 'Trợ lý AI & quyền riêng tư',
+  title: 'Trợ lý AI & quyền riêng tư',
+  sections: {
+    categorization: 'Phân loại giao dịch',
+    experience: 'Trải nghiệm AI',
+    dataScope: 'Dữ liệu AI được phép sử dụng',
+  },
+  categorizationHint: 'Chọn cách FinViet dùng AI để phân loại giao dịch của bạn.',
+  modes: {
+    off: {
+      label: 'Tắt phân loại bằng AI',
+      description: 'FinViet không dùng AI để gợi ý hoặc tự áp dụng danh mục.',
+    },
+    suggest_only: {
+      label: 'Chỉ gợi ý',
+      description: 'AI đề xuất danh mục để bạn xem và xác nhận.',
+    },
+    high_confidence_auto: {
+      label: 'Tự động khi đủ tin cậy',
+      description: 'AI tự áp dụng danh mục khi đạt ngưỡng tin cậy bạn chọn.',
+    },
+  },
+  threshold: {
+    label: 'Ngưỡng tin cậy',
+    description: (percent: number) =>
+      `Chỉ tự động phân loại khi AI có độ tin cậy từ ${percent}% trở lên.`,
+    decrease: (percent: number) => `Giảm ngưỡng xuống ${percent}%`,
+    increase: (percent: number) => `Tăng ngưỡng lên ${percent}%`,
+  },
+  experience: {
+    defaultHistoryEnabled: {
+      label: 'Lưu lịch sử trò chuyện mặc định',
+      description: 'Các cuộc trò chuyện mới có thể dùng lại ngữ cảnh gần đây.',
+    },
+    weeklyReportEnabled: {
+      label: 'Tạo báo cáo chi tiêu hằng tuần',
+      description: 'Cho phép FinViet tự động tạo báo cáo tuần cho bạn.',
+    },
+    ragEnabled: {
+      label: 'Dùng RAG để cá nhân hóa',
+      description: 'Kết hợp dữ liệu được phép và tài liệu liên quan để trả lời sát hơn.',
+    },
+  },
+  dataScopeHint: 'Bạn có thể tắt riêng từng nhóm dữ liệu mà trợ lý AI được phép sử dụng.',
+  dataScope: {
+    shareBalances: 'Số dư ví',
+    shareTransactions: 'Giao dịch',
+    shareBudgets: 'Ngân sách',
+    shareGoals: 'Mục tiêu tiết kiệm',
+    shareReports: 'Báo cáo',
+  },
+  loadError: 'Không thể tải cài đặt AI.',
+  saveError: 'Không thể lưu cài đặt AI.',
+  saving: 'Đang lưu…',
+  back: 'Quay lại',
+};
+
 // Subscription screen strings (Vietnamese)
 export const SUBSCRIPTION_STRINGS = {
   title: 'Gói dịch vụ',

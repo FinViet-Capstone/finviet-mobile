@@ -49,6 +49,7 @@ export {
   useWithdrawFromGoal,
 } from './useGoals';
 export { useBucketSpend, type BucketSpend } from './useBucketSpend';
+export { useAiPreferences, useUpdateAiPreferences } from './useAiPreferences';
 export {
   useSpendingScore,
   useWeeklyReport,
