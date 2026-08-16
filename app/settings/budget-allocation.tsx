@@ -41,11 +41,11 @@ const S = {
   incomeInvalid: 'Thu nhập phải lớn hơn 0',
   resetDefault: 'Dùng mặc định 50/30/20',
   totalValid: 'Tổng: 100%',
-  totalInvalid: (n: number) => `Tổng: ${n}% — phải bằng 100%`,
+  totalInvalid: (n: string) => `Tổng: ${n}% — phải bằng 100%`,
   saveSuccess: 'Đã lên lịch — thay đổi sẽ áp dụng từ tháng tới.',
   lockLabel: (bucket: string) => `Khóa ${bucket}`,
   unlockLabel: (bucket: string) => `Bỏ khóa ${bucket}`,
-  editPctLabel: (bucket: string, pct: number) => `Sửa ${bucket}, hiện tại ${pct} phần trăm`,
+  editAmountLabel: (bucket: string, amount: string) => `Sửa ${bucket}, hiện tại ${amount}`,
   buckets: {
     needs: { label: 'Thiết yếu', hint: 'Nhà ở, ăn uống, đi lại' },
     wants: { label: 'Mong muốn', hint: 'Mua sắm, giải trí' },
@@ -72,6 +72,16 @@ function clampPct(n: number): number {
   return Math.min(100, Math.max(0, n));
 }
 
+/** Round a % to at most 2 decimal places (max precision this feature supports). */
+function roundPct(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** "15" for whole numbers, "15.3" for fractional — no trailing zeros. */
+function formatPct(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 // ─── Bucket card ──────────────────────────────────────────────────────────────
 
 function BucketCard({
@@ -80,6 +90,7 @@ function BucketCard({
   icon,
   color,
   pct,
+  displayPct,
   amount,
   onChangePct,
   isLocked,
@@ -92,6 +103,13 @@ function BucketCard({
   icon: string;
   color: string;
   pct: number;
+  /** % shown in the secondary line — differs from `pct` only while this
+   * card's numpad is open, so it reflects what's being typed immediately
+   * instead of waiting for Done. The slider stays bound to `pct` so it
+   * doesn't jump mid-typing. */
+  displayPct: number;
+  /** VND amount shown next to the edit pencil — the numpad edits this
+   * directly (amount, not %); same live-while-typing behavior as displayPct. */
   amount: number;
   onChangePct: (v: number) => void;
   isLocked: boolean;
@@ -137,13 +155,13 @@ function BucketCard({
               onPress={onPressPct}
               style={styles.bucketPctRow}
               accessibilityRole="button"
-              accessibilityLabel={S.editPctLabel(label, pct)}
+              accessibilityLabel={S.editAmountLabel(label, formatVND(amount))}
             >
-              <Text style={[styles.bucketPct, { color }, isLocked && styles.bucketPctDisabled]}>{pct}%</Text>
+              <Text style={[styles.bucketPct, { color }, isLocked && styles.bucketPctDisabled]}>{formatVND(amount)}</Text>
               {!isLocked && <MaterialIcon name="edit" size={12} color={color} />}
             </TouchableOpacity>
           </View>
-          <Text style={styles.bucketAmount}>{formatVND(amount)}</Text>
+          <Text style={styles.bucketAmount}>{formatPct(displayPct)}%</Text>
         </View>
       </View>
       <CustomSlider
@@ -175,7 +193,9 @@ export default function BudgetAllocationScreen() {
   const [savings, setSavings] = useState(20);
   const [incomeRaw, setIncomeRaw] = useState('');
   const [activeField, setActiveField] = useState<ActiveField>(null);
-  const [pctRaw, setPctRaw] = useState('');
+  // Raw digits of the VND amount being typed for a bucket's numpad — the
+  // numpad edits the amount directly; % is derived from it (see handleKeypadDone).
+  const [bucketAmountRaw, setBucketAmountRaw] = useState('');
   const [lockedBucket, setLockedBucket] = useState<LockedBucket>(null);
   const [seeded, setSeeded] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -199,127 +219,165 @@ export default function BudgetAllocationScreen() {
   const income = parseInt(incomeRaw || '0', 10);
   const isIncomeValid = income > 0;
   const total = needs + wants + savings;
-  const isValid = total === 100 && isIncomeValid;
+  // Tolerance guards against float noise from the decimal-% redistribution
+  // above (e.g. 99.99999999999999 after several proportional splits).
+  const isValid = Math.abs(total - 100) < 0.01 && isIncomeValid;
 
-  const needsAmount = Math.round((needs / 100) * income);
-  const wantsAmount = Math.round((wants / 100) * income);
-  const savingsAmount = Math.round((savings / 100) * income);
+  // While a bucket's numpad is open, show exactly what's being typed (not
+  // round-tripped through %) so precise amounts like 530đ or 571.000đ don't
+  // get mangled into a rounded percentage and back. % is derived from the
+  // typed amount only for the secondary preview text.
+  const typedBucketAmount = parseInt(bucketAmountRaw || '0', 10);
+  const typedPct = income > 0 ? roundPct((typedBucketAmount / income) * 100) : 0;
+  const needsDisplayPct = activeField === 'needs' ? typedPct : needs;
+  const wantsDisplayPct = activeField === 'wants' ? typedPct : wants;
+  const savingsDisplayPct = activeField === 'savings' ? typedPct : savings;
+
+  const needsAmount = activeField === 'needs' ? typedBucketAmount : Math.round((needs / 100) * income);
+  const wantsAmount = activeField === 'wants' ? typedBucketAmount : Math.round((wants / 100) * income);
+  const savingsAmount = activeField === 'savings' ? typedBucketAmount : Math.round((savings / 100) * income);
+
+  // Set by openField, consumed by scrollToField — lets onContentSizeChange
+  // (below) finish the scroll once the keypad's extra bottom padding has
+  // actually been laid out, not just requested. Needed because a same-tick
+  // scrollTo (right after setActiveField) can clamp short for buckets near
+  // the bottom (savings, the last one) since there's no extra scroll room
+  // until that padding is committed.
+  const pendingScrollField = useRef<Exclude<ActiveField, null> | null>(null);
+
+  const scrollToField = useCallback((field: Exclude<ActiveField, null>) => {
+    if (field === 'income') return; // always visible near the top already
+    const y = fieldOffsets.current[field];
+    if (y !== undefined) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - SPACING[4]), animated: true });
+    }
+  }, []);
 
   const openField = useCallback((field: Exclude<ActiveField, null>) => {
     // A locked bucket's own % is fixed — editing it requires unlocking first.
     if (field !== 'income' && field === lockedBucket) return;
-    setPctRaw('');
+    setBucketAmountRaw('');
     setActiveField(field);
-    // Income is always visible near the top already; buckets are stacked
-    // below it, so scroll the tapped one clear of the bottom-anchored keypad.
-    if (field !== 'income') {
-      const y = fieldOffsets.current[field];
-      if (y !== undefined) {
-        scrollRef.current?.scrollTo({ y: Math.max(0, y - SPACING[4]), animated: true });
-      }
-    }
-  }, [lockedBucket]);
+    pendingScrollField.current = field;
+    // Covers switching directly between fields while the keypad is already
+    // open — the extra bottom padding is already laid out, so this lands
+    // correctly right away.
+    scrollToField(field);
+  }, [lockedBucket, scrollToField]);
 
+  // Income and bucket fields both take a plain VND amount now, so they share
+  // the same typing behavior — only which state they write to differs.
   const handleKeypadNumberPress = useCallback((key: string) => {
-    if (activeField === 'income') {
-      setIncomeRaw((prev) => {
-        if (key === '000') return prev === '' ? '' : prev + '000';
-        return prev + key;
-      });
-    } else if (activeField) {
-      setPctRaw((prev) => {
-        if (key === '000') return prev;
-        const next = prev + key;
-        return next.length > 3 ? prev : next;
-      });
-    }
+    const setter = activeField === 'income' ? setIncomeRaw : setBucketAmountRaw;
+    if (!activeField) return;
+    setter((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
   }, [activeField]);
 
   const handleKeypadBackspace = useCallback(() => {
     if (activeField === 'income') setIncomeRaw((prev) => prev.slice(0, -1));
-    else setPctRaw((prev) => prev.slice(0, -1));
+    else setBucketAmountRaw((prev) => prev.slice(0, -1));
   }, [activeField]);
 
   const handleKeypadClear = useCallback(() => {
     if (activeField === 'income') setIncomeRaw('');
-    else setPctRaw('');
+    else setBucketAmountRaw('');
   }, [activeField]);
 
   const handleKeypadClose = useCallback(() => {
     setActiveField(null);
-    setPctRaw('');
+    setBucketAmountRaw('');
   }, []);
+
+  // Redistribution math rounds to 2 decimal places (not the nearest whole
+  // percent) so a numpad-typed exact amount round-trips back to itself
+  // instead of snapping to the nearest 1%. Drag input already arrives as a
+  // whole number (BucketCard's onChangePct rounds it), so this is a no-op
+  // there. Each pair's second bucket is derived as the exact remainder (not
+  // independently rounded) so all three always sum to exactly 100.
 
   const handleNeeds = useCallback((v: number) => {
     if (lockedBucket === 'needs') return; // defensive; its slider/% are already disabled
+    const rounded = roundPct(v);
     if (lockedBucket === 'wants') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - wants);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - wants));
       setNeeds(clampedV);
-      setSavings(100 - wants - clampedV);
+      setSavings(roundPct(100 - wants - clampedV));
       return;
     }
     if (lockedBucket === 'savings') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - savings);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - savings));
       setNeeds(clampedV);
-      setWants(100 - savings - clampedV);
+      setWants(roundPct(100 - savings - clampedV));
       return;
     }
-    setNeeds(v);
-    const rem = 100 - v;
+    setNeeds(rounded);
+    const rem = roundPct(100 - rounded);
     const wRatio = wants / (wants + savings) || 0.6;
-    setWants(Math.round(rem * wRatio));
-    setSavings(rem - Math.round(rem * wRatio));
+    const newWants = roundPct(rem * wRatio);
+    setWants(newWants);
+    setSavings(roundPct(rem - newWants));
   }, [wants, savings, lockedBucket]);
 
   const handleWants = useCallback((v: number) => {
     if (lockedBucket === 'wants') return;
+    const rounded = roundPct(v);
     if (lockedBucket === 'needs') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - needs);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - needs));
       setWants(clampedV);
-      setSavings(100 - needs - clampedV);
+      setSavings(roundPct(100 - needs - clampedV));
       return;
     }
     if (lockedBucket === 'savings') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - savings);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - savings));
       setWants(clampedV);
-      setNeeds(100 - savings - clampedV);
+      setNeeds(roundPct(100 - savings - clampedV));
       return;
     }
-    setWants(v);
-    const rem = 100 - v;
+    setWants(rounded);
+    const rem = roundPct(100 - rounded);
     const nRatio = needs / (needs + savings) || 0.7;
-    setNeeds(Math.round(rem * nRatio));
-    setSavings(rem - Math.round(rem * nRatio));
+    const newNeeds = roundPct(rem * nRatio);
+    setNeeds(newNeeds);
+    setSavings(roundPct(rem - newNeeds));
   }, [needs, savings, lockedBucket]);
 
   const handleSavings = useCallback((v: number) => {
     if (lockedBucket === 'savings') return;
+    const rounded = roundPct(v);
     if (lockedBucket === 'needs') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - needs);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - needs));
       setSavings(clampedV);
-      setWants(100 - needs - clampedV);
+      setWants(roundPct(100 - needs - clampedV));
       return;
     }
     if (lockedBucket === 'wants') {
-      const clampedV = Math.min(Math.max(v, 0), 100 - wants);
+      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - wants));
       setSavings(clampedV);
-      setNeeds(100 - wants - clampedV);
+      setNeeds(roundPct(100 - wants - clampedV));
       return;
     }
-    setSavings(v);
-    const rem = 100 - v;
+    setSavings(rounded);
+    const rem = roundPct(100 - rounded);
     const nRatio = needs / (needs + wants) || 0.625;
-    setNeeds(Math.round(rem * nRatio));
-    setWants(rem - Math.round(rem * nRatio));
+    const newNeeds = roundPct(rem * nRatio);
+    setNeeds(newNeeds);
+    setWants(roundPct(rem - newNeeds));
   }, [needs, wants, lockedBucket]);
 
   const handleKeypadDone = useCallback(() => {
-    if (activeField === 'needs') handleNeeds(clampPct(parseInt(pctRaw || '0', 10)));
-    else if (activeField === 'wants') handleWants(clampPct(parseInt(pctRaw || '0', 10)));
-    else if (activeField === 'savings') handleSavings(clampPct(parseInt(pctRaw || '0', 10)));
+    const typedAmount = parseInt(bucketAmountRaw || '0', 10);
+    // 2-decimal precision (not the nearest whole percent) so an exact typed
+    // amount round-trips back to itself instead of snapping to the nearest 1%.
+    const pct = income > 0 ? clampPct(roundPct((typedAmount / income) * 100)) : 0;
+    if (activeField === 'needs') handleNeeds(pct);
+    else if (activeField === 'wants') handleWants(pct);
+    else if (activeField === 'savings') handleSavings(pct);
     setActiveField(null);
-    setPctRaw('');
-  }, [activeField, pctRaw, handleNeeds, handleWants, handleSavings]);
+    setBucketAmountRaw('');
+  }, [activeField, bucketAmountRaw, income, handleNeeds, handleWants, handleSavings]);
 
   const handleReset = useCallback(() => {
     setNeeds(50); setWants(30); setSavings(20);
@@ -329,6 +387,8 @@ export default function BudgetAllocationScreen() {
   const handleSave = useCallback(async () => {
     if (!isValid) return;
     try {
+      // needsPct/wantsPct/savingsPct support up to 2 decimal places (backend
+      // columns are numeric(5,2)) so an exact typed amount round-trips cleanly.
       await scheduleChange.mutateAsync({
         monthlyIncome: income,
         needsPct: needs,
@@ -363,7 +423,13 @@ export default function BudgetAllocationScreen() {
         ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, activeField !== null && { paddingBottom: NUMPAD_HEIGHT }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (pendingScrollField.current) {
+            scrollToField(pendingScrollField.current);
+            pendingScrollField.current = null;
+          }
+        }}>
 
         {/* Current month — read-only, locked */}
         <View style={styles.currentCard}>
@@ -417,7 +483,7 @@ export default function BudgetAllocationScreen() {
         {/* Bucket sliders */}
         <BucketCard label={S.buckets.needs.label} hint={S.buckets.needs.hint}
           icon="home" color={COLORS.primary}
-          pct={needs} amount={needsAmount} onChangePct={handleNeeds}
+          pct={needs} displayPct={needsDisplayPct} amount={needsAmount} onChangePct={handleNeeds}
           isLocked={lockedBucket === 'needs'}
           onToggleLock={() => setLockedBucket((prev) => (prev === 'needs' ? null : 'needs'))}
           onPressPct={() => openField('needs')}
@@ -425,7 +491,7 @@ export default function BudgetAllocationScreen() {
 
         <BucketCard label={S.buckets.wants.label} hint={S.buckets.wants.hint}
           icon="shopping_bag" color={COLORS.secondary}
-          pct={wants} amount={wantsAmount} onChangePct={handleWants}
+          pct={wants} displayPct={wantsDisplayPct} amount={wantsAmount} onChangePct={handleWants}
           isLocked={lockedBucket === 'wants'}
           onToggleLock={() => setLockedBucket((prev) => (prev === 'wants' ? null : 'wants'))}
           onPressPct={() => openField('wants')}
@@ -433,7 +499,7 @@ export default function BudgetAllocationScreen() {
 
         <BucketCard label={S.buckets.savings.label} hint={S.buckets.savings.hint}
           icon="savings" color={COLORS.tertiary}
-          pct={savings} amount={savingsAmount} onChangePct={handleSavings}
+          pct={savings} displayPct={savingsDisplayPct} amount={savingsAmount} onChangePct={handleSavings}
           isLocked={lockedBucket === 'savings'}
           onToggleLock={() => setLockedBucket((prev) => (prev === 'savings' ? null : 'savings'))}
           onPressPct={() => openField('savings')}
@@ -445,7 +511,7 @@ export default function BudgetAllocationScreen() {
         <View style={[styles.totalPillInner, isValid ? styles.totalPillValid : styles.totalPillInvalid]}>
           {isValid && <MaterialIcon name="check_circle" size={18} color={COLORS.tertiary} />}
           <Text style={[styles.totalPillText, { color: isValid ? COLORS.tertiary : COLORS.error }]}>
-            {isValid ? S.totalValid : S.totalInvalid(total)}
+            {isValid ? S.totalValid : S.totalInvalid(formatPct(total))}
           </Text>
         </View>
       </View>
