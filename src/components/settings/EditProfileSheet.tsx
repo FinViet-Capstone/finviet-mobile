@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
@@ -33,7 +33,12 @@ export function EditProfileSheet({ visible, onClose, currentName }: Props) {
 
   return (
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>Chỉnh sửa hồ sơ</Text>
         <TextInput
           label="Tên hiển thị"
@@ -53,7 +58,7 @@ export function EditProfileSheet({ visible, onClose, currentName }: Props) {
           />
           <Button title="Huỷ" onPress={onClose} variant="ghost" disabled={updateProfile.isPending} />
         </View>
-      </View>
+      </ScrollView>
     </DraggableSheet>
   );
 }

@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  TextInput,
   ActivityIndicator,
   Dimensions,
   Alert,
@@ -20,6 +19,7 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
+import { TextInput } from '@/components/common/TextInput';
 import { useArchivedGoals, useCreateGoal, useGoals } from '@/hooks/useGoals';
 import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
@@ -150,8 +150,8 @@ function NewGoalSheet({ visible, onClose }: { visible: boolean; onClose: () => v
         <Text style={styles.sheetTitle}>{S.newGoalTitle}</Text>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
-        <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
-          placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+        <TextInput value={name} onChangeText={setName}
+          placeholder={S.namePlaceholder}
           onFocus={() => setTargetFocused(false)} />
 
         <Text style={styles.fieldLabel}>{S.targetLabel}</Text>

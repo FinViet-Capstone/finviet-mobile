@@ -10,7 +10,6 @@ import {
   Alert,
   Modal,
   FlatList,
-  TextInput as RNTextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,6 +23,9 @@ import {
 } from "@/constants/theme";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
+import { DatePickerField } from "@/components/common/DatePickerField";
+import { TextInput } from "@/components/common/TextInput";
 import { CATEGORIES } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
 import { CategoryPickerSheet } from "@/components/categories";
@@ -108,6 +110,9 @@ export default function SMSEntryScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
+  // Unlike manual entry, SMS pre-fills the amount from AI extraction, so the
+  // numpad does not auto-open on mount — only when the user taps to edit.
+  const [amountFocused, setAmountFocused] = useState(false);
 
   // SMS entries can only target basic wallets — bank-linked wallets are read-only.
   const basicWallets = (walletData?.wallets ?? []).filter((w) => w.type !== "linked");
@@ -211,6 +216,25 @@ export default function SMSEntryScreen() {
     return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
   };
 
+  const handleAmountNumberPress = (key: string) => {
+    setAmountRaw((prev) => {
+      if (key === "000") return prev === "" ? "" : prev + "000";
+      return prev + key;
+    });
+    setAmountError(undefined);
+    setAmountUncertain(false);
+  };
+
+  const handleAmountBackspace = () => {
+    setAmountRaw((prev) => prev.slice(0, -1));
+    setAmountError(undefined);
+  };
+
+  const handleAmountClear = () => {
+    setAmountRaw("");
+    setAmountError(undefined);
+  };
+
   // ── Extracting phase ────────────────────────────────────────────────────────
 
   if (phase === "extracting") {
@@ -236,7 +260,10 @@ export default function SMSEntryScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScrollView
-            contentContainerStyle={styles.reviewContent}
+            contentContainerStyle={[
+              styles.reviewContent,
+              amountFocused && { paddingBottom: NUMPAD_HEIGHT },
+            ]}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
@@ -283,32 +310,27 @@ export default function SMSEntryScreen() {
             </View>
 
             {/* Amount */}
-            <View
+            <TouchableOpacity
+              activeOpacity={0.7}
               style={[
                 styles.fieldCard,
                 amountUncertain && styles.fieldCardUncertain,
               ]}
+              onPress={() => setAmountFocused(true)}
             >
               <Text style={styles.fieldLabel}>{S.fieldAmount}</Text>
-              <RNTextInput
-                value={amountRaw}
-                onChangeText={(t) => {
-                  setAmountRaw(t.replace(/\D/g, ""));
-                  setAmountError(undefined);
-                  setAmountUncertain(false);
-                }}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={COLORS.outlineVariant}
-                style={styles.fieldInput}
-              />
-              {amountNum > 0 && (
-                <Text style={styles.amountPreview}>{formatVND(amountNum)}</Text>
-              )}
+              <Text
+                style={[
+                  styles.fieldValueText,
+                  amountNum === 0 && styles.fieldPlaceholder,
+                ]}
+              >
+                {amountNum > 0 ? formatVND(amountNum) : "0"}
+              </Text>
               {amountError && (
                 <Text style={styles.fieldError}>{amountError}</Text>
               )}
-            </View>
+            </TouchableOpacity>
 
             {/* Merchant */}
             <View
@@ -318,15 +340,15 @@ export default function SMSEntryScreen() {
               ]}
             >
               <Text style={styles.fieldLabel}>{S.fieldMerchant}</Text>
-              <RNTextInput
+              <TextInput
+                variant="inline"
                 value={merchant}
                 onChangeText={(t) => {
                   setMerchant(t);
                   setMerchantUncertain(false);
                 }}
+                onFocus={() => setAmountFocused(false)}
                 placeholder="Tên cửa hàng, mô tả..."
-                placeholderTextColor={COLORS.outlineVariant}
-                style={styles.fieldInput}
               />
             </View>
 
@@ -388,10 +410,21 @@ export default function SMSEntryScreen() {
             </TouchableOpacity>
 
             {/* Date */}
-            <View style={styles.fieldCard}>
-              <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
-              <Text style={styles.fieldValueText}>{formatDate(dateIso)}</Text>
-            </View>
+            <DatePickerField
+              value={dateIso}
+              onChange={setDateIso}
+              maxDate={todayISO()}
+              customTrigger={(openPicker) => (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.fieldCard}
+                  onPress={openPicker}
+                >
+                  <Text style={styles.fieldLabel}>{S.fieldDate}</Text>
+                  <Text style={styles.fieldValueText}>{formatDate(dateIso)}</Text>
+                </TouchableOpacity>
+              )}
+            />
 
             {/* Actions */}
             <View style={styles.reviewActions}>
@@ -421,6 +454,16 @@ export default function SMSEntryScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Custom numpad — modal overlay, opens when the amount is focused */}
+        <NumericKeypad
+          visible={amountFocused}
+          onClose={() => setAmountFocused(false)}
+          onNumberPress={handleAmountNumberPress}
+          onBackspace={handleAmountBackspace}
+          onClear={handleAmountClear}
+          onDone={() => setAmountFocused(false)}
+        />
 
         {/* Category modal */}
         <CategoryPickerSheet
@@ -504,12 +547,12 @@ export default function SMSEntryScreen() {
 
           {/* Textarea */}
           <View style={styles.textareaWrap}>
-            <RNTextInput
+            <TextInput
+              variant="bare"
+              inputStyle={styles.textarea}
               value={smsText}
               onChangeText={setSmsText}
               placeholder={S.placeholder}
-              placeholderTextColor={COLORS.outlineVariant}
-              style={styles.textarea}
               multiline
               textAlignVertical="top"
               autoFocus
@@ -864,12 +907,6 @@ const styles = StyleSheet.create({
   },
   fieldCardUncertain: { borderColor: COLORS.warning, borderWidth: 1.5 },
   fieldLabel: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  fieldInput: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurface,
-    padding: 0,
-  },
   fieldValueText: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.medium,
@@ -882,11 +919,6 @@ const styles = StyleSheet.create({
     gap: SPACING[2],
   },
   fieldError: { fontSize: FONT_SIZE.xs, color: COLORS.error },
-  amountPreview: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-  },
   dot: { width: 10, height: 10, borderRadius: BORDER_RADIUS.full },
   uncertainBadge: {
     fontSize: FONT_SIZE.xl,

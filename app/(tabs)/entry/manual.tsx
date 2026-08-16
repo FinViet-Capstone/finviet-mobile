@@ -16,7 +16,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  TextInput as RNTextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -37,6 +36,7 @@ import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad"
 import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { CategoryPickerSheet } from "@/components/categories";
 import { DatePickerField } from "@/components/common/DatePickerField";
+import { TextInput } from "@/components/common/TextInput";
 import { useWallets, useCreateTransaction } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
 import { formatVND } from "@/utils/formatters";
@@ -404,12 +404,11 @@ export default function ManualEntryScreen() {
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldPayee}</Text>
-              <RNTextInput
+              <TextInput
+                variant="inline"
                 value={payee}
                 onChangeText={setPayee}
                 placeholder={S.payeePlaceholder}
-                placeholderTextColor={COLORS.outlineVariant}
-                style={styles.inlineInput}
               />
             </View>
           </View>
@@ -426,12 +425,11 @@ export default function ManualEntryScreen() {
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldNote}</Text>
-              <RNTextInput
+              <TextInput
+                variant="inline"
                 value={note}
                 onChangeText={setNote}
                 placeholder={S.notePlaceholder}
-                placeholderTextColor={COLORS.outlineVariant}
-                style={styles.inlineInput}
               />
             </View>
           </View>
@@ -629,12 +627,6 @@ const styles = StyleSheet.create({
   fieldPlaceholder: {
     color: COLORS.outlineVariant,
     fontWeight: FONT_WEIGHT.normal,
-  },
-  inlineInput: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-    padding: 0,
-    fontWeight: FONT_WEIGHT.medium,
   },
 
   // Modal

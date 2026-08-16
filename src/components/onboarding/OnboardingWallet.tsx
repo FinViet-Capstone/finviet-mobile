@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
+import { TextInput } from '@/components/common/TextInput';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency } from '@/data/onboardingData';
 
@@ -131,18 +131,14 @@ export function OnboardingWallet({
               {/* Wallet Name */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{ONBOARDING_STRINGS.wallet.nameLabel}</Text>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputIcon}>✏️</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={ONBOARDING_STRINGS.wallet.namePlaceholder}
-                    placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
-                    value={walletName}
-                    onChangeText={onChangeWalletName}
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                </View>
+                <TextInput
+                  leftIcon={<Text style={styles.inputIcon}>✏️</Text>}
+                  placeholder={ONBOARDING_STRINGS.wallet.namePlaceholder}
+                  value={walletName}
+                  onChangeText={onChangeWalletName}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
               </View>
 
               {/* Current Balance */}
@@ -329,12 +325,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.onSurfaceVariant,
-  },
-  input: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onBackground,
-    padding: 0,
   },
   balanceDisplay: {
     flex: 1,

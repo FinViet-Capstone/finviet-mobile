@@ -23,8 +23,7 @@ import { updateProfile } from '@/services';
 import { useAuthStore } from '@/stores/authStore';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { ONBOARDING_STRINGS } from '@/data/onboardingData';
-
-
+import { getApiErrorMessage } from '@/utils/errors';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -75,6 +74,8 @@ export default function OnboardingScreen() {
           gender: state.gender,
           dateOfBirth: state.dateOfBirth,
           // Step 2's 50/30/20 sliders — persist so it doesn't get silently dropped.
+          // needsPct/wantsPct/savingsPct support up to 2 decimal places (backend
+          // columns are numeric(5,2)) so an exact typed amount round-trips cleanly.
           needsPct: state.allocations.essential,
           wantsPct: state.allocations.wants,
           savingsPct: state.allocations.savings,
@@ -91,10 +92,10 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.user.all() });
       markOnboardingDone();
       router.replace('/(tabs)/home');
-    } catch {
+    } catch (err) {
       Alert.alert(
         'Không thể hoàn tất',
-        'Đã xảy ra lỗi khi lưu thiết lập. Vui lòng kiểm tra kết nối và thử lại.',
+        getApiErrorMessage(err, 'Đã xảy ra lỗi khi lưu thiết lập. Vui lòng kiểm tra kết nối và thử lại.'),
       );
     } finally {
       setLoading(false);

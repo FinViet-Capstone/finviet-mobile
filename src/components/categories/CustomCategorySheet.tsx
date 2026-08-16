@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -14,6 +13,7 @@ import { SvgUri } from 'react-native-svg';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { Button } from '@/components/common/Button';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { TextInput } from '@/components/common/TextInput';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import type { BucketId } from './CategoryBucketCard';
 
@@ -69,7 +69,6 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
   const [name, setName] = useState('');
   const [bucket, setBucket] = useState<BucketId | null>(null);
   const [color, setColor] = useState<string | null>(null);
-  const [nameFocused, setNameFocused] = useState(false);
   const [picked, setPicked] = useState<{ uri: string; ext: 'svg' | 'png' } | null>(null);
 
   const reset = () => {
@@ -120,13 +119,9 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
         <View style={styles.field}>
           <Text style={styles.label}>{S.nameLabel}</Text>
           <TextInput
-            style={[styles.input, nameFocused && styles.inputFocused]}
             placeholder={S.namePlaceholder}
-            placeholderTextColor={COLORS.onSurfaceVariant + '80'}
             value={name}
             onChangeText={setName}
-            onFocus={() => setNameFocused(true)}
-            onBlur={() => setNameFocused(false)}
           />
         </View>
 
@@ -234,19 +229,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onSurfaceVariant,
-  },
-  input: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant + '4D',
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
   },
   chipRow: {
     flexDirection: 'row',

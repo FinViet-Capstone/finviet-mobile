@@ -3,7 +3,6 @@ import {
   SectionList,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   ViewToken,
@@ -13,6 +12,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { TextInput } from "@/components/common/TextInput";
 import { MonthNavigator } from "@/components/transaction/MonthNavigator";
 import { TransactionSummaryBanner } from "@/components/transaction/TransactionSummaryBanner";
 import { TransactionCalendar } from "@/components/transaction/TransactionCalendar";
@@ -269,11 +269,11 @@ export default function TransactionsScreen() {
         <View style={styles.searchBar}>
           <MaterialIcon name="search" size={18} color={COLORS.onSurfaceVariant} />
           <TextInput
-            style={styles.searchInput}
+            variant="bare"
+            inputStyle={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Tìm theo tên người nhận..."
-            placeholderTextColor={COLORS.onSurfaceVariant}
             autoFocus
             returnKeyType="search"
           />

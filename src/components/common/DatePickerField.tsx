@@ -15,7 +15,7 @@
  *   />
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -29,12 +29,14 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import {
   COLORS,
+  DARK_COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
   SHADOW,
 } from '@/constants/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { Button } from './Button';
 
 export interface DatePickerFieldProps {
@@ -86,6 +88,10 @@ export function DatePickerField({
   uncertain,
   customTrigger,
 }: DatePickerFieldProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const isDark = colors === DARK_COLORS;
+
   const [iosVisible, setIosVisible] = useState(false);
   // iOS spinner needs a draft so the user can scroll without committing on every tick.
   const [iosDraft, setIosDraft] = useState<Date>(() => isoToDate(value));
@@ -186,7 +192,7 @@ export function DatePickerField({
                 }}
                 minimumDate={minimumDate}
                 maximumDate={maximumDate}
-                themeVariant="light"
+                themeVariant={isDark ? 'dark' : 'light'}
                 locale="vi-VN"
                 style={styles.iosPicker}
               />
@@ -213,94 +219,96 @@ export function DatePickerField({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  wrap: {},
-  label: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-    marginBottom: SPACING[2],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[3],
-    minHeight: 48,
-    backgroundColor: COLORS.white,
-  },
-  rowUncertain: {
-    borderColor: COLORS.calendar.uncategorized,
-    borderWidth: 2,
-  },
-  rowDisabled: {
-    backgroundColor: COLORS.gray[100],
-  },
-  value: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[900],
-  },
-  valueDisabled: {
-    color: COLORS.gray[500],
-  },
-  chevron: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.gray[400],
-    marginLeft: SPACING[2],
-  },
-  uncertainBadge: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.calendar.uncategorized,
-    marginLeft: SPACING[2],
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {},
+    label: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurfaceVariant,
+      marginBottom: SPACING[2],
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      borderRadius: BORDER_RADIUS.lg,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[3],
+      height: 48,
+      backgroundColor: colors.surfaceContainer,
+    },
+    rowUncertain: {
+      borderColor: COLORS.calendar.uncategorized,
+      borderWidth: 2,
+    },
+    rowDisabled: {
+      backgroundColor: colors.surfaceVariant,
+    },
+    value: {
+      flex: 1,
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurface,
+    },
+    valueDisabled: {
+      color: colors.onSurfaceVariant,
+    },
+    chevron: {
+      fontSize: FONT_SIZE.xl,
+      color: colors.onSurfaceVariant,
+      marginLeft: SPACING[2],
+    },
+    uncertainBadge: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: COLORS.calendar.uncategorized,
+      marginLeft: SPACING[2],
+    },
 
-  // iOS modal
-  iosOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  iosSheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingHorizontal: SPACING[5],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
-    ...SHADOW.lg,
-  },
-  iosHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.gray[300],
-    marginBottom: SPACING[3],
-  },
-  iosTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-    textAlign: 'center',
-    marginBottom: SPACING[2],
-  },
-  iosPicker: {
-    alignSelf: 'stretch',
-  },
-  iosActions: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-    marginTop: SPACING[3],
-  },
-  iosBtn: {
-    flex: 1,
-  },
-});
+    // iOS modal
+    iosOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'flex-end',
+    },
+    iosSheet: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderTopLeftRadius: BORDER_RADIUS['2xl'],
+      borderTopRightRadius: BORDER_RADIUS['2xl'],
+      paddingHorizontal: SPACING[5],
+      paddingTop: SPACING[3],
+      paddingBottom: SPACING[8],
+      ...SHADOW.lg,
+    },
+    iosHandle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.outlineVariant,
+      marginBottom: SPACING[3],
+    },
+    iosTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginBottom: SPACING[2],
+    },
+    iosPicker: {
+      alignSelf: 'stretch',
+    },
+    iosActions: {
+      flexDirection: 'row',
+      gap: SPACING[3],
+      marginTop: SPACING[3],
+    },
+    iosBtn: {
+      flex: 1,
+    },
+  });
+}

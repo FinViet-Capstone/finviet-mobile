@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { TextInput } from '@/components/common/TextInput';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { DELETE_ACCOUNT_STRINGS } from '@/data/settingsScreensData';
 import { useAuthStore } from '@/stores/authStore';
@@ -98,17 +98,12 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
             <Text style={styles.confirmEmail}>{userEmail}</Text>
           </Text>
           <TextInput
-            style={[
-              styles.emailInput,
-              focused && styles.emailInputFocused,
-              isConfirmed && styles.emailInputValid,
-            ]}
+            borderColor={isConfirmed ? COLORS.tertiary : focused ? COLORS.error : undefined}
             value={inputEmail}
             onChangeText={setInputEmail}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={DELETE_ACCOUNT_STRINGS.confirmPlaceholder}
-            placeholderTextColor={COLORS.outline}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -217,24 +212,6 @@ const styles = StyleSheet.create({
   confirmEmail: {
     color: COLORS.onSurface,
     fontWeight: FONT_WEIGHT.bold,
-  },
-  emailInput: {
-    width: '100%',
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[2],
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-    minHeight: 48,
-  },
-  emailInputFocused: {
-    borderColor: COLORS.error,
-  },
-  emailInputValid: {
-    borderColor: COLORS.tertiary,
   },
   // Bottom bar
   bottomBar: {
