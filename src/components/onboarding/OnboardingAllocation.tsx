@@ -15,6 +15,18 @@ import { ONBOARDING_STRINGS, ALLOCATION_PRESETS } from '@/data/onboardingData';
 
 type BucketKey = 'essential' | 'wants' | 'savings';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Round a % to at most 2 decimal places (max precision this feature supports). */
+function roundPct(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** "15" for whole numbers, "15.3" for fractional — no trailing zeros. */
+function formatPct(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 export interface OnboardingAllocationProps {
   readonly allocations: {
     essential: number;
@@ -38,16 +50,26 @@ export function OnboardingAllocation({
 
   const [lockedBucket, setLockedBucket] = useState<BucketKey | null>(null);
   const [activeField, setActiveField] = useState<BucketKey | null>(null);
-  const [pctRaw, setPctRaw] = useState('');
+  // Raw digits of the VND amount being typed on the numpad — the keypad
+  // edits the amount directly; % is derived from it (see handleKeypadDone).
+  const [amountRaw, setAmountRaw] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldOffsets = useRef<Partial<Record<BucketKey, number>>>({});
+  // Card offsets from onLayout are relative to cardsContainer, not the
+  // ScrollView content — track its own y so scrollTo lands on the right spot.
+  const cardsContainerY = useRef(0);
 
-  const calculateAmount = (percentage: number): string => {
-    const amount = (income * percentage) / 100;
-    return amount.toLocaleString('vi-VN').replace(/,/g, '.') + 'đ';
-  };
+  const formatAmount = (amount: number): string =>
+    amount.toLocaleString('vi-VN').replace(/,/g, '.') + 'đ';
 
   const handleSliderChange = useCallback((key: BucketKey, newValue: number) => {
     if (key === lockedBucket) return; // the locked bucket's own share is fixed
-    const rounded = Math.round(newValue);
+    // Round to 2 decimal places rather than the nearest whole percent — an
+    // exact typed amount (e.g. 15.300.000đ on a 100.000.000đ income) needs a
+    // fractional % (15.3%) to round-trip back to that exact amount instead
+    // of snapping to 15% → 15.000.000đ. Drag input already arrives as a
+    // whole number (CustomSlider's step=1 snaps it), so this is a no-op there.
+    const rounded = roundPct(newValue);
     const otherKeys = (['essential', 'wants', 'savings'] as const).filter(k => k !== key);
     const [key1, key2] = otherKeys;
 
@@ -57,25 +79,28 @@ export function OnboardingAllocation({
       // other (unlocked) bucket rather than splitting proportionally.
       const lockedValue = allocations[lockedBucket];
       const freeKey = lockedBucket === key1 ? key2 : key1;
-      const clamped = Math.min(Math.max(rounded, 0), 100 - lockedValue);
+      const clamped = Math.min(Math.max(rounded, 0), roundPct(100 - lockedValue));
       onChangeAllocation(key, clamped);
-      onChangeAllocation(freeKey, 100 - lockedValue - clamped);
+      onChangeAllocation(freeKey, roundPct(100 - lockedValue - clamped));
       return;
     }
 
     // No lock: redistribute proportionally between the other two, as before.
-    const remaining = 100 - rounded;
+    const remaining = roundPct(100 - rounded);
     const total1and2 = allocations[key1] + allocations[key2];
 
     if (total1and2 === 0) {
       // If both are 0, split evenly
-      onChangeAllocation(key1, Math.floor(remaining / 2));
-      onChangeAllocation(key2, remaining - Math.floor(remaining / 2));
+      const half = roundPct(remaining / 2);
+      onChangeAllocation(key1, half);
+      onChangeAllocation(key2, roundPct(remaining - half));
     } else {
-      // Distribute proportionally
+      // Distribute proportionally. key2 is derived as the exact remainder
+      // (not independently rounded) so the three buckets always sum to
+      // exactly 100 despite the extra decimal precision.
       const ratio1 = allocations[key1] / total1and2;
-      const new1 = Math.round(remaining * ratio1);
-      const new2 = remaining - new1;
+      const new1 = roundPct(remaining * ratio1);
+      const new2 = roundPct(remaining - new1);
 
       onChangeAllocation(key1, new1);
       onChangeAllocation(key2, new2);
@@ -84,41 +109,71 @@ export function OnboardingAllocation({
     onChangeAllocation(key, rounded);
   }, [allocations, lockedBucket, onChangeAllocation]);
 
+  // Set by openField, consumed by scrollToField — lets onContentSizeChange
+  // (below) finish the scroll once the keypad's extra bottom padding has
+  // actually been laid out, not just requested.
+  const pendingScrollKey = useRef<BucketKey | null>(null);
+
+  const scrollToField = useCallback((key: BucketKey) => {
+    const cardY = fieldOffsets.current[key];
+    if (cardY === undefined) return;
+    const y = cardsContainerY.current + cardY;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - SPACING[4]), animated: true });
+  }, []);
+
   const openField = useCallback((key: BucketKey) => {
     if (key === lockedBucket) return;
-    setPctRaw('');
+    setAmountRaw('');
     setActiveField(key);
-  }, [lockedBucket]);
+    pendingScrollKey.current = key;
+    // Covers switching directly between fields while the keypad is already
+    // open — the extra bottom padding is already laid out, so this lands
+    // correctly right away (onContentSizeChange won't fire again below since
+    // content height isn't changing).
+    scrollToField(key);
+  }, [lockedBucket, scrollToField]);
 
   const handleKeypadNumberPress = useCallback((key: string) => {
-    setPctRaw((prev) => {
-      if (key === '000') return prev;
-      const next = prev + key;
-      return next.length > 3 ? prev : next;
+    setAmountRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
     });
   }, []);
 
-  const handleKeypadBackspace = useCallback(() => setPctRaw((prev) => prev.slice(0, -1)), []);
-  const handleKeypadClear = useCallback(() => setPctRaw(''), []);
-  const handleKeypadClose = useCallback(() => { setActiveField(null); setPctRaw(''); }, []);
+  const handleKeypadBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
+  const handleKeypadClear = useCallback(() => setAmountRaw(''), []);
+  const handleKeypadClose = useCallback(() => { setActiveField(null); setAmountRaw(''); }, []);
 
   const handleKeypadDone = useCallback(() => {
     if (activeField) {
-      const clamped = Math.min(100, Math.max(0, parseInt(pctRaw || '0', 10)));
-      handleSliderChange(activeField, clamped);
+      const typedAmount = parseInt(amountRaw || '0', 10);
+      const pct = income > 0 ? roundPct((typedAmount / income) * 100) : 0;
+      handleSliderChange(activeField, Math.min(100, Math.max(0, pct)));
     }
     setActiveField(null);
-    setPctRaw('');
-  }, [activeField, pctRaw, handleSliderChange]);
+    setAmountRaw('');
+  }, [activeField, amountRaw, income, handleSliderChange]);
 
-  const isValid = allocations.essential + allocations.wants + allocations.savings === 100;
+  const totalPct = allocations.essential + allocations.wants + allocations.savings;
+  // Tolerance guards against float noise from the decimal-% redistribution
+  // above (e.g. 99.99999999999999 after several proportional splits).
+  const isValid = Math.abs(totalPct - 100) < 0.01;
 
   return (
     <>
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={[styles.scrollContent, activeField !== null && { paddingBottom: NUMPAD_HEIGHT }]}
       showsVerticalScrollIndicator={false}
+      onContentSizeChange={() => {
+        // Fires once the extra keypad padding has actually been laid out —
+        // the reliable moment to finish the scroll (see openField/scrollToField).
+        if (pendingScrollKey.current) {
+          scrollToField(pendingScrollKey.current);
+          pendingScrollKey.current = null;
+        }
+      }}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -141,10 +196,24 @@ export function OnboardingAllocation({
       </View>
 
       {/* Allocation Cards */}
-      <View style={styles.cardsContainer}>
+      <View
+        style={styles.cardsContainer}
+        onLayout={(e) => { cardsContainerY.current = e.nativeEvent.layout.y; }}
+      >
         {ALLOCATION_PRESETS.map((preset) => {
           const key = preset.id as BucketKey;
           const percentage = allocations[key];
+          const committedAmount = Math.round((income * percentage) / 100);
+          const isEditingThis = activeField === key;
+          // While this card's numpad is open, show what's being typed
+          // instead of the last committed value — otherwise digits appear to
+          // do nothing until Done is pressed. The slider stays bound to the
+          // committed `percentage` so it doesn't jump mid-typing (matches
+          // SetLimitSheet's amount-vs-slider split).
+          const displayAmount = isEditingThis ? parseInt(amountRaw || '0', 10) : committedAmount;
+          const displayPercentage = isEditingThis
+            ? (income > 0 ? roundPct((displayAmount / income) * 100) : 0)
+            : percentage;
           const colorMap = {
             primary: COLORS.primary,
             secondary: COLORS.secondary,
@@ -160,6 +229,7 @@ export function OnboardingAllocation({
                 styles.allocationCard,
                 { borderLeftColor: color, borderLeftWidth: 4 },
               ]}
+              onLayout={(e) => { fieldOffsets.current[key] = e.nativeEvent.layout.y; }}
             >
               <View style={styles.cardContent}>
                 <View style={[styles.iconCircle, { backgroundColor: `${color}1A` }]}>
@@ -195,10 +265,10 @@ export function OnboardingAllocation({
                         onPress={() => openField(key)}
                         style={styles.pctRow}
                         accessibilityRole="button"
-                        accessibilityLabel={ONBOARDING_STRINGS.allocation.editPctLabel(preset.name, percentage)}
+                        accessibilityLabel={ONBOARDING_STRINGS.allocation.editAmountLabel(preset.name, formatAmount(committedAmount))}
                       >
                         <Text style={[styles.percentage, { color }, isLocked && styles.percentageDisabled]}>
-                          {percentage}%
+                          {formatAmount(displayAmount)}
                         </Text>
                         {!isLocked && <MaterialIcon name="edit" size={12} color={color} />}
                       </TouchableOpacity>
@@ -207,7 +277,7 @@ export function OnboardingAllocation({
 
                   <View style={styles.cardDetails}>
                     <Text style={styles.description}>{preset.description}</Text>
-                    <Text style={styles.amount}>{calculateAmount(percentage)}</Text>
+                    <Text style={styles.amount}>{formatPct(displayPercentage)}%</Text>
                   </View>
 
                   {/* Interactive Slider */}

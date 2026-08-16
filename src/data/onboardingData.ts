@@ -97,7 +97,7 @@ export const ONBOARDING_STRINGS = {
     button: 'Tiếp theo',
     lockLabel: (bucket: string) => `Khóa ${bucket}`,
     unlockLabel: (bucket: string) => `Bỏ khóa ${bucket}`,
-    editPctLabel: (bucket: string, pct: number) => `Sửa ${bucket}, hiện tại ${pct} phần trăm`,
+    editAmountLabel: (bucket: string, amount: string) => `Sửa ${bucket}, hiện tại ${amount}`,
   },
   categories: {
     title: 'Danh mục chi tiêu của bạn',
