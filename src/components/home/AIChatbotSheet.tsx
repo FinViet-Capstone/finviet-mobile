@@ -3,7 +3,6 @@ import {
   Modal,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -22,6 +21,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { TextInput } from '@/components/common/TextInput';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import {
   useChatSessions,
@@ -410,11 +410,11 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
                 <MaterialIcon name="mic" size={22} color={isListening ? COLORS.primary : COLORS.onSurfaceVariant} />
               </TouchableOpacity>
               <TextInput
-                style={styles.textInput}
+                variant="bare"
+                inputStyle={styles.textInput}
                 value={input}
                 onChangeText={setInput}
                 placeholder={S.placeholder}
-                placeholderTextColor={COLORS.onSurfaceVariant}
                 multiline={false}
                 returnKeyType="send"
                 onSubmitEditing={() => handleSend(input)}

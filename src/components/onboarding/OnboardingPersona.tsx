@@ -2,7 +2,6 @@ import React from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DatePickerField } from '@/components/common/DatePickerField';
+import { TextInput } from '@/components/common/TextInput';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 
 type Gender = 'male' | 'female' | 'other';
@@ -77,11 +77,9 @@ export function OnboardingPersona({
         <View style={styles.field}>
           <Text style={styles.label}>{S.nameLabel}</Text>
           <TextInput
-            style={styles.input}
             value={displayName}
             onChangeText={onChangeDisplayName}
             placeholder={S.namePlaceholder}
-            placeholderTextColor={`${COLORS.onSurfaceVariant}80`}
           />
         </View>
 
@@ -169,16 +167,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.onSurfaceVariant,
-  },
-  input: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}4D`,
-    borderRadius: BORDER_RADIUS.xl,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[4],
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
   },
   inputRow: {
     flexDirection: 'row',

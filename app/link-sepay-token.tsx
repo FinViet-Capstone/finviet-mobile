@@ -10,13 +10,14 @@
 
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { TextInput } from '@/components/common/TextInput';
 import { useLinkSepayWithToken } from '@/hooks/useWallets';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import { USE_MOCK, API_BASE_URL } from '@/lib/env';
@@ -124,11 +125,10 @@ export default function LinkSepayTokenScreen() {
 
               <Text style={styles.fieldLabel}>{S.tokenLabel}</Text>
               <TextInput
-                style={styles.input}
+                variant="multiline"
                 value={token}
                 onChangeText={setToken}
                 placeholder={S.tokenPlaceholder}
-                placeholderTextColor={COLORS.onSurfaceVariant}
                 autoCapitalize="none"
                 autoCorrect={false}
                 multiline
@@ -137,11 +137,9 @@ export default function LinkSepayTokenScreen() {
 
               <Text style={styles.fieldLabel}>{S.accountLabel}</Text>
               <TextInput
-                style={styles.inputSingle}
                 value={accountNumber}
                 onChangeText={setAccountNumber}
                 placeholder={S.accountPlaceholder}
-                placeholderTextColor={COLORS.onSurfaceVariant}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
@@ -223,16 +221,6 @@ const styles = StyleSheet.create({
   },
   mockWarningText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.secondary, lineHeight: 16 },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
-  input: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING[4], fontSize: FONT_SIZE.sm, color: COLORS.onSurface,
-    borderWidth: 1, borderColor: COLORS.surfaceVariant, minHeight: 80, textAlignVertical: 'top',
-  },
-  inputSingle: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING[4], fontSize: FONT_SIZE.sm, color: COLORS.onSurface,
-    borderWidth: 1, borderColor: COLORS.surfaceVariant,
-  },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
     backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,

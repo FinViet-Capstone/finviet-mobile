@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { TextInput } from '@/components/common/TextInput';
 import { useCreateWallet } from '@/hooks/useWallets';
 
 const S = {
@@ -98,8 +99,8 @@ export default function CreateWalletScreen() {
         </View>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
-        <TextInput style={styles.fieldInput} value={name} onChangeText={setName}
-          placeholder={S.namePlaceholder} placeholderTextColor={COLORS.onSurfaceVariant}
+        <TextInput value={name} onChangeText={setName}
+          placeholder={S.namePlaceholder}
           onFocus={() => setBalanceFocused(false)} autoFocus />
 
         {/* Balance — tappable display, numpad below */}
@@ -152,7 +153,6 @@ const styles = StyleSheet.create({
   typeInactiveText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textAlign: 'center' },
   comingSoon: { fontSize: 10, color: COLORS.onSurfaceVariant },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
-  fieldInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
   amountDisplayFocused: { borderColor: COLORS.primary },
   amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },

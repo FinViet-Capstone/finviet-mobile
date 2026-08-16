@@ -10,7 +10,6 @@ import {
   Alert,
   FlatList,
   ActivityIndicator,
-  TextInput as RNTextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,6 +27,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
+import { TextInput } from '@/components/common/TextInput';
 import {
   useTransactionById,
   useWallets,
@@ -324,12 +324,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
               </View>
               <View style={styles.fieldTextWrap}>
                 <Text style={styles.fieldLabel}>{S.merchantLabel}</Text>
-                <RNTextInput
+                <TextInput
+                  variant="inline"
                   value={merchant}
                   onChangeText={setMerchant}
                   placeholder={S.merchantPlaceholder}
-                  placeholderTextColor={COLORS.outlineVariant}
-                  style={styles.inlineInput}
                   editable={!fieldsLocked}
                 />
               </View>
@@ -343,12 +342,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.descriptionLabel}</Text>
-              <RNTextInput
+              <TextInput
+                variant="inline"
                 value={description}
                 onChangeText={setDescription}
                 placeholder={S.descriptionPlaceholder}
-                placeholderTextColor={COLORS.outlineVariant}
-                style={styles.inlineInput}
                 editable={!fieldsLocked}
               />
             </View>
@@ -524,7 +522,6 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginBottom: 2 },
   fieldValue: { fontSize: FONT_SIZE.base, color: COLORS.onSurface, fontWeight: FONT_WEIGHT.medium },
   fieldPlaceholder: { color: COLORS.outlineVariant, fontWeight: FONT_WEIGHT.normal },
-  inlineInput: { fontSize: FONT_SIZE.base, color: COLORS.onSurface, padding: 0, fontWeight: FONT_WEIGHT.medium },
 
   // Actions
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },

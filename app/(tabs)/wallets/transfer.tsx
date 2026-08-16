@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
+import { TextInput } from '@/components/common/TextInput';
 import { useWallets, useCreateTransfer } from '@/hooks/useWallets';
 import type { Wallet } from '@/types/wallet';
 
@@ -162,11 +163,9 @@ export default function TransferScreen() {
         {/* Note */}
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
         <TextInput
-          style={styles.noteInputField}
           value={note}
           onChangeText={setNote}
           placeholder={S.notePlaceholder}
-          placeholderTextColor={COLORS.onSurfaceVariant}
           onFocus={() => setAmountFocused(false)}
           returnKeyType="done"
         />
@@ -218,7 +217,6 @@ const styles = StyleSheet.create({
   amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
   amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
   noteInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center' },
-  noteInputField: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: -SPACING[2] },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
