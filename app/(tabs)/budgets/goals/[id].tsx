@@ -8,7 +8,6 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
-  TextInput,
   Alert,
   InteractionManager,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
+import { TextInput } from '@/components/common/TextInput';
 import { WalletPickerSheet } from '@/components/transaction/WalletPickerSheet';
 import {
   useGoalById,
@@ -197,7 +197,15 @@ function ContributionSheet({
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, amountFocused && !zeroBalance && { paddingBottom: NUMPAD_HEIGHT }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.sheet,
+          amountFocused && !zeroBalance && { paddingBottom: NUMPAD_HEIGHT },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.sheetTitle}>{S.contribTitle}</Text>
 
         {/* Source wallet — the money is deducted from here */}
@@ -255,11 +263,9 @@ function ContributionSheet({
 
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
         <TextInput
-          style={styles.noteInput}
           value={note}
           onChangeText={setNote}
           placeholder={S.notePlaceholder}
-          placeholderTextColor={COLORS.onSurfaceVariant}
           onFocus={() => setAmountFocused(false)}
           returnKeyType="done"
         />
@@ -276,7 +282,7 @@ function ContributionSheet({
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </DraggableSheet>
     <NumericKeypad
       visible={visible && amountFocused && !zeroBalance}
@@ -402,7 +408,15 @@ function WithdrawSheet({
   return (
     <>
     <DraggableSheet visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, amountFocused && { paddingBottom: NUMPAD_HEIGHT }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.sheet,
+          amountFocused && { paddingBottom: NUMPAD_HEIGHT },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.sheetTitle}>{S.withdrawTitle}</Text>
 
         <Text style={styles.fieldLabel}>{S.destLabel}</Text>
@@ -446,11 +460,9 @@ function WithdrawSheet({
 
         <Text style={styles.fieldLabel}>{S.noteLabel}</Text>
         <TextInput
-          style={styles.noteInput}
           value={note}
           onChangeText={setNote}
           placeholder={S.notePlaceholder}
-          placeholderTextColor={COLORS.onSurfaceVariant}
           onFocus={() => setAmountFocused(false)}
           returnKeyType="done"
         />
@@ -467,7 +479,7 @@ function WithdrawSheet({
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </DraggableSheet>
     <NumericKeypad
       visible={visible && amountFocused}
@@ -842,11 +854,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
   },
   noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
-  noteInput: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
-    paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface,
-  },
   walletSelectRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
     backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,

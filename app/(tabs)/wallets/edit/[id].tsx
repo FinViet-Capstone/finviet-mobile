@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert,
 } from 'react-native';
 import { isAxiosError } from 'axios';
@@ -10,6 +10,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/consta
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
+import { TextInput } from '@/components/common/TextInput';
 import { useWalletById, useUpdateWallet } from '@/hooks/useWallets';
 import { formatVND } from '@/utils/formatters';
 
@@ -94,11 +95,9 @@ export default function EditWalletScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
         <TextInput
-          style={styles.fieldInput}
           value={currentName}
           onChangeText={setName}
           placeholder={S.namePlaceholder}
-          placeholderTextColor={COLORS.onSurfaceVariant}
           autoFocus
         />
 
@@ -154,7 +153,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, flex: 1, textAlign: 'center' },
   content: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
-  fieldInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
   readonlyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING[4], height: 48 },
   readonlyText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
   readonlyAmount: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
