@@ -7,7 +7,7 @@
  * Magic test current-password "wrongpw" -> wrong_current_password error.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -28,13 +28,14 @@ import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useChangePassword } from '@/hooks';
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
   SHADOW,
-} from '@/constants/theme';
+  withAlpha,
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   changePasswordSchema as schema,
   type ChangePasswordInput as FormValues,
@@ -46,6 +47,8 @@ export interface ChangePasswordSheetProps {
 }
 
 export function ChangePasswordSheet({ visible, onClose }: ChangePasswordSheetProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const mutation = useChangePassword();
   const insets = useSafeAreaInsets();
   const [showCurrent, setShowCurrent] = useState(false);
@@ -252,66 +255,68 @@ export function ChangePasswordSheet({ visible, onClose }: ChangePasswordSheetPro
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  kav: {
-    flexShrink: 1,
-  },
-  sheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS['2xl'],
-    borderTopRightRadius: BORDER_RADIUS['2xl'],
-    paddingHorizontal: SPACING[5],
-    paddingTop: SPACING[3],
-    maxHeight: '90%',
-    ...SHADOW.lg,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.gray[300],
-    marginBottom: SPACING[3],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING[2],
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-  },
-  closeIcon: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.gray[500],
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.gray[500],
-    marginBottom: SPACING[4],
-    lineHeight: 20,
-  },
-  field: {
-    marginBottom: SPACING[4],
-  },
-  fieldIcon: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.gray[400],
-  },
-  showHide: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.brand[500],
-  },
-  submitBtn: {
-    marginBottom: SPACING[2],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: withAlpha(colors.black, 0.45),
+      justifyContent: 'flex-end',
+    },
+    kav: {
+      flexShrink: 1,
+    },
+    sheet: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderTopLeftRadius: BORDER_RADIUS['2xl'],
+      borderTopRightRadius: BORDER_RADIUS['2xl'],
+      paddingHorizontal: SPACING[5],
+      paddingTop: SPACING[3],
+      maxHeight: '90%',
+      ...SHADOW.lg,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.outlineVariant,
+      marginBottom: SPACING[3],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: SPACING[2],
+    },
+    title: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+    },
+    closeIcon: {
+      fontSize: FONT_SIZE.xl,
+      color: colors.onSurfaceVariant,
+    },
+    subtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      marginBottom: SPACING[4],
+      lineHeight: 20,
+    },
+    field: {
+      marginBottom: SPACING[4],
+    },
+    fieldIcon: {
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurfaceVariant,
+    },
+    showHide: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.primary,
+    },
+    submitBtn: {
+      marginBottom: SPACING[2],
+    },
+  });
+}

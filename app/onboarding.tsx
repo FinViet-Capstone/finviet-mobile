@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -21,12 +21,15 @@ import { useSeedCategories } from '@/hooks/useCustomerCategories';
 import { useCreateWallet } from '@/hooks/useWallets';
 import { updateProfile } from '@/services';
 import { useAuthStore } from '@/stores/authStore';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { ONBOARDING_STRINGS } from '@/data/onboardingData';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { getApiErrorMessage } from '@/utils/errors';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const markOnboardingDone = useAuthStore((s) => s.markOnboardingDone);
   const updateCustomer = useAuthStore((s) => s.updateCustomer);
@@ -195,52 +198,54 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[4],
-    minHeight: 64,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  backArrow: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHT.bold,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  stepIndicator: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-  },
-  skipButton: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: SPACING[2],
-  },
-  skipText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[4],
+      minHeight: 64,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: BORDER_RADIUS.full,
+    },
+    backArrow: {
+      fontSize: FONT_SIZE.xl,
+      color: colors.primary,
+      fontWeight: FONT_WEIGHT.bold,
+    },
+    headerCenter: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    stepIndicator: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+    },
+    skipButton: {
+      paddingHorizontal: SPACING[2],
+      paddingVertical: SPACING[2],
+    },
+    skipText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    content: {
+      flex: 1,
+    },
+  });
+}

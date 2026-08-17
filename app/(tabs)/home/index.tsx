@@ -17,7 +17,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   useWallets,
   useTransactions,
@@ -56,6 +57,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [scoreView, setScoreView] = useState<'weekly' | 'monthly'>('weekly');
 
   const [balanceHidden, setBalanceHidden] = useState(false);
@@ -165,7 +168,7 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <View style={styles.avatarPlaceholder}>
-            <MaterialIcon name="person" size={20} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="person" size={20} color={colors.onSurfaceVariant} />
           </View>
         </TouchableOpacity>
         <Text style={styles.greeting}>Xin chào, {displayName} 👋</Text>
@@ -177,7 +180,7 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Thông báo, ${unreadNotifications.length} chưa đọc`}
         >
-          <MaterialIcon name="notifications" size={22} color={COLORS.outline} />
+          <MaterialIcon name="notifications" size={22} color={colors.outline} />
           {unreadNotifications.length > 0 && (
             <View style={styles.unreadBadge}>
               <Text style={styles.unreadBadgeText}>
@@ -201,7 +204,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.primary}
+            tintColor={colors.primary}
           />
         }
       >
@@ -216,7 +219,7 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/entry')}
           >
             <View style={styles.emptyCtaIcon}>
-              <MaterialIcon name="insights" size={26} color={COLORS.primary} />
+              <MaterialIcon name="insights" size={26} color={colors.primary} />
             </View>
             <View style={styles.emptyCtaBody}>
               <Text style={styles.emptyCtaTitle}>Chưa đủ dữ liệu để phân tích</Text>
@@ -225,7 +228,7 @@ export default function HomeScreen() {
               </Text>
             </View>
             <View style={styles.emptyCtaBtn}>
-              <MaterialIcon name="add" size={22} color={COLORS.onPrimary} />
+              <MaterialIcon name="add" size={22} color={colors.onPrimary} />
             </View>
           </TouchableOpacity>
         )}
@@ -272,17 +275,18 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
-    backgroundColor: `${COLORS.background}CC`,
+    backgroundColor: withAlpha(colors.background, 0.8),
   },
   avatarWrapper: {
     marginRight: SPACING[3],
@@ -291,9 +295,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderWidth: 1,
-    borderColor: `${COLORS.outline}4D`,
+    borderColor: withAlpha(colors.outline, 0.3),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -301,13 +305,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   bellBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -321,15 +325,15 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.error,
+    backgroundColor: colors.error,
     borderWidth: 2,
-    borderColor: COLORS.background,
+    borderColor: colors.background,
   },
   unreadBadgeText: {
     fontSize: 9,
     lineHeight: 12,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onError,
+    color: colors.onError,
   },
   scroll: {
     flex: 1,
@@ -348,9 +352,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[3],
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: `${COLORS.primary}33`,
+    borderColor: withAlpha(colors.primary, 0.2),
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
   },
@@ -358,7 +362,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: `${COLORS.primary}1A`,
+    backgroundColor: withAlpha(colors.primary, 0.1),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -368,20 +372,21 @@ const styles = StyleSheet.create({
   emptyCtaTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     marginBottom: 2,
   },
   emptyCtaText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
   },
   emptyCtaBtn: {
     width: 40,
     height: 40,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+  });
+}

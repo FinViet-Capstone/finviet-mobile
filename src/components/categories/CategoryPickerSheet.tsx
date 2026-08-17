@@ -12,11 +12,12 @@ import React, { useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from "@/constants/theme";
+  withAlpha,
+} from "@/theme";
+import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { useCustomerCategories } from "@/hooks/useCustomerCategories";
@@ -48,6 +49,8 @@ export function CategoryPickerSheet({
   selectedCategoryId,
   onSelect,
 }: CategoryPickerSheetProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: customerCats } = useCustomerCategories();
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>("all");
 
@@ -112,7 +115,7 @@ export function CategoryPickerSheet({
               <View style={[styles.dot, { backgroundColor: item.color }]} />
               <Text style={styles.rowText}>{item.nameVi}</Text>
               {selectedCategoryId === item.id && (
-                <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                <MaterialIcon name="check" size={18} color={colors.primary} />
               )}
             </TouchableOpacity>
           )}
@@ -122,67 +125,69 @@ export function CategoryPickerSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[2],
-  },
-  title: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    marginBottom: SPACING[3],
-  },
-  filterRow: {
-    flexDirection: "row",
-    gap: SPACING[2],
-    marginBottom: SPACING[3],
-  },
-  filterChip: {
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerHighest,
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-  },
-  filterChipText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurfaceVariant,
-  },
-  filterChipTextActive: {
-    color: COLORS.onPrimary,
-  },
-  // Bounded so the list scrolls inside the sheet instead of growing past the top.
-  list: {
-    maxHeight: 380,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: SPACING[3],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    gap: SPACING[3],
-  },
-  rowSelected: {
-    backgroundColor: `${COLORS.primary}10`,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[2],
-    borderBottomWidth: 0,
-    marginVertical: SPACING[1],
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: BORDER_RADIUS.full,
-    flexShrink: 0,
-  },
-  rowText: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[2],
+    },
+    title: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      marginBottom: SPACING[3],
+    },
+    filterRow: {
+      flexDirection: "row",
+      gap: SPACING[2],
+      marginBottom: SPACING[3],
+    },
+    filterChip: {
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1],
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceContainerHighest,
+    },
+    filterChipActive: {
+      backgroundColor: colors.primary,
+    },
+    filterChipText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurfaceVariant,
+    },
+    filterChipTextActive: {
+      color: colors.onPrimary,
+    },
+    // Bounded so the list scrolls inside the sheet instead of growing past the top.
+    list: {
+      maxHeight: 380,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: SPACING[3],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+      gap: SPACING[3],
+    },
+    rowSelected: {
+      backgroundColor: withAlpha(colors.primary, 0.06),
+      borderRadius: BORDER_RADIUS.md,
+      paddingHorizontal: SPACING[2],
+      borderBottomWidth: 0,
+      marginVertical: SPACING[1],
+    },
+    dot: {
+      width: 14,
+      height: 14,
+      borderRadius: BORDER_RADIUS.full,
+      flexShrink: 0,
+    },
+    rowText: {
+      flex: 1,
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurface,
+    },
+  });
+}

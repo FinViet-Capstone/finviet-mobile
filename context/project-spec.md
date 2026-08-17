@@ -254,9 +254,10 @@ catalog/upgrade-flow scaffold rather than an enforced paywall.
 ---
 **General:**
 - Vietnamese-first UI strings, centralized as constants rather than inlined in JSX
-- Dark, tonal design-token system in `src/constants/theme.ts` (Material-3-flavored naming:
-  primary/secondary/tertiary/surface variants, plus semantic success/warning/danger/info and
-  domain-specific palettes for score/budget/calendar/chart contexts)
+- Dark-and-light, tonal design-token system in `src/theme/` (imported via the `@/theme` barrel;
+  Material-3-flavored naming: primary/secondary/tertiary/surface variants, plus semantic
+  success/warning/danger/info and domain-specific palettes for score/budget/calendar/chart
+  contexts). Both palettes are contrast-verified to WCAG AA against each other.
 - Material Symbols Outlined as the icon font, via a custom `MaterialIcon` text-glyph wrapper
 
 **Layout:**

@@ -5,7 +5,7 @@
  * Accepts optional `date` query-param ("YYYY-MM-DD") from Calendar double-tap.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -23,11 +23,12 @@ import { z } from "zod";
 
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from "@/constants/theme";
+  withAlpha,
+} from "@/theme";
+import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { CATEGORIES } from "@/constants/categories";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
@@ -87,6 +88,8 @@ export default function ManualEntryScreen() {
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const { data: walletData, isLoading } = useWallets();
   const createMutation = useCreateTransaction();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const initialISO = dateParam ?? todayISO();
 
@@ -198,7 +201,7 @@ export default function ManualEntryScreen() {
   };
 
   const isExpense = entryType === "expense";
-  const amountColor = isExpense ? COLORS.error : COLORS.tertiary;
+  const amountColor = isExpense ? colors.error : colors.tertiary;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -251,9 +254,9 @@ export default function ManualEntryScreen() {
                 style={[
                   styles.typeOptionText,
                   entryType === t && styles.typeOptionTextActive,
-                  entryType === t && t === "expense" && { color: COLORS.error },
+                  entryType === t && t === "expense" && { color: colors.error },
                   entryType === t &&
-                    t === "income" && { color: COLORS.tertiary },
+                    t === "income" && { color: colors.tertiary },
                 ]}
               >
                 {t === "expense" ? S.expense : S.income}
@@ -298,13 +301,13 @@ export default function ManualEntryScreen() {
             <View
               style={[
                 styles.fieldIconWrap,
-                { backgroundColor: `${COLORS.primary}20` },
+                { backgroundColor: withAlpha(colors.primary, 0.13) },
               ]}
             >
               <MaterialIcon
                 name="account_balance_wallet"
                 size={20}
-                color={COLORS.primary}
+                color={colors.primary}
               />
             </View>
             <View style={styles.fieldTextWrap}>
@@ -316,7 +319,7 @@ export default function ManualEntryScreen() {
             <MaterialIcon
               name="chevron_right"
               size={20}
-              color={COLORS.outlineVariant}
+              color={colors.outlineVariant}
             />
           </TouchableOpacity>
 
@@ -332,14 +335,14 @@ export default function ManualEntryScreen() {
                 {
                   backgroundColor: selectedCategory
                     ? `${selectedCategory.color}25`
-                    : `${COLORS.secondary}20`,
+                    : withAlpha(colors.secondary, 0.13),
                 },
               ]}
             >
               <MaterialIcon
                 name="category"
                 size={20}
-                color={selectedCategory?.color ?? COLORS.secondary}
+                color={selectedCategory?.color ?? colors.secondary}
               />
             </View>
             <View style={styles.fieldTextWrap}>
@@ -356,7 +359,7 @@ export default function ManualEntryScreen() {
             <MaterialIcon
               name="chevron_right"
               size={20}
-              color={COLORS.outlineVariant}
+              color={colors.outlineVariant}
             />
           </TouchableOpacity>
 
@@ -373,13 +376,13 @@ export default function ManualEntryScreen() {
                 <View
                   style={[
                     styles.fieldIconWrap,
-                    { backgroundColor: `${COLORS.primary}15` },
+                    { backgroundColor: withAlpha(colors.primary, 0.08) },
                   ]}
                 >
                   <MaterialIcon
                     name="calendar_today"
                     size={20}
-                    color={COLORS.onSurfaceVariant}
+                    color={colors.onSurfaceVariant}
                   />
                 </View>
                 <View style={styles.fieldTextWrap}>
@@ -397,10 +400,10 @@ export default function ManualEntryScreen() {
             <View
               style={[
                 styles.fieldIconWrap,
-                { backgroundColor: `${COLORS.outline}20` },
+                { backgroundColor: withAlpha(colors.outline, 0.13) },
               ]}
             >
-              <MaterialIcon name="person" size={20} color={COLORS.outline} />
+              <MaterialIcon name="person" size={20} color={colors.outline} />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldPayee}</Text>
@@ -418,10 +421,10 @@ export default function ManualEntryScreen() {
             <View
               style={[
                 styles.fieldIconWrap,
-                { backgroundColor: `${COLORS.outline}20` },
+                { backgroundColor: withAlpha(colors.outline, 0.13) },
               ]}
             >
-              <MaterialIcon name="notes" size={20} color={COLORS.outline} />
+              <MaterialIcon name="notes" size={20} color={colors.outline} />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.fieldNote}</Text>
@@ -494,11 +497,11 @@ export default function ManualEntryScreen() {
                 <MaterialIcon
                   name="account_balance_wallet"
                   size={18}
-                  color={COLORS.onSurfaceVariant}
+                  color={colors.onSurfaceVariant}
                 />
                 <Text style={styles.sheetRowText}>{item.name}</Text>
                 {selectedWalletId === item.id && (
-                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                  <MaterialIcon name="check" size={18} color={colors.primary} />
                 )}
               </TouchableOpacity>
             )}
@@ -511,8 +514,9 @@ export default function ManualEntryScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   // Top bar
   topBar: {
@@ -522,22 +526,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     height: 52,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   topBarBtn: { minWidth: 56, alignItems: "center" },
   topBarTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   topBarCancel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   topBarSave: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   disabled: { opacity: 0.5 },
 
@@ -545,7 +549,7 @@ const styles = StyleSheet.create({
   typeToggleWrap: { paddingHorizontal: SPACING[4], paddingTop: SPACING[3] },
   typeToggle: {
     flexDirection: "row",
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: BORDER_RADIUS.full,
     padding: 4,
   },
@@ -556,15 +560,15 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   typeExpenseActive: {
-    backgroundColor: `${COLORS.error}20`,
+    backgroundColor: withAlpha(colors.error, 0.13),
   },
   typeIncomeActive: {
-    backgroundColor: `${COLORS.tertiary}20`,
+    backgroundColor: withAlpha(colors.tertiary, 0.13),
   },
   typeOptionText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   typeOptionTextActive: {
     fontWeight: FONT_WEIGHT.semibold,
@@ -583,7 +587,7 @@ const styles = StyleSheet.create({
   },
   amountError: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.error,
+    color: colors.error,
     marginTop: SPACING[1],
   },
 
@@ -599,7 +603,7 @@ const styles = StyleSheet.create({
   fieldRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     gap: SPACING[3],
@@ -616,16 +620,16 @@ const styles = StyleSheet.create({
   fieldTextWrap: { flex: 1 },
   fieldLabel: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginBottom: 2,
   },
   fieldValue: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     fontWeight: FONT_WEIGHT.medium,
   },
   fieldPlaceholder: {
-    color: COLORS.outlineVariant,
+    color: colors.outlineVariant,
     fontWeight: FONT_WEIGHT.normal,
   },
 
@@ -641,13 +645,13 @@ const styles = StyleSheet.create({
   sheetEmpty: {
     paddingVertical: SPACING[6],
     textAlign: "center",
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontSize: FONT_SIZE.sm,
   },
   sheetTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     marginBottom: SPACING[3],
   },
   sheetRow: {
@@ -655,11 +659,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
     gap: SPACING[3],
   },
   sheetRowSelected: {
-    backgroundColor: `${COLORS.primary}10`,
+    backgroundColor: withAlpha(colors.primary, 0.06),
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 0,
@@ -668,6 +672,7 @@ const styles = StyleSheet.create({
   sheetRowText: {
     flex: 1,
     fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
-});
+  });
+}

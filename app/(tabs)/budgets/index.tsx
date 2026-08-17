@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -141,6 +142,8 @@ interface SetLimitTarget {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function BucketCard({ summary }: { summary: BucketSummary }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const color = getBucketColor(summary.bucket);
   const icon = getBucketIcon(summary.bucket);
   const label = getBucketLabel(summary.bucket);
@@ -154,20 +157,20 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
   // overspending Needs/Wants; below target it stays neutral gray, no tint at
   // all — never warning/danger).
   const statusColor = isGoodOver
-    ? COLORS.tertiary
+    ? colors.tertiary
     : isSavings
     ? null
     : summary.percentage > 80
-    ? COLORS.budget.danger
+    ? colors.budget.danger
     : summary.percentage > 60
-    ? COLORS.budget.warning
-    : COLORS.budget.safe;
+    ? colors.budget.warning
+    : colors.budget.safe;
 
   const displayColor = statusColor ?? color;
   const barWidth = Math.min(summary.percentage, 100);
 
   return (
-    <View style={[styles.bucketCard, statusColor && { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}60` }]}>
+    <View style={[styles.bucketCard, statusColor && { backgroundColor: withAlpha(statusColor, 0.09), borderColor: withAlpha(statusColor, 0.38) }]}>
       <View style={styles.bucketCardTop}>
         <Text style={[styles.bucketLabel, { color }]}>{label}</Text>
         <MaterialIcon name={icon} size={16} color={displayColor} />
@@ -204,14 +207,16 @@ interface CategoryRowProps {
 }
 
 function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, remainingCap, onSetLimit }: CategoryRowProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const msIcon = getCategoryIcon(icon);
   const hasLimit = !!budget;
   const isOver = hasLimit && budget.percentage > 100;
   const barColor = isOver
-    ? COLORS.error
+    ? colors.error
     : budget?.status === 'warning'
-    ? COLORS.warning
-    : COLORS.primary;
+    ? colors.warning
+    : colors.primary;
 
   return (
     <TouchableOpacity
@@ -220,13 +225,13 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
       onPress={() => onSetLimit({ categoryId, categoryName: nameVi, bucket, existingLimit: budget?.monthlyLimit, allocationCap, remainingCap })}
     >
       <View style={styles.categoryLeft}>
-        <View style={[styles.categoryIconWrap, { backgroundColor: `${COLORS.primary}20` }]}>
-          <MaterialIcon name={msIcon} size={20} color={COLORS.primary} />
+        <View style={[styles.categoryIconWrap, { backgroundColor: withAlpha(colors.primary, 0.13) }]}>
+          <MaterialIcon name={msIcon} size={20} color={colors.primary} />
         </View>
         <View style={styles.categoryInfo}>
-          <Text style={[styles.categoryName, isOver && { color: COLORS.error }]}>{nameVi}</Text>
+          <Text style={[styles.categoryName, isOver && { color: colors.error }]}>{nameVi}</Text>
           {hasLimit ? (
-            <Text style={[styles.categoryMeta, isOver && { color: COLORS.error }]}>
+            <Text style={[styles.categoryMeta, isOver && { color: colors.error }]}>
               {formatVND(budget.spent)} {S.of} {formatVND(budget.monthlyLimit)} ₫
             </Text>
           ) : (
@@ -251,7 +256,7 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
         </View>
       ) : (
         <View style={styles.setLimitBtn}>
-          <MaterialIcon name="add" size={14} color={COLORS.primary} />
+          <MaterialIcon name="add" size={14} color={colors.primary} />
           <Text style={styles.setLimitText}>{S.setLimit}</Text>
         </View>
       )}
@@ -262,6 +267,8 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BudgetsScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   // Stable "now" for this screen session — computing it inline during render is
   // non-deterministic and breaks memoization of callbacks that depend on it.
@@ -378,7 +385,7 @@ export default function BudgetsScreen() {
           style={styles.headerBtn}
           onPress={() => router.push({ pathname: '/settings/budget-allocation' })}
         >
-          <MaterialIcon name={S.settings} size={24} color={COLORS.primary} />
+          <MaterialIcon name={S.settings} size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -402,20 +409,20 @@ export default function BudgetsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.primary} />}
       >
         {/* Month nav */}
         <View style={styles.monthNav}>
           <TouchableOpacity activeOpacity={0.7} onPress={handlePrevMonth} style={styles.monthNavBtn}>
-            <MaterialIcon name={S.prevMonth} size={24} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name={S.prevMonth} size={24} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
           <Text style={styles.monthLabel}>{S.months[month]}, {year}</Text>
           <View style={styles.monthNavRight}>
             <TouchableOpacity activeOpacity={0.7} onPress={handleNextMonth} style={styles.monthNavBtn}>
-              <MaterialIcon name={S.nextMonth} size={24} color={COLORS.onSurfaceVariant} />
+              <MaterialIcon name={S.nextMonth} size={24} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.7} onPress={handleJumpCurrent} style={styles.monthNavBtn}>
-              <MaterialIcon name={S.jumpCurrent} size={24} color={COLORS.onSurfaceVariant} />
+              <MaterialIcon name={S.jumpCurrent} size={24} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           </View>
         </View>
@@ -423,12 +430,12 @@ export default function BudgetsScreen() {
         {/* AI Dự báo banner — Progress-First style */}
         {(() => {
           const status = pacingStatus(currentDay, totalDays, bucketSummaries);
-          const accentColor = status === 'over' ? COLORS.error : status === 'warning' ? COLORS.secondary : COLORS.tertiary;
+          const accentColor = status === 'over' ? colors.error : status === 'warning' ? colors.secondary : colors.tertiary;
           return (
             <View style={[styles.aiBanner, { borderLeftColor: accentColor }]}>
               <View style={styles.aiBadgeRow}>
                 <View style={styles.aiBadge}>
-                  <MaterialIcon name={S.aiIcon} size={14} color={COLORS.primary} />
+                  <MaterialIcon name={S.aiIcon} size={14} color={colors.primary} />
                   <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
                 </View>
               </View>
@@ -468,7 +475,7 @@ export default function BudgetsScreen() {
                 <MaterialIcon
                   name={isCollapsed ? 'expand_more' : 'expand_less'}
                   size={20}
-                  color={COLORS.onSurfaceVariant}
+                  color={colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
 
@@ -530,10 +537,11 @@ export default function BudgetsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -545,7 +553,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   headerBtn: {
     width: 40,
@@ -559,7 +567,7 @@ const styles = StyleSheet.create({
   },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderRadius: BORDER_RADIUS.full,
     padding: 4,
   },
@@ -570,17 +578,17 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   toggleOptionActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
   },
   toggleTextActive: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
+    color: colors.onPrimary,
   },
   toggleTextInactive: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   scroll: {
     flex: 1,
@@ -594,7 +602,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[2],
@@ -610,14 +618,14 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   aiBanner: {
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderLeftWidth: 4,
     gap: SPACING[2],
     overflow: 'hidden',
@@ -629,7 +637,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[1],
-    backgroundColor: `${COLORS.primary}20`,
+    backgroundColor: withAlpha(colors.primary, 0.13),
     paddingHorizontal: SPACING[2],
     paddingVertical: 4,
     borderRadius: BORDER_RADIUS.full,
@@ -637,7 +645,7 @@ const styles = StyleSheet.create({
   aiBadgeText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   aiHeadline: {
     fontSize: FONT_SIZE.lg,
@@ -645,7 +653,7 @@ const styles = StyleSheet.create({
   },
   aiMessage: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     lineHeight: 20,
   },
   bucketRow: {
@@ -654,12 +662,12 @@ const styles = StyleSheet.create({
   },
   bucketCard: {
     flex: 1,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING[3],
     gap: SPACING[2],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   bucketCardTop: {
     flexDirection: 'row',
@@ -676,15 +684,15 @@ const styles = StyleSheet.create({
   bucketSpent: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   bucketLimit: {
     fontSize: 10,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   bucketBarTrack: {
     height: 4,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: BORDER_RADIUS.full,
     overflow: 'hidden',
   },
@@ -702,7 +710,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[2],
     paddingHorizontal: SPACING[2],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.surfaceVariant,
+    borderBottomColor: colors.surfaceVariant,
   },
   groupDot: {
     width: 8,
@@ -716,7 +724,7 @@ const styles = StyleSheet.create({
   },
   groupCount: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontWeight: FONT_WEIGHT.semibold,
   },
   // Thread-line layout
@@ -750,15 +758,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING[3],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     minHeight: 48,
   },
   categoryRowOver: {
-    borderColor: `${COLORS.error}50`,
+    borderColor: withAlpha(colors.error, 0.31),
   },
   categoryLeft: {
     flexDirection: 'row',
@@ -779,16 +787,16 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   categoryMeta: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   categoryNoLimit: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   categoryRight: {
@@ -803,7 +811,7 @@ const styles = StyleSheet.create({
   categoryBarTrack: {
     width: 64,
     height: 4,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: BORDER_RADIUS.full,
     overflow: 'hidden',
   },
@@ -819,11 +827,12 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[1],
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
   },
   setLimitText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
-});
+  });
+}

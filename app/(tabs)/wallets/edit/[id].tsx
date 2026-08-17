@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert,
@@ -6,7 +6,8 @@ import {
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -52,6 +53,8 @@ function getUpdateErrorMessage(err: unknown): string {
 export default function EditWalletScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const updateWallet = useUpdateWallet();
 
@@ -86,7 +89,7 @@ export default function EditWalletScreen() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -107,11 +110,11 @@ export default function EditWalletScreen() {
           <View style={styles.readonlyRow}>
             <MaterialIcon
               name={wallet.type === 'linked' ? 'account_balance' : 'account_balance_wallet'}
-              size={18} color={COLORS.onSurfaceVariant} />
+              size={18} color={colors.onSurfaceVariant} />
             <Text style={styles.readonlyText}>
               {wallet.type === 'linked' ? S.typeLinked : S.typeBasic}
             </Text>
-            <MaterialIcon name="lock" size={16} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="lock" size={16} color={colors.onSurfaceVariant} />
           </View>
           <Text style={styles.hint}>{S.typeLocked}</Text>
         </View>
@@ -135,7 +138,7 @@ export default function EditWalletScreen() {
             disabled={!canSave}
           >
             {updateWallet.isPending ? (
-              <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
               <Text style={styles.saveText}>{S.save}</Text>
             )}
@@ -146,21 +149,23 @@ export default function EditWalletScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING[4], paddingVertical: SPACING[3] },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, flex: 1, textAlign: 'center' },
   content: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
-  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
-  readonlyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING[4], height: 48 },
-  readonlyText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  readonlyAmount: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  hint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: SPACING[1] },
+  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, marginBottom: SPACING[1] },
+  readonlyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], backgroundColor: colors.surfaceVariant, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING[4], height: 48 },
+  readonlyText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  readonlyAmount: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+  hint: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: SPACING[1] },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
-  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  saveBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  saveBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.5 },
-  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
-});
+  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
+  });
+}

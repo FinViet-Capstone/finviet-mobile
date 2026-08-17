@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const VI_MONTHS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
@@ -26,17 +27,19 @@ export function MonthNavigator({
   onNext,
   onJumpCurrent,
 }: MonthNavigatorProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const today = new Date();
   const isCurrentMonth = year === today.getFullYear() && monthIdx === today.getMonth();
   return (
     <View style={styles.monthNav}>
       <TouchableOpacity onPress={onPrev} activeOpacity={0.75} style={styles.navBtn}>
-        <MaterialIcon name="chevron_left" size={22} color={COLORS.onSurface} />
+        <MaterialIcon name="chevron_left" size={22} color={colors.onSurface} />
       </TouchableOpacity>
       <Text style={styles.monthLabel}>{VI_MONTHS[monthIdx]}, {year}</Text>
       <View style={styles.navRight}>
         <TouchableOpacity onPress={onNext} activeOpacity={0.75} style={styles.navBtn}>
-          <MaterialIcon name="chevron_right" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="chevron_right" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         {onJumpCurrent && !isCurrentMonth ? (
           <TouchableOpacity
@@ -48,7 +51,7 @@ export function MonthNavigator({
             <MaterialIcon
               name="keyboard_double_arrow_right"
               size={22}
-              color={COLORS.primary}
+              color={colors.primary}
             />
           </TouchableOpacity>
         ) : null}
@@ -57,31 +60,33 @@ export function MonthNavigator({
   );
 }
 
-const styles = StyleSheet.create({
-  monthNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[4],
-    backgroundColor: COLORS.surfaceContainerLow,
-  },
-  navRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  navBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.surfaceContainerHigh,
-  },
-  monthLabel: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    monthNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[4],
+      backgroundColor: colors.surfaceContainerLow,
+    },
+    navRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[2],
+    },
+    navBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceContainerHigh,
+    },
+    monthLabel: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+    },
+  });
+}

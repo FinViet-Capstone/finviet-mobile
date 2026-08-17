@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -34,6 +35,8 @@ const S = {
 
 export default function TransferScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: walletsData, isLoading, isError, error, refetch } = useWallets();
   const createTransfer = useCreateTransfer();
 
@@ -93,7 +96,7 @@ export default function TransferScreen() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -111,8 +114,8 @@ export default function TransferScreen() {
               onPress={() => setFromId(w.id)}
               disabled={toId === w.id}>
               <MaterialIcon name="account_balance_wallet" size={18}
-                color={fromId === w.id ? COLORS.primary : COLORS.onSurfaceVariant} />
-              <Text style={[styles.walletOptionName, fromId === w.id && { color: COLORS.primary }]}
+                color={fromId === w.id ? colors.primary : colors.onSurfaceVariant} />
+              <Text style={[styles.walletOptionName, fromId === w.id && { color: colors.primary }]}
                 numberOfLines={1}>{w.name}</Text>
               <Text style={styles.walletOptionBalance}>{S.balance(w.balance)}</Text>
             </TouchableOpacity>
@@ -129,8 +132,8 @@ export default function TransferScreen() {
               onPress={() => setToId(w.id)}
               disabled={fromId === w.id}>
               <MaterialIcon name="account_balance_wallet" size={18}
-                color={toId === w.id ? COLORS.tertiary : COLORS.onSurfaceVariant} />
-              <Text style={[styles.walletOptionName, toId === w.id && { color: COLORS.tertiary }]}
+                color={toId === w.id ? colors.tertiary : colors.onSurfaceVariant} />
+              <Text style={[styles.walletOptionName, toId === w.id && { color: colors.tertiary }]}
                 numberOfLines={1}>{w.name}</Text>
               <Text style={styles.walletOptionBalance}>{S.balance(w.balance)}</Text>
             </TouchableOpacity>
@@ -141,7 +144,7 @@ export default function TransferScreen() {
         {fromWallet && toWallet && (
           <View style={styles.transferIndicator}>
             <Text style={styles.transferFrom} numberOfLines={1}>{fromWallet.name}</Text>
-            <MaterialIcon name="arrow_forward" size={20} color={COLORS.primary} />
+            <MaterialIcon name="arrow_forward" size={20} color={colors.primary} />
             <Text style={styles.transferTo} numberOfLines={1}>{toWallet.name}</Text>
           </View>
         )}
@@ -156,7 +159,7 @@ export default function TransferScreen() {
           <Text style={[styles.amountText, !amountDisplay && styles.amountPlaceholder]}>
             {amountDisplay || S.amountPlaceholder}
           </Text>
-          <MaterialIcon name="dialpad" size={18} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="dialpad" size={18} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
         {exceedsBalance && <Text style={styles.errorText}>{S.insufficient}</Text>}
 
@@ -178,7 +181,7 @@ export default function TransferScreen() {
             style={[styles.confirmBtn, (!isValid || createTransfer.isPending) && styles.confirmBtnDisabled]}
             onPress={handleConfirm} disabled={!isValid || createTransfer.isPending}>
             {createTransfer.isPending
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              ? <ActivityIndicator size="small" color={colors.onPrimary} />
               : <Text style={styles.confirmText}>{S.confirm}</Text>}
           </TouchableOpacity>
         </View>
@@ -196,33 +199,35 @@ export default function TransferScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING[4], paddingVertical: SPACING[3] },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, flex: 1, textAlign: 'center' },
   content: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
-  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
+  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, marginBottom: SPACING[1] },
   walletGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[2] },
-  walletOption: { flex: 1, minWidth: 120, padding: SPACING[3], borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.surfaceContainer, borderWidth: 1, borderColor: COLORS.outlineVariant, gap: SPACING[1] },
-  walletOptionActive: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
+  walletOption: { flex: 1, minWidth: 120, padding: SPACING[3], borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.surfaceContainer, borderWidth: 1, borderColor: colors.outlineVariant, gap: SPACING[1] },
+  walletOptionActive: { borderColor: colors.primary, backgroundColor: withAlpha(colors.primary, 0.08) },
   walletOptionDisabled: { opacity: 0.4 },
-  walletOptionName: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  walletOptionBalance: { fontSize: 10, color: COLORS.onSurfaceVariant },
-  transferIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[3], backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, padding: SPACING[3] },
-  transferFrom: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface, flex: 1, textAlign: 'right' },
-  transferTo: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.tertiary, flex: 1 },
-  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
-  amountDisplayFocused: { borderColor: COLORS.primary },
-  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
-  noteInput: { backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center' },
-  noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
-  errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: -SPACING[2] },
+  walletOptionName: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  walletOptionBalance: { fontSize: 10, color: colors.onSurfaceVariant },
+  transferIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[3], backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg, padding: SPACING[3] },
+  transferFrom: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface, flex: 1, textAlign: 'right' },
+  transferTo: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.tertiary, flex: 1 },
+  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
+  amountDisplayFocused: { borderColor: colors.primary },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  amountPlaceholder: { color: colors.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
+  noteInput: { backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center' },
+  noteText: { fontSize: FONT_SIZE.sm, color: colors.onSurface },
+  errorText: { fontSize: FONT_SIZE.xs, color: colors.error, marginTop: -SPACING[2] },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
-  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  confirmBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  confirmBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   confirmBtnDisabled: { opacity: 0.5 },
-  confirmText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
-});
+  confirmText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
+  });
+}

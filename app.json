@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/finviet-vertical.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1A6B3C"
+      "backgroundColor": "#15121b"
     },
     "ios": {
       "supportsTablet": false,

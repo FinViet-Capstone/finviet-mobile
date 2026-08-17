@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,12 @@ import * as ImagePicker from 'expo-image-picker';
 
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from '@/constants/theme';
+  withAlpha,
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -41,6 +42,8 @@ export default function PhotoEntryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
@@ -93,11 +96,11 @@ export default function PhotoEntryScreen() {
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <TouchableOpacity activeOpacity={0.7} style={styles.topBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onBackground} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.topTitle}>{S.title}</Text>
         <TouchableOpacity activeOpacity={0.7} style={styles.topBtn} onPress={handleGallery}>
-          <MaterialIcon name="photo_library" size={22} color={COLORS.onBackground} />
+          <MaterialIcon name="photo_library" size={22} color={colors.onBackground} />
         </TouchableOpacity>
       </View>
 
@@ -121,7 +124,7 @@ export default function PhotoEntryScreen() {
 
         {/* Tip bubble */}
         <View style={styles.tipBubble}>
-          <MaterialIcon name="info" size={16} color={COLORS.primary} />
+          <MaterialIcon name="info" size={16} color={colors.primary} />
           <Text style={styles.tipText}>{S.tip}</Text>
         </View>
       </View>
@@ -132,7 +135,7 @@ export default function PhotoEntryScreen() {
         <View style={styles.recentRow}>
           <TouchableOpacity activeOpacity={0.7} style={styles.recentThumb} onPress={handleGallery}>
             <View style={styles.recentThumbInner}>
-              <MaterialIcon name="add" size={22} color={COLORS.onSurfaceVariant} />
+              <MaterialIcon name="add" size={22} color={colors.onSurfaceVariant} />
             </View>
           </TouchableOpacity>
         </View>
@@ -158,7 +161,7 @@ export default function PhotoEntryScreen() {
             <MaterialIcon
               name={flashOn ? S.flashOn : S.flashOff}
               size={26}
-              color={COLORS.onSurface}
+              color={colors.onSurface}
             />
           </TouchableOpacity>
 
@@ -181,7 +184,7 @@ export default function PhotoEntryScreen() {
             onPress={handleGallery}
             disabled={isLoading}
           >
-            <MaterialIcon name="image" size={26} color={COLORS.onSurface} />
+            <MaterialIcon name="image" size={26} color={colors.onSurface} />
           </TouchableOpacity>
         </View>
       </View>
@@ -194,8 +197,9 @@ export default function PhotoEntryScreen() {
 const CORNER_SIZE = 32;
 const CORNER_BORDER = 4;
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.surfaceContainerLowest },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
 
   // Top bar
   topBar: {
@@ -222,13 +226,13 @@ const styles = StyleSheet.create({
   topTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
+    color: colors.onBackground,
   },
 
   // Viewfinder
   viewfinder: {
     flex: 1,
-    backgroundColor: COLORS.surfaceContainerLowest,
+    backgroundColor: colors.surfaceContainerLowest,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -251,7 +255,7 @@ const styles = StyleSheet.create({
   corner: {
     width: CORNER_SIZE,
     height: CORNER_SIZE,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
     borderStyle: 'solid',
     position: 'absolute',
   },
@@ -265,8 +269,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 4,
@@ -281,23 +285,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    backgroundColor: `${COLORS.surfaceContainer}E6`,
+    backgroundColor: withAlpha(colors.surfaceContainer, 0.9),
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   tipText: {
     flex: 1,
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     textAlign: 'center',
   },
 
   // Bottom panel
   bottomPanel: {
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: SPACING[5],
@@ -322,23 +326,23 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   recentThumbInner: {
     flex: 1,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderRadius: BORDER_RADIUS.lg,
   },
 
   // Permission error
   permErrWrap: { gap: SPACING[1] },
-  permErrText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
-  permErrLink: { fontSize: FONT_SIZE.sm, color: COLORS.primary, fontWeight: FONT_WEIGHT.semibold },
+  permErrText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+  permErrLink: { fontSize: FONT_SIZE.sm, color: colors.primary, fontWeight: FONT_WEIGHT.semibold },
 
   // Controls
   controlsRow: {
@@ -353,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
   },
 
   // Shutter
@@ -362,7 +366,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 4,
-    borderColor: COLORS.surfaceContainerHighest,
+    borderColor: colors.surfaceContainerHighest,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}25`,
+    backgroundColor: withAlpha(colors.primary, 0.15),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -378,12 +382,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 15,
   },
 
   disabled: { opacity: 0.5 },
-});
+  });
+}

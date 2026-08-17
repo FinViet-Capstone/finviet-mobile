@@ -27,16 +27,8 @@ import {
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import {
-  COLORS,
-  DARK_COLORS,
-  SPACING,
-  FONT_SIZE,
-  FONT_WEIGHT,
-  BORDER_RADIUS,
-  SHADOW,
-} from '@/constants/theme';
-import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, SHADOW } from '@/theme';
+import { useThemeColors, useThemeScheme, type ThemeColors } from '@/providers/ThemeProvider';
 import { Button } from './Button';
 
 export interface DatePickerFieldProps {
@@ -90,7 +82,10 @@ export function DatePickerField({
 }: DatePickerFieldProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const isDark = colors === DARK_COLORS;
+  // Was `colors === DARK_COLORS` — a reference-identity check that breaks the
+  // moment ThemeProvider's palette objects stop being the exact DARK_COLORS/
+  // LIGHT_COLORS singletons. useThemeScheme() is the real signal.
+  const isDark = useThemeScheme() === 'dark';
 
   const [iosVisible, setIosVisible] = useState(false);
   // iOS spinner needs a draft so the user can scroll without committing on every tick.
@@ -243,7 +238,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surfaceContainer,
     },
     rowUncertain: {
-      borderColor: COLORS.calendar.uncategorized,
+      borderColor: colors.calendar.uncategorized,
       borderWidth: 2,
     },
     rowDisabled: {
@@ -265,7 +260,7 @@ function createStyles(colors: ThemeColors) {
     uncertainBadge: {
       fontSize: FONT_SIZE.xl,
       fontWeight: FONT_WEIGHT.bold,
-      color: COLORS.calendar.uncategorized,
+      color: colors.calendar.uncategorized,
       marginLeft: SPACING[2],
     },
 

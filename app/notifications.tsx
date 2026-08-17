@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -79,10 +79,10 @@ function notifIconColor(type: NotificationType, colors: ThemeColors): string {
 
 function notifIconBg(type: NotificationType, colors: ThemeColors): string {
   switch (type) {
-    case 'budget_alert': return `${colors.errorContainer}30`;
-    case 'weekly_report': return `${colors.primaryContainer}20`;
-    case 'goal_milestone': return `${colors.tertiaryContainer}20`;
-    case 'announcement': return `${colors.secondaryContainer}20`;
+    case 'budget_alert': return withAlpha(colors.errorContainer, 0.19);
+    case 'weekly_report': return withAlpha(colors.primaryContainer, 0.13);
+    case 'goal_milestone': return withAlpha(colors.tertiaryContainer, 0.13);
+    case 'announcement': return withAlpha(colors.secondaryContainer, 0.13);
     default: return colors.surfaceVariant;
   }
 }
@@ -307,8 +307,8 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.outlineVariant,
   },
   chipActive: {
-    backgroundColor: `${colors.primary}20`,
-    borderColor: `${colors.primary}40`,
+    backgroundColor: withAlpha(colors.primary, 0.13),
+    borderColor: withAlpha(colors.primary, 0.25),
   },
   chipText: {
     fontSize: FONT_SIZE.xs,
@@ -336,16 +336,19 @@ function createStyles(colors: ThemeColors) {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SPACING[3],
-    backgroundColor: `${colors.surfaceContainer}66`,
+    backgroundColor: withAlpha(colors.surfaceContainer, 0.4),
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: `${colors.white}08`,
+    // Was `${colors.white}08` — white at ~3% alpha, invisible on the light
+    // theme's near-white surface. outlineVariant is the token built for a
+    // subtle hairline border in both themes.
+    borderColor: withAlpha(colors.outlineVariant, 0.5),
     marginBottom: SPACING[2],
     overflow: 'hidden',
   },
   notifRowUnread: {
-    borderColor: `${colors.primary}20`,
+    borderColor: withAlpha(colors.primary, 0.13),
   },
   unreadDot: {
     position: 'absolute',
@@ -381,9 +384,9 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: SPACING[2],
     paddingVertical: 2,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${colors.primary}15`,
+    backgroundColor: withAlpha(colors.primary, 0.08),
     borderWidth: 1,
-    borderColor: `${colors.primary}30`,
+    borderColor: withAlpha(colors.primary, 0.19),
   },
   aiBadgeText: {
     fontSize: 10,

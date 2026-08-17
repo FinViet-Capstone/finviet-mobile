@@ -1,10 +1,9 @@
-// Design tokens — shared across all screens via StyleSheet.
-// Import COLORS, SPACING, FONT_SIZE, etc. instead of hardcoding values.
+// Color tokens. Import via `@/theme`, not this file directly.
 //
-// COLORS is theme-invariant (always DARK_COLORS) for backward compatibility —
-// most screens still import it directly and are unaffected by the theme
-// switcher. Components migrated to be theme-aware use `useThemeColors()`
-// (src/providers/ThemeProvider.tsx) instead, which resolves to DARK_COLORS or
+// COLORS is theme-invariant (always DARK_COLORS) for the one legitimate case
+// that needs it before ThemeProvider can mount (app/_layout.tsx's root
+// ErrorBoundary). Everywhere else, use `useThemeColors()`
+// (src/providers/ThemeProvider.tsx), which resolves to DARK_COLORS or
 // LIGHT_COLORS based on the customer's theme preference + system setting.
 //
 // Keys shared by both palettes below (brand/gray/success/warning/danger/info/
@@ -40,7 +39,11 @@ const SHARED_COLORS = {
     900: '#0F172A',
   },
 
-  // Semantic
+  // Semantic — flat status reds/greens for data (budget bars, score bands,
+  // calendar cells). Use `danger` here, not the M3 `error`/`errorContainer`
+  // role pair below (DARK_COLORS/LIGHT_COLORS) — that pair is for form
+  // validation and destructive-action UI chrome (error banners, delete
+  // buttons), themed per light/dark, and intentionally a different red.
   success: '#22C55E',
   warning: '#F59E0B',
   danger:  '#EF4444',
@@ -149,10 +152,9 @@ export const DARK_COLORS: ColorPalette = {
 } as const;
 
 // Light counterpart, hue-matched to DARK_COLORS' purple/orange/green brand
-// identity using Material Design 3 tonal-role conventions (no light-mode
-// design system exists in Stitch — checked both FinViet design system assets,
-// both are dark-only — so this is authored directly per
-// context/fe-plan-2026-07-revamp.md item 2).
+// identity using Material Design 3 tonal-role conventions, contrast-checked
+// pair-by-pair against DARK_COLORS (see the published token spec) so every
+// text/container role clears WCAG AA in both themes.
 export const LIGHT_COLORS: ColorPalette = {
   ...SHARED_COLORS,
 
@@ -201,68 +203,23 @@ export const LIGHT_COLORS: ColorPalette = {
 
 export const COLORS = DARK_COLORS;
 
-export const SPACING = {
-  0:   0,
-  1:   4,
-  2:   8,
-  3:   12,
-  4:   16,
-  5:   20,
-  6:   24,
-  8:   32,
-  10:  40,
-  12:  48,
-  16:  64,
-} as const;
-
-export const BORDER_RADIUS = {
-  sm:   4,
-  md:   8,
-  lg:   12,
-  xl:   16,
-  '2xl': 24,
-  full: 9999,
-} as const;
-
-export const FONT_SIZE = {
-  xs:   12,
-  sm:   14,
-  base: 16,
-  lg:   18,
-  xl:   20,
-  '2xl': 24,
-  '3xl': 30,
-  '4xl': 36,
-} as const;
-
-export const FONT_WEIGHT = {
-  normal:   '400' as const,
-  medium:   '500' as const,
-  semibold: '600' as const,
-  bold:     '700' as const,
-  extrabold:'800' as const,
-} as const;
-
-export const SHADOW = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-} as const;
+/**
+ * Overlay a token color at `alpha` (0-1) as `rgba(...)`.
+ *
+ * Replaces the `` `${COLORS.x}20` `` string-concat pattern seen across the
+ * codebase, which only produces a valid color for 6-digit hex tokens and
+ * silently breaks for anything else (e.g. `COLORS.transparent`, or any
+ * future non-hex token). Accepts `#RGB`/`#RRGGBB` hex strings only, since
+ * that's the only shape every token in this file actually has.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+  let h = hex.replace('#', '');
+  if (h.length === 3) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const a = Math.min(1, Math.max(0, alpha));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}

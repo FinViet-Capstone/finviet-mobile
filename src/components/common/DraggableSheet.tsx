@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BORDER_RADIUS, SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, SPACING } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const DISMISS_THRESHOLD = 120;
