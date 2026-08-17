@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -32,6 +33,11 @@ const S = {
   scaleAvg: 'Trung bình',
   scaleNeedWork: 'Cần cải thiện',
   scaleNote: 'Điểm số dựa trên 3 yếu tố: tuân thủ ngân sách, đều đặn tiết kiệm, và biến động chi tiêu bất thường.',
+  spikeLabel: 'Biến động chi tiêu',
+  budgetLabel: 'Tuân thủ ngân sách',
+  savingsLabel: 'Tiết kiệm',
+  notEnoughData: 'Chưa đủ dữ liệu',
+  weightSuffix: (w: number) => `${w}% trọng số cho lần tính này`,
 };
 
 // ─── Score color helper ────────────────────────────────────────────────────────
@@ -56,6 +62,31 @@ function ScaleRow({ color, label, range }: { color: string; label: string; range
   );
 }
 
+function SubScoreRow({
+  label,
+  value,
+  weight,
+}: {
+  label: string;
+  value: number | null | undefined;
+  weight: number | undefined;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const hasValue = value !== null && value !== undefined;
+  return (
+    <View style={styles.subScoreRow}>
+      <View style={styles.subScoreLabelCol}>
+        <Text style={styles.subScoreLabel}>{label}</Text>
+        {weight !== undefined && <Text style={styles.subScoreWeight}>{S.weightSuffix(weight)}</Text>}
+      </View>
+      <Text style={[styles.subScoreValue, !hasValue && styles.subScoreValueMuted]}>
+        {hasValue ? `${Math.round(value)}/100` : S.notEnoughData}
+      </Text>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SpendingScoreDetail() {
@@ -63,8 +94,11 @@ export default function SpendingScoreDetail() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { view } = useLocalSearchParams<{ view?: 'weekly' | 'monthly' }>();
-  const { data: score, isLoading } = useSpendingScore(view === 'monthly' ? 'monthly' : 'weekly');
+  const { data: score, isLoading, isRefetching, refetch } = useSpendingScore(
+    view === 'monthly' ? 'monthly' : 'weekly',
+  );
   const [chatOpen, setChatOpen] = useState(false);
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -77,13 +111,29 @@ export default function SpendingScoreDetail() {
     );
   }
 
-  const [, mm, dd] = score.weekStart.split('-');
-  const weekStartDisplay = `${dd}/${mm}`;
-  const weekStartDate = new Date(score.weekStart);
-  const weekEnd = new Date(weekStartDate);
-  weekEnd.setDate(weekStartDate.getDate() + 6);
-  const weekEndDisplay = `${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+  const [yyyy, mm, dd] = score.weekStart.split('-');
+  // Monthly scores carry the month's first day in weekStart (mirrors the
+  // backend's periodStart) — label it as a month, not a fabricated 7-day
+  // range starting from that date.
+  const periodLabel =
+    score.view === 'monthly'
+      ? `Tháng ${Number(mm)}/${yyyy}`
+      : (() => {
+          const weekStartDate = new Date(score.weekStart);
+          const weekEnd = new Date(weekStartDate);
+          weekEnd.setDate(weekStartDate.getDate() + 6);
+          return `Tuần ${dd}/${mm} – ${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+        })();
   const accentColor = getScoreColor(score.color, colors);
+  // In real mode the backend sends one `comment` field mapped onto both
+  // reasonVi/commentaryVi — showing the identical paragraph twice under two
+  // different headings reads as broken, so collapse to one block when they match.
+  const hasDistinctCommentary =
+    !!score.commentaryVi && score.commentaryVi !== score.reasonVi;
+  // Real mode always sends these; only a stale cached object from before this
+  // field existed would lack them entirely — fall back to the prose note then.
+  const hasSubScores =
+    score.spikeScore !== undefined || score.budgetScore !== undefined || score.savingsScore !== undefined;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -92,13 +142,14 @@ export default function SpendingScoreDetail() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
       >
         {/* Hero ring */}
         <View style={[styles.heroCard, { borderColor: withAlpha(accentColor, 0.2) }]}>
           <RingBadge score={score.score} color={score.color} verdict={score.verdictVi} size={160} />
-          <Text style={styles.weekRange}>
-            Tuần {weekStartDisplay} – {weekEndDisplay}
-          </Text>
+          <Text style={styles.weekRange}>{periodLabel}</Text>
         </View>
 
         {/* Quick review */}
@@ -109,23 +160,35 @@ export default function SpendingScoreDetail() {
           </View>
         </View>
 
-        {/* AI commentary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{S.aiAnalysis}</Text>
-          <View style={styles.commentaryCard}>
-            <MaterialIcon name="auto_awesome" size={16} color={colors.primary} />
-            <Text style={styles.commentaryText}>{score.commentaryVi ?? S.aiUnavailable}</Text>
+        {/* AI commentary — only when it says something the quick review above didn't */}
+        {hasDistinctCommentary && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{S.aiAnalysis}</Text>
+            <View style={styles.commentaryCard}>
+              <MaterialIcon name="auto_awesome" size={16} color={colors.primary} />
+              <Text style={styles.commentaryText}>{score.commentaryVi}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Scale */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{S.howScore}</Text>
           <View style={styles.scaleCard}>
-            <ScaleRow color={colors.tertiary} label={S.scaleGood} range="≥ 70" />
-            <ScaleRow color={colors.secondary} label={S.scaleAvg} range="40 – 69" />
-            <ScaleRow color={colors.error} label={S.scaleNeedWork} range="< 40" />
-            <Text style={styles.scaleNote}>{S.scaleNote}</Text>
+            <ScaleRow color={colors.tertiary} label={S.scaleGood} range="≥ 80" />
+            <ScaleRow color={colors.secondary} label={S.scaleAvg} range="50 – 79" />
+            <ScaleRow color={colors.error} label={S.scaleNeedWork} range="< 50" />
+            {hasSubScores ? (
+              <View style={styles.subScoreList}>
+                <SubScoreRow label={S.spikeLabel} value={score.spikeScore} weight={score.weights?.spike} />
+                <SubScoreRow label={S.budgetLabel} value={score.budgetScore} weight={score.weights?.budget} />
+                {score.view === 'monthly' && (
+                  <SubScoreRow label={S.savingsLabel} value={score.savingsScore} weight={score.weights?.savings} />
+                )}
+              </View>
+            ) : (
+              <Text style={styles.scaleNote}>{S.scaleNote}</Text>
+            )}
           </View>
         </View>
 
@@ -261,6 +324,39 @@ function createStyles(colors: ThemeColors) {
     fontSize: FONT_SIZE.xs,
     color: colors.onSurfaceVariant,
     lineHeight: 18,
+  },
+
+  subScoreList: {
+    marginTop: SPACING[3],
+    paddingTop: SPACING[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.outlineVariant,
+    gap: SPACING[3],
+  },
+  subScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subScoreLabelCol: { flex: 1, paddingRight: SPACING[3] },
+  subScoreLabel: {
+    fontSize: FONT_SIZE.sm,
+    color: colors.onSurface,
+    fontWeight: FONT_WEIGHT.medium,
+  },
+  subScoreWeight: {
+    fontSize: 11,
+    color: colors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  subScoreValue: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: colors.onSurface,
+  },
+  subScoreValueMuted: {
+    color: colors.onSurfaceVariant,
+    fontWeight: FONT_WEIGHT.normal,
   },
   });
 }

@@ -21,6 +21,7 @@ import { useCustomerCategories } from '@/hooks/useCustomerCategories';
 import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
+import { getBudgetStatus } from '@/utils/budgetStatus';
 import type { BucketType } from '@/constants/categories';
 import type { BudgetWithSpend } from '@/types/budget';
 
@@ -160,11 +161,7 @@ function BucketCard({ summary }: { summary: BucketSummary }) {
     ? colors.tertiary
     : isSavings
     ? null
-    : summary.percentage > 80
-    ? colors.budget.danger
-    : summary.percentage > 60
-    ? colors.budget.warning
-    : colors.budget.safe;
+    : colors.budget[getBudgetStatus(summary.percentage)];
 
   const displayColor = statusColor ?? color;
   const barWidth = Math.min(summary.percentage, 100);
@@ -211,9 +208,20 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
   const styles = useMemo(() => createStyles(colors), [colors]);
   const msIcon = getCategoryIcon(icon);
   const hasLimit = !!budget;
-  const isOver = hasLimit && budget.percentage > 100;
-  const barColor = isOver
+  const isOverLimit = hasLimit && budget.percentage > 100;
+  const isSavings = bucket === 'savings';
+  // Savings is a target, not a spending cap — exceeding it is good (tertiary),
+  // never the red "over budget" treatment; below it stays neutral, matching
+  // the bucket card above and real/budgets.ts's toStatus. Only a non-savings
+  // category over its limit gets the red row treatment.
+  const isGoodOver = isOverLimit && isSavings;
+  const isBadOver = isOverLimit && !isSavings;
+  const barColor = isGoodOver
+    ? colors.tertiary
+    : isBadOver
     ? colors.error
+    : isSavings
+    ? colors.onSurfaceVariant
     : budget?.status === 'warning'
     ? colors.warning
     : colors.primary;
@@ -221,7 +229,7 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      style={[styles.categoryRow, isOver && styles.categoryRowOver]}
+      style={[styles.categoryRow, isBadOver && styles.categoryRowOver]}
       onPress={() => onSetLimit({ categoryId, categoryName: nameVi, bucket, existingLimit: budget?.monthlyLimit, allocationCap, remainingCap })}
     >
       <View style={styles.categoryLeft}>
@@ -229,9 +237,9 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
           <MaterialIcon name={msIcon} size={20} color={colors.primary} />
         </View>
         <View style={styles.categoryInfo}>
-          <Text style={[styles.categoryName, isOver && { color: colors.error }]}>{nameVi}</Text>
+          <Text style={[styles.categoryName, isBadOver && { color: colors.error }]}>{nameVi}</Text>
           {hasLimit ? (
-            <Text style={[styles.categoryMeta, isOver && { color: colors.error }]}>
+            <Text style={[styles.categoryMeta, isBadOver && { color: colors.error }]}>
               {formatVND(budget.spent)} {S.of} {formatVND(budget.monthlyLimit)} ₫
             </Text>
           ) : (

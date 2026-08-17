@@ -23,7 +23,9 @@ export interface SpendingScore {
   view: 'weekly' | 'monthly';
   /** Integer 0-100 */
   score: number;
-  /** green >= 70 | amber 40-69 | red < 40 */
+  /** green >= 80 | amber 50-79 | red < 50 (backend SpendingScoreService.cs) — always
+   * trust this field over re-deriving a band from `score`; the cutoffs are
+   * admin-configurable server-side and don't match a naive 70/40 guess. */
   color: ScoreColor;
   /** One-word verdict in Vietnamese */
   verdictVi: string;
@@ -35,6 +37,24 @@ export interface SpendingScore {
   weekStart: string;
   /** ISO 8601 timestamp */
   generatedAt: string;
+  /**
+   * Deterministic sub-scores behind `score`, 0-100 each. `null` when that
+   * metric had insufficient data for the period (e.g. spikeScore needs ≥7
+   * distinct spending days; savingsScore — monthly only — needs ≥3 months of
+   * history). Not the customer's own budget/goal figures — spikeScore is a
+   * spending-volatility z-score, budgetScore is needs/wants pacing (savings
+   * excluded), savingsScore blends savings-category spend with saving-goal
+   * contributions against a flat 20%-of-income target.
+   */
+  spikeScore?: number | null;
+  budgetScore?: number | null;
+  savingsScore?: number | null;
+  /**
+   * The post-renormalization weight (0-100) actually applied to each present
+   * metric for THIS computation — not the admin-configured base weights.
+   * Keyed by lowercase metric name ("spike" | "budget" | "savings").
+   */
+  weights?: Record<string, number>;
 }
 
 // -------------------------------------------------------------------------

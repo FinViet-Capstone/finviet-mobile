@@ -11,6 +11,7 @@ import {
   type MonthRange,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
+import { invalidateAiDerived } from './useReports';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -44,11 +45,17 @@ export const useBudgetBuckets = (range?: MonthRange) =>
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
+function invalidateBudgetDependents(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+  // A limit change moves budgetScore's pacing inputs behind "Điểm chi tiêu".
+  invalidateAiDerived(qc);
+}
+
 export const useCreateBudget = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateBudgetInput) => createBudget(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
+    onSuccess: () => invalidateBudgetDependents(qc),
   });
 };
 
@@ -57,7 +64,7 @@ export const useUpdateBudget = () => {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateBudgetInput }) =>
       updateBudget(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
+    onSuccess: () => invalidateBudgetDependents(qc),
   });
 };
 
@@ -65,6 +72,6 @@ export const useDeleteBudget = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteBudget(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budgets.all() }),
+    onSuccess: () => invalidateBudgetDependents(qc),
   });
 };

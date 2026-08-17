@@ -21,6 +21,11 @@ import {
   useScheduleIncomeAllocationChange,
 } from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
+import {
+  roundPct,
+  redistributeProportionalWithFallbackRatio as redistributeProportional,
+  redistributeLocked,
+} from '@/utils/allocationRedistribution';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,11 +76,6 @@ function nextMonthDate(): Date {
 
 function clampPct(n: number): number {
   return Math.min(100, Math.max(0, n));
-}
-
-/** Round a % to at most 2 decimal places (max precision this feature supports). */
-function roundPct(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 /** "15" for whole numbers, "15.3" for fractional — no trailing zeros. */
@@ -305,71 +305,62 @@ export default function BudgetAllocationScreen() {
 
   const handleNeeds = useCallback((v: number) => {
     if (lockedBucket === 'needs') return; // defensive; its slider/% are already disabled
-    const rounded = roundPct(v);
     if (lockedBucket === 'wants') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - wants));
-      setNeeds(clampedV);
-      setSavings(roundPct(100 - wants - clampedV));
+      const { changed, free } = redistributeLocked(v, wants);
+      setNeeds(changed);
+      setSavings(free);
       return;
     }
     if (lockedBucket === 'savings') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - savings));
-      setNeeds(clampedV);
-      setWants(roundPct(100 - savings - clampedV));
+      const { changed, free } = redistributeLocked(v, savings);
+      setNeeds(changed);
+      setWants(free);
       return;
     }
-    setNeeds(rounded);
-    const rem = roundPct(100 - rounded);
-    const wRatio = wants / (wants + savings) || 0.6;
-    const newWants = roundPct(rem * wRatio);
-    setWants(newWants);
-    setSavings(roundPct(rem - newWants));
+    const { changed, otherA, otherB } = redistributeProportional(v, wants, savings, 0.6);
+    setNeeds(changed);
+    setWants(otherA);
+    setSavings(otherB);
   }, [wants, savings, lockedBucket]);
 
   const handleWants = useCallback((v: number) => {
     if (lockedBucket === 'wants') return;
-    const rounded = roundPct(v);
     if (lockedBucket === 'needs') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - needs));
-      setWants(clampedV);
-      setSavings(roundPct(100 - needs - clampedV));
+      const { changed, free } = redistributeLocked(v, needs);
+      setWants(changed);
+      setSavings(free);
       return;
     }
     if (lockedBucket === 'savings') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - savings));
-      setWants(clampedV);
-      setNeeds(roundPct(100 - savings - clampedV));
+      const { changed, free } = redistributeLocked(v, savings);
+      setWants(changed);
+      setNeeds(free);
       return;
     }
-    setWants(rounded);
-    const rem = roundPct(100 - rounded);
-    const nRatio = needs / (needs + savings) || 0.7;
-    const newNeeds = roundPct(rem * nRatio);
-    setNeeds(newNeeds);
-    setSavings(roundPct(rem - newNeeds));
+    const { changed, otherA, otherB } = redistributeProportional(v, needs, savings, 0.7);
+    setWants(changed);
+    setNeeds(otherA);
+    setSavings(otherB);
   }, [needs, savings, lockedBucket]);
 
   const handleSavings = useCallback((v: number) => {
     if (lockedBucket === 'savings') return;
-    const rounded = roundPct(v);
     if (lockedBucket === 'needs') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - needs));
-      setSavings(clampedV);
-      setWants(roundPct(100 - needs - clampedV));
+      const { changed, free } = redistributeLocked(v, needs);
+      setSavings(changed);
+      setWants(free);
       return;
     }
     if (lockedBucket === 'wants') {
-      const clampedV = Math.min(Math.max(rounded, 0), roundPct(100 - wants));
-      setSavings(clampedV);
-      setNeeds(roundPct(100 - wants - clampedV));
+      const { changed, free } = redistributeLocked(v, wants);
+      setSavings(changed);
+      setNeeds(free);
       return;
     }
-    setSavings(rounded);
-    const rem = roundPct(100 - rounded);
-    const nRatio = needs / (needs + wants) || 0.625;
-    const newNeeds = roundPct(rem * nRatio);
-    setNeeds(newNeeds);
-    setWants(roundPct(rem - newNeeds));
+    const { changed, otherA, otherB } = redistributeProportional(v, needs, wants, 0.625);
+    setSavings(changed);
+    setNeeds(otherA);
+    setWants(otherB);
   }, [needs, wants, lockedBucket]);
 
   const handleKeypadDone = useCallback(() => {

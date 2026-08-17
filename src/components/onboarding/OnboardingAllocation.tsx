@@ -13,15 +13,15 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { ONBOARDING_STRINGS, ALLOCATION_PRESETS } from '@/data/onboardingData';
+import {
+  roundPct,
+  redistributeProportionalEvenSplit as redistributeProportional,
+  redistributeLocked,
+} from '@/utils/allocationRedistribution';
 
 type BucketKey = 'essential' | 'wants' | 'savings';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Round a % to at most 2 decimal places (max precision this feature supports). */
-function roundPct(n: number): number {
-  return Math.round(n * 100) / 100;
-}
 
 /** "15" for whole numbers, "15.3" for fractional — no trailing zeros. */
 function formatPct(n: number): string {
@@ -72,44 +72,26 @@ export function OnboardingAllocation({
     // fractional % (15.3%) to round-trip back to that exact amount instead
     // of snapping to 15% → 15.000.000đ. Drag input already arrives as a
     // whole number (CustomSlider's step=1 snaps it), so this is a no-op there.
-    const rounded = roundPct(newValue);
     const otherKeys = (['essential', 'wants', 'savings'] as const).filter(k => k !== key);
     const [key1, key2] = otherKeys;
 
     if (lockedBucket === key1 || lockedBucket === key2) {
-      // One of the other two buckets is locked: clamp the dragged value
-      // against the locked share, and give the entire remainder to the
-      // other (unlocked) bucket rather than splitting proportionally.
       const lockedValue = allocations[lockedBucket];
       const freeKey = lockedBucket === key1 ? key2 : key1;
-      const clamped = Math.min(Math.max(rounded, 0), roundPct(100 - lockedValue));
-      onChangeAllocation(key, clamped);
-      onChangeAllocation(freeKey, roundPct(100 - lockedValue - clamped));
+      const { changed, free } = redistributeLocked(newValue, lockedValue);
+      onChangeAllocation(key, changed);
+      onChangeAllocation(freeKey, free);
       return;
     }
 
-    // No lock: redistribute proportionally between the other two, as before.
-    const remaining = roundPct(100 - rounded);
-    const total1and2 = allocations[key1] + allocations[key2];
-
-    if (total1and2 === 0) {
-      // If both are 0, split evenly
-      const half = roundPct(remaining / 2);
-      onChangeAllocation(key1, half);
-      onChangeAllocation(key2, roundPct(remaining - half));
-    } else {
-      // Distribute proportionally. key2 is derived as the exact remainder
-      // (not independently rounded) so the three buckets always sum to
-      // exactly 100 despite the extra decimal precision.
-      const ratio1 = allocations[key1] / total1and2;
-      const new1 = roundPct(remaining * ratio1);
-      const new2 = roundPct(remaining - new1);
-
-      onChangeAllocation(key1, new1);
-      onChangeAllocation(key2, new2);
-    }
-
-    onChangeAllocation(key, rounded);
+    const { changed, otherA, otherB } = redistributeProportional(
+      newValue,
+      allocations[key1],
+      allocations[key2],
+    );
+    onChangeAllocation(key1, otherA);
+    onChangeAllocation(key2, otherB);
+    onChangeAllocation(key, changed);
   }, [allocations, lockedBucket, onChangeAllocation]);
 
   // Set by openField, consumed by scrollToField — lets onContentSizeChange
