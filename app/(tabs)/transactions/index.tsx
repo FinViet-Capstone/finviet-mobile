@@ -27,6 +27,7 @@ import {
   SPACING,
 } from "@/constants/theme";
 import {
+  shouldClearUncategorizedFilter,
   useMonthlyTransactions,
   type TxSection,
   type DayCell,
@@ -62,6 +63,8 @@ export default function TransactionsScreen() {
 
   const {
     isLoading,
+    isMonthFetching,
+    hasLoadedMonth,
     wallets,
     totalBalance,
     selectedWallet,
@@ -84,6 +87,19 @@ export default function TransactionsScreen() {
     uncategorizedOnly,
     isFocused,
   );
+
+  // Reset retained screen state before committing an empty filtered render.
+  if (
+    shouldClearUncategorizedFilter(
+      uncategorizedOnly,
+      uncategorizedCount,
+      isFocused,
+      isMonthFetching,
+      hasLoadedMonth,
+    )
+  ) {
+    setUncategorizedOnly(false);
+  }
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
