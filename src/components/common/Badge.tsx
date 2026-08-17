@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface BadgeProps {
   label: string;
@@ -13,28 +14,35 @@ export interface BadgeProps {
 
 export function Badge({
   label,
-  backgroundColor = COLORS.brand[100],
-  textColor = COLORS.brand[700],
+  backgroundColor,
+  textColor,
   style,
 }: BadgeProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const bg = backgroundColor ?? colors.brand[100];
+  const tc = textColor ?? colors.brand[700];
+
   return (
-    <View style={[styles.badge, { backgroundColor }, style]}>
-      <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
+    <View style={[styles.badge, { backgroundColor: bg }, style]}>
+      <Text style={[styles.label, { color: tc }]} numberOfLines={1}>
         {label}
       </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  badge: {
-    alignSelf: 'flex-start',
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-  },
-  label: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    badge: {
+      alignSelf: 'flex-start',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1],
+    },
+    label: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+  });
+}

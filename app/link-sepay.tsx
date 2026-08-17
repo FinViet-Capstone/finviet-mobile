@@ -14,7 +14,7 @@
  *  7. Navigate back to wallets with the new linked wallet.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,7 +24,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { queryKeys } from '@/lib/queryKeys';
 import { linkSepayAccount, getSepayAuthorizeUrl } from '@/services/real/sepay';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 type Phase = 'loading' | 'webview' | 'completing' | 'success' | 'error';
 
@@ -37,6 +38,8 @@ function extractCode(url: string): string | null {
 
 export default function LinkSepayScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const qc = useQueryClient();
   const settledRef = useRef(false);
   const stateRef = useRef<string | undefined>(undefined);
@@ -111,7 +114,7 @@ export default function LinkSepayScreen() {
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
         >
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Liên kết SePay</Text>
         <View style={styles.headerBtn} />
@@ -119,7 +122,7 @@ export default function LinkSepayScreen() {
 
       {phase === 'loading' && (
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.statusSubtitle}>Đang chuẩn bị liên kết...</Text>
         </View>
       )}
@@ -132,7 +135,7 @@ export default function LinkSepayScreen() {
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Đang tải SePay...</Text>
             </View>
           )}
@@ -150,7 +153,7 @@ export default function LinkSepayScreen() {
 
       {phase === 'completing' && (
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.statusTitle}>Đang liên kết tài khoản...</Text>
           <Text style={styles.statusSubtitle}>
             Đang đồng bộ giao dịch từ ngân hàng. Có thể mất 30-60 giây.
@@ -161,7 +164,7 @@ export default function LinkSepayScreen() {
       {phase === 'success' && (
         <View style={styles.centerContent}>
           <View style={styles.successIcon}>
-            <MaterialIcon name="check_circle" size={64} color={COLORS.tertiary} />
+            <MaterialIcon name="check_circle" size={64} color={colors.tertiary} />
           </View>
           <Text style={styles.statusTitle}>Liên kết thành công!</Text>
           <Text style={styles.statusSubtitle}>
@@ -173,7 +176,7 @@ export default function LinkSepayScreen() {
       {phase === 'error' && (
         <View style={styles.centerContent}>
           <View style={styles.errorIcon}>
-            <MaterialIcon name="error" size={64} color={COLORS.error} />
+            <MaterialIcon name="error" size={64} color={colors.error} />
           </View>
           <Text style={styles.statusTitle}>Liên kết thất bại</Text>
           <Text style={styles.statusSubtitle}>{errorMessage}</Text>
@@ -190,63 +193,65 @@ export default function LinkSepayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
-  },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    flex: 1,
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-    textAlign: 'center',
-  },
-  webview: { flex: 1 },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  loadingText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING[8],
-    gap: SPACING[3],
-  },
-  successIcon: { marginBottom: SPACING[2] },
-  errorIcon: { marginBottom: SPACING[2] },
-  statusTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    textAlign: 'center',
-  },
-  statusSubtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  retryBtn: {
-    marginTop: SPACING[4],
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[3],
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.lg,
-  },
-  retryText: {
-    color: COLORS.onPrimary,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
+    },
+    headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: {
+      flex: 1,
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary,
+      textAlign: 'center',
+    },
+    webview: { flex: 1 },
+    loadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: SPACING[3],
+    },
+    loadingText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+    centerContent: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: SPACING[8],
+      gap: SPACING[3],
+    },
+    successIcon: { marginBottom: SPACING[2] },
+    errorIcon: { marginBottom: SPACING[2] },
+    statusTitle: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      textAlign: 'center',
+    },
+    statusSubtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    retryBtn: {
+      marginTop: SPACING[4],
+      paddingHorizontal: SPACING[6],
+      paddingVertical: SPACING[3],
+      backgroundColor: colors.primary,
+      borderRadius: BORDER_RADIUS.lg,
+    },
+    retryText: {
+      color: colors.onPrimary,
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+  });
+}

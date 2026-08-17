@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 type Gender = 'male' | 'female' | 'other';
 
@@ -51,8 +52,10 @@ export function OnboardingPersona({
   onChangeDateOfBirth,
   onNext,
 }: OnboardingPersonaProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Helper to display YYYY-MM-DD as DD/MM/YYYY
-  const displayDob = dateOfBirth 
+  const displayDob = dateOfBirth
     ? `${dateOfBirth.split('-')[2]}/${dateOfBirth.split('-')[1]}/${dateOfBirth.split('-')[0]}`
     : '';
 
@@ -117,11 +120,11 @@ export function OnboardingPersona({
                 style={styles.inputRow}
                 onPress={openPicker}
               >
-                <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon name="calendar_today" size={20} color={colors.onSurfaceVariant} />
                 <Text
                   style={[
                     styles.inputFlex,
-                    !dateOfBirth && { color: `${COLORS.onSurfaceVariant}80` }
+                    !dateOfBirth && { color: withAlpha(colors.onSurfaceVariant, 0.5) }
                   ]}
                 >
                   {displayDob || S.dobPlaceholder}
@@ -136,105 +139,107 @@ export function OnboardingPersona({
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={onNext} activeOpacity={0.9}>
           <Text style={styles.buttonText}>{S.next}</Text>
-          <MaterialIcon name="arrow_forward" size={20} color={COLORS.onPrimary} />
+          <MaterialIcon name="arrow_forward" size={20} color={colors.onPrimary} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[4],
-    paddingBottom: SPACING[6],
-    gap: SPACING[5],
-  },
-  headerSection: { gap: SPACING[2] },
-  title: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 24,
-  },
-  field: { gap: SPACING[2] },
-  label: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}4D`,
-    borderRadius: BORDER_RADIUS.xl,
-    paddingHorizontal: SPACING[4],
-  },
-  inputFlex: {
-    flex: 1,
-    paddingVertical: SPACING[4],
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-  },
-  segment: {
-    flexDirection: 'row',
-    gap: SPACING[1],
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}4D`,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[1],
-  },
-  segmentOption: {
-    flex: 1,
-    paddingVertical: SPACING[3],
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg,
-  },
-  segmentOptionActive: {
-    backgroundColor: COLORS.surfaceBright,
-    borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}80`,
-  },
-  segmentText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurfaceVariant,
-  },
-  segmentTextActive: {
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-  buttonContainer: {
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[6],
-    paddingTop: SPACING[3],
-  },
-  button: {
-    height: 56,
-    flexDirection: 'row',
-    gap: SPACING[2],
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  buttonText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    scrollContent: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[6],
+      gap: SPACING[5],
+    },
+    headerSection: { gap: SPACING[2] },
+    title: {
+      fontSize: FONT_SIZE['2xl'],
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+    },
+    subtitle: {
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurfaceVariant,
+      lineHeight: 24,
+    },
+    field: { gap: SPACING[2] },
+    label: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[3],
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.outlineVariant, 0.3),
+      borderRadius: BORDER_RADIUS.xl,
+      paddingHorizontal: SPACING[4],
+    },
+    inputFlex: {
+      flex: 1,
+      paddingVertical: SPACING[4],
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurface,
+    },
+    segment: {
+      flexDirection: 'row',
+      gap: SPACING[1],
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.outlineVariant, 0.3),
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[1],
+    },
+    segmentOption: {
+      flex: 1,
+      paddingVertical: SPACING[3],
+      alignItems: 'center',
+      borderRadius: BORDER_RADIUS.lg,
+    },
+    segmentOptionActive: {
+      backgroundColor: colors.surfaceBright,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.outlineVariant, 0.5),
+    },
+    segmentText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurfaceVariant,
+    },
+    segmentTextActive: {
+      color: colors.primary,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+    buttonContainer: {
+      paddingHorizontal: SPACING[4],
+      paddingBottom: SPACING[6],
+      paddingTop: SPACING[3],
+    },
+    button: {
+      height: 56,
+      flexDirection: 'row',
+      gap: SPACING[2],
+      backgroundColor: colors.primary,
+      borderRadius: BORDER_RADIUS.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 14,
+      elevation: 6,
+    },
+    buttonText: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onPrimary,
+    },
+  });
+}

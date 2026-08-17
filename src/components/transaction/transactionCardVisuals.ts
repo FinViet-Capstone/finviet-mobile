@@ -7,7 +7,8 @@
  * component body — keeps the component simple and lets the branching be unit
  * tested directly. Behaviour is identical to the previous inline logic.
  */
-import { COLORS } from '@/constants/theme';
+import { withAlpha } from '@/theme';
+import type { ThemeColors } from '@/providers/ThemeProvider';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import type { Transaction } from '@/types/transaction';
@@ -31,8 +32,9 @@ function resolveIcon(
   isGoalContrib: boolean,
   isUncategorized: boolean,
   category: Category,
+  colors: ThemeColors,
 ): Pick<TransactionCardVisuals, 'iconName' | 'iconColor' | 'iconBg'> {
-  const catColor = category?.color ?? COLORS.outlineVariant;
+  const catColor = category?.color ?? colors.outlineVariant;
   const iconName = isTransfer
     ? 'swap_horiz'
     : isGoalContrib
@@ -41,33 +43,34 @@ function resolveIcon(
     ? 'help_outline'
     : getCategoryIcon(category?.icon);
   const iconColor = isTransfer
-    ? COLORS.onSurfaceVariant
+    ? colors.onSurfaceVariant
     : isGoalContrib
-    ? COLORS.tertiary
+    ? colors.tertiary
     : isUncategorized
-    ? COLORS.secondary
+    ? colors.secondary
     : catColor;
   const iconBg = isTransfer
-    ? `${COLORS.onSurfaceVariant}26`
+    ? withAlpha(colors.onSurfaceVariant, 0.15)
     : isGoalContrib
-    ? `${COLORS.tertiary}26`
-    : `${catColor}26`;
+    ? withAlpha(colors.tertiary, 0.15)
+    : withAlpha(catColor, 0.15);
   return { iconName, iconColor, iconBg };
 }
 
 function resolveAmount(
   tx: Transaction,
   isIncome: boolean,
+  colors: ThemeColors,
 ): Pick<TransactionCardVisuals, 'amountPrefix' | 'amountColor'> {
   // Income / transfer-in are credits (+, green); transfer-out is a debit (−,
   // neutral); expenses stay unsigned per the Transactions design.
   const isCredit = isIncome || tx.type === 'transfer_in';
   const amountPrefix = isCredit ? '+' : tx.type === 'transfer_out' ? '−' : '';
   const amountColor = isCredit
-    ? COLORS.tertiary
+    ? colors.tertiary
     : tx.type === 'transfer_out'
-    ? COLORS.onSurfaceVariant
-    : COLORS.onSurface;
+    ? colors.onSurfaceVariant
+    : colors.onSurface;
   return { amountPrefix, amountColor };
 }
 
@@ -106,6 +109,7 @@ function resolveText(
 
 export function getTransactionCardVisuals(
   tx: Transaction,
+  colors: ThemeColors,
   walletName = '',
 ): TransactionCardVisuals {
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
@@ -117,8 +121,8 @@ export function getTransactionCardVisuals(
   const isUncategorized = !isTransfer && !tx.categoryId;
 
   return {
-    ...resolveIcon(isTransfer, isGoalContrib, isUncategorized, category),
-    ...resolveAmount(tx, isIncome),
+    ...resolveIcon(isTransfer, isGoalContrib, isUncategorized, category, colors),
+    ...resolveAmount(tx, isIncome, colors),
     ...resolveText(tx, isTransfer, isGoalContrib, isUncategorized, category, walletName),
     isUncategorized,
   };

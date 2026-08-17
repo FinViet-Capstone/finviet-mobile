@@ -1,7 +1,8 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, SHADOW } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface ScreenHeaderProps {
   title: string;
@@ -18,6 +19,9 @@ export function ScreenHeader({
   onBack,
   rightAction,
 }: ScreenHeaderProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       {/* Left slot */}
@@ -29,7 +33,7 @@ export function ScreenHeader({
             style={styles.backButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MaterialIcon name="chevron_left" size={24} color={COLORS.gray[800]} />
+            <MaterialIcon name="chevron_left" size={24} color={colors.gray[800]} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -47,31 +51,33 @@ export function ScreenHeader({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 56,
-    paddingHorizontal: SPACING[4],
-    backgroundColor: COLORS.white,
-    ...SHADOW.sm,
-  },
-  side: {
-    width: 40,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  sideRight: {
-    alignItems: 'flex-end',
-  },
-  backButton: {
-    padding: SPACING[1],
-  },
-  title: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[900],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 56,
+      paddingHorizontal: SPACING[4],
+      backgroundColor: colors.white,
+      ...SHADOW.sm,
+    },
+    side: {
+      width: 40,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    sideRight: {
+      alignItems: 'flex-end',
+    },
+    backButton: {
+      padding: SPACING[1],
+    },
+    title: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.gray[900],
+    },
+  });
+}

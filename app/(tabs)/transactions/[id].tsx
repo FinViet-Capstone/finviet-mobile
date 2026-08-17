@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
-} from '@/constants/theme';
+  withAlpha,
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -28,6 +29,7 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
+import { CategoryPickerSheet } from '@/components/categories';
 import {
   useTransactionById,
   useWallets,
@@ -35,9 +37,10 @@ import {
   useDeleteTransaction,
   useCreateRule,
 } from '@/hooks';
-import { CATEGORIES } from '@/constants/categories';
+import { CATEGORIES, getCategoryTypeForTransaction } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVND } from '@/utils/formatters';
+import { getApiErrorMessage } from '@/utils/errors';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -47,6 +50,8 @@ import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function TransactionDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>();
 
@@ -63,6 +68,8 @@ export default function TransactionDetailScreen() {
 }
 
 function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { data: tx, isLoading, isError } = useTransactionById(txId);
   const { data: walletData } = useWallets();
@@ -130,6 +137,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
   const amountNum = parseInt(amountRaw, 10) || 0;
   const isIncome = tx.type === 'income';
+  const categoryType = getCategoryTypeForTransaction(tx.type);
 
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
     const catName = CATEGORIES.find((c) => c.id === catId)?.nameVi ?? S.categoryLabel;
@@ -185,7 +193,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             Alert.alert(S.savedTitle, S.savedMsg, [{ text: S.ok, onPress: () => router.back() }]);
           }
         },
-        onError: () => Alert.alert(S.saveErrorTitle, S.saveErrorMsg),
+        onError: (error) =>
+          Alert.alert(S.saveErrorTitle, getApiErrorMessage(error, S.saveErrorMsg)),
       },
     );
   };
@@ -218,12 +227,12 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
       {/* Transfer / linked banner */}
       {isTransfer ? (
         <View style={styles.banner}>
-          <MaterialIcon name="swap_horiz" size={18} color={COLORS.secondary} />
+          <MaterialIcon name="swap_horiz" size={18} color={colors.secondary} />
           <Text style={styles.bannerText}>{S.transferBanner}</Text>
         </View>
       ) : categoryOnly ? (
         <View style={styles.banner}>
-          <MaterialIcon name="link" size={18} color={COLORS.secondary} />
+          <MaterialIcon name="link" size={18} color={colors.secondary} />
           <Text style={styles.bannerText}>{S.linkedBanner}</Text>
         </View>
       ) : null}
@@ -231,7 +240,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
       {/* Type badge + amount display */}
       <View style={styles.amountSection}>
         <View style={[styles.typeBadge, isIncome ? styles.typeBadgeIncome : styles.typeBadgeExpense]}>
-          <Text style={[styles.typeBadgeText, { color: isIncome ? COLORS.tertiary : COLORS.error }]}>
+          <Text style={[styles.typeBadgeText, { color: isIncome ? colors.tertiary : colors.error }]}>
             {isIncome ? S.income : isTransfer ? S.transfer : S.expense}
           </Text>
         </View>
@@ -239,7 +248,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           activeOpacity={fieldsLocked ? 1 : 0.7}
           onPress={() => { if (!fieldsLocked) setAmountFocused(true); }}
         >
-          <Text style={[styles.amountDisplay, { color: isIncome ? COLORS.tertiary : COLORS.error }]}>
+          <Text style={[styles.amountDisplay, { color: isIncome ? colors.tertiary : colors.error }]}>
             {amountNum > 0 ? formatVND(amountNum) : '0 đ'}
           </Text>
         </TouchableOpacity>
@@ -256,11 +265,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           {/* Category */}
           {!isTransfer ? (
             <TouchableOpacity activeOpacity={0.7} style={styles.fieldRow} onPress={() => setShowCategoryModal(true)}>
-              <View style={[styles.fieldIconWrap, { backgroundColor: selectedCategory ? `${selectedCategory.color}25` : `${COLORS.secondary}20` }]}>
+              <View style={[styles.fieldIconWrap, { backgroundColor: selectedCategory ? `${selectedCategory.color}25` : withAlpha(colors.secondary, 0.13) }]}>
                 <MaterialIcon
                   name={selectedCategory ? getCategoryIcon(selectedCategory.icon) : 'category'}
                   size={20}
-                  color={selectedCategory?.color ?? COLORS.secondary}
+                  color={selectedCategory?.color ?? colors.secondary}
                 />
               </View>
               <View style={styles.fieldTextWrap}>
@@ -269,7 +278,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                   {selectedCategory?.nameVi ?? S.categoryPlaceholder}
                 </Text>
               </View>
-              <MaterialIcon name="chevron_right" size={20} color={COLORS.outlineVariant} />
+              <MaterialIcon name="chevron_right" size={20} color={colors.outlineVariant} />
             </TouchableOpacity>
           ) : null}
 
@@ -279,18 +288,18 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             style={styles.fieldRow}
             onPress={() => { if (!fieldsLocked) setShowWalletModal(true); }}
           >
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}20` }]}>
+            <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.primary, 0.13) }]}>
               <MaterialIcon
                 name={selectedWallet?.type === 'linked' ? 'link' : 'account_balance_wallet'}
                 size={20}
-                color={COLORS.primary}
+                color={colors.primary}
               />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.walletLabel}</Text>
               <Text style={styles.fieldValue}>{selectedWallet?.name ?? S.walletUnknown}</Text>
             </View>
-            {!fieldsLocked && <MaterialIcon name="chevron_right" size={20} color={COLORS.outlineVariant} />}
+            {!fieldsLocked && <MaterialIcon name="chevron_right" size={20} color={colors.outlineVariant} />}
           </TouchableOpacity>
 
           {/* Date */}
@@ -305,8 +314,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 onPress={openPicker}
                 disabled={fieldsLocked}
               >
-                <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.primary}15` }]}>
-                  <MaterialIcon name="calendar_today" size={20} color={COLORS.onSurfaceVariant} />
+                <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.primary, 0.08) }]}>
+                  <MaterialIcon name="calendar_today" size={20} color={colors.onSurfaceVariant} />
                 </View>
                 <View style={styles.fieldTextWrap}>
                   <Text style={styles.fieldLabel}>{S.dateLabel}</Text>
@@ -319,8 +328,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           {/* Merchant */}
           {!isTransfer ? (
             <View style={styles.fieldRow}>
-              <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.outline}20` }]}>
-                <MaterialIcon name="person" size={20} color={COLORS.outline} />
+              <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.outline, 0.13) }]}>
+                <MaterialIcon name="person" size={20} color={colors.outline} />
               </View>
               <View style={styles.fieldTextWrap}>
                 <Text style={styles.fieldLabel}>{S.merchantLabel}</Text>
@@ -337,8 +346,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
           {/* Description / note */}
           <View style={styles.fieldRow}>
-            <View style={[styles.fieldIconWrap, { backgroundColor: `${COLORS.outline}20` }]}>
-              <MaterialIcon name="notes" size={20} color={COLORS.outline} />
+            <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.outline, 0.13) }]}>
+              <MaterialIcon name="notes" size={20} color={colors.outline} />
             </View>
             <View style={styles.fieldTextWrap}>
               <Text style={styles.fieldLabel}>{S.descriptionLabel}</Text>
@@ -361,7 +370,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
               disabled={updateMutation.isPending || createRuleMutation.isPending}
             >
               {updateMutation.isPending || createRuleMutation.isPending
-                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                ? <ActivityIndicator size="small" color={colors.onPrimary} />
                 : <Text style={styles.saveBtnText}>{S.save}</Text>}
             </TouchableOpacity>
             {/* Bank-synced (linked-wallet) transactions are read-only and cannot be deleted. */}
@@ -373,7 +382,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending
-                  ? <ActivityIndicator size="small" color={COLORS.error} />
+                  ? <ActivityIndicator size="small" color={colors.error} />
                   : <Text style={styles.deleteBtnText}>{S.delete}</Text>}
               </TouchableOpacity>
             )}
@@ -382,29 +391,17 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
       </KeyboardAvoidingView>
 
       {/* Category picker */}
-      <DraggableSheet visible={showCategoryModal} onClose={() => setShowCategoryModal(false)}>
-        <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>{S.pickCategory}</Text>
-          <FlatList
-            data={[...CATEGORIES]}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.listRow, categoryId === item.id && styles.listRowSelected]}
-                onPress={() => { setCategoryId(item.id); setShowCategoryModal(false); }}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: `${item.color}26` }]}>
-                  <MaterialIcon name={getCategoryIcon(item.icon)} size={18} color={item.color} />
-                </View>
-                <Text style={styles.listRowText}>{item.nameVi}</Text>
-                {categoryId === item.id ? <MaterialIcon name="check" size={20} color={COLORS.primary} /> : null}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </DraggableSheet>
+      <CategoryPickerSheet
+        visible={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        title={S.pickCategory}
+        entryType={categoryType ?? 'expense'}
+        selectedCategoryId={categoryId}
+        onSelect={(selectedCategoryId) => {
+          setCategoryId(selectedCategoryId);
+          setShowCategoryModal(false);
+        }}
+      />
 
       {/* Wallet picker */}
       <DraggableSheet visible={showWalletModal} onClose={() => setShowWalletModal(false)}>
@@ -424,11 +421,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                   <MaterialIcon
                     name={item.type === 'linked' ? 'link' : 'account_balance_wallet'}
                     size={18}
-                    color={item.type === 'linked' ? COLORS.secondary : COLORS.primary}
+                    color={item.type === 'linked' ? colors.secondary : colors.primary}
                   />
                 </View>
                 <Text style={styles.listRowText}>{item.name}</Text>
-                {walletId === item.id ? <MaterialIcon name="check" size={20} color={COLORS.primary} /> : null}
+                {walletId === item.id ? <MaterialIcon name="check" size={20} color={colors.primary} /> : null}
               </TouchableOpacity>
             )}
           />
@@ -448,11 +445,13 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 }
 
 function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.header}>
       <TouchableOpacity style={styles.headerBtn} onPress={onBack} activeOpacity={0.75}
         accessibilityRole="button" accessibilityLabel="Quay lại">
-        <MaterialIcon name="arrow_back" size={24} color={COLORS.onSurface} />
+        <MaterialIcon name="arrow_back" size={24} color={colors.onSurface} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>{title}</Text>
       <View style={styles.headerBtn} />
@@ -460,57 +459,58 @@ function Header({ onBack, title }: { onBack: () => void; title: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[3],
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   headerBtn: { width: 44, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
     flex: 1, textAlign: 'center',
-    fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface,
+    fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface,
   },
 
   banner: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    backgroundColor: COLORS.secondaryContainer,
+    backgroundColor: colors.secondaryContainer,
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
-    borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+    borderBottomWidth: 1, borderBottomColor: colors.outlineVariant,
   },
-  bannerText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.onSecondaryContainer, lineHeight: 20 },
+  bannerText: { flex: 1, fontSize: FONT_SIZE.sm, color: colors.onSecondaryContainer, lineHeight: 20 },
 
   // Amount section
   amountSection: {
     alignItems: 'center',
     paddingVertical: SPACING[4],
     paddingHorizontal: SPACING[4],
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
     gap: SPACING[2],
   },
   typeBadge: {
     paddingHorizontal: SPACING[3], paddingVertical: SPACING[1],
     borderRadius: BORDER_RADIUS.full, borderWidth: 1,
   },
-  typeBadgeIncome: { backgroundColor: `${COLORS.tertiary}15`, borderColor: `${COLORS.tertiary}40` },
-  typeBadgeExpense: { backgroundColor: `${COLORS.error}15`, borderColor: `${COLORS.error}40` },
+  typeBadgeIncome: { backgroundColor: withAlpha(colors.tertiary, 0.08), borderColor: withAlpha(colors.tertiary, 0.25) },
+  typeBadgeExpense: { backgroundColor: withAlpha(colors.error, 0.08), borderColor: withAlpha(colors.error, 0.25) },
   typeBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold },
   amountDisplay: { fontSize: FONT_SIZE['4xl'], fontWeight: FONT_WEIGHT.bold, letterSpacing: -1 },
-  amountError: { fontSize: FONT_SIZE.xs, color: COLORS.error },
+  amountError: { fontSize: FONT_SIZE.xs, color: colors.error },
 
   // Field rows (matches manual.tsx)
   fieldsContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], paddingTop: SPACING[3], gap: SPACING[2] },
   fieldRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4], gap: SPACING[3], minHeight: 64,
   },
@@ -519,40 +519,41 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   fieldTextWrap: { flex: 1 },
-  fieldLabel: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginBottom: 2 },
-  fieldValue: { fontSize: FONT_SIZE.base, color: COLORS.onSurface, fontWeight: FONT_WEIGHT.medium },
-  fieldPlaceholder: { color: COLORS.outlineVariant, fontWeight: FONT_WEIGHT.normal },
+  fieldLabel: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginBottom: 2 },
+  fieldValue: { fontSize: FONT_SIZE.base, color: colors.onSurface, fontWeight: FONT_WEIGHT.medium },
+  fieldPlaceholder: { color: colors.outlineVariant, fontWeight: FONT_WEIGHT.normal },
 
   // Actions
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
   saveBtn: {
     flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  saveBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  saveBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
   deleteBtn: {
     flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: `${COLORS.error}50`,
+    borderWidth: 1, borderColor: withAlpha(colors.error, 0.31),
     alignItems: 'center', justifyContent: 'center',
   },
-  deleteBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.error },
+  deleteBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.error },
   btnDisabled: { opacity: 0.5 },
 
   // Sheet
   sheetContent: { paddingHorizontal: SPACING[5], paddingBottom: SPACING[8], maxHeight: '72%' },
-  sheetTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, marginBottom: SPACING[3] },
+  sheetTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, marginBottom: SPACING[3] },
   listRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
-    paddingVertical: SPACING[3], borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+    paddingVertical: SPACING[3], borderBottomWidth: 1, borderBottomColor: colors.outlineVariant,
   },
   listRowSelected: {
-    backgroundColor: `${COLORS.primaryContainer}22`, borderRadius: BORDER_RADIUS.md,
+    backgroundColor: withAlpha(colors.primaryContainer, 0.13), borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING[2], borderBottomWidth: 0,
   },
-  listRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
+  listRowText: { flex: 1, fontSize: FONT_SIZE.base, color: colors.onSurface },
   iconWrap: {
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
-});
+  });
+}

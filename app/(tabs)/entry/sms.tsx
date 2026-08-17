@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,11 +16,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from "@/constants/theme";
+  withAlpha,
+} from "@/theme";
+import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
@@ -83,6 +84,8 @@ const S = {
 
 export default function SMSEntryScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const initialISO = dateParam ?? todayISO();
 
@@ -271,7 +274,7 @@ export default function SMSEntryScreen() {
             {/* Uncertain notice */}
             {(amountUncertain || merchantUncertain || categoryUncertain) && (
               <View style={styles.uncertainBanner}>
-                <MaterialIcon name="warning" size={16} color={COLORS.warning} />
+                <MaterialIcon name="warning" size={16} color={colors.warning} />
                 <Text style={styles.uncertainText}>{S.uncertainNotice}</Text>
               </View>
             )}
@@ -297,9 +300,9 @@ export default function SMSEntryScreen() {
                         styles.typeOptionText,
                         entryType === t && styles.typeOptionTextActive,
                         entryType === t &&
-                          t === "expense" && { color: COLORS.error },
+                          t === "expense" && { color: colors.error },
                         entryType === t &&
-                          t === "income" && { color: COLORS.tertiary },
+                          t === "income" && { color: colors.tertiary },
                       ]}
                     >
                       {t === "expense" ? S.expense : S.income}
@@ -384,7 +387,7 @@ export default function SMSEntryScreen() {
                   <MaterialIcon
                     name="chevron_right"
                     size={20}
-                    color={COLORS.outlineVariant}
+                    color={colors.outlineVariant}
                   />
                 )}
               </View>
@@ -404,7 +407,7 @@ export default function SMSEntryScreen() {
                 <MaterialIcon
                   name="chevron_right"
                   size={20}
-                  color={COLORS.outlineVariant}
+                  color={colors.outlineVariant}
                 />
               </View>
             </TouchableOpacity>
@@ -448,7 +451,7 @@ export default function SMSEntryScreen() {
                 <MaterialIcon
                   name="arrow_forward"
                   size={18}
-                  color={COLORS.onSurface}
+                  color={colors.onSurface}
                 />
               </TouchableOpacity>
             </View>
@@ -504,11 +507,11 @@ export default function SMSEntryScreen() {
                 <MaterialIcon
                   name="account_balance_wallet"
                   size={18}
-                  color={COLORS.onSurfaceVariant}
+                  color={colors.onSurfaceVariant}
                 />
                 <Text style={styles.sheetRowText}>{item.name}</Text>
                 {walletId === item.id && (
-                  <MaterialIcon name="check" size={18} color={COLORS.primary} />
+                  <MaterialIcon name="check" size={18} color={colors.primary} />
                 )}
               </TouchableOpacity>
             )}
@@ -570,7 +573,7 @@ export default function SMSEntryScreen() {
                   <MaterialIcon
                     name="close"
                     size={16}
-                    color={COLORS.onSurface}
+                    color={colors.onSurface}
                   />
                 </TouchableOpacity>
               )}
@@ -581,7 +584,7 @@ export default function SMSEntryScreen() {
                 <MaterialIcon
                   name="content_paste"
                   size={16}
-                  color={COLORS.primary}
+                  color={colors.primary}
                 />
               </TouchableOpacity>
             </View>
@@ -593,7 +596,7 @@ export default function SMSEntryScreen() {
               <MaterialIcon
                 name="lightbulb"
                 size={18}
-                color={COLORS.secondary}
+                color={colors.secondary}
               />
               <Text style={styles.guideTitle}>{S.guide}</Text>
             </View>
@@ -613,7 +616,7 @@ export default function SMSEntryScreen() {
           <Text style={styles.shortHint}>{S.tooShortHint}</Text>
         )}
         <View style={styles.aiBadge}>
-          <MaterialIcon name="auto_awesome" size={13} color={COLORS.primary} />
+          <MaterialIcon name="auto_awesome" size={13} color={colors.primary} />
           <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
         </View>
         <TouchableOpacity
@@ -629,7 +632,7 @@ export default function SMSEntryScreen() {
           <MaterialIcon
             name="arrow_forward"
             size={18}
-            color={COLORS.onSurface}
+            color={colors.onSurface}
           />
         </TouchableOpacity>
       </View>
@@ -650,6 +653,8 @@ function Header({
   rightLabel?: string;
   onRightPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.header}>
       <TouchableOpacity
@@ -659,7 +664,7 @@ function Header({
         accessibilityRole="button"
         accessibilityLabel="Quay lại"
       >
-        <MaterialIcon name="arrow_back_ios" size={20} color={COLORS.primary} />
+        <MaterialIcon name="arrow_back_ios" size={20} color={colors.primary} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>{title}</Text>
       {rightLabel ? (
@@ -691,6 +696,8 @@ function PickerModal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal
       visible={visible}
@@ -715,294 +722,296 @@ function PickerModal({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SPACING[4],
-    height: 56,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  headerBtn: { minWidth: 56, alignItems: "center" },
-  headerTitle: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-  },
-  headerRight: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-  },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: SPACING[4],
+      height: 56,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    headerBtn: { minWidth: 56, alignItems: "center" },
+    headerTitle: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary,
+    },
+    headerRight: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+    },
 
-  loadingBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACING[3],
-  },
-  loadingLabel: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
+    loadingBox: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: SPACING[3],
+    },
+    loadingLabel: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
 
-  // Paste phase
-  pasteContent: { padding: SPACING[4], gap: SPACING[4] },
-  instructionWrap: { gap: SPACING[1] },
-  instructionTitle: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-  },
-  instructionBody: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 20,
-  },
+    // Paste phase
+    pasteContent: { padding: SPACING[4], gap: SPACING[4] },
+    instructionWrap: { gap: SPACING[1] },
+    instructionTitle: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+    },
+    instructionBody: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      lineHeight: 20,
+    },
 
-  textareaWrap: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    minHeight: 200,
-    position: "relative",
-  },
-  textarea: {
-    minHeight: 200,
-    padding: SPACING[4],
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
-    lineHeight: 24,
-  },
-  textareaActions: {
-    position: "absolute",
-    bottom: SPACING[3],
-    right: SPACING[3],
-    flexDirection: "row",
-    gap: SPACING[2],
-  },
-  textareaActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerHighest,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  textareaActionBtnPrimary: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}25`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    textareaWrap: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      minHeight: 200,
+      position: "relative",
+    },
+    textarea: {
+      minHeight: 200,
+      padding: SPACING[4],
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurface,
+      lineHeight: 24,
+    },
+    textareaActions: {
+      position: "absolute",
+      bottom: SPACING[3],
+      right: SPACING[3],
+      flexDirection: "row",
+      gap: SPACING[2],
+    },
+    textareaActionBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceContainerHighest,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    textareaActionBtnPrimary: {
+      width: 36,
+      height: 36,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.primary, 0.15),
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  guideCard: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS["2xl"],
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    gap: SPACING[2],
-  },
-  guideHeader: { flexDirection: "row", alignItems: "center", gap: SPACING[2] },
-  guideTitle: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.secondary,
-  },
-  guideStep: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 20,
-  },
+    guideCard: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS["2xl"],
+      padding: SPACING[4],
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      gap: SPACING[2],
+    },
+    guideHeader: { flexDirection: "row", alignItems: "center", gap: SPACING[2] },
+    guideTitle: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.secondary,
+    },
+    guideStep: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      lineHeight: 20,
+    },
 
-  bottomArea: {
-    backgroundColor: `${COLORS.surface}E6`,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[4],
-    gap: SPACING[2],
-  },
-  aiBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACING[1],
-    backgroundColor: `${COLORS.primary}15`,
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1] + 2,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}25`,
-  },
-  aiBadgeText: { fontSize: 11, color: COLORS.primary },
-  processBtn: {
-    height: 56,
-    backgroundColor: COLORS.inversePrimary,
-    borderRadius: BORDER_RADIUS.full,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACING[2],
-  },
-  processBtnText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-  },
-  shortHint: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.warning,
-    textAlign: "center",
-  },
+    bottomArea: {
+      backgroundColor: withAlpha(colors.surface, 0.9),
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[3],
+      paddingBottom: SPACING[4],
+      gap: SPACING[2],
+    },
+    aiBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: SPACING[1],
+      backgroundColor: withAlpha(colors.primary, 0.08),
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1] + 2,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.15),
+    },
+    aiBadgeText: { fontSize: 11, color: colors.primary },
+    processBtn: {
+      height: 56,
+      backgroundColor: colors.inversePrimary,
+      borderRadius: BORDER_RADIUS.full,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: SPACING[2],
+    },
+    processBtnText: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+    },
+    shortHint: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.warning,
+      textAlign: "center",
+    },
 
-  // Review phase
-  reviewContent: { padding: SPACING[4], gap: SPACING[3] },
-  typeToggleWrap: {},
-  typeToggle: {
-    flexDirection: "row",
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderRadius: BORDER_RADIUS.full,
-    padding: 4,
-  },
-  typeOption: {
-    flex: 1,
-    paddingVertical: SPACING[2],
-    alignItems: "center",
-    borderRadius: BORDER_RADIUS.full,
-  },
-  typeExpenseActive: { backgroundColor: `${COLORS.error}20` },
-  typeIncomeActive: { backgroundColor: `${COLORS.tertiary}20` },
-  typeOptionText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurfaceVariant,
-  },
-  typeOptionTextActive: { fontWeight: FONT_WEIGHT.semibold },
-  uncertainBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING[2],
-    backgroundColor: `${COLORS.warning}20`,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING[3],
-    borderWidth: 1,
-    borderColor: `${COLORS.warning}40`,
-  },
-  uncertainText: { fontSize: FONT_SIZE.sm, color: COLORS.warning, flex: 1 },
+    // Review phase
+    reviewContent: { padding: SPACING[4], gap: SPACING[3] },
+    typeToggleWrap: {},
+    typeToggle: {
+      flexDirection: "row",
+      backgroundColor: colors.surfaceContainerHigh,
+      borderRadius: BORDER_RADIUS.full,
+      padding: 4,
+    },
+    typeOption: {
+      flex: 1,
+      paddingVertical: SPACING[2],
+      alignItems: "center",
+      borderRadius: BORDER_RADIUS.full,
+    },
+    typeExpenseActive: { backgroundColor: withAlpha(colors.error, 0.13) },
+    typeIncomeActive: { backgroundColor: withAlpha(colors.tertiary, 0.13) },
+    typeOptionText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurfaceVariant,
+    },
+    typeOptionTextActive: { fontWeight: FONT_WEIGHT.semibold },
+    uncertainBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: SPACING[2],
+      backgroundColor: withAlpha(colors.warning, 0.13),
+      borderRadius: BORDER_RADIUS.lg,
+      padding: SPACING[3],
+      borderWidth: 1,
+      borderColor: withAlpha(colors.warning, 0.25),
+    },
+    uncertainText: { fontSize: FONT_SIZE.sm, color: colors.warning, flex: 1 },
 
-  fieldCard: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    gap: SPACING[1],
-  },
-  fieldCardUncertain: { borderColor: COLORS.warning, borderWidth: 1.5 },
-  fieldLabel: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  fieldValueText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurface,
-  },
-  fieldPlaceholder: { fontSize: FONT_SIZE.base, color: COLORS.outlineVariant },
-  fieldRowValue: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING[2],
-  },
-  fieldError: { fontSize: FONT_SIZE.xs, color: COLORS.error },
-  dot: { width: 10, height: 10, borderRadius: BORDER_RADIUS.full },
-  uncertainBadge: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.warning,
-    marginLeft: SPACING[1],
-  },
+    fieldCard: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[4],
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      gap: SPACING[1],
+    },
+    fieldCardUncertain: { borderColor: colors.warning, borderWidth: 1.5 },
+    fieldLabel: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+    fieldValueText: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurface,
+    },
+    fieldPlaceholder: { fontSize: FONT_SIZE.base, color: colors.outlineVariant },
+    fieldRowValue: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: SPACING[2],
+    },
+    fieldError: { fontSize: FONT_SIZE.xs, color: colors.error },
+    dot: { width: 10, height: 10, borderRadius: BORDER_RADIUS.full },
+    uncertainBadge: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.warning,
+      marginLeft: SPACING[1],
+    },
 
-  reviewActions: { flexDirection: "row", gap: SPACING[3] },
-  rePasteBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rePasteBtnText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
-  },
-  confirmBtn: {
-    flex: 2,
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.inversePrimary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACING[2],
-  },
-  confirmBtnText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-  },
+    reviewActions: { flexDirection: "row", gap: SPACING[3] },
+    rePasteBtn: {
+      flex: 1,
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rePasteBtnText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant,
+    },
+    confirmBtn: {
+      flex: 2,
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.inversePrimary,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: SPACING[2],
+    },
+    confirmBtnText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+    },
 
-  disabled: { opacity: 0.45 },
+    disabled: { opacity: 0.45 },
 
-  // Modal / sheet
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderTopLeftRadius: BORDER_RADIUS["2xl"],
-    borderTopRightRadius: BORDER_RADIUS["2xl"],
-    paddingTop: SPACING[3],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[4],
-    maxHeight: "70%",
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant,
-    alignSelf: "center",
-    marginBottom: SPACING[4],
-  },
-  sheetTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    marginBottom: SPACING[3],
-  },
-  sheetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: SPACING[3],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    gap: SPACING[3],
-  },
-  sheetRowSelected: {
-    backgroundColor: `${COLORS.primary}10`,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[2],
-    borderBottomWidth: 0,
-    marginVertical: SPACING[1],
-  },
-  sheetRowText: { flex: 1, fontSize: FONT_SIZE.base, color: COLORS.onSurface },
-});
+    // Modal / sheet
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      backgroundColor: colors.surfaceContainerLow,
+      borderTopLeftRadius: BORDER_RADIUS["2xl"],
+      borderTopRightRadius: BORDER_RADIUS["2xl"],
+      paddingTop: SPACING[3],
+      paddingBottom: SPACING[8],
+      paddingHorizontal: SPACING[4],
+      maxHeight: "70%",
+    },
+    sheetHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.outlineVariant,
+      alignSelf: "center",
+      marginBottom: SPACING[4],
+    },
+    sheetTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      marginBottom: SPACING[3],
+    },
+    sheetRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: SPACING[3],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+      gap: SPACING[3],
+    },
+    sheetRowSelected: {
+      backgroundColor: withAlpha(colors.primary, 0.06),
+      borderRadius: BORDER_RADIUS.md,
+      paddingHorizontal: SPACING[2],
+      borderBottomWidth: 0,
+      marginVertical: SPACING[1],
+    },
+    sheetRowText: { flex: 1, fontSize: FONT_SIZE.base, color: colors.onSurface },
+  });
+}

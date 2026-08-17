@@ -12,7 +12,8 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 
 import { useTransactions } from '@/hooks';
 import { BarWeek, type WeekBarDatum } from '@/components/charts/BarWeek';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface WeeklySpendingSwiperProps {
   /** Number of past weeks to make available (in addition to the current week). Defaults to 12. */
@@ -47,6 +48,8 @@ export function WeeklySpendingSwiper({
   chartHeight = 260,
   onDayPress,
 }: WeeklySpendingSwiperProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   // PAGE_PAD lines up with the surrounding card padding so each page fills the
   // card without overflowing the screen edge.
@@ -86,7 +89,7 @@ export function WeeklySpendingSwiper({
           <MaterialIcon
             name="chevron_left"
             size={20}
-            color={activeIndex === 0 ? COLORS.gray[300] : COLORS.gray[700]}
+            color={activeIndex === 0 ? colors.outlineVariant : colors.onSurface}
           />
         </TouchableOpacity>
 
@@ -100,7 +103,7 @@ export function WeeklySpendingSwiper({
           <MaterialIcon
             name="chevron_right"
             size={20}
-            color={activeIndex === lastIndex ? COLORS.gray[300] : COLORS.gray[700]}
+            color={activeIndex === lastIndex ? colors.outlineVariant : colors.onSurface}
           />
         </TouchableOpacity>
       </View>
@@ -238,20 +241,22 @@ function WeekPage({ range, dayLabels, formatValue, chartHeight, onDayPress }: We
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[2],
-  },
-  headerLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[700],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      width: '100%',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4],
+      paddingBottom: SPACING[2],
+    },
+    headerLabel: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.gray[700],
+    },
+  });
+}

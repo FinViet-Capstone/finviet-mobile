@@ -1,6 +1,8 @@
 import {
   buildCalendarWeeks,
   buildDayCells,
+  countUncategorizedTransactions,
+  shouldClearUncategorizedFilter,
 } from '../useMonthlyTransactions';
 import type { Transaction } from '@/types';
 
@@ -52,6 +54,28 @@ describe('buildCalendarWeeks', () => {
     expect(finalWeek?.map((cell) => cell.day)).toEqual([27, 28, 29, 30, 1, 2, 3]);
     expect(finalWeek?.slice(4).every((cell) => cell.current === null)).toBe(true);
     expect(weeks.every((week) => week.length === 7)).toBe(true);
+  });
+});
+
+describe('uncategorized transaction state', () => {
+  it('counts uncategorized rows from the raw month and excludes transfer legs', () => {
+    expect(countUncategorizedTransactions([
+      transaction({ id: 'uncategorized', categoryId: null }),
+      transaction({ id: 'categorized', categoryId: 'cat_food' }),
+      transaction({ id: 'transfer', categoryId: null, type: 'transfer_in' }),
+    ])).toBe(1);
+  });
+
+  it('clears the active filter after the final uncategorized row is refetched', () => {
+    expect(shouldClearUncategorizedFilter(true, 0, true, false, true)).toBe(true);
+  });
+
+  it('keeps the filter while matching rows remain or the month is still loading', () => {
+    expect(shouldClearUncategorizedFilter(true, 1, true, false, true)).toBe(false);
+    expect(shouldClearUncategorizedFilter(true, 0, true, true, true)).toBe(false);
+    expect(shouldClearUncategorizedFilter(true, 0, true, false, false)).toBe(false);
+    expect(shouldClearUncategorizedFilter(true, 0, false, false, true)).toBe(false);
+    expect(shouldClearUncategorizedFilter(false, 0, true, false, true)).toBe(false);
   });
 });
 

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
@@ -20,6 +21,8 @@ function daysUntil(deadlineIso: string | null): number | null {
 
 export function SavingsGoalCard({ goal }: SavingsGoalCardProps) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   if (!goal) return null;
 
@@ -35,7 +38,7 @@ export function SavingsGoalCard({ goal }: SavingsGoalCardProps) {
       <View style={styles.header}>
         <Text style={styles.title}>Mục tiêu tiết kiệm</Text>
         <View style={styles.deadlineBadge}>
-          <MaterialIcon name="timer" size={13} color={COLORS.secondary} />
+          <MaterialIcon name="timer" size={13} color={colors.secondary} />
           <Text style={styles.deadlineText}>
             {days === null ? 'Không có thời hạn' : `Còn ${days} ngày`}
           </Text>
@@ -69,13 +72,14 @@ export function SavingsGoalCard({ goal }: SavingsGoalCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[5],
     borderWidth: 1,
-    borderColor: `${COLORS.outline}1A`,
+    borderColor: withAlpha(colors.outline, 0.1),
     overflow: 'hidden',
   },
   header: {
@@ -87,7 +91,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   deadlineBadge: {
     flexDirection: 'row',
@@ -95,15 +99,15 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
-    backgroundColor: `${COLORS.secondaryContainer}33`,
+    backgroundColor: withAlpha(colors.secondaryContainer, 0.2),
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    borderColor: `${COLORS.secondary}4D`,
+    borderColor: withAlpha(colors.secondary, 0.3),
   },
   deadlineText: {
     fontSize: 11,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.secondary,
+    color: colors.secondary,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -117,9 +121,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: `${COLORS.primary}1A`,
+    backgroundColor: withAlpha(colors.primary, 0.1),
     borderWidth: 1,
-    borderColor: `${COLORS.primary}33`,
+    borderColor: withAlpha(colors.primary, 0.2),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -132,20 +136,20 @@ const styles = StyleSheet.create({
   goalName: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   progressSection: {
     gap: SPACING[2],
   },
   progressTrack: {
     height: 10,
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderRadius: BORDER_RADIUS.full,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     borderRadius: BORDER_RADIUS.full,
   },
   progressLabels: {
@@ -155,16 +159,17 @@ const styles = StyleSheet.create({
   },
   progressCurrent: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   progressCurrentBold: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   progressPct: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
-});
+  });
+}

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { CATEGORIES } from '@/constants/categories';
@@ -26,6 +27,8 @@ function formatRelativeDate(dateStr: string): string {
 
 export function RecentTransactionsList({ transactions }: RecentTransactionsListProps) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View>
@@ -36,7 +39,7 @@ export function RecentTransactionsList({ transactions }: RecentTransactionsListP
           activeOpacity={0.7}
           hitSlop={8}
         >
-          <MaterialIcon name="search" size={22} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="search" size={22} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
 
@@ -45,9 +48,9 @@ export function RecentTransactionsList({ transactions }: RecentTransactionsListP
           const cat = CATEGORIES.find((c) => c.id === tx.categoryId);
           const iconName = cat ? getCategoryIcon(cat.icon) : 'receipt';
           const isIncome = tx.type === 'income';
-          const amountColor = isIncome ? COLORS.tertiary : COLORS.onSurface;
-          const iconBg = isIncome ? `${COLORS.tertiary}1A` : COLORS.surfaceContainerHigh;
-          const iconColor = isIncome ? COLORS.tertiary : COLORS.outline;
+          const amountColor = isIncome ? colors.tertiary : colors.onSurface;
+          const iconBg = isIncome ? withAlpha(colors.tertiary, 0.1) : colors.surfaceContainerHigh;
+          const iconColor = isIncome ? colors.tertiary : colors.outline;
 
           return (
             <TouchableOpacity
@@ -78,7 +81,8 @@ export function RecentTransactionsList({ transactions }: RecentTransactionsListP
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -88,7 +92,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   list: {
     gap: 2,
@@ -114,15 +118,16 @@ const styles = StyleSheet.create({
   txTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   txMeta: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   txAmount: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
   },
-});
+  });
+}

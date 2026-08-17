@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
 import { TextInput } from '@/components/common/TextInput';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { ONBOARDING_STRINGS, WALLET_TYPES, formatVietnameseCurrency } from '@/data/onboardingData';
 
 export interface OnboardingWalletProps {
@@ -35,6 +36,8 @@ export function OnboardingWallet({
   onChangeWalletBalance,
   onFinish,
 }: OnboardingWalletProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
 
   const handleNumberPress = (num: string) => {
@@ -107,15 +110,15 @@ export function OnboardingWallet({
                   <View style={[
                     styles.typeIcon,
                     isSelected
-                      ? { backgroundColor: COLORS.primaryContainer }
-                      : { backgroundColor: COLORS.surfaceVariant }
+                      ? { backgroundColor: colors.primaryContainer }
+                      : { backgroundColor: colors.surfaceVariant }
                   ]}>
                     <Text style={styles.typeIconText}>{getIconForType(type.icon)}</Text>
                   </View>
 
                   <Text style={[
                     styles.typeLabel,
-                    isSelected ? { color: COLORS.onBackground } : { color: COLORS.onSurfaceVariant }
+                    isSelected ? { color: colors.onBackground } : { color: colors.onSurfaceVariant }
                   ]}>
                     {type.label}
                   </Text>
@@ -198,10 +201,11 @@ const getIconForType = (iconName: string): string => {
   return iconMap[iconName] || '💰';
 };
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   contentContainer: {
     paddingHorizontal: SPACING[4],
@@ -214,12 +218,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZE['2xl'],
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
+    color: colors.onBackground,
     marginBottom: SPACING[2],
   },
   subtitle: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 24,
   },
   typeSelection: {
@@ -230,20 +234,20 @@ const styles = StyleSheet.create({
   typeCard: {
     flex: 1,
     position: 'relative',
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     alignItems: 'center',
     opacity: 0.8,
   },
   typeCardSelected: {
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
     opacity: 1,
-    shadowColor: COLORS.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 15,
@@ -256,12 +260,12 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkIcon: {
-    color: COLORS.onPrimary,
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: FONT_WEIGHT.bold,
   },
@@ -284,15 +288,15 @@ const styles = StyleSheet.create({
   },
   typeDescription: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
   },
   formCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: `${COLORS.white}0D`,
+    borderColor: withAlpha(colors.white, 0.05),
     gap: SPACING[4],
   },
   inputGroup: {
@@ -300,22 +304,22 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginBottom: 4,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
     gap: SPACING[2],
   },
   inputContainerFocused: {
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   inputIcon: {
@@ -324,22 +328,22 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   balanceDisplay: {
     flex: 1,
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
+    color: colors.onBackground,
     textAlign: 'right',
   },
   balancePlaceholder: {
-    color: `${COLORS.onSurfaceVariant}80`,
+    color: withAlpha(colors.onSurfaceVariant, 0.5),
     fontWeight: FONT_WEIGHT.normal,
   },
   inputHint: {
     fontSize: FONT_SIZE.xs,
-    color: `${COLORS.onSurfaceVariant}B3`,
+    color: withAlpha(colors.onSurfaceVariant, 0.7),
     marginTop: 4,
   },
   buttonContainer: {
@@ -347,13 +351,13 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 56,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     borderRadius: BORDER_RADIUS.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING[2],
-    shadowColor: COLORS.primaryContainer,
+    shadowColor: colors.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
@@ -365,10 +369,11 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   checkIconButton: {
     fontSize: FONT_SIZE.xl,
-    color: COLORS.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
-});
+  });
+}

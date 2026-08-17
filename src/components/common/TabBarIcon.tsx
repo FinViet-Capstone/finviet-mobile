@@ -1,6 +1,6 @@
 import React from 'react';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS } from '@/constants/theme';
+import { useThemeColors } from '@/providers/ThemeProvider';
 
 interface TabBarIconProps {
   icon: string;
@@ -10,8 +10,9 @@ interface TabBarIconProps {
 
 export default function TabBarIcon({
   icon,
-  color = COLORS.gray[500],
+  color,
   size = 22,
 }: TabBarIconProps) {
-  return <MaterialIcon name={icon} color={color} size={size} />;
+  const colors = useThemeColors();
+  return <MaterialIcon name={icon} color={color ?? colors.gray[500]} size={size} />;
 }

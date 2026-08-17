@@ -19,7 +19,7 @@ import {
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from '@/constants/theme';
+} from '@/theme';
 import { AI_PREFERENCES_STRINGS as S } from '@/data/settingsScreensData';
 import { useAiPreferences, useUpdateAiPreferences } from '@/hooks';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';

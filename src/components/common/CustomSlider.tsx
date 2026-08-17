@@ -7,6 +7,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useThemeColors } from '@/providers/ThemeProvider';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,9 +30,6 @@ interface CustomSliderProps {
 const TRACK_HEIGHT = 4;
 const THUMB_SIZE = 20;
 const THUMB_SPRING = { damping: 15, stiffness: 300, mass: 0.5 };
-const DEFAULT_MIN_COLOR = '#d0bcff';
-const DEFAULT_MAX_COLOR = '#37333d';
-const DEFAULT_THUMB_COLOR = '#d0bcff';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,12 +59,19 @@ export function CustomSlider({
   value,
   onValueChange,
   onValueChangeEnd,
-  minimumTrackTintColor = DEFAULT_MIN_COLOR,
-  maximumTrackTintColor = DEFAULT_MAX_COLOR,
-  thumbTintColor = DEFAULT_THUMB_COLOR,
+  minimumTrackTintColor,
+  maximumTrackTintColor,
+  thumbTintColor,
   disabled = false,
   style,
 }: CustomSliderProps) {
+  // Defaults resolve from the active theme rather than a fixed dark literal —
+  // callers may still override any of the three explicitly.
+  const colors = useThemeColors();
+  const resolvedMinColor = minimumTrackTintColor ?? colors.primary;
+  const resolvedMaxColor = maximumTrackTintColor ?? colors.surfaceContainerHighest;
+  const resolvedThumbColor = thumbTintColor ?? colors.primary;
+
   const trackWidth = useSharedValue(0);
   const thumbX = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -175,12 +180,12 @@ export function CustomSlider({
         onLayout={handleLayout}
       >
         {/* Track background (unfilled) */}
-        <View style={[styles.track, { backgroundColor: maximumTrackTintColor }]}>
+        <View style={[styles.track, { backgroundColor: resolvedMaxColor }]}>
           {/* Track filled */}
           <Animated.View
             style={[
               styles.trackFilled,
-              { backgroundColor: minimumTrackTintColor },
+              { backgroundColor: resolvedMinColor },
               filledStyle,
             ]}
           />
@@ -191,8 +196,8 @@ export function CustomSlider({
           style={[
             styles.thumb,
             {
-              backgroundColor: thumbTintColor,
-              shadowColor: thumbTintColor,
+              backgroundColor: resolvedThumbColor,
+              shadowColor: resolvedThumbColor,
             },
             thumbStyle,
           ]}

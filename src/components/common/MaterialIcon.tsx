@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, TextStyle, StyleSheet } from 'react-native';
+import { useThemeColors } from '@/providers/ThemeProvider';
 
 export interface MaterialIconProps {
   readonly name: string;
@@ -13,6 +14,10 @@ export interface MaterialIconProps {
  * Material Symbols icon component
  * Uses Material Symbols Outlined font family
  *
+ * Defaults `color` to the resolved theme's `onSurface` rather than a fixed
+ * black — an omitted `color` used to render invisible on the app's dark
+ * surfaces.
+ *
  * @example
  * <MaterialIcon name="home" size={24} color="#000" />
  * <MaterialIcon name="favorite" size={20} color="red" filled />
@@ -20,17 +25,19 @@ export interface MaterialIconProps {
 export function MaterialIcon({
   name,
   size = 24,
-  color = '#000000',
+  color,
   filled = false,
   style,
 }: MaterialIconProps) {
+  const colors = useThemeColors();
+  const resolvedColor = color ?? colors.onSurface;
   return (
     <Text
       style={[
         styles.icon,
         {
           fontSize: size,
-          color,
+          color: resolvedColor,
           // Note: fontVariationSettings is not supported in React Native
           // The filled prop is here for API compatibility but won't work
           // Use Material Symbols with FILL suffix in font name instead

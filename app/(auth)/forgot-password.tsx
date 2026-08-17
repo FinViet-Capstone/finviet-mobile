@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,13 +19,13 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useForgotPassword, useResetPassword, useLogin } from '@/hooks';
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
   SHADOW,
-} from '@/constants/theme';
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -42,6 +42,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const forgotMutation = useForgotPassword();
   const resetMutation = useResetPassword();
   const loginMutation = useLogin();
@@ -231,7 +233,7 @@ export default function ForgotPasswordScreen() {
                           <MaterialIcon
                             name={showPw ? 'visibility_off' : 'visibility'}
                             size={20}
-                            color={COLORS.onSurfaceVariant}
+                            color={colors.onSurfaceVariant}
                           />
                         </TouchableOpacity>
                       }
@@ -366,181 +368,183 @@ export default function ForgotPasswordScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  // Layout
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: SPACING[8],
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    // Layout
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: SPACING[8],
+    },
 
-  // Nav bar
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[4],
-    paddingBottom: SPACING[2],
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainer,
-  },
-  backArrow: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHT.bold,
-  },
-  navTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onBackground,
-  },
-  navSpacer: {
-    width: 40,
-  },
+    // Nav bar
+    navBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[2],
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceContainer,
+    },
+    backArrow: {
+      fontSize: FONT_SIZE.xl,
+      color: colors.primary,
+      fontWeight: FONT_WEIGHT.bold,
+    },
+    navTitle: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onBackground,
+    },
+    navSpacer: {
+      width: 40,
+    },
 
-  // Hero
-  heroSection: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING[6],
-    paddingTop: SPACING[6],
-    paddingBottom: SPACING[8],
-    backgroundColor: COLORS.background,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING[4],
-  },
-  iconEmoji: {
-    fontSize: 36,
-  },
-  heroTitle: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
-    marginBottom: SPACING[2],
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+    // Hero
+    heroSection: {
+      alignItems: 'center',
+      paddingHorizontal: SPACING[6],
+      paddingTop: SPACING[6],
+      paddingBottom: SPACING[8],
+      backgroundColor: colors.background,
+    },
+    iconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING[4],
+    },
+    iconEmoji: {
+      fontSize: 36,
+    },
+    heroTitle: {
+      fontSize: FONT_SIZE['2xl'],
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onBackground,
+      marginBottom: SPACING[2],
+      textAlign: 'center',
+    },
+    heroSubtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
 
-  // Card
-  card: {
-    marginHorizontal: SPACING[4],
-    marginTop: -SPACING[2],
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[6],
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  cardLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: SPACING[4],
-  },
+    // Card
+    card: {
+      marginHorizontal: SPACING[4],
+      marginTop: -SPACING[2],
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[6],
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    cardLabel: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      marginBottom: SPACING[4],
+    },
 
-  // Fields
-  fieldSpacing: {
-    alignSelf: 'stretch',
-    marginBottom: SPACING[5],
-  },
-  fieldIcon: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurfaceVariant,
-  },
+    // Fields
+    fieldSpacing: {
+      alignSelf: 'stretch',
+      marginBottom: SPACING[5],
+    },
+    fieldIcon: {
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurfaceVariant,
+    },
 
-  // Submit / cancel
-  submitButton: {
-    marginBottom: SPACING[4],
-  },
-  cancelRow: {
-    alignItems: 'center',
-    paddingVertical: SPACING[2],
-  },
-  cancelLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.primary,
-  },
+    // Submit / cancel
+    submitButton: {
+      marginBottom: SPACING[4],
+    },
+    cancelRow: {
+      alignItems: 'center',
+      paddingVertical: SPACING[2],
+    },
+    cancelLabel: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.primary,
+    },
 
-  // Success state
-  successContent: {
-    alignItems: 'center',
-  },
-  successIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING[4],
-  },
-  successIcon: {
-    fontSize: 36,
-  },
-  successTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
-    marginBottom: SPACING[3],
-    textAlign: 'center',
-  },
-  successMessage: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: SPACING[6],
-  },
-  successHighlight: {
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onBackground,
-  },
-  backLoginButton: {
-    alignSelf: 'stretch',
-    marginBottom: SPACING[4],
-  },
-  resendNote: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-  },
-  resendLink: {
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-  },
-  disabledLink: {
-    color: COLORS.outline,
-  },
-  waitHint: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: SPACING[3],
-  },
-});
+    // Success state
+    successContent: {
+      alignItems: 'center',
+    },
+    successIconWrap: {
+      width: 72,
+      height: 72,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING[4],
+    },
+    successIcon: {
+      fontSize: 36,
+    },
+    successTitle: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onBackground,
+      marginBottom: SPACING[3],
+      textAlign: 'center',
+    },
+    successMessage: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: SPACING[6],
+    },
+    successHighlight: {
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onBackground,
+    },
+    backLoginButton: {
+      alignSelf: 'stretch',
+      marginBottom: SPACING[4],
+    },
+    resendNote: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+    resendLink: {
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+    },
+    disabledLink: {
+      color: colors.outline,
+    },
+    waitHint: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginTop: SPACING[3],
+    },
+  });
+}

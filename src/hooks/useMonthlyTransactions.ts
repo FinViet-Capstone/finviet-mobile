@@ -126,6 +126,24 @@ export function buildDayCells(
 const isUncategorizedSpend = (tx: Transaction): boolean =>
   tx.categoryId === null && tx.type !== 'transfer_in' && tx.type !== 'transfer_out';
 
+export function countUncategorizedTransactions(transactions: Transaction[]): number {
+  return transactions.filter(isUncategorizedSpend).length;
+}
+
+export function shouldClearUncategorizedFilter(
+  uncategorizedOnly: boolean,
+  uncategorizedCount: number,
+  isFocused: boolean,
+  isMonthFetching: boolean,
+  hasLoadedMonth: boolean,
+): boolean {
+  return uncategorizedOnly
+    && uncategorizedCount === 0
+    && isFocused
+    && !isMonthFetching
+    && hasLoadedMonth;
+}
+
 export function useMonthlyTransactions(
   year: number,
   monthIdx: number,
@@ -146,7 +164,12 @@ export function useMonthlyTransactions(
   const prevEnd = isoDate(prevYear, prevMonthIdx, new Date(prevYear, prevMonthIdx + 1, 0).getDate());
 
   // ── Data ─────────────────────────────────────────────────────────────────
-  const { data: txData, isLoading } = useTransactions({
+  const {
+    data: txData,
+    isLoading,
+    isFetching: isMonthFetching,
+    isFetched: hasLoadedMonth,
+  } = useTransactions({
     startDate: monthStart,
     endDate: monthEnd,
     walletId: selectedWalletId ?? undefined,
@@ -158,8 +181,9 @@ export function useMonthlyTransactions(
   }, { enabled });
   const { data: walletsData } = useWallets();
 
+  const monthTransactions = useMemo(() => txData ?? [], [txData]);
   const transactions = useMemo(() => {
-    let txs = txData ?? [];
+    let txs = monthTransactions;
     if (uncategorizedOnly) return txs.filter(isUncategorizedSpend);
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -168,7 +192,7 @@ export function useMonthlyTransactions(
     if (filterType !== 'all') txs = txs.filter((tx) => tx.type === filterType);
     if (filterCategoryId) txs = txs.filter((tx) => tx.categoryId === filterCategoryId);
     return txs;
-  }, [txData, searchQuery, filterType, filterCategoryId, uncategorizedOnly]);
+  }, [monthTransactions, searchQuery, filterType, filterCategoryId, uncategorizedOnly]);
   const prevTransactions = useMemo(() => prevTxData ?? [], [prevTxData]);
   const wallets = walletsData?.wallets ?? [];
   const totalBalance = walletsData?.totalBalance ?? 0;
@@ -196,8 +220,8 @@ export function useMonthlyTransactions(
   const monthNet = income - expense;
 
   const uncategorizedCount = useMemo(
-    () => transactions.filter(isUncategorizedSpend).length,
-    [transactions],
+    () => countUncategorizedTransactions(monthTransactions),
+    [monthTransactions],
   );
 
   // ── SectionList sections ─────────────────────────────────────────────────
@@ -231,6 +255,8 @@ export function useMonthlyTransactions(
 
   return {
     isLoading,
+    isMonthFetching,
+    hasLoadedMonth,
     wallets,
     totalBalance,
     selectedWallet,

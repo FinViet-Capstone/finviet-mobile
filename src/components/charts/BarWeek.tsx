@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { EmptyState } from '@/components/common/EmptyState';
-import { COLORS, FONT_SIZE } from '@/constants/theme';
+import { FONT_SIZE } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface WeekBarDatum {
   /** Day label e.g. "T2", "T3" … "CN" (Vietnamese weekday abbreviations) */
@@ -42,6 +43,8 @@ export function BarWeek({
   formatValue = String,
   onDayPress,
 }: BarWeekProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const hasData = data.length > 0 && data.some((d) => d.amount > 0);
 
   if (!hasData) {
@@ -59,8 +62,8 @@ export function BarWeek({
     // iso is a custom field read back in onPress to identify the tapped date
     iso: d.iso,
     stacks: [
-      { value: d.categorized,   color: COLORS.brand[500] },
-      { value: d.uncategorized, color: COLORS.gray[400] },
+      { value: d.categorized,   color: colors.brand[500] },
+      { value: d.uncategorized, color: colors.gray[400] },
     ],
   }));
 
@@ -80,8 +83,8 @@ export function BarWeek({
         noOfSections={4}
         maxValue={niceMax}
         yAxisThickness={0}
-        xAxisColor={COLORS.gray[300]}
-        rulesColor={COLORS.gray[200]}
+        xAxisColor={colors.outlineVariant}
+        rulesColor={colors.outlineVariant}
         rulesType="dashed"
         yAxisTextStyle={styles.axisText}
         xAxisLabelTextStyle={styles.axisText}
@@ -110,12 +113,14 @@ function niceRoundUp(n: number): number {
   return nice * exp;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  axisText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      width: '100%',
+    },
+    axisText: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.gray[500],
+    },
+  });
+}
