@@ -675,7 +675,12 @@ export default function GoalDetailScreen() {
             </View>
           </View>
 
-          {!goal.isCompleted && !goal.isDeleted && (
+          {/* monthlySavingNeeded/deadline text are both undefined without a
+              deadline (both mock and real agree) — hide the whole row rather
+              than showing a fabricated 0đ/tháng or remaining/1 figure next to
+              a blank date. Unreachable via the app's own create flow today
+              (deadline is required), kept defensive. */}
+          {!goal.isCompleted && !goal.isDeleted && goal.deadline && (
             <View style={styles.monthlyRow}>
               <MaterialIcon name="savings" size={16} color={colors.primary} />
               <Text style={styles.monthlyText}>

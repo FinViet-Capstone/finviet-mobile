@@ -60,6 +60,31 @@ describe('calculateBucketSpend', () => {
     expect(result.savings).toBe(3_000_000);
   });
 
+  it('does not erase an unrelated ordinary savings expense when a goal withdrawal exceeds this month\'s contributions', () => {
+    // The exact C1 data-loss repro: a large goal withdrawal must only ever
+    // zero out the goal component, never clamp away a real cat_savings
+    // expense logged in the same month.
+    const result = calculateBucketSpend(
+      [
+        transaction({
+          id: 'manual-savings',
+          categoryId: 'cat_savings',
+          amount: 2_000_000,
+          type: 'expense',
+        }),
+        transaction({
+          id: 'withdrawal',
+          categoryId: 'cat_savings_goal',
+          amount: 5_000_000,
+          type: 'income',
+        }),
+      ],
+      [],
+    );
+
+    expect(result.savings).toBe(2_000_000);
+  });
+
   it('never reports negative Savings progress', () => {
     const result = calculateBucketSpend(
       [

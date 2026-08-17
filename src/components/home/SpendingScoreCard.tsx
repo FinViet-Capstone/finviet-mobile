@@ -5,7 +5,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
-import type { SpendingScore } from '@/types/ai';
+import type { SpendingScore, ScoreColor } from '@/types/ai';
 
 export interface SpendingScoreCardProps {
   readonly score: SpendingScore | null | undefined;
@@ -17,10 +17,15 @@ const STROKE_WIDTH = 8;
 const RADIUS = (SCORE_ARC_SIZE - STROKE_WIDTH * 2) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-function getScoreColor(colors: ThemeColors, score: number): string {
-  if (score >= 70) return colors.tertiary;
-  if (score >= 40) return colors.secondary;
-  return colors.error;
+// Always defer to the backend's own colorBadge (score.color) rather than
+// re-deriving a band from the raw number — the backend's actual cutoffs
+// (≥80 green, ≥50 amber, else red) don't match a naive 70/40 guess, and
+// hardcoding thresholds here would drift the moment they're tuned server-side
+// (scoring_criteria is admin-editable). Matches score.tsx's own mapping.
+function getScoreColor(colors: ThemeColors, color: ScoreColor | undefined): string {
+  if (color === 'green') return colors.tertiary;
+  if (color === 'red') return colors.error;
+  return colors.secondary;
 }
 
 export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProps) {
@@ -35,14 +40,14 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
   };
 
   const scoreValue = score?.score ?? 0;
-  const ringColor = getScoreColor(colors, scoreValue);
+  const ringColor = getScoreColor(colors, score?.color);
   const progress = scoreValue / 100;
   const dashOffset = CIRCUMFERENCE * (1 - progress);
 
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push('/(tabs)/home/score')}
+      onPress={() => router.push({ pathname: '/(tabs)/home/score', params: { view: activeView } })}
       activeOpacity={0.9}
     >
       <View style={styles.glowAccent} />

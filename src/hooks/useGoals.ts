@@ -18,6 +18,7 @@ import { newIdempotencyKey } from '@/lib/idempotency';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 import type { SavingsGoalWithProgress } from '@/types';
 import { runSingleFlight } from '@/utils/goalWithdrawal';
+import { invalidateAiDerived } from './useReports';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,9 @@ function invalidateGoalDependents(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
   qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
   qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+  // Goal money feeds the AI score's savingsScore (monthly view) — keep "Điểm chi
+  // tiêu" from sitting on a pre-contribution value.
+  invalidateAiDerived(qc);
 }
 
 export const useCreateGoal = () => {

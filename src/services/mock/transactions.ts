@@ -16,8 +16,11 @@ export interface TransactionFilters {
   uncategorizedOnly?: boolean;
   /**
    * When true, filters out all cat_savings_goal transactions.
-   * Use for "pure spend" views (Budgets bucket spend, spending reports).
-   * Default false — goal contributions appear in the full transaction history.
+   * Used by getBudgetBuckets (mock/budgets.ts) for the "pure category spend"
+   * side of the Savings bucket — goal money is netted in separately there so
+   * it isn't double-counted via defaultBucket resolution. Not used elsewhere
+   * today. Default false — goal contributions appear in the full transaction
+   * history.
    */
   hideGoalContributions?: boolean;
 }
@@ -1562,9 +1565,10 @@ export function createTransactionSync(input: CreateTransactionInput): Transactio
 }
 
 /**
- * Synchronous version of deleteTransaction.
- * Used internally by goals.ts when reversing goal-contribution expense records.
- * Wallet balance is restored immediately.
+ * Synchronous version of deleteTransaction. Wallet balance is restored
+ * immediately. Currently unused — goals.ts never reverses a contribution's
+ * generated transaction (a withdrawal creates its own, separate reversing
+ * transaction instead); kept in case a future caller needs a sync delete.
  */
 export function deleteTransactionSync(id: string): void {
   const target = TRANSACTIONS.find((t) => t.id === id);

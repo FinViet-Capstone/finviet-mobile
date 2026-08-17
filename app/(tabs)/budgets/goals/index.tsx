@@ -22,6 +22,7 @@ import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
 import { useArchivedGoals, useCreateGoal, useGoals } from '@/hooks/useGoals';
+import { useBudgetBuckets } from '@/hooks/useBudgets';
 import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
 
@@ -40,6 +41,8 @@ const S = {
   archived: 'Đã lưu trữ',
   noDeadline: 'Không có thời hạn',
   needsPerMonth: (n: string) => `Cần ${n}/tháng`,
+  affordabilityWarning: (needed: string, cap: string) =>
+    `Các mục tiêu đang cần ${needed}/tháng, vượt quá phân bổ Tiết kiệm hiện tại (${cap}/tháng). Hãy điều chỉnh mục tiêu hoặc tăng phân bổ Tiết kiệm.`,
   newGoalTitle: 'Tạo mục tiêu mới',
   nameLabel: 'Tên mục tiêu',
   namePlaceholder: 'VD: Mua MacBook Pro',
@@ -78,6 +81,24 @@ function isoDaysFromNow(days: number): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Do this month's active goals collectively need more than the customer's own
+ * Savings allocation? Exported so the comparison is directly testable —
+ * neither the mobile mock nor the real backend compares these two numbers on
+ * its own, so a customer can otherwise commit to goals their own plan can't
+ * fund with no warning anywhere in the app.
+ */
+export function computeGoalAffordability(
+  activeGoals: Pick<SavingsGoalWithProgress, 'requiredMonthlySaving'>[],
+  savingsCap: number,
+): { totalRequiredMonthly: number; isOverAllocated: boolean } {
+  const totalRequiredMonthly = activeGoals.reduce((sum, g) => sum + g.requiredMonthlySaving, 0);
+  return {
+    totalRequiredMonthly,
+    isOverAllocated: savingsCap > 0 && totalRequiredMonthly > savingsCap,
+  };
 }
 
 function deadlineBadge(goal: SavingsGoalWithProgress, colors: ThemeColors): { label: string; color: string; bg: string } {
@@ -230,7 +251,11 @@ function GoalCard({ goal, onPress }: { goal: SavingsGoalWithProgress; onPress: (
           )}
           <View style={styles.goalNameWrap}>
             <Text style={styles.goalName} numberOfLines={1}>{goal.name}</Text>
-            {!isCompleted && (
+            {/* monthlySavingNeeded is genuinely undefined without a deadline (both
+                mock and real agree) — show nothing rather than a fabricated
+                0đ/tháng or remaining/1 figure. Unreachable via the app's own
+                create flow today (deadline is required), kept defensive. */}
+            {!isCompleted && goal.deadline && (
               <Text style={styles.goalMonthly}>
                 {S.needsPerMonth(formatVND(goal.requiredMonthlySaving) + 'đ')}
               </Text>
@@ -282,6 +307,7 @@ export default function GoalsScreen() {
     error: archivedError,
     refetch: refetchArchived,
   } = useArchivedGoals();
+  const { data: bucketAllocation } = useBudgetBuckets();
   const [newGoalVisible, setNewGoalVisible] = useState(false);
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
@@ -289,6 +315,14 @@ export default function GoalsScreen() {
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && !g.isCompleted)
       .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline)),
     [goals]);
+
+  // `savingsCap` is already an absolute VND amount, correctly scaled (see
+  // real/budgets.ts's toBucket normalization) — no further conversion needed.
+  const savingsCap = bucketAllocation?.buckets.find((b) => b.bucket === 'savings')?.allocationCap ?? 0;
+  const { totalRequiredMonthly, isOverAllocated } = useMemo(
+    () => computeGoalAffordability(activeGoals, savingsCap),
+    [activeGoals, savingsCap],
+  );
 
   const completedGoals = useMemo(() =>
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && g.isCompleted),
@@ -353,6 +387,14 @@ export default function GoalsScreen() {
           </View>
         ) : (
           <>
+            {isOverAllocated && (
+              <View style={styles.affordabilityBanner}>
+                <MaterialIcon name="warning" size={18} color={colors.secondary} />
+                <Text style={styles.affordabilityBannerText}>
+                  {S.affordabilityWarning(formatVND(totalRequiredMonthly), formatVND(savingsCap))}
+                </Text>
+              </View>
+            )}
             {activeGoals.map((goal) => (
               <GoalCard key={goal.id} goal={goal} onPress={() => handleGoalPress(goal)} />
             ))}
@@ -433,6 +475,13 @@ function createStyles(colors: ThemeColors) {
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: SPACING[16], gap: SPACING[3] },
   emptyTitle: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
   emptyHint: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center' },
+  affordabilityBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING[2],
+    backgroundColor: withAlpha(colors.secondary, 0.1),
+    borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.3),
+    borderRadius: BORDER_RADIUS.lg, padding: SPACING[3],
+  },
+  affordabilityBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
   sectionDivider: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
     paddingVertical: SPACING[2], borderTopWidth: 1, borderTopColor: colors.surfaceVariant,

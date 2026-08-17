@@ -1,6 +1,75 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Savings Goals ↔ Budget Adherence ↔ AI Spending Score integration — cross-repo work
+with `finviet-be` (branch `fix/savings-bucket-goal-netting` there; this repo's branch is
+`fix/savings-goal-budget-score-integration`). Started from an inspection of how the three
+features relate: found the Budgets-bucket "Savings" spend figure was blind to Saving Goal
+money entirely (backend excluded it by design), mobile's own client-side workaround for that
+had a data-loss clamp bug, the real backend's `allocationPct`/`uncategorizedRatio` scale
+(0-100) didn't match the mobile mock's assumed 0-1 fraction, the AI score's colour bands
+(≥80/≥50 backend-side) didn't match the 70/40 the mobile FE assumed everywhere, and the score
+was never refreshed after a transaction/goal/budget mutation.
+
+## Status
+
+<!-- Not Started | In Progress | Completed -->
+Completed — backend fix implemented and verified (`dotnet build` 0 errors/warnings,
+`FinViet.Application.UnitTests` 238/238); all three tiers of the mobile fix implemented and
+verified (`npm run type-check` clean, `npm run lint` 0 errors/93 pre-existing warnings,
+`npm test` 28/28 suites, 162/162 tests). Backend handoff doc written
+(`finviet-be/docs/saving-goals-todo.md`) for the remaining genuinely open product questions.
+Not committed/pushed in either repo yet.
+
+## Goals
+
+<!-- Goals and requirements -->
+- **Backend** (`BudgetService.ComputeBucketSpentAsync`): net `cat_savings_goal`
+  contributions minus withdrawals into the Savings bucket's `Spent`, instead of excluding the
+  category outright — a goal contribution is functionally the customer fulfilling their
+  Savings allocation.
+- **Mobile Tier 1 (correctness)**: invalidate the AI score's query keys on
+  transaction/goal/budget mutations + add pull-to-refresh to the score detail screen; fix
+  `useBucketSpend`'s clamp to floor only the goal-net component, not the whole Savings
+  accumulator; normalize `allocationPct`/`uncategorizedRatio` from the real backend's 0-100
+  scale to the mock's 0-1 contract; fix the score detail screen's period label/duplicate-
+  comment/view-param bugs and stop re-deriving colour from the raw score number; add a
+  regression test locking in the allocation-percentage exact-sum-100 invariant (hardened with
+  integer basis-point arithmetic after the test caught real floating-point summation noise).
+- **Mobile Tier 2 (integration)**: surface the AI score's `spikeScore`/`budgetScore`/
+  `savingsScore`/`weights` sub-scores on the score detail screen, with copy that accurately
+  describes what `savingsScore` actually measures; exclude the savings bucket from the mock's
+  `budgetAdherenceScore`, matching the real backend's already-correct formula; warn on the
+  goals list when active goals collectively need more than the customer's own Savings
+  allocation cap.
+- **Mobile Tier 3 (consistency)**: reconcile the mock's `getBudgetBuckets` bucket assignment
+  and goal-netting with the corrected backend rule; unify the Needs/Wants spend-status colour
+  thresholds (previously three different sets: 60/80, >60/>80, >85/>60) into one shared
+  `getBudgetStatus`; fix savings category rows to never show red over 100%; hide the
+  "Cần X/tháng" line for a deadline-less goal instead of fabricating a value; correct two
+  stale docstrings.
+- No schema/migration change on the backend side — this is a query-logic change inside an
+  existing service method.
+
+## Notes
+
+<!-- Any extra notes -->
+- Full inspection notes (both repos, exact file:line citations, and the reasoning behind each
+  finding) live in this session's plan file and are summarized in
+  `finviet-be/docs/saving-goals-todo.md`'s "Context" section.
+- The mobile-only reading of several findings turned out to be wrong once checked against
+  actual backend source: the "100× allocationCap bug" and "score penalizes ahead-of-pace
+  saving" were both confirmed to be mobile mock/real drift, with the real backend already
+  correct — fixed on the mobile side only, no backend change needed for those two.
+- Deadline-less goals (no `monthsRemaining`/`monthlySavingNeeded`) are unreachable through
+  either app's own create flow today (`SavingGoalService.ValidateCreate` requires a deadline
+  on the backend; `NewGoalSheet` always defaults+requires one on mobile) — the mobile display
+  fix for this case is defensive only, not fixing a live bug.
+- No `.env`, API key, commit, push, deployment, production database change, or credential
+  change without explicit permission, in either repo.
+
+---
+
 Feature: reliable notification delivery with foreground in-app banners, background/terminated
 OS push, unread visibility, and exact entity deep links.
 
@@ -239,3 +308,64 @@ non-production EAS/provider credential setup remain before the feature can be ma
   type-check clean; lint clean on all changed files (pre-existing warnings elsewhere
   untouched). Not fully re-verified live end-to-end after the last emulator crash — worth a
   fresh Maestro pass next session before trusting these fixes fully.
+  **Correction (2026-08-17):** direct inspection of `finviet-be` source confirmed this was
+  never a backend bug — `BudgetService.cs` computes `AllocationCap = income * pct / 100m`
+  correctly server-side, and `AllocationPct` is deliberately a raw 0–100 percent by design,
+  matching `Customer.NeedsPct` storage. The 100× mismatch was entirely `real/budgets.ts`'s own
+  passthrough disagreeing with the mock's pre-divided 0–1 contract. Fixed in `toBucket()` — see
+  the entry below.
+- 2026-08-17 — Inspected how Saving Goals, Budget Adherence, and the AI Spending Score relate
+  to each other, across both `finviet-mobile` and `finviet-be`, prompted by a user question
+  about whether the three surfaces stacked on Home actually form one coherent system. Found the
+  UI implies they do (score card above budget card above goal card, plus the score screen's own
+  copy claiming the score factors in "đều đặn tiết kiệm") but the Budgets-bucket "Savings" spend
+  figure was backend-blind to goal money entirely — `ComputeBucketSpentAsync` excluded
+  `cat_savings_goal` outright, not by oversight but in a way that made the bucket effectively
+  unfillable for anyone who actually uses Goals. Recommended fixing this at the source rather
+  than deepening the mobile-only workaround (`useBucketSpend`'s ad hoc netting, which itself had
+  a real data-loss clamp bug — a goal withdrawal larger than that month's contributions could
+  zero out an unrelated `cat_savings` expense logged the same month). User confirmed doing both
+  repos in one coordinated effort.
+- 2026-08-17 — Implemented across both repos. **Backend** (`fix/savings-bucket-goal-netting`):
+  `ComputeBucketSpentAsync`'s Savings bucket now nets `cat_savings_goal` contributions minus
+  withdrawals (floored at 0) via a new `ComputeGoalNetSavingsAsync`; `CalculateFlatBudgetAdherenceScore`'s
+  separate needs/wants-only exclusion left untouched (a different, correct design choice). New
+  `BudgetServiceTests.cs` (3 tests, EF Core InMemory pattern) prove the netting formula and the
+  exact data-loss repro reported from mobile. `dotnet build` 0 errors/warnings, full
+  `FinViet.Application.UnitTests` 238/238 (235 pre-existing + 3 new), no regressions.
+  **Mobile** (`fix/savings-goal-budget-score-integration`), all three tiers: Tier 1 — score
+  query invalidation on transaction/goal/budget mutations + pull-to-refresh on the score detail
+  screen; `useBucketSpend`'s clamp fixed to floor only the goal-net sub-total; `real/budgets.ts`'s
+  `toBucket()` now divides `allocationPct`/`uncategorizedRatio` by 100 to match the mock's 0-1
+  contract (the confirmed root cause of the "100x bug" noted above); score detail screen's period
+  label/duplicate-AI-comment/view-param bugs fixed and its colour now always comes from
+  `score.color` instead of re-deriving a 70/40 band from the raw number (backend's real bands are
+  80/50); new shared `src/utils/allocationRedistribution.ts` consolidates the two allocation
+  screens' redistribution math (previously duplicated) with a regression test for the
+  exact-sum-100 invariant — the test itself caught a real subtlety (naive JS `+` on three
+  individually-correct 2-decimal percentages can show floating-point noise like
+  `99.99999999999999` even though each value round-trips correctly through JSON to the backend's
+  exact decimal type), which led to hardening the production math with integer basis-point
+  arithmetic rather than just patching the test. Tier 2 — `SpendingScore` gained optional
+  `spikeScore`/`budgetScore`/`savingsScore`/`weights`, mapped from the real DTO and surfaced as a
+  three-row breakdown on the score detail screen (replacing the prose-only note) with copy that
+  correctly describes `savingsScore` as a blended income-rate model rather than "goal
+  regularity"; mock's `budgetAdherenceScore` now excludes the savings bucket, matching the real
+  backend's already-correct formula; goals list now warns when active goals' summed
+  `requiredMonthlySaving` exceeds the customer's own Savings allocation cap. Tier 3 — mock's
+  `getBudgetBuckets` now honors the customer's bucket override and nets goal transactions the
+  same way the corrected backend does; Needs/Wants spend-status colour thresholds unified into
+  one shared `getBudgetStatus` (previously three drifted sets: 60/80, >60/>80, >85/>60); savings
+  category rows no longer turn red over 100%; the "Cần X/tháng" line is hidden rather than
+  fabricated for a deadline-less goal (confirmed unreachable via either app's real create flow
+  today); two stale docstrings corrected (`hideGoalContributions`'s actual caller,
+  `deleteTransactionSync`'s stale claim about `goals.ts`). Verified: `npm run type-check` clean;
+  `npm run lint` 0 errors / 93 pre-existing warnings (none newly introduced); `npm test` 28/28
+  suites, 162/162 tests (23 new: allocation redistribution ×22, budget status ×3, mock budgets
+  score ×4, getBudgetBuckets reconciliation ×3, goal affordability ×5, real budgets scale ×1,
+  real reports sub-scores ×2 — some overlap across categories). Backend handoff doc written at
+  `finviet-be/docs/saving-goals-todo.md` covering the three genuinely open product questions
+  (score threshold finality, `savingsScore`'s flat 20% target, the income/expense category-type
+  mismatch on goal withdrawals) — deliberately short, since most of what looked like backend
+  gaps from a mobile-only read turned out to be mobile-side mock/real drift once checked against
+  actual backend source. Not committed/pushed in either repo.

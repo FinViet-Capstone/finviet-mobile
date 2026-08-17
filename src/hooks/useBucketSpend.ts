@@ -16,7 +16,21 @@ export function calculateBucketSpend(
     override[category.categoryId] = category.bucketId as BucketType;
 
   const spend: BucketSpend = { needs: 0, wants: 0, savings: 0 };
+  // Goal contributions/withdrawals are tracked separately from ordinary
+  // savings-category spend so a large withdrawal can only ever zero out the
+  // goal component, never erase a real, unrelated cat_savings/cat_invest
+  // expense logged in the same month. Mirrors the backend's
+  // ComputeGoalNetSavingsAsync formula exactly (BudgetService.cs) so mock,
+  // real, and this rendered number all agree.
+  let goalNet = 0;
+
   for (const transaction of transactions) {
+    if (transaction.categoryId === 'cat_savings_goal') {
+      if (transaction.type === 'expense') goalNet += transaction.amount;
+      else if (transaction.type === 'income') goalNet -= transaction.amount;
+      continue;
+    }
+
     if (!transaction.categoryId) continue;
 
     const bucket =
@@ -26,18 +40,10 @@ export function calculateBucketSpend(
 
     if (transaction.type === 'expense') {
       spend[bucket] += transaction.amount;
-      continue;
-    }
-
-    if (
-      transaction.type === 'income' &&
-      transaction.categoryId === 'cat_savings_goal'
-    ) {
-      spend.savings -= transaction.amount;
     }
   }
 
-  spend.savings = Math.max(0, spend.savings);
+  spend.savings += Math.max(0, goalNet);
   return spend;
 }
 
