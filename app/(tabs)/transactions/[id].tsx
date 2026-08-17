@@ -28,6 +28,7 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
+import { CategoryPickerSheet } from '@/components/categories';
 import {
   useTransactionById,
   useWallets,
@@ -35,9 +36,10 @@ import {
   useDeleteTransaction,
   useCreateRule,
 } from '@/hooks';
-import { CATEGORIES } from '@/constants/categories';
+import { CATEGORIES, getCategoryTypeForTransaction } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVND } from '@/utils/formatters';
+import { getApiErrorMessage } from '@/utils/errors';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -130,6 +132,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
   const amountNum = parseInt(amountRaw, 10) || 0;
   const isIncome = tx.type === 'income';
+  const categoryType = getCategoryTypeForTransaction(tx.type);
 
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
     const catName = CATEGORIES.find((c) => c.id === catId)?.nameVi ?? S.categoryLabel;
@@ -185,7 +188,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             Alert.alert(S.savedTitle, S.savedMsg, [{ text: S.ok, onPress: () => router.back() }]);
           }
         },
-        onError: () => Alert.alert(S.saveErrorTitle, S.saveErrorMsg),
+        onError: (error) =>
+          Alert.alert(S.saveErrorTitle, getApiErrorMessage(error, S.saveErrorMsg)),
       },
     );
   };
@@ -382,29 +386,17 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
       </KeyboardAvoidingView>
 
       {/* Category picker */}
-      <DraggableSheet visible={showCategoryModal} onClose={() => setShowCategoryModal(false)}>
-        <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>{S.pickCategory}</Text>
-          <FlatList
-            data={[...CATEGORIES]}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.listRow, categoryId === item.id && styles.listRowSelected]}
-                onPress={() => { setCategoryId(item.id); setShowCategoryModal(false); }}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: `${item.color}26` }]}>
-                  <MaterialIcon name={getCategoryIcon(item.icon)} size={18} color={item.color} />
-                </View>
-                <Text style={styles.listRowText}>{item.nameVi}</Text>
-                {categoryId === item.id ? <MaterialIcon name="check" size={20} color={COLORS.primary} /> : null}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </DraggableSheet>
+      <CategoryPickerSheet
+        visible={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        title={S.pickCategory}
+        entryType={categoryType ?? 'expense'}
+        selectedCategoryId={categoryId}
+        onSelect={(selectedCategoryId) => {
+          setCategoryId(selectedCategoryId);
+          setShowCategoryModal(false);
+        }}
+      />
 
       {/* Wallet picker */}
       <DraggableSheet visible={showWalletModal} onClose={() => setShowWalletModal(false)}>
