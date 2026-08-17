@@ -42,8 +42,13 @@ const S = {
   chips: ['Phân tích chi tiêu', 'Ngân sách tháng này', 'Mục tiêu tiết kiệm', 'Giao dịch gần đây'],
   historyTitle: 'Lịch sử hội thoại',
   historyEmpty: 'Chưa có hội thoại nào.',
+  openHistory: 'Mở lịch sử hội thoại',
+  closeHistory: 'Đóng lịch sử hội thoại',
   messages: (n: number) => `${n} tin nhắn`,
 };
+
+const CHAT_HEADER_HEIGHT = 64;
+const HISTORY_DRAWER_MAX_HEIGHT = 280;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +64,11 @@ interface Message {
 interface Props {
   visible: boolean;
   onClose: () => void;
+}
+
+interface ChatHistoryDrawerProps {
+  sessions: ChatSession[];
+  onSelectSession: (sessionId: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -181,6 +191,50 @@ function AIBubble({ message, isTyping = false }: { message?: Message; isTyping?:
           <Text style={styles.aiBubbleText}>{message?.text}</Text>
         )}
       </View>
+    </View>
+  );
+}
+
+function ChatHistoryDrawer({ sessions, onSelectSession }: ChatHistoryDrawerProps) {
+  const renderSession = useCallback(({ item: session }: { item: ChatSession }) => {
+    const date = new Date(session.lastMessageAt);
+    const dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={styles.sessionRow}
+        onPress={() => onSelectSession(session.sessionId)}
+      >
+        <View style={styles.sessionIcon}>
+          <MaterialIcon name="chat" size={16} color={COLORS.primary} />
+        </View>
+        <View style={styles.sessionInfo}>
+          <Text style={styles.sessionPreview} numberOfLines={1}>{session.previewText}</Text>
+          <Text style={styles.sessionMeta}>
+            {session.messageCount === undefined
+              ? dateStr
+              : `${dateStr} · ${S.messages(session.messageCount)}`}
+          </Text>
+        </View>
+        <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
+      </TouchableOpacity>
+    );
+  }, [onSelectSession]);
+
+  return (
+    <View style={styles.historyDrawer} testID="chat-history-drawer">
+      <Text style={styles.historyTitle}>{S.historyTitle}</Text>
+      <FlatList
+        testID="chat-history-list"
+        style={styles.historyList}
+        data={sessions}
+        keyExtractor={(session) => session.sessionId}
+        renderItem={renderSession}
+        ListEmptyComponent={<Text style={styles.historyEmpty}>{S.historyEmpty}</Text>}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      />
     </View>
   );
 }
@@ -333,7 +387,14 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
           <GestureDetector gesture={pan}>
             <View style={styles.header}>
               <View style={styles.headerLeft}>
-                <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => setHistoryOpen((v) => !v)}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.headerBtn}
+                  onPress={() => setHistoryOpen((value) => !value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={historyOpen ? S.closeHistory : S.openHistory}
+                  accessibilityState={{ expanded: historyOpen }}
+                >
                   <MaterialIcon name="history" size={22} color={historyOpen ? COLORS.primary : COLORS.onSurfaceVariant} />
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleNewChat}>
@@ -353,38 +414,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 
           {/* History drawer */}
           {historyOpen && (
-            <View style={styles.historyDrawer}>
-              <Text style={styles.historyTitle}>{S.historyTitle}</Text>
-              {sessions.length === 0 ? (
-                <Text style={styles.historyEmpty}>{S.historyEmpty}</Text>
-              ) : (
-                sessions.map((session: ChatSession) => {
-                  const date = new Date(session.lastMessageAt);
-                  const dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
-                  return (
-                    <TouchableOpacity
-                      key={session.sessionId}
-                      activeOpacity={0.7}
-                      style={styles.sessionRow}
-                      onPress={() => handleLoadSession(session.sessionId)}
-                    >
-                      <View style={styles.sessionIcon}>
-                        <MaterialIcon name="chat" size={16} color={COLORS.primary} />
-                      </View>
-                      <View style={styles.sessionInfo}>
-                        <Text style={styles.sessionPreview} numberOfLines={1}>{session.previewText}</Text>
-                        <Text style={styles.sessionMeta}>
-                          {session.messageCount === undefined
-                            ? dateStr
-                            : `${dateStr} · ${S.messages(session.messageCount)}`}
-                        </Text>
-                      </View>
-                      <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
+            <ChatHistoryDrawer sessions={sessions} onSelectSession={handleLoadSession} />
           )}
 
           {/* Chat list */}
@@ -480,10 +510,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING[4],
-    height: 64,
+    height: CHAT_HEADER_HEIGHT,
     backgroundColor: COLORS.surfaceContainerHighest,
     borderBottomWidth: 1,
     borderBottomColor: `${COLORS.surfaceVariant}80`,
+    zIndex: 2,
   },
   headerBtn: {
     width: 40,
@@ -497,12 +528,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   historyDrawer: {
+    position: 'absolute',
+    top: CHAT_HEADER_HEIGHT,
+    left: 0,
+    right: 0,
+    maxHeight: HISTORY_DRAWER_MAX_HEIGHT,
     backgroundColor: COLORS.surfaceContainerHighest,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
-    maxHeight: 280,
+    zIndex: 3,
+    elevation: 4,
+  },
+  historyList: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   historyTitle: {
     fontSize: FONT_SIZE.xs,

@@ -45,6 +45,24 @@ non-production EAS/provider credential setup remain before the feature can be ma
   queue/cache state when the authenticated customer changes.
 - No commit, push, deployment, production database migration, credential change, or branch deletion
   without explicit permission.
+- 2026-08-17 — Diagnosed the AI chat history layout regression: `AIChatbotSheet` renders the history
+  drawer in normal document flow immediately above the message `FlatList`, so opening it consumes up
+  to 280 points and pushes the chat viewport downward. The drawer also renders sessions with
+  `sessions.map` inside a non-scrollable `View`; a long history can overflow its `maxHeight` and cover
+  the chat/input area. Approved fix scope: make the history drawer an absolutely positioned overlay
+  below the header, render sessions in a bounded vertical `FlatList`, preserve session selection and
+  chat behavior, and add focused regression coverage. No API or backend change is required.
+- 2026-08-17 — Implemented on `fix/chat-history-layout`: the history drawer is now an absolutely
+  positioned overlay below the fixed chat header, so opening it no longer participates in the flex
+  layout or reduces the message viewport. Sessions now render in a vertically scrollable `FlatList`
+  constrained to 280 points, with explicit shrink behavior for long histories on iOS and Android.
+  Added accessible expanded-state labels to the history toggle and a component regression test that
+  verifies the bounded overlay and independent history list. Verified: TypeScript clean; changed-test
+  ESLint clean; full main-workspace ESLint 0 errors / 86 pre-existing warnings; focused Jest 1/1 and
+  full main-workspace Jest 23/23 suites, 122/122 tests pass; `git diff --check` clean. Raw full-repo
+  Jest also passed 107/107 suites and 578/578 tests but redundantly scanned four temporary `.claude`
+  worktrees; raw ESLint likewise scanned those checkouts, so the authoritative reruns excluded them.
+  No physical-device acceptance, commit, or push.
 - 2026-08-17 — Diagnosed a linked-wallet uncategorized income transaction that failed when the
   customer selected `Ăn uống`: the transaction-detail picker exposed every system category instead
   of filtering by transaction type, so the backend correctly rejected the expense category with
