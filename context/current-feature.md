@@ -45,6 +45,39 @@ non-production EAS/provider credential setup remain before the feature can be ma
   queue/cache state when the authenticated customer changes.
 - No commit, push, deployment, production database migration, credential change, or branch deletion
   without explicit permission.
+- 2026-08-17 — Diagnosed a linked-wallet uncategorized income transaction that failed when the
+  customer selected `Ăn uống`: the transaction-detail picker exposed every system category instead
+  of filtering by transaction type, so the backend correctly rejected the expense category with
+  `category_type_mismatch`. Approved fix scope: filter the picker to compatible, manually selectable
+  categories, surface the mapped API error instead of the generic save failure, and add regression
+  coverage. No backend change is required; category-only edits on SePay transactions are supported.
+- 2026-08-17 — Implemented on `fix/transaction-category-filter`: transaction detail now reuses the
+  shared type-aware `CategoryPickerSheet`, with a transaction-type helper that maps only income and
+  expense records to compatible picker categories; transfers remain non-classifiable. Save failures
+  now pass through `getApiErrorMessage`, so any backend safeguard such as `category_type_mismatch`
+  is shown in Vietnamese. Added category filtering and error-mapping regression tests. Verified:
+  TypeScript clean; changed-file ESLint clean; full main-workspace ESLint 0 errors / 87 pre-existing
+  warnings; focused Jest 12/12 and full main-workspace Jest 22/22 suites, 118/118 tests pass. The raw
+  full-repo commands initially also scanned two locked temporary `.claude/worktrees` created by
+  failed read-only agents; reruns explicitly excluded those duplicate checkouts. No commit or push.
+- 2026-08-17 — Diagnosed the follow-up Calendar regression after categorizing the final
+  uncategorized transaction: the mutation invalidated and refetched the month correctly, but the
+  Transactions screen retained its local `uncategorizedOnly` filter. Because the hook derived the
+  summary, Calendar cells, and history from that now-empty filtered list—and also counted
+  uncategorized rows from the same filtered list—the whole month appeared empty until login remounted
+  the screen. Approved fix scope: count uncategorized rows from the raw month query, automatically
+  clear the filter only when a completed refetch leaves no uncategorized rows, and add regression
+  coverage. Existing filters must remain active while matching rows still exist.
+- 2026-08-17 — Implemented the Calendar follow-up on the same branch: the monthly hook now keeps the
+  raw month query separate from its display-filtered transactions and derives the uncategorized count
+  from the raw rows. The Transactions screen clears a retained uncategorized-only filter only after
+  the focused month's query has loaded, finished refetching, and reports zero uncategorized rows; it
+  keeps the filter while any matching rows remain. The next render therefore restores the full month
+  immediately, including summary totals, Calendar amounts, and transaction history. Added regression
+  coverage for raw counting, transfer exclusion, completed-refetch clearing, and all guard conditions.
+  Verified: TypeScript clean; changed-file ESLint clean; full main-workspace ESLint 0 errors / 87
+  pre-existing warnings; focused Jest 3/3 suites and 20/20 tests; full main-workspace Jest 22/22 suites
+  and 121/121 tests pass; `git diff --check` clean. No physical-device acceptance, commit, or push.
 - 2026-08-15 — Started after confirming the current app only requests notification permission: it
   does not register an Expo token, install receive/response listeners, poll unread notifications,
   show a global banner, or expose the unread count. Backend push is incomplete: customer-token push

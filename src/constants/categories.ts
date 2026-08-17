@@ -16,6 +16,8 @@
  * Savings too (see item 5 of context/fe-plan-2026-07-revamp.md).
  */
 
+import type { TransactionType } from '@/types';
+
 // -------------------------------------------------------------------------
 // Category shape
 // -------------------------------------------------------------------------
@@ -295,8 +297,14 @@ export const CATEGORIES_BY_BUCKET: Record<BucketType, readonly Category[]> = {
 };
 
 /** Return picker-safe categories filtered by type. */
-export function getCategories(type: 'expense' | 'income'): readonly Category[] {
+export function getCategories(type: CategoryType): readonly Category[] {
   return type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+}
+
+export function getCategoryTypeForTransaction(type: TransactionType): CategoryType | null {
+  if (type === 'income') return 'income';
+  if (type === 'expense') return 'expense';
+  return null;
 }
 
 export function getCategoryById(id: string): Category | undefined {

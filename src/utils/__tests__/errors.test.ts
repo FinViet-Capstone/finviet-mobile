@@ -16,6 +16,17 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'fallback')).toBe(BUSINESS_RULE_MESSAGES_VI.last_wallet);
   });
 
+  it('maps an incompatible transaction category to the Vietnamese business-rule message', () => {
+    const err = fakeAxiosError(422, {
+      code: 'category_type_mismatch',
+      message: 'Category type does not match transaction type.',
+    });
+
+    expect(getApiErrorMessage(err, 'fallback')).toBe(
+      BUSINESS_RULE_MESSAGES_VI.category_type_mismatch,
+    );
+  });
+
   it('maps the dynamic sepay_error_{status} catch-all to the generic SePay message', () => {
     const err = fakeAxiosError(502, { code: 'sepay_error_418', message: "SePay failed with HTTP 418." });
     expect(getApiErrorMessage(err, 'fallback')).toBe('SePay đang gặp sự cố. Vui lòng thử lại sau.');
