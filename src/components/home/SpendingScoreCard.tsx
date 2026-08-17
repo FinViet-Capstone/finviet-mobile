@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import Svg, { Circle } from 'react-native-svg';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
 import type { SpendingScore } from '@/types/ai';
@@ -73,16 +74,29 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
 
       <View style={styles.scoreRingWrapper}>
         <View style={[styles.scoreRingOuter, { width: SCORE_ARC_SIZE, height: SCORE_ARC_SIZE }]}>
-          <View style={styles.scoreRingTrack} />
-          <View
-            style={[
-              styles.scoreRingFill,
-              {
-                borderColor: ringColor,
-                shadowColor: ringColor,
-              },
-            ]}
-          />
+          <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE}>
+            <Circle
+              cx={SCORE_ARC_SIZE / 2}
+              cy={SCORE_ARC_SIZE / 2}
+              r={RADIUS}
+              stroke={COLORS.surfaceContainerHighest}
+              strokeWidth={STROKE_WIDTH}
+              fill="none"
+            />
+            <Circle
+              cx={SCORE_ARC_SIZE / 2}
+              cy={SCORE_ARC_SIZE / 2}
+              r={RADIUS}
+              stroke={ringColor}
+              strokeWidth={STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+              strokeDashoffset={dashOffset}
+              fill="none"
+              rotation={-90}
+              origin={`${SCORE_ARC_SIZE / 2}, ${SCORE_ARC_SIZE / 2}`}
+            />
+          </Svg>
           <View style={styles.scoreCenter}>
             <Text style={[styles.scoreNumber, { color: COLORS.onSurface }]}>{scoreValue}</Text>
             <Text style={styles.scoreOutOf}>/ 100</Text>
@@ -192,28 +206,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  scoreRingTrack: {
-    position: 'absolute',
-    width: SCORE_ARC_SIZE - STROKE_WIDTH,
-    height: SCORE_ARC_SIZE - STROKE_WIDTH,
-    borderRadius: (SCORE_ARC_SIZE - STROKE_WIDTH) / 2,
-    borderWidth: STROKE_WIDTH,
-    borderColor: COLORS.surfaceContainerHighest,
-  },
-  scoreRingFill: {
-    position: 'absolute',
-    width: SCORE_ARC_SIZE - STROKE_WIDTH,
-    height: SCORE_ARC_SIZE - STROKE_WIDTH,
-    borderRadius: (SCORE_ARC_SIZE - STROKE_WIDTH) / 2,
-    borderWidth: STROKE_WIDTH,
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   scoreCenter: {
+    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
