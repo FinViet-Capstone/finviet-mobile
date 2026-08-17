@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Platform,
 } from 'react-native';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   ONBOARDING_STRINGS,
   formatVietnameseCurrency,
@@ -22,6 +23,8 @@ export interface OnboardingIncomeProps {
 }
 
 export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingIncomeProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Numpad is a modal overlay — auto-open on mount (income is the only field);
   // tapping the amount re-opens it, Done/outside dismisses to reveal "Tiếp tục".
   const [focused, setFocused] = useState(true);
@@ -102,98 +105,100 @@ export function OnboardingIncome({ value, onChangeValue, onNext }: OnboardingInc
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[8],
-  },
-  header: {
-    marginBottom: SPACING[12],
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-    textAlign: 'center',
-    marginBottom: SPACING[2],
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.base,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  inputWrapper: {
-    flex: 1,
-    // Anchor near the top (not vertically centred) so the amount card always
-    // stays above the numeric keypad overlay instead of sliding behind it.
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: SPACING[6],
-    position: 'relative',
-  },
-  glowBackground: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: `${COLORS.primary}0D`,
-    opacity: 0.5,
-  },
-  glassCard: {
-    width: '100%',
-    maxWidth: 320,
-    backgroundColor: `${COLORS.surfaceContainerLow}CC`,
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[6],
-    borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}4D`,
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    width: '100%',
-    gap: SPACING[2],
-  },
-  displayText: {
-    fontSize: 28,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-    textAlign: 'center',
-    minWidth: 80,
-  },
-  currency: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
-  },
-  buttonContainer: {
-    paddingBottom: SPACING[8],
-    paddingTop: SPACING[4],
-  },
-  button: {
-    height: 56,
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[8],
+    },
+    header: {
+      marginBottom: SPACING[12],
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: FONT_SIZE['2xl'],
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginBottom: SPACING[2],
+    },
+    subtitle: {
+      fontSize: FONT_SIZE.base,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 24,
+    },
+    inputWrapper: {
+      flex: 1,
+      // Anchor near the top (not vertically centred) so the amount card always
+      // stays above the numeric keypad overlay instead of sliding behind it.
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      paddingTop: SPACING[6],
+      position: 'relative',
+    },
+    glowBackground: {
+      position: 'absolute',
+      width: 300,
+      height: 300,
+      borderRadius: 150,
+      backgroundColor: withAlpha(colors.primary, 0.05),
+      opacity: 0.5,
+    },
+    glassCard: {
+      width: '100%',
+      maxWidth: 320,
+      backgroundColor: withAlpha(colors.surfaceContainerLow, 0.8),
+      borderRadius: BORDER_RADIUS['2xl'],
+      padding: SPACING[6],
+      borderWidth: 1,
+      borderColor: withAlpha(colors.outlineVariant, 0.3),
+      alignItems: 'center',
+      gap: SPACING[2],
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'center',
+      width: '100%',
+      gap: SPACING[2],
+    },
+    displayText: {
+      fontSize: 28,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary,
+      textAlign: 'center',
+      minWidth: 80,
+    },
+    currency: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant,
+    },
+    buttonContainer: {
+      paddingBottom: SPACING[8],
+      paddingTop: SPACING[4],
+    },
+    button: {
+      height: 56,
+      backgroundColor: colors.primary,
+      borderRadius: BORDER_RADIUS.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 14,
+      elevation: 6,
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+    buttonText: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onPrimary,
+    },
+  });
+}

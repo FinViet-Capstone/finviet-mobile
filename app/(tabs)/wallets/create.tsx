@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { TextInput } from '@/components/common/TextInput';
@@ -39,6 +40,8 @@ function getCreateErrorMessage(err: unknown): string {
 
 export default function CreateWalletScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const createWallet = useCreateWallet();
   const [name, setName] = useState('');
   const [balanceRaw, setBalanceRaw] = useState('');
@@ -77,7 +80,7 @@ export default function CreateWalletScreen() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -88,11 +91,11 @@ export default function CreateWalletScreen() {
         {/* Type selector — only basic active */}
         <View style={styles.typeRow}>
           <View style={[styles.typeCard, styles.typeCardActive]}>
-            <MaterialIcon name="account_balance_wallet" size={28} color={COLORS.primary} />
+            <MaterialIcon name="account_balance_wallet" size={28} color={colors.primary} />
             <Text style={styles.typeActiveText}>{S.typeBasic}</Text>
           </View>
           <View style={styles.typeCard}>
-            <MaterialIcon name="account_balance" size={28} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="account_balance" size={28} color={colors.onSurfaceVariant} />
             <Text style={styles.typeInactiveText}>{S.typeLinked}</Text>
             <Text style={styles.comingSoon}>{S.comingSoon}</Text>
           </View>
@@ -113,7 +116,7 @@ export default function CreateWalletScreen() {
           <Text style={[styles.amountText, !balanceDisplay && styles.amountPlaceholder]}>
             {balanceDisplay || S.balancePlaceholder}
           </Text>
-          <MaterialIcon name="dialpad" size={18} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="dialpad" size={18} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
 
         <View style={styles.actions}>
@@ -140,27 +143,29 @@ export default function CreateWalletScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING[4], paddingVertical: SPACING[3] },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, flex: 1, textAlign: 'center' },
   content: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
   typeRow: { flexDirection: 'row', gap: SPACING[3] },
-  typeCard: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING[2], padding: SPACING[4], borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.surfaceVariant, borderWidth: 1, borderColor: 'transparent' },
-  typeCardActive: { backgroundColor: `${COLORS.primaryContainer}20`, borderColor: COLORS.primary },
-  typeActiveText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary, textAlign: 'center' },
-  typeInactiveText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textAlign: 'center' },
-  comingSoon: { fontSize: 10, color: COLORS.onSurfaceVariant },
-  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1] },
-  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
-  amountDisplayFocused: { borderColor: COLORS.primary },
-  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
+  typeCard: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING[2], padding: SPACING[4], borderRadius: BORDER_RADIUS.xl, backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: 'transparent' },
+  typeCardActive: { backgroundColor: withAlpha(colors.primaryContainer, 0.13), borderColor: colors.primary },
+  typeActiveText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary, textAlign: 'center' },
+  typeInactiveText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textAlign: 'center' },
+  comingSoon: { fontSize: 10, color: colors.onSurfaceVariant },
+  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, marginBottom: SPACING[1] },
+  amountDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, paddingHorizontal: SPACING[4], height: 48 },
+  amountDisplayFocused: { borderColor: colors.primary },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  amountPlaceholder: { color: colors.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
-  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.outlineVariant, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  saveBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: colors.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  saveBtn: { flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.5 },
-  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
-});
+  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
+  });
+}

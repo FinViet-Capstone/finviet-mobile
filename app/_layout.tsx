@@ -10,9 +10,9 @@ import { MaterialSymbolsOutlined_400Regular } from '@expo-google-fonts/material-
 import { queryClient } from '@/lib/queryClient';
 import { useBootstrapSession } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
-import { ThemeProvider } from '@/providers/ThemeProvider';
+import { ThemeProvider, useThemeScheme } from '@/providers/ThemeProvider';
 import { NotificationProvider } from '@/providers/NotificationProvider';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { initSentry, captureException } from '@/lib/sentry';
 import * as Sentry from '@sentry/react-native';
 
@@ -43,7 +43,7 @@ export default Sentry.wrap(function RootLayout() {
         <ThemeProvider>
           <SafeAreaProvider>
             <NotificationProvider>
-              <StatusBar style="auto" />
+              <ThemedStatusBar />
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="(auth)" />
@@ -61,6 +61,18 @@ export default Sentry.wrap(function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 });
+
+/**
+ * `expo-status-bar`'s `style="auto"` derives its content color from the OS
+ * color scheme, not from `user.theme` — so a light-OS device showed dark
+ * status-bar icons on top of the app's dark palette (invisible clock/battery)
+ * whenever the resolved app theme didn't match the OS. Resolve explicitly
+ * from `useThemeScheme()` instead. Rendered inside `ThemeProvider`.
+ */
+function ThemedStatusBar() {
+  const scheme = useThemeScheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
 
 /**
  * Root error boundary — Expo Router renders this in place of the app when a

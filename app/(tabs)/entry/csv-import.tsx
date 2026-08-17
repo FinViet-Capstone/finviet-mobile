@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryPickerSheet } from '@/components/categories';
 import { useWallets } from '@/hooks/useWallets';
@@ -108,19 +109,23 @@ function formatVND(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: boolean; onPress: () => void }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity activeOpacity={0.7} style={[styles.walletCard, selected && styles.walletCardActive]} onPress={onPress}>
-      <MaterialIcon name="account_balance_wallet" size={18} color={selected ? COLORS.primary : COLORS.onSurfaceVariant} />
+      <MaterialIcon name="account_balance_wallet" size={18} color={selected ? colors.primary : colors.onSurfaceVariant} />
       <View style={styles.walletCardText}>
-        <Text style={[styles.walletCardName, selected && { color: COLORS.primary }]} numberOfLines={1}>{wallet.name}</Text>
+        <Text style={[styles.walletCardName, selected && { color: colors.primary }]} numberOfLines={1}>{wallet.name}</Text>
         <Text style={styles.walletCardBalance}>{formatVND(wallet.balance)}</Text>
       </View>
-      {selected && <MaterialIcon name="check_circle" size={16} color={COLORS.primary} />}
+      {selected && <MaterialIcon name="check_circle" size={16} color={colors.primary} />}
     </TouchableOpacity>
   );
 }
 
 function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggle: () => void; onEditCategory: () => void }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const cat = row.suggestedCategoryId ? getCategoryById(row.suggestedCategoryId) : null;
   const icon = cat ? getCategoryIcon(cat.icon) : 'more_horiz';
   const isIncome = row.type === 'income';
@@ -129,14 +134,14 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
   return (
     <TouchableOpacity activeOpacity={0.7} style={[styles.previewRow, !row.selected && styles.previewRowDeselected, row.isDuplicate && styles.previewRowDuplicate]} onPress={onToggle}>
       {/* Checkbox */}
-      <MaterialIcon name={row.selected ? 'check_box' : 'check_box_outline_blank'} size={20} color={row.selected ? COLORS.primary : COLORS.onSurfaceVariant} />
+      <MaterialIcon name={row.selected ? 'check_box' : 'check_box_outline_blank'} size={20} color={row.selected ? colors.primary : colors.onSurfaceVariant} />
       {/* Category icon — tappable if uncategorized */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={needsCategoryEdit ? onEditCategory : undefined}
-        style={[styles.rowIconWrap, { backgroundColor: cat ? `${cat.color}25` : `${COLORS.secondary}20` }, needsCategoryEdit && styles.rowIconWrapUncategorized]}
+        style={[styles.rowIconWrap, { backgroundColor: cat ? withAlpha(cat.color, 0.15) : withAlpha(colors.secondary, 0.13) }, needsCategoryEdit && styles.rowIconWrapUncategorized]}
       >
-        <MaterialIcon name={icon} size={14} color={needsCategoryEdit ? COLORS.secondary : (cat?.color ?? COLORS.onSurfaceVariant)} />
+        <MaterialIcon name={icon} size={14} color={needsCategoryEdit ? colors.secondary : (cat?.color ?? colors.onSurfaceVariant)} />
       </TouchableOpacity>
       {/* Info */}
       <View style={styles.rowInfo}>
@@ -145,7 +150,7 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
       </View>
       {/* Right */}
       <View style={styles.rowRight}>
-        <Text style={[styles.rowAmount, { color: isIncome ? COLORS.tertiary : COLORS.onSurface }, !row.selected && styles.dimText]}>
+        <Text style={[styles.rowAmount, { color: isIncome ? colors.tertiary : colors.onSurface }, !row.selected && styles.dimText]}>
           {isIncome ? '+' : '-'}{formatVND(row.amount)}
         </Text>
         {row.isDuplicate && <View style={styles.dupBadge}><Text style={styles.dupBadgeText}>{S.duplicate}</Text></View>}
@@ -163,6 +168,8 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
 
 export default function CsvImportScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: walletsData } = useWallets();
   const { data: existingTx } = useTransactions();
   const { data: rules } = useRules();
@@ -305,7 +312,7 @@ export default function CsvImportScreen() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name={S.back} size={20} color={COLORS.primary} />
+          <MaterialIcon name={S.back} size={20} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -317,8 +324,8 @@ export default function CsvImportScreen() {
         <TouchableOpacity activeOpacity={0.75} style={styles.uploadArea} onPress={handleParse} disabled={isParsing}>
           <View style={styles.uploadIconWrap}>
             {isParsing
-              ? <ActivityIndicator size="small" color={COLORS.primary} />
-              : <MaterialIcon name={S.uploadIcon} size={32} color={COLORS.primary} />}
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <MaterialIcon name={S.uploadIcon} size={32} color={colors.primary} />}
           </View>
           <Text style={styles.uploadTitle}>{S.uploadTitle}</Text>
           <Text style={styles.uploadSubtitle}>{S.uploadSubtitle}</Text>
@@ -326,13 +333,13 @@ export default function CsvImportScreen() {
 
         {/* AI badge — AI is the categorisation engine, any CSV format works */}
         <View style={styles.aiBadge}>
-          <MaterialIcon name={S.aiBadgeIcon} size={16} color={COLORS.primary} />
+          <MaterialIcon name={S.aiBadgeIcon} size={16} color={colors.primary} />
           <Text style={styles.aiBadgeText}>{S.aiBadge}</Text>
         </View>
 
         {/* Template link */}
         <TouchableOpacity activeOpacity={0.7} style={styles.templateBtn} onPress={handleDownloadTemplate}>
-          <MaterialIcon name={S.templateIcon} size={16} color={COLORS.primary} />
+          <MaterialIcon name={S.templateIcon} size={16} color={colors.primary} />
           <Text style={styles.templateBtnText}>{S.templateBtn}</Text>
         </TouchableOpacity>
 
@@ -370,7 +377,7 @@ export default function CsvImportScreen() {
         {/* Guide */}
         <View style={styles.guideCard}>
           <View style={styles.guideHeader}>
-            <MaterialIcon name={S.guideHelp} size={20} color={COLORS.primary} />
+            <MaterialIcon name={S.guideHelp} size={20} color={colors.primary} />
             <Text style={styles.guideTitle}>{S.guideTitle}</Text>
           </View>
           {S.guideSteps.map((step, i) => (
@@ -401,7 +408,7 @@ export default function CsvImportScreen() {
               disabled={!canStart || isImporting}
             >
               {isImporting
-                ? <ActivityIndicator size="small" color={COLORS.onBackground} />
+                ? <ActivityIndicator size="small" color={colors.onBackground} />
                 : <Text style={styles.confirmText}>{S.confirmBtn} ({selectedCount})</Text>}
             </TouchableOpacity>
           </>
@@ -413,7 +420,7 @@ export default function CsvImportScreen() {
             onPress={handleParse}
           >
             {isParsing
-              ? <ActivityIndicator size="small" color={COLORS.onBackground} />
+              ? <ActivityIndicator size="small" color={colors.onBackground} />
               : <Text style={styles.confirmText}>{S.startBtn}</Text>}
           </TouchableOpacity>
         )}
@@ -434,192 +441,194 @@ export default function CsvImportScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    height: 56,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4],
+      height: 56,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
 
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: SPACING[4], paddingTop: SPACING[4], gap: SPACING[4] },
+    scroll: { flex: 1 },
+    content: { paddingHorizontal: SPACING[4], paddingTop: SPACING[4], gap: SPACING[4] },
 
-  // Upload area
-  uploadArea: {
-    backgroundColor: `${COLORS.surfaceContainer}99`,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: COLORS.outlineVariant,
-    paddingVertical: SPACING[6],
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  uploadIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}15`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING[1],
-  },
-  uploadTitle: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface, textAlign: 'center', paddingHorizontal: SPACING[4] },
-  uploadSubtitle: { fontSize: 11, color: COLORS.outline },
+    // Upload area
+    uploadArea: {
+      backgroundColor: withAlpha(colors.surfaceContainer, 0.6),
+      borderRadius: 24,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: colors.outlineVariant,
+      paddingVertical: SPACING[6],
+      alignItems: 'center',
+      gap: SPACING[2],
+    },
+    uploadIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.primary, 0.08),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING[1],
+    },
+    uploadTitle: { fontSize: FONT_SIZE.sm, color: colors.onSurface, textAlign: 'center', paddingHorizontal: SPACING[4] },
+    uploadSubtitle: { fontSize: 11, color: colors.outline },
 
-  // Template
-  templateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[1],
-    alignSelf: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[2],
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}10`,
-  },
-  templateBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
+    // Template
+    templateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[1],
+      alignSelf: 'center',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[2],
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.primary, 0.06),
+    },
+    templateBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
 
-  // Section
-  section: { gap: SPACING[3] },
-  stepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  stepTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  stepHint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: -SPACING[2] },
-  selectedCount: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
-  emptyText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
+    // Section
+    section: { gap: SPACING[3] },
+    stepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    stepTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    stepHint: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: -SPACING[2] },
+    selectedCount: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
+    emptyText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
 
-  // AI badge
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    alignSelf: 'center',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2],
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}15`,
-  },
-  aiBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
+    // AI badge
+    aiBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING[2],
+      alignSelf: 'center',
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[2],
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.primary, 0.08),
+    },
+    aiBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
 
-  // Wallets
-  walletList: { gap: SPACING[2] },
-  walletCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-    padding: SPACING[3],
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceContainer,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    minHeight: 56,
-  },
-  walletCardActive: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
-  walletCardText: { flex: 1 },
-  walletCardName: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  walletCardBalance: { fontSize: 11, color: COLORS.onSurfaceVariant, marginTop: 2 },
+    // Wallets
+    walletList: { gap: SPACING[2] },
+    walletCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[3],
+      padding: SPACING[3],
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      minHeight: 56,
+    },
+    walletCardActive: { borderColor: colors.primary, backgroundColor: withAlpha(colors.primary, 0.08) },
+    walletCardText: { flex: 1 },
+    walletCardName: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+    walletCardBalance: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 2 },
 
-  // Preview rows
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    padding: SPACING[3],
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    minHeight: 56,
-  },
-  previewRowDeselected: { opacity: 0.5 },
-  previewRowDuplicate: { borderColor: `${COLORS.secondary}50`, backgroundColor: `${COLORS.secondary}08` },
-  rowIconWrap: { width: 30, height: 30, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  rowIconWrapUncategorized: { borderWidth: 1, borderColor: `${COLORS.secondary}50`, borderStyle: 'dashed' },
-  rowInfo: { flex: 1, minWidth: 0 },
-  rowMerchant: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: COLORS.onSurface },
-  rowDate: { fontSize: 11, color: COLORS.onSurfaceVariant, marginTop: 2 },
-  dimText: { color: COLORS.onSurfaceVariant },
-  rowRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-  rowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
-  dupBadge: { backgroundColor: `${COLORS.secondary}20`, paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
-  dupBadgeText: { fontSize: 10, color: COLORS.secondary, fontWeight: FONT_WEIGHT.semibold },
-  uncatBadge: { backgroundColor: `${COLORS.secondary}20`, paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
-  uncatBadgeText: { fontSize: 10, color: COLORS.secondary, fontWeight: FONT_WEIGHT.semibold },
+    // Preview rows
+    previewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[2],
+      padding: SPACING[3],
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.surfaceContainerLow,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      minHeight: 56,
+    },
+    previewRowDeselected: { opacity: 0.5 },
+    previewRowDuplicate: { borderColor: withAlpha(colors.secondary, 0.31), backgroundColor: withAlpha(colors.secondary, 0.03) },
+    rowIconWrap: { width: 30, height: 30, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    rowIconWrapUncategorized: { borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.31), borderStyle: 'dashed' },
+    rowInfo: { flex: 1, minWidth: 0 },
+    rowMerchant: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: colors.onSurface },
+    rowDate: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 2 },
+    dimText: { color: colors.onSurfaceVariant },
+    rowRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+    rowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
+    dupBadge: { backgroundColor: withAlpha(colors.secondary, 0.13), paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
+    dupBadgeText: { fontSize: 10, color: colors.secondary, fontWeight: FONT_WEIGHT.semibold },
+    uncatBadge: { backgroundColor: withAlpha(colors.secondary, 0.13), paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
+    uncatBadgeText: { fontSize: 10, color: colors.secondary, fontWeight: FONT_WEIGHT.semibold },
 
-  // Category picker sheet
+    // Category picker sheet
 
-  // Guide
-  guideCard: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    gap: SPACING[4],
-    overflow: 'hidden',
-  },
-  guideHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
-  guideTitle: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  guideStep: { flexDirection: 'row', gap: SPACING[3], alignItems: 'flex-start' },
-  guideStepNum: {
-    width: 28,
-    height: 28,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  guideStepNumText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
-  guideStepText: { flex: 1, gap: 2 },
-  guideStepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  guideStepBody: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, lineHeight: 18 },
+    // Guide
+    guideCard: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS['2xl'],
+      padding: SPACING[4],
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      gap: SPACING[4],
+      overflow: 'hidden',
+    },
+    guideHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
+    guideTitle: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    guideStep: { flexDirection: 'row', gap: SPACING[3], alignItems: 'flex-start' },
+    guideStepNum: {
+      width: 28,
+      height: 28,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    guideStepNumText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
+    guideStepText: { flex: 1, gap: 2 },
+    guideStepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+    guideStepBody: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
 
-  // Bottom bar
-  bottomBar: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-    backgroundColor: COLORS.background,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  confirmBtn: {
-    flex: 2,
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.inversePrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtnDisabled: { opacity: 0.45 },
-  confirmText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: COLORS.onBackground },
-  startBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.inversePrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+    // Bottom bar
+    bottomBar: {
+      flexDirection: 'row',
+      gap: SPACING[3],
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+      backgroundColor: colors.background,
+    },
+    cancelBtn: {
+      flex: 1,
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+    confirmBtn: {
+      flex: 2,
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.inversePrimary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmBtnDisabled: { opacity: 0.45 },
+    confirmText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onBackground },
+    startBtn: {
+      flex: 1,
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.inversePrimary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+}

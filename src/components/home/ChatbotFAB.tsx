@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -6,7 +6,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, BORDER_RADIUS } from '@/constants/theme';
+import { BORDER_RADIUS } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const BASE_BOTTOM = 24;
 
@@ -16,6 +17,8 @@ export interface ChatbotFABProps {
 }
 
 export function ChatbotFAB({ extraBottomOffset = 0, onOpen }: ChatbotFABProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const bottomAnim = useSharedValue(BASE_BOTTOM + extraBottomOffset);
 
   useEffect(() => {
@@ -33,28 +36,30 @@ export function ChatbotFAB({ extraBottomOffset = 0, onOpen }: ChatbotFABProps) {
         onPress={onOpen}
         activeOpacity={0.85}
       >
-        <MaterialIcon name="smart_toy" size={26} color={COLORS.onPrimary} />
+        <MaterialIcon name="smart_toy" size={26} color={colors.onPrimary} />
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    right: 20,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrapper: {
+      position: 'absolute',
+      right: 20,
+    },
+    fab: {
+      width: 56,
+      height: 56,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   SectionList,
   StyleSheet,
@@ -21,11 +21,12 @@ import { WalletPickerSheet } from "@/components/transaction/WalletPickerSheet";
 import { UncategorizedPill } from "@/components/transaction/UncategorizedPill";
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from "@/constants/theme";
+  withAlpha,
+} from "@/theme";
+import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import {
   useMonthlyTransactions,
   type TxSection,
@@ -41,6 +42,8 @@ const VIEWABILITY_CONFIG = {
 };
 
 export default function TransactionsScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const isFocused = useIsFocused();
   const now = new Date();
@@ -191,30 +194,30 @@ export default function TransactionsScreen() {
       sections.length > 0 ? (
         <Text style={styles.listLabel}>{"LỊCH SỬ GIAO DỊCH"}</Text>
       ) : null,
-    [sections.length],
+    [sections.length, styles],
   );
 
   const renderListEmpty = useCallback(
     () => (
       <View style={styles.emptyState}>
-        <MaterialIcon name="receipt_long" size={40} color={COLORS.outlineVariant} />
+        <MaterialIcon name="receipt_long" size={40} color={colors.outlineVariant} />
         <Text style={styles.emptyText}>{"Không có giao dịch trong tháng này"}</Text>
         <Text style={styles.emptyHint}>{"Nhấn đúp vào ngày để nhập giao dịch"}</Text>
       </View>
     ),
-    [],
+    [colors, styles],
   );
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: TxSection }) => (
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionDate}>{sectionLabel(section.title)}</Text>
-        <Text style={[styles.sectionNet, { color: section.dayNet >= 0 ? COLORS.tertiary : COLORS.error }]}>
+        <Text style={[styles.sectionNet, { color: section.dayNet >= 0 ? colors.tertiary : colors.error }]}>
           {signedCompact(section.dayNet)}
         </Text>
       </View>
     ),
-    [],
+    [colors, styles],
   );
 
   const renderItem = useCallback(
@@ -240,11 +243,11 @@ export default function TransactionsScreen() {
           onPress={() => setWalletModalVisible(true)}
           activeOpacity={0.75}
         >
-          <MaterialIcon name="account_balance_wallet" size={14} color={COLORS.primary} />
+          <MaterialIcon name="account_balance_wallet" size={14} color={colors.primary} />
           <Text style={styles.walletPillText} numberOfLines={1}>
             {selectedWallet?.name ?? "Tất cả ví"}
           </Text>
-          <MaterialIcon name="expand_more" size={14} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="expand_more" size={14} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -253,21 +256,21 @@ export default function TransactionsScreen() {
             activeOpacity={0.75}
             onPress={handleSearchToggle}
           >
-            <MaterialIcon name="search" size={22} color={searchVisible ? COLORS.primary : COLORS.onSurface} />
+            <MaterialIcon name="search" size={22} color={searchVisible ? colors.primary : colors.onSurface} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconBtn, isFiltered && styles.iconBtnActive]}
             activeOpacity={0.75}
             onPress={handleFilterToggle}
           >
-            <MaterialIcon name="tune" size={22} color={isFiltered ? COLORS.primary : COLORS.onSurface} />
+            <MaterialIcon name="tune" size={22} color={isFiltered ? colors.primary : colors.onSurface} />
           </TouchableOpacity>
         </View>
       </View>
 
       {searchVisible && (
         <View style={styles.searchBar}>
-          <MaterialIcon name="search" size={18} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="search" size={18} color={colors.onSurfaceVariant} />
           <TextInput
             variant="bare"
             inputStyle={styles.searchInput}
@@ -280,7 +283,7 @@ export default function TransactionsScreen() {
           {searchQuery.length > 0 && (
             <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchQuery("")}
               accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
-              <MaterialIcon name="close" size={18} color={COLORS.onSurfaceVariant} />
+              <MaterialIcon name="close" size={18} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           )}
         </View>
@@ -366,12 +369,13 @@ export default function TransactionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   stickyHeader: {
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   header: {
     flexDirection: "row",
@@ -379,15 +383,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   walletPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING[1],
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[2],
     borderRadius: BORDER_RADIUS.full,
@@ -396,50 +400,50 @@ const styles = StyleSheet.create({
   walletPillText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     flexShrink: 1,
   },
   headerActions: { flexDirection: "row", gap: SPACING[1] },
   iconBtn: { width: 40, height: 40, borderRadius: BORDER_RADIUS.full, alignItems: "center", justifyContent: "center" },
-  iconBtnActive: { backgroundColor: `${COLORS.primary}15` },
+  iconBtnActive: { backgroundColor: withAlpha(colors.primary, 0.08) },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING[2],
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
-  searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.onSurface, height: 36, padding: 0 },
+  searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: colors.onSurface, height: 36, padding: 0 },
   filterRow: {
     flexDirection: "row",
     gap: SPACING[2],
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
     flexWrap: "wrap",
   },
   filterChip: {
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
-  filterChipActive: { backgroundColor: `${COLORS.primary}20`, borderColor: `${COLORS.primary}50` },
-  filterChipText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  filterChipTextActive: { color: COLORS.primary },
+  filterChipActive: { backgroundColor: withAlpha(colors.primary, 0.13), borderColor: withAlpha(colors.primary, 0.31) },
+  filterChipText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  filterChipTextActive: { color: colors.primary },
   sectionList: { flex: 1 },
   listContent: { paddingBottom: SPACING[16] },
   listLabel: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     letterSpacing: 0.8,
@@ -450,11 +454,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
-  sectionDate: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
+  sectionDate: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
   sectionNet: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold },
   emptyState: { alignItems: "center", paddingVertical: SPACING[10], gap: SPACING[2] },
-  emptyText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.medium },
-  emptyHint: { fontSize: FONT_SIZE.xs, color: COLORS.outlineVariant },
-});
+  emptyText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, fontWeight: FONT_WEIGHT.medium },
+  emptyHint: { fontSize: FONT_SIZE.xs, color: colors.outlineVariant },
+  });
+}

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import { EmptyState } from '@/components/common/EmptyState';
-import { COLORS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface DonutDatum {
   /** Label shown when the slice is focused */
@@ -40,6 +41,8 @@ export function Donut({
   formatValue = String,
   totalLabel = 'Tổng',
 }: DonutProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   const sorted = [...data]
@@ -75,7 +78,7 @@ export function Donut({
         innerRadius={innerRadius}
         sectionAutoFocus
         focusOnPress
-        innerCircleColor={COLORS.white}
+        innerCircleColor={colors.white}
         onPress={(_item: unknown, index: number) =>
           setFocusedIndex((cur) => (cur === index ? null : index))
         }
@@ -113,30 +116,32 @@ export function Donut({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerLabel: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerHeading: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[500],
-    marginBottom: 2,
-  },
-  centerValue: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
-  },
-  centerSub: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[500],
-    marginTop: 2,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      width: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centerLabel: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centerHeading: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.gray[500],
+      marginBottom: 2,
+    },
+    centerValue: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.gray[900],
+    },
+    centerSub: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.gray[500],
+      marginTop: 2,
+    },
+  });
+}

@@ -1,11 +1,12 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, SHADOW } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export interface CardProps {
   children: ReactNode;
@@ -14,6 +15,9 @@ export interface CardProps {
 }
 
 export function Card({ children, onPress, style }: CardProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (onPress) {
     return (
       <TouchableOpacity
@@ -29,11 +33,13 @@ export function Card({ children, onPress, style }: CardProps) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    ...SHADOW.md,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.white,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[4],
+      ...SHADOW.md,
+    },
+  });
+}

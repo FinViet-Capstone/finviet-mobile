@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { getCategoryById } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 
@@ -11,18 +12,20 @@ export interface CategoryBadgeProps {
 }
 
 export function CategoryBadge({ categoryId }: CategoryBadgeProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const category = categoryId ? getCategoryById(categoryId) : undefined;
 
   if (!category) {
     return (
-      <View style={[styles.pill, { backgroundColor: COLORS.gray[200] }]}>
-        <Text style={[styles.label, { color: COLORS.gray[600] }]}>{'Khác'}</Text>
+      <View style={[styles.pill, { backgroundColor: colors.gray[200] }]}>
+        <Text style={[styles.label, { color: colors.gray[600] }]}>{'Khác'}</Text>
       </View>
     );
   }
 
   const iconName = getCategoryIcon(category.icon);
-  const backgroundColor = category.color + '26'; // ~15% opacity tint
+  const backgroundColor = withAlpha(category.color, 0.15); // ~15% opacity tint
 
   return (
     <View style={[styles.pill, { backgroundColor }]}>
@@ -34,18 +37,20 @@ export function CategoryBadge({ categoryId }: CategoryBadgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    gap: SPACING[1],
-  },
-  label: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1],
+      gap: SPACING[1],
+    },
+    label: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+  });
+}

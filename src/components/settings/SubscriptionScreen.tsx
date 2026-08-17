@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { Button } from '@/components/common/Button';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   useSubscriptionPlans,
   useCurrentSubscription,
@@ -26,12 +27,14 @@ interface FeatureRowProps {
 }
 
 function FeatureRow({ text, checked }: FeatureRowProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.featureRow}>
       <MaterialIcon
         name={checked ? 'check_circle' : 'check'}
         size={20}
-        color={checked ? COLORS.tertiary : COLORS.onSurfaceVariant}
+        color={checked ? colors.tertiary : colors.onSurfaceVariant}
       />
       <Text style={[styles.featureText, !checked && styles.featureTextMuted]}>
         {text}
@@ -41,6 +44,9 @@ function FeatureRow({ text, checked }: FeatureRowProps) {
 }
 
 export function SubscriptionScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const {
     data: plans,
     isLoading: plansLoading,
@@ -125,11 +131,11 @@ export function SubscriptionScreen() {
                 <MaterialIcon
                   name="stars"
                   size={64}
-                  color={COLORS.primary + '33'}
+                  color={withAlpha(colors.primary, 0.2)}
                   style={styles.decorStars}
                 />
                 <View style={styles.planHeader}>
-                  <MaterialIcon name="workspace_premium" size={22} color={COLORS.primary} />
+                  <MaterialIcon name="workspace_premium" size={22} color={colors.primary} />
                   <Text style={styles.premiumTitle}>Premium</Text>
                 </View>
                 <View style={styles.priceRow}>
@@ -178,7 +184,7 @@ export function SubscriptionScreen() {
           style={styles.upgradeBtn}
         />
         <View style={styles.safePayRow}>
-          <MaterialIcon name="lock" size={12} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="lock" size={12} color={colors.onSurfaceVariant} />
           <Text style={styles.safePayText}>{SUBSCRIPTION_STRINGS.safePayment}</Text>
         </View>
       </View>
@@ -188,199 +194,201 @@ export function SubscriptionScreen() {
 
 const CARD_WIDTH = 280;
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  blobTop: {
-    position: 'absolute',
-    top: '-10%' as any,
-    left: '-10%' as any,
-    width: '50%' as any,
-    height: '50%' as any,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary + '1A',
-  },
-  blobBottom: {
-    position: 'absolute',
-    bottom: '-10%' as any,
-    right: '-10%' as any,
-    width: '60%' as any,
-    height: '60%' as any,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.tertiaryContainer + '0D',
-  },
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[2],
-    paddingBottom: 140,
-    gap: SPACING[6],
-  },
-  // Current plan banner
-  currentBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surfaceContainerHigh + '66',
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.white + '1A',
-    padding: SPACING[4],
-  },
-  currentLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-    letterSpacing: 1,
-    marginBottom: SPACING[1],
-  },
-  currentValue: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-  },
-  inUseBadge: {
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  inUseText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-  },
-  // Plans row
-  plansRow: {
-    paddingHorizontal: SPACING[4],
-    gap: SPACING[4],
-  },
-  // Premium card
-  premiumCardWrapper: {
-    width: CARD_WIDTH,
-    position: 'relative',
-  },
-  purpleGlow: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: COLORS.primaryContainer + '66',
-    top: '50%' as any,
-    left: '50%' as any,
-    marginTop: -100,
-    marginLeft: -100,
-    zIndex: -1,
-  },
-  premiumCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[6],
-    backgroundColor: COLORS.primaryContainer + '26',
-    borderWidth: 1,
-    borderColor: COLORS.primary + '4D',
-    overflow: 'hidden',
-    minHeight: 240,
-  },
-  decorStars: {
-    position: 'absolute',
-    top: SPACING[4],
-    right: SPACING[4],
-  },
-  planHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    marginBottom: SPACING[2],
-  },
-  premiumTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SPACING[1],
-    marginBottom: SPACING[6],
-  },
-  priceValue: {
-    fontSize: 28,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    lineHeight: 36,
-  },
-  priceValueMuted: {
-    fontSize: 28,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    lineHeight: 36,
-  },
-  priceUnit: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: 4,
-  },
-  featureList: {
-    gap: SPACING[2],
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING[2],
-  },
-  featureText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
-    flex: 1,
-  },
-  featureTextMuted: {
-    color: COLORS.onSurfaceVariant,
-  },
-  // Free card
-  freeCardWrapper: {
-    width: CARD_WIDTH,
-  },
-  dimmed: { opacity: 0.7 },
-  freeCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING[6],
-    backgroundColor: COLORS.surfaceContainerHigh + '66',
-    borderWidth: 1,
-    borderColor: COLORS.white + '1A',
-    minHeight: 240,
-  },
-  freeTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-    marginBottom: SPACING[2],
-  },
-  // Bottom CTA
-  bottomCta: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[4],
-    paddingBottom: SPACING[8],
-    backgroundColor: COLORS.background,
-  },
-  upgradeBtn: {
-    height: 56,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  safePayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[1],
-    marginTop: SPACING[2],
-  },
-  safePayText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    blobTop: {
+      position: 'absolute',
+      top: '-10%' as any,
+      left: '-10%' as any,
+      width: '50%' as any,
+      height: '50%' as any,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.primary, 0.1),
+    },
+    blobBottom: {
+      position: 'absolute',
+      bottom: '-10%' as any,
+      right: '-10%' as any,
+      width: '60%' as any,
+      height: '60%' as any,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.tertiaryContainer, 0.05),
+    },
+    scroll: { flex: 1 },
+    scrollContent: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[2],
+      paddingBottom: 140,
+      gap: SPACING[6],
+    },
+    // Current plan banner
+    currentBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: withAlpha(colors.surfaceContainerHigh, 0.4),
+      borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.1),
+      padding: SPACING[4],
+    },
+    currentLabel: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+      letterSpacing: 1,
+      marginBottom: SPACING[1],
+    },
+    currentValue: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+    },
+    inUseBadge: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1],
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    inUseText: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+    },
+    // Plans row
+    plansRow: {
+      paddingHorizontal: SPACING[4],
+      gap: SPACING[4],
+    },
+    // Premium card
+    premiumCardWrapper: {
+      width: CARD_WIDTH,
+      position: 'relative',
+    },
+    purpleGlow: {
+      position: 'absolute',
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: withAlpha(colors.primaryContainer, 0.4),
+      top: '50%' as any,
+      left: '50%' as any,
+      marginTop: -100,
+      marginLeft: -100,
+      zIndex: -1,
+    },
+    premiumCard: {
+      borderRadius: BORDER_RADIUS['2xl'],
+      padding: SPACING[6],
+      backgroundColor: withAlpha(colors.primaryContainer, 0.15),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.3),
+      overflow: 'hidden',
+      minHeight: 240,
+    },
+    decorStars: {
+      position: 'absolute',
+      top: SPACING[4],
+      right: SPACING[4],
+    },
+    planHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[2],
+      marginBottom: SPACING[2],
+    },
+    premiumTitle: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary,
+    },
+    priceRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: SPACING[1],
+      marginBottom: SPACING[6],
+    },
+    priceValue: {
+      fontSize: 28,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      lineHeight: 36,
+    },
+    priceValueMuted: {
+      fontSize: 28,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      lineHeight: 36,
+    },
+    priceUnit: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      marginBottom: 4,
+    },
+    featureList: {
+      gap: SPACING[2],
+    },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SPACING[2],
+    },
+    featureText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurface,
+      flex: 1,
+    },
+    featureTextMuted: {
+      color: colors.onSurfaceVariant,
+    },
+    // Free card
+    freeCardWrapper: {
+      width: CARD_WIDTH,
+    },
+    dimmed: { opacity: 0.7 },
+    freeCard: {
+      borderRadius: BORDER_RADIUS['2xl'],
+      padding: SPACING[6],
+      backgroundColor: withAlpha(colors.surfaceContainerHigh, 0.4),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.1),
+      minHeight: 240,
+    },
+    freeTitle: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+      marginBottom: SPACING[2],
+    },
+    // Bottom CTA
+    bottomCta: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[8],
+      backgroundColor: colors.background,
+    },
+    upgradeBtn: {
+      height: 56,
+      borderRadius: BORDER_RADIUS.full,
+    },
+    safePayRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING[1],
+      marginTop: SPACING[2],
+    },
+    safePayText: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+    },
+  });
+}

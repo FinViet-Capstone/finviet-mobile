@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CustomSlider } from '@/components/common/CustomSlider';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad';
@@ -67,6 +68,8 @@ export default function SetLimitSheet({
   remainingCap,
   onClose,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const createBudget = useCreateBudget();
 
@@ -127,8 +130,8 @@ export default function SetLimitSheet({
     }
   }, [sliderValue, isOverRemaining, bucket, allocationCap, doSave]);
 
-  const thumbColor = isOverRemaining ? COLORS.secondary : COLORS.primary;
-  const trackColor = isOverRemaining ? COLORS.secondary : COLORS.primary;
+  const thumbColor = isOverRemaining ? colors.secondary : colors.primary;
+  const trackColor = isOverRemaining ? colors.secondary : colors.primary;
 
   return (
     <>
@@ -159,13 +162,13 @@ export default function SetLimitSheet({
               accessibilityRole="button"
               accessibilityLabel={S.amountLabel}
             >
-              <Text style={[styles.sliderAmount, isOverRemaining && { color: COLORS.secondary }]}>
+              <Text style={[styles.sliderAmount, isOverRemaining && { color: colors.secondary }]}>
                 {amountFocused
                   ? `${parseInt(amountRaw || '0', 10) > 0 ? formatVND(parseInt(amountRaw, 10)) : '0'}đ`
                   : sliderValue > 0 ? `${formatVND(Math.round(sliderValue))}đ` : '0đ'}
               </Text>
               <Text style={styles.sliderSuffix}>{S.monthly}</Text>
-              <MaterialIcon name="edit" size={14} color={isOverRemaining ? COLORS.secondary : COLORS.primary} />
+              <MaterialIcon name="edit" size={14} color={isOverRemaining ? colors.secondary : colors.primary} />
             </TouchableOpacity>
 
             {/* Slider track with remainingCap marker */}
@@ -178,7 +181,7 @@ export default function SetLimitSheet({
                 value={sliderValue}
                 onValueChange={setSliderValue}
                 minimumTrackTintColor={trackColor}
-                maximumTrackTintColor={COLORS.surfaceVariant}
+                maximumTrackTintColor={colors.surfaceVariant}
                 thumbTintColor={thumbColor}
               />
               {/* Remaining cap marker */}
@@ -190,7 +193,7 @@ export default function SetLimitSheet({
             <View style={styles.sliderLabels}>
               <Text style={styles.sliderLabelMin}>0đ</Text>
               {hasIncome && remainingCap > 0 && remainingCap < allocationCap && (
-                <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: COLORS.secondary }]}>
+                <Text style={[styles.sliderLabelMarker, isOverRemaining && { color: colors.secondary }]}>
                   {S.remaining}: {formatVND(remainingCap)}đ
                 </Text>
               )}
@@ -202,7 +205,7 @@ export default function SetLimitSheet({
             {/* Over-remaining warning */}
             {isOverRemaining && (
               <View style={styles.overWarning}>
-                <MaterialIcon name="warning" size={14} color={COLORS.secondary} />
+                <MaterialIcon name="warning" size={14} color={colors.secondary} />
                 <Text style={styles.overWarningText}>
                   Vượt ngân sách còn lại của nhóm {bucket}
                 </Text>
@@ -223,7 +226,7 @@ export default function SetLimitSheet({
               disabled={createBudget.isPending}
             >
               {createBudget.isPending
-                ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                ? <ActivityIndicator size="small" color={colors.onPrimary} />
                 : <Text style={styles.saveText}>{S.save}</Text>}
             </TouchableOpacity>
           </View>
@@ -244,68 +247,70 @@ export default function SetLimitSheet({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  sheet: {
-    flexShrink: 1,
-  },
-  scroll: {
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[2],
-    paddingBottom: SPACING[4],
-  },
-  header: { marginBottom: SPACING[4] },
-  title: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  categoryName: { fontSize: FONT_SIZE.sm, color: COLORS.primary, marginTop: SPACING[1] },
-  sectionLabel: {
-    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant, textTransform: 'uppercase',
-    letterSpacing: 0.5, marginBottom: SPACING[2],
-  },
-  noIncomeHint: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginBottom: SPACING[3] },
-  sliderAmountRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING[1], marginBottom: SPACING[2] },
-  sliderAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
-  sliderSuffix: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
-  sliderWrap: { position: 'relative' },
-  slider: { width: '100%', height: 40 },
-  marker: {
-    position: 'absolute',
-    top: 16,
-    width: 2,
-    height: 8,
-    backgroundColor: COLORS.secondary,
-    borderRadius: 1,
-    marginLeft: -1,
-  },
-  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING[2] },
-  sliderLabelMin: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  sliderLabelMarker: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  sliderLabelMax: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  overWarning: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    backgroundColor: `${COLORS.secondary}15`, borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING[3], marginBottom: SPACING[3],
-    borderWidth: 1, borderColor: `${COLORS.secondary}30`,
-  },
-  overWarningText: { fontSize: FONT_SIZE.xs, color: COLORS.secondary, flex: 1 },
-  actions: {
-    flexDirection: 'row', gap: SPACING[3],
-    paddingHorizontal: SPACING[4], paddingTop: SPACING[3],
-    borderTopWidth: 1, borderTopColor: COLORS.outlineVariant,
-  },
-  cancelBtn: {
-    flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  saveBtn: {
-    flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-  },
-  saveBtnWarning: { backgroundColor: COLORS.secondary },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    sheet: {
+      flexShrink: 1,
+    },
+    scroll: {
+      flexShrink: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[2],
+      paddingBottom: SPACING[4],
+    },
+    header: { marginBottom: SPACING[4] },
+    title: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    categoryName: { fontSize: FONT_SIZE.sm, color: colors.primary, marginTop: SPACING[1] },
+    sectionLabel: {
+      fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant, textTransform: 'uppercase',
+      letterSpacing: 0.5, marginBottom: SPACING[2],
+    },
+    noIncomeHint: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginBottom: SPACING[3] },
+    sliderAmountRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING[1], marginBottom: SPACING[2] },
+    sliderAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: colors.primary },
+    sliderSuffix: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+    sliderWrap: { position: 'relative' },
+    slider: { width: '100%', height: 40 },
+    marker: {
+      position: 'absolute',
+      top: 16,
+      width: 2,
+      height: 8,
+      backgroundColor: colors.secondary,
+      borderRadius: 1,
+      marginLeft: -1,
+    },
+    sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING[2] },
+    sliderLabelMin: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+    sliderLabelMarker: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+    sliderLabelMax: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+    overWarning: {
+      flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+      backgroundColor: withAlpha(colors.secondary, 0.08), borderRadius: BORDER_RADIUS.lg,
+      padding: SPACING[3], marginBottom: SPACING[3],
+      borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.19),
+    },
+    overWarningText: { fontSize: FONT_SIZE.xs, color: colors.secondary, flex: 1 },
+    actions: {
+      flexDirection: 'row', gap: SPACING[3],
+      paddingHorizontal: SPACING[4], paddingTop: SPACING[3],
+      borderTopWidth: 1, borderTopColor: colors.outlineVariant,
+    },
+    cancelBtn: {
+      flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg,
+      borderWidth: 1, borderColor: colors.outlineVariant,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+    saveBtn: {
+      flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+    },
+    saveBtnWarning: { backgroundColor: colors.secondary },
+    saveBtnDisabled: { opacity: 0.5 },
+    saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
+  });
+}

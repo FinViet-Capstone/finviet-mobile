@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { getProfile } from '@/services';
 import { getAccessToken, hydrateTokenCache } from '@/lib/mmkv';
 import { hydrateCategoryIconCache } from '@/lib/categoryIconStorage';
+import { hydrateThemeCache } from '@/lib/themeCache';
 import { useAuthStore } from '@/stores/authStore';
 
 // Max time the splash waits on the profile fetch before showing the login gate.
@@ -47,7 +48,10 @@ export function useBootstrapSession() {
     hydrateCategoryIconCache();
 
     (async () => {
-      await hydrateTokenCache();
+      // themeCache must finish before the gate opens: ThemeProvider reads it
+      // synchronously on first render (as the pre-customer / logged-out
+      // fallback), so an un-awaited hydrate would race the first paint.
+      await Promise.all([hydrateTokenCache(), hydrateThemeCache()]);
       const token = getAccessToken();
       if (!token) {
         clearTimeout(timer);

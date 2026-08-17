@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,11 +14,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   BORDER_RADIUS,
-  COLORS,
   FONT_SIZE,
   FONT_WEIGHT,
   SPACING,
-} from "@/constants/theme";
+  withAlpha,
+} from "@/theme";
+import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { CATEGORIES } from "@/constants/categories";
@@ -102,6 +103,8 @@ function ReviewRow({
   onToggle: () => void;
   onEditCategory: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const cat = row.categoryId
     ? (CATEGORIES.find((c) => c.id === row.categoryId) ?? null)
     : null;
@@ -132,7 +135,7 @@ function ReviewRow({
           <MaterialIcon
             name={row.selected ? "check_circle" : "radio_button_unchecked"}
             size={20}
-            color={row.selected ? COLORS.primary : COLORS.onSurfaceVariant}
+            color={row.selected ? colors.primary : colors.onSurfaceVariant}
           />
         </View>
       </View>
@@ -149,7 +152,7 @@ function ReviewRow({
                 <MaterialIcon
                   name="warning"
                   size={12}
-                  color={COLORS.secondary}
+                  color={colors.secondary}
                 />
                 <Text style={styles.uncertainBadgeText}>Cần kiểm tra</Text>
               </View>
@@ -249,7 +252,7 @@ function ReviewRow({
                 <MaterialIcon
                   name="chevron_right"
                   size={16}
-                  color={blocking ? COLORS.error : COLORS.onSurfaceVariant}
+                  color={blocking ? colors.error : colors.onSurfaceVariant}
                 />
               </View>
             </TouchableOpacity>
@@ -279,6 +282,8 @@ export default function PhotoConfirmScreen() {
   const extract = useExtractFromPhoto();
   const createMutation = useCreateTransaction();
   const { data: walletsData } = useWallets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const uris: string[] = (() => {
     try {
@@ -449,7 +454,7 @@ export default function PhotoConfirmScreen() {
             accessibilityRole="button"
             accessibilityLabel="Quay lại"
           >
-            <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
+            <MaterialIcon name={S.back} size={22} color={colors.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{S.title}</Text>
           <View style={styles.headerBtn} />
@@ -470,7 +475,7 @@ export default function PhotoConfirmScreen() {
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
         >
-          <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
+          <MaterialIcon name={S.back} size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -517,7 +522,7 @@ export default function PhotoConfirmScreen() {
           disabled={!isReadyToSubmit || isImporting}
         >
           {isImporting ? (
-            <ActivityIndicator size="small" color={COLORS.onPrimary} />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <Text style={styles.confirmText}>
               {unresolvedCount > 0
@@ -543,8 +548,9 @@ export default function PhotoConfirmScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   header: {
     flexDirection: "row",
@@ -553,7 +559,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   headerBtn: {
     width: 40,
@@ -566,7 +572,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
 
   listContent: {
@@ -579,36 +585,36 @@ const styles = StyleSheet.create({
   reviewRow: {
     flexDirection: "row",
     gap: SPACING[3],
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[3],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   reviewRowDeselected: { opacity: 0.5 },
-  reviewRowUncertain: { borderColor: `${COLORS.secondary}60` },
+  reviewRowUncertain: { borderColor: withAlpha(colors.secondary, 0.38) },
   reviewRowDuplicate: {
-    borderColor: `${COLORS.tertiary}50`,
-    backgroundColor: `${COLORS.tertiary}08`,
+    borderColor: withAlpha(colors.tertiary, 0.31),
+    backgroundColor: withAlpha(colors.tertiary, 0.03),
   },
   reviewRowFailed: {
-    borderColor: `${COLORS.error}40`,
-    backgroundColor: `${COLORS.error}08`,
+    borderColor: withAlpha(colors.error, 0.25),
+    backgroundColor: withAlpha(colors.error, 0.03),
   },
-  reviewRowBlocking: { borderColor: `${COLORS.error}55` },
+  reviewRowBlocking: { borderColor: withAlpha(colors.error, 0.33) },
 
   reviewThumbWrap: { position: "relative", width: 64, flexShrink: 0 },
   reviewThumb: {
     width: 64,
     height: 80,
     borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
   },
   reviewCheckOverlay: {
     position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: `${COLORS.background}CC`,
+    backgroundColor: withAlpha(colors.background, 0.8),
     borderRadius: BORDER_RADIUS.full,
   },
 
@@ -621,7 +627,7 @@ const styles = StyleSheet.create({
   reviewImageLabel: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   reviewBadges: { flexDirection: "row", gap: SPACING[1] },
 
@@ -629,25 +635,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: `${COLORS.secondary}20`,
+    backgroundColor: withAlpha(colors.secondary, 0.13),
     paddingHorizontal: SPACING[2],
     paddingVertical: 2,
     borderRadius: BORDER_RADIUS.full,
   },
   uncertainBadgeText: {
     fontSize: 10,
-    color: COLORS.secondary,
+    color: colors.secondary,
     fontWeight: FONT_WEIGHT.semibold,
   },
   dupBadge: {
-    backgroundColor: `${COLORS.tertiary}20`,
+    backgroundColor: withAlpha(colors.tertiary, 0.13),
     paddingHorizontal: SPACING[2],
     paddingVertical: 2,
     borderRadius: BORDER_RADIUS.full,
   },
   dupBadgeText: {
     fontSize: 10,
-    color: COLORS.tertiary,
+    color: colors.tertiary,
     fontWeight: FONT_WEIGHT.semibold,
   },
 
@@ -659,18 +665,18 @@ const styles = StyleSheet.create({
   },
   reviewFieldLabel: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     flex: 1,
   },
   reviewFieldValue: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     flex: 2,
     textAlign: "right",
   },
-  uncertainLabel: { color: COLORS.secondary },
-  uncertainValue: { color: COLORS.secondary },
+  uncertainLabel: { color: colors.secondary },
+  uncertainValue: { color: colors.secondary },
   reviewCategoryRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -681,15 +687,15 @@ const styles = StyleSheet.create({
   catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
   uncategorizedText: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.secondary,
+    color: colors.secondary,
     fontStyle: "italic",
   },
   needCategoryText: {
-    color: COLORS.error,
+    color: colors.error,
     fontStyle: "normal",
     fontWeight: FONT_WEIGHT.semibold,
   },
-  failedText: { fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 18 },
+  failedText: { fontSize: FONT_SIZE.xs, color: colors.error, lineHeight: 18 },
 
   // Bottom bar
   bottomBar: {
@@ -698,28 +704,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-    backgroundColor: COLORS.background,
+    borderTopColor: colors.outlineVariant,
+    backgroundColor: colors.background,
   },
   retakeBtn: {
     flex: 1,
     height: 52,
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     alignItems: "center",
     justifyContent: "center",
   },
   retakeText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   confirmBtn: {
     flex: 2,
     height: 52,
     borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -727,6 +733,7 @@ const styles = StyleSheet.create({
   confirmText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onPrimary,
+    color: colors.onPrimary,
   },
-});
+  });
+}

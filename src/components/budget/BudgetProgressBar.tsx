@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import { BudgetWithSpend } from '@/types/budget';
 import { formatVND } from '@/utils/formatters';
@@ -21,12 +22,15 @@ export interface BudgetProgressBarProps {
  *   red    — > 80%   (danger)
  */
 export function BudgetProgressBar({ budget, onPress }: BudgetProgressBarProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const barColor =
     budget.status === 'safe'
-      ? COLORS.budget.safe
+      ? colors.budget.safe
       : budget.status === 'warning'
-      ? COLORS.budget.warning
-      : COLORS.budget.danger;
+      ? colors.budget.warning
+      : colors.budget.danger;
 
   const spentFormatted = formatVND(budget.spent);
   const limitFormatted = formatVND(budget.monthlyLimit);
@@ -71,44 +75,46 @@ export function BudgetProgressBar({ budget, onPress }: BudgetProgressBarProps) {
 }
 
 
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: SPACING[3],
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING[2],
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SPACING[2],
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: SPACING[2],
-  },
-  categoryName: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.gray[800],
-    flex: 1,
-  },
-  amounts: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.gray[900],
-  },
-  limit: {
-    fontWeight: FONT_WEIGHT.normal,
-    color: COLORS.gray[500],
-  },
-  bar: {
-    marginTop: SPACING[1],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      paddingVertical: SPACING[3],
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: SPACING[2],
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: SPACING[2],
+    },
+    dot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: SPACING[2],
+    },
+    categoryName: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.medium,
+      color: colors.onSurface,
+      flex: 1,
+    },
+    amounts: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+    },
+    limit: {
+      fontWeight: FONT_WEIGHT.normal,
+      color: colors.onSurfaceVariant,
+    },
+    bar: {
+      marginTop: SPACING[1],
+    },
+  });
+}

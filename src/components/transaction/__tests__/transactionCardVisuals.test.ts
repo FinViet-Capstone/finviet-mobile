@@ -1,5 +1,5 @@
 import { getTransactionCardVisuals } from '../transactionCardVisuals';
-import { COLORS } from '@/constants/theme';
+import { COLORS } from '@/theme';
 import type { Transaction } from '@/types/transaction';
 
 /** Minimal transaction factory — override only what a case cares about. */
@@ -23,16 +23,19 @@ function tx(overrides: Partial<Transaction> = {}): Transaction {
   };
 }
 
+// COLORS (theme-invariant, always DARK_COLORS) is a fine fixture here — this
+// suite only checks the pure derivation logic branches correctly on a given
+// palette, not that the app renders dark by default.
 describe('getTransactionCardVisuals', () => {
   it('income is a green credit with a + prefix', () => {
-    const v = getTransactionCardVisuals(tx({ type: 'income', merchant: 'Lương' }));
+    const v = getTransactionCardVisuals(tx({ type: 'income', merchant: 'Lương' }), COLORS);
     expect(v.amountPrefix).toBe('+');
     expect(v.amountColor).toBe(COLORS.tertiary);
     expect(v.isUncategorized).toBe(false);
   });
 
   it('transfer_out is a neutral debit with a − prefix and swap icon', () => {
-    const v = getTransactionCardVisuals(tx({ type: 'transfer_out', categoryId: null }));
+    const v = getTransactionCardVisuals(tx({ type: 'transfer_out', categoryId: null }), COLORS);
     expect(v.amountPrefix).toBe('−');
     expect(v.amountColor).toBe(COLORS.onSurfaceVariant);
     expect(v.iconName).toBe('swap_horiz');
@@ -41,13 +44,13 @@ describe('getTransactionCardVisuals', () => {
   });
 
   it('transfer_in is a credit and reads "Nhận về"', () => {
-    const v = getTransactionCardVisuals(tx({ type: 'transfer_in', categoryId: null }));
+    const v = getTransactionCardVisuals(tx({ type: 'transfer_in', categoryId: null }), COLORS);
     expect(v.amountPrefix).toBe('+');
     expect(v.subtitle).toBe('Nhận về');
   });
 
   it('uncategorized expense gets the classify-now treatment', () => {
-    const v = getTransactionCardVisuals(tx({ categoryId: null }));
+    const v = getTransactionCardVisuals(tx({ categoryId: null }), COLORS);
     expect(v.isUncategorized).toBe(true);
     expect(v.iconName).toBe('help_outline');
     expect(v.iconColor).toBe(COLORS.secondary);
@@ -59,6 +62,7 @@ describe('getTransactionCardVisuals', () => {
   it('goal contribution derives its name from the description', () => {
     const v = getTransactionCardVisuals(
       tx({ categoryId: 'cat_savings_goal', description: 'Nạp mục tiêu: Du lịch' }),
+      COLORS,
     );
     expect(v.iconName).toBe('savings');
     expect(v.iconColor).toBe(COLORS.tertiary);
@@ -74,6 +78,7 @@ describe('getTransactionCardVisuals', () => {
         description: 'Rút mục tiêu: Du lịch',
         type: 'income',
       }),
+      COLORS,
     );
 
     expect(v.iconName).toBe('savings');
@@ -84,9 +89,11 @@ describe('getTransactionCardVisuals', () => {
   });
 
   it('expense prefers merchant, then description, for its title', () => {
-    expect(getTransactionCardVisuals(tx({ merchant: 'Highlands' })).title).toBe('Highlands');
-    expect(getTransactionCardVisuals(tx({ merchant: null, description: 'Cà phê' })).title).toBe(
-      'Cà phê',
+    expect(getTransactionCardVisuals(tx({ merchant: 'Highlands' }), COLORS).title).toBe(
+      'Highlands',
     );
+    expect(
+      getTransactionCardVisuals(tx({ merchant: null, description: 'Cà phê' }), COLORS).title,
+    ).toBe('Cà phê');
   });
 });

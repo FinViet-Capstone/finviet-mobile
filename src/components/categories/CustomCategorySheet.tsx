@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { Button } from '@/components/common/Button';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { TextInput } from '@/components/common/TextInput';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import type { BucketId } from './CategoryBucketCard';
 
 export interface CustomCategoryInput {
@@ -32,11 +33,13 @@ interface Props {
   loading?: boolean;
 }
 
-const BUCKET_OPTIONS: { id: BucketId; label: string; color: string }[] = [
-  { id: 'needs', label: 'Thiết yếu', color: COLORS.primary },
-  { id: 'wants', label: 'Mong muốn', color: COLORS.secondary },
-  { id: 'savings', label: 'Tiết kiệm', color: COLORS.tertiary },
-];
+function getBucketOptions(colors: ThemeColors): { id: BucketId; label: string; color: string }[] {
+  return [
+    { id: 'needs', label: 'Thiết yếu', color: colors.primary },
+    { id: 'wants', label: 'Mong muốn', color: colors.secondary },
+    { id: 'savings', label: 'Tiết kiệm', color: colors.tertiary },
+  ];
+}
 
 const COLOR_SWATCHES = [
   '#F97316', '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6',
@@ -66,6 +69,9 @@ function extFromAsset(name: string, mimeType?: string): 'svg' | 'png' | null {
 }
 
 export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const bucketOptions = useMemo(() => getBucketOptions(colors), [colors]);
   const [name, setName] = useState('');
   const [bucket, setBucket] = useState<BucketId | null>(null);
   const [color, setColor] = useState<string | null>(null);
@@ -129,15 +135,15 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
         <View style={styles.field}>
           <Text style={styles.label}>{S.bucketLabel}</Text>
           <View style={styles.chipRow}>
-            {BUCKET_OPTIONS.map((opt) => {
+            {bucketOptions.map((opt) => {
               const selected = bucket === opt.id;
               return (
                 <TouchableOpacity
                   key={opt.id}
                   style={[
                     styles.chip,
-                    { borderColor: opt.color + '80', backgroundColor: opt.color + '1A' },
-                    selected && { backgroundColor: opt.color + '33', borderColor: opt.color },
+                    { borderColor: withAlpha(opt.color, 0.5), backgroundColor: withAlpha(opt.color, 0.1) },
+                    selected && { backgroundColor: withAlpha(opt.color, 0.2), borderColor: opt.color },
                   ]}
                   onPress={() => setBucket(opt.id)}
                   activeOpacity={0.7}
@@ -166,7 +172,7 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
                   onPress={() => setColor(hex)}
                   activeOpacity={0.8}
                 >
-                  {selected && <MaterialIcon name="check" size={16} color={COLORS.white} />}
+                  {selected && <MaterialIcon name="check" size={16} color={colors.white} />}
                 </TouchableOpacity>
               );
             })}
@@ -177,7 +183,7 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
         <View style={styles.field}>
           <Text style={styles.label}>{S.iconLabel}</Text>
           <TouchableOpacity style={styles.iconPickRow} onPress={handlePickIcon} activeOpacity={0.7}>
-            <View style={[styles.iconPreview, { backgroundColor: (color ?? COLORS.surfaceVariant) + '33' }]}>
+            <View style={[styles.iconPreview, { backgroundColor: withAlpha(color ?? colors.surfaceVariant, 0.2) }]}>
               {picked ? (
                 picked.ext === 'svg' ? (
                   <SvgUri uri={picked.uri} width={28} height={28} />
@@ -185,7 +191,7 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
                   <Image source={{ uri: picked.uri }} style={styles.iconPreviewImage} resizeMode="contain" />
                 )
               ) : (
-                <MaterialIcon name="add_photo_alternate" size={24} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon name="add_photo_alternate" size={24} color={colors.onSurfaceVariant} />
               )}
             </View>
             <Text style={styles.iconPickText}>{picked ? S.iconChange : S.iconPick}</Text>
@@ -209,85 +215,87 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
   );
 }
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: SPACING[6],
-    paddingBottom: SPACING[8],
-    gap: SPACING[5],
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    textAlign: 'center',
-    marginBottom: SPACING[1],
-  },
-  field: {
-    gap: SPACING[2],
-  },
-  label: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING[2],
-  },
-  chip: {
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1] + 2,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING[3],
-  },
-  swatch: {
-    width: 32,
-    height: 32,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swatchSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.onSurface,
-  },
-  iconPickRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  iconPreview: {
-    width: 48,
-    height: 48,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconPreviewImage: {
-    width: 28,
-    height: 28,
-  },
-  iconPickText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-  },
-  iconHint: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant + 'B3',
-  },
-  actions: {
-    gap: SPACING[2],
-    marginTop: SPACING[4],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    content: {
+      paddingHorizontal: SPACING[6],
+      paddingBottom: SPACING[8],
+      gap: SPACING[5],
+    },
+    title: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginBottom: SPACING[1],
+    },
+    field: {
+      gap: SPACING[2],
+    },
+    label: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING[2],
+    },
+    chip: {
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[1] + 2,
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 1,
+    },
+    chipText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+    swatchRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING[3],
+    },
+    swatch: {
+      width: 32,
+      height: 32,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    swatchSelected: {
+      borderWidth: 2,
+      borderColor: colors.onSurface,
+    },
+    iconPickRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[3],
+    },
+    iconPreview: {
+      width: 48,
+      height: 48,
+      borderRadius: BORDER_RADIUS.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconPreviewImage: {
+      width: 28,
+      height: 28,
+    },
+    iconPickText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+    },
+    iconHint: {
+      fontSize: FONT_SIZE.xs,
+      color: withAlpha(colors.onSurfaceVariant, 0.7),
+    },
+    actions: {
+      gap: SPACING[2],
+      marginTop: SPACING[4],
+    },
+  });
+}

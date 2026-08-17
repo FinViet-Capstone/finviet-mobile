@@ -27,8 +27,8 @@ You are an expert in TypeScript, React Native, Expo, and Mobile UI development.
   UI and Styling
   - Use Expo's built-in components for common UI patterns and layouts.
   - Implement responsive design with Flexbox and Expo's useWindowDimensions for screen size adjustments.
-  - Use plain React Native `StyleSheet` with centralized design tokens (`src/constants/theme.ts`) for component styling — not styled-components or Tailwind.
-  - Implement dark/light mode support via `useThemeColors()` (`src/providers/ThemeProvider.tsx`), which resolves `DARK_COLORS`/`LIGHT_COLORS` from `src/constants/theme.ts` based on user preference + `useColorScheme`. Prefer it over importing the theme-invariant `COLORS` export directly in new code.
+  - Use plain React Native `StyleSheet` with centralized design tokens (`src/theme/`, imported via the `@/theme` barrel) for component styling — not styled-components or Tailwind.
+  - Implement dark/light mode support via `useThemeColors()` (`src/providers/ThemeProvider.tsx`), which resolves `DARK_COLORS`/`LIGHT_COLORS` from `src/theme/colors.ts` based on user preference + `useColorScheme`. Prefer it over importing the theme-invariant `COLORS` export directly in new code.
   - Ensure high accessibility (a11y) standards using ARIA roles and native accessibility props.
   - Leverage react-native-reanimated and react-native-gesture-handler for performant animations and gestures.
 

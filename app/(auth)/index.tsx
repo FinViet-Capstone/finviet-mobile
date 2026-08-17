@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -28,12 +28,13 @@ import {
   type RegisterInput as RegisterFormValues,
 } from '@/validators/auth.schema';
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
-} from '@/constants/theme';
+  withAlpha,
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 // ---------------------------------------------------------------------------
 // Shared field bits
@@ -44,6 +45,7 @@ import {
 function renderPasswordToggle(
   visible: boolean,
   onToggle: () => void,
+  color: string,
 ): React.ReactNode {
   return (
     <TouchableOpacity
@@ -53,7 +55,7 @@ function renderPasswordToggle(
       <MaterialIcon
         name={visible ? 'visibility_off' : 'visibility'}
         size={20}
-        color={COLORS.onSurfaceVariant}
+        color={color}
       />
     </TouchableOpacity>
   );
@@ -65,6 +67,8 @@ function renderPasswordToggle(
 
 export default function AuthScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -249,7 +253,7 @@ export default function AuthScreen() {
                       onBlur={onBlur}
                       error={loginForm.formState.errors.password?.message}
                       rightIcon={renderPasswordToggle(showPassword, () =>
-                        setShowPassword((prev) => !prev),
+                        setShowPassword((prev) => !prev), colors.onSurfaceVariant,
                       )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
@@ -316,7 +320,7 @@ export default function AuthScreen() {
                       onBlur={onBlur}
                       error={registerForm.formState.errors.password?.message}
                       rightIcon={renderPasswordToggle(showPassword, () =>
-                        setShowPassword((prev) => !prev),
+                        setShowPassword((prev) => !prev), colors.onSurfaceVariant,
                       )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
@@ -340,7 +344,7 @@ export default function AuthScreen() {
                       onBlur={onBlur}
                       error={registerForm.formState.errors.confirmPassword?.message}
                       rightIcon={renderPasswordToggle(showConfirmPassword, () =>
-                        setShowConfirmPassword((prev) => !prev),
+                        setShowConfirmPassword((prev) => !prev), colors.onSurfaceVariant,
                       )}
                       containerStyle={styles.fieldSpacing}
                       editable={!isBusy}
@@ -402,141 +406,143 @@ export default function AuthScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[8],
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[8],
+    },
 
-  // Header
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING[8],
-  },
-  appName: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary,
-    marginBottom: SPACING[1],
-  },
-  tagline: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-  },
+    // Header
+    header: {
+      alignItems: 'center',
+      marginBottom: SPACING[8],
+    },
+    appName: {
+      fontSize: FONT_SIZE['2xl'],
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary,
+      marginBottom: SPACING[1],
+    },
+    tagline: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+    },
 
-  // Card
-  card: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  glassAccent: {
-    position: 'absolute',
-    top: -80,
-    right: -80,
-    width: 160,
-    height: 160,
-    backgroundColor: COLORS.primary + '1A', // 10% opacity
-    borderRadius: BORDER_RADIUS.full,
-    opacity: 0.3,
-  },
+    // Card
+    card: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[4],
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    glassAccent: {
+      position: 'absolute',
+      top: -80,
+      right: -80,
+      width: 160,
+      height: 160,
+      backgroundColor: withAlpha(colors.primary, 0.1),
+      borderRadius: BORDER_RADIUS.full,
+      opacity: 0.3,
+    },
 
-  // Tabs
-  tabsContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    marginBottom: SPACING[5],
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: SPACING[3],
-    alignItems: 'center',
-    position: 'relative',
-  },
-  tabText: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
-  },
-  tabTextActive: {
-    color: COLORS.primary,
-  },
-  tabIndicator: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: COLORS.primary,
-    borderTopLeftRadius: BORDER_RADIUS.full,
-    borderTopRightRadius: BORDER_RADIUS.full,
-  },
+    // Tabs
+    tabsContainer: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+      marginBottom: SPACING[5],
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: SPACING[3],
+      alignItems: 'center',
+      position: 'relative',
+    },
+    tabText: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurfaceVariant,
+    },
+    tabTextActive: {
+      color: colors.primary,
+    },
+    tabIndicator: {
+      position: 'absolute',
+      bottom: -1,
+      left: 0,
+      right: 0,
+      height: 2,
+      backgroundColor: colors.primary,
+      borderTopLeftRadius: BORDER_RADIUS.full,
+      borderTopRightRadius: BORDER_RADIUS.full,
+    },
 
-  // Form
-  form: {
-    position: 'relative',
-    zIndex: 10,
-  },
-  fieldSpacing: {
-    marginBottom: SPACING[4],
-  },
+    // Form
+    form: {
+      position: 'relative',
+      zIndex: 10,
+    },
+    fieldSpacing: {
+      marginBottom: SPACING[4],
+    },
 
-  // Forgot password
-  forgotRow: {
-    alignSelf: 'flex-end',
-    marginTop: SPACING[1],
-    marginBottom: SPACING[5],
-  },
-  forgotLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.primary,
-  },
+    // Forgot password
+    forgotRow: {
+      alignSelf: 'flex-end',
+      marginTop: SPACING[1],
+      marginBottom: SPACING[5],
+    },
+    forgotLabel: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.primary,
+    },
 
-  // Terms
-  termsText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 18,
-    marginBottom: SPACING[5],
-  },
-  termsLink: {
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHT.medium,
-  },
+    // Terms
+    termsText: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+      lineHeight: 18,
+      marginBottom: SPACING[5],
+    },
+    termsLink: {
+      color: colors.primary,
+      fontWeight: FONT_WEIGHT.medium,
+    },
 
-  // Submit button
-  submitButton: {
-    marginBottom: SPACING[5],
-  },
+    // Submit button
+    submitButton: {
+      marginBottom: SPACING[5],
+    },
 
-  // Divider
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING[5],
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.outlineVariant,
-  },
-  dividerText: {
-    marginHorizontal: SPACING[3],
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-  },
-});
+    // Divider
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: SPACING[5],
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.outlineVariant,
+    },
+    dividerText: {
+      marginHorizontal: SPACING[3],
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+    },
+  });
+}

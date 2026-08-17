@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
   ActivityIndicator, Alert,
@@ -6,7 +6,8 @@ import {
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -71,6 +72,8 @@ function formatVND(n: number): string {
 export default function WalletDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: wallet, isLoading, isError, error, refetch } = useWalletById(id);
   const sepaySyncMutation = useSyncSepayWallet();
   const deleteWalletMutation = useDeleteWallet();
@@ -165,12 +168,12 @@ export default function WalletDetailScreen() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={() => router.back()}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
+          <MaterialIcon name={S.back} size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{wallet.name}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleEditPress}>
-            <MaterialIcon name={S.edit} size={22} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name={S.edit} size={22} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -179,9 +182,9 @@ export default function WalletDetailScreen() {
             disabled={isDeleting}
           >
             {isDeleting ? (
-              <ActivityIndicator size="small" color={COLORS.error} />
+              <ActivityIndicator size="small" color={colors.error} />
             ) : (
-              <MaterialIcon name={S.delete} size={22} color={COLORS.error} />
+              <MaterialIcon name={S.delete} size={22} color={colors.error} />
             )}
           </TouchableOpacity>
         </View>
@@ -189,12 +192,12 @@ export default function WalletDetailScreen() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); refetchTx(); }} tintColor={COLORS.primary} />}>
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); refetchTx(); }} tintColor={colors.primary} />}>
 
         {/* Relink-required banner */}
         {relinkRequired && (
           <View style={styles.relinkBanner}>
-            <MaterialIcon name="warning" size={18} color={COLORS.error} />
+            <MaterialIcon name="warning" size={18} color={colors.error} />
             <Text style={styles.relinkBannerText}>{S.relinkBanner}</Text>
           </View>
         )}
@@ -206,13 +209,13 @@ export default function WalletDetailScreen() {
           <View style={styles.typeRow}>
             <MaterialIcon
               name={wallet.type === 'linked' ? 'account_balance' : 'account_balance_wallet'}
-              size={14} color={COLORS.onSurfaceVariant} />
+              size={14} color={colors.onSurfaceVariant} />
             <Text style={styles.typeText}>
               {wallet.type === 'linked' ? S.linked : S.basic}
             </Text>
             {syncStatus && (
               <Text style={[styles.syncText, {
-                color: syncStatus === 'active' ? COLORS.tertiary : syncStatus === 'error' ? COLORS.error : COLORS.onSurfaceVariant
+                color: syncStatus === 'active' ? colors.tertiary : syncStatus === 'error' ? colors.error : colors.onSurfaceVariant
               }]}>
                 · {syncStatus === 'active' ? S.syncOk : syncStatus === 'error' ? S.syncError : S.syncing}
               </Text>
@@ -232,9 +235,9 @@ export default function WalletDetailScreen() {
             disabled={isSyncing}
           >
             {isSyncing ? (
-              <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
-              <MaterialIcon name="sync" size={18} color={COLORS.onPrimary} />
+              <MaterialIcon name="sync" size={18} color={colors.onPrimary} />
             )}
             <Text style={styles.syncBtnText}>
               {isSyncing ? S.syncing : S.syncBtn}
@@ -251,9 +254,9 @@ export default function WalletDetailScreen() {
             disabled={unlinkMutation.isPending}
           >
             {unlinkMutation.isPending ? (
-              <ActivityIndicator size="small" color={COLORS.error} />
+              <ActivityIndicator size="small" color={colors.error} />
             ) : (
-              <MaterialIcon name="link_off" size={18} color={COLORS.error} />
+              <MaterialIcon name="link_off" size={18} color={colors.error} />
             )}
             <Text style={styles.unlinkBtnText}>{S.unlinkBtn}</Text>
           </TouchableOpacity>
@@ -278,49 +281,51 @@ export default function WalletDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary, textAlign: 'center' },
+  headerTitle: { flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.primary, textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[3] },
   balanceCard: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[6], alignItems: 'center', gap: SPACING[2],
-    borderWidth: 1, borderColor: COLORS.surfaceVariant,
+    borderWidth: 1, borderColor: colors.surfaceVariant,
   },
-  balanceLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8 },
-  balanceAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
+  balanceLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8 },
+  balanceAmount: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
   typeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
-  typeText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  typeText: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
   // Dimmer than typeText so it reads as a footnote, not a second status line.
-  balanceNote: { fontSize: FONT_SIZE.xs, color: COLORS.outline, textAlign: 'center' },
+  balanceNote: { fontSize: FONT_SIZE.xs, color: colors.outline, textAlign: 'center' },
   syncText: { fontSize: FONT_SIZE.xs },
   syncBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SPACING[2], backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING[2], backgroundColor: colors.primary, borderRadius: BORDER_RADIUS.lg,
     paddingVertical: SPACING[3], paddingHorizontal: SPACING[5],
   },
   syncBtnDisabled: { opacity: 0.6 },
-  syncBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
+  syncBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onPrimary },
   unlinkBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: SPACING[2], backgroundColor: 'transparent', borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: `${COLORS.error}50`,
+    borderWidth: 1, borderColor: withAlpha(colors.error, 0.31),
     paddingVertical: SPACING[3], paddingHorizontal: SPACING[5],
   },
-  unlinkBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.error },
+  unlinkBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.error },
   relinkBanner: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    backgroundColor: `${COLORS.error}15`, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: `${COLORS.error}30`,
+    backgroundColor: withAlpha(colors.error, 0.08), borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: withAlpha(colors.error, 0.19),
     padding: SPACING[3],
   },
-  relinkBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.error, lineHeight: 16 },
-  sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
-});
+  relinkBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.error, lineHeight: 16 },
+  sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: SPACING[2] },
+  });
+}

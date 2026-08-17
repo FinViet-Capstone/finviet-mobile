@@ -8,7 +8,7 @@
  *   3. Backend validates it, creates a sepay_linked wallet, and imports transactions.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView,
@@ -19,7 +19,8 @@ import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { TextInput } from '@/components/common/TextInput';
 import { useLinkSepayWithToken } from '@/hooks/useWallets';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { USE_MOCK, API_BASE_URL } from '@/lib/env';
 import { getApiErrorMessage } from '@/utils/errors';
 
@@ -46,6 +47,8 @@ type Phase = 'input' | 'linking' | 'success' | 'error';
 
 export default function LinkSepayTokenScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const linkMutation = useLinkSepayWithToken();
 
   const [token, setToken] = useState('');
@@ -97,7 +100,7 @@ export default function LinkSepayTokenScreen() {
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
         >
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.primary} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
@@ -111,14 +114,14 @@ export default function LinkSepayTokenScreen() {
           {phase === 'input' || phase === 'linking' ? (
             <>
               <View style={styles.iconWrap}>
-                <MaterialIcon name="account_balance" size={48} color={COLORS.primary} />
+                <MaterialIcon name="account_balance" size={48} color={colors.primary} />
               </View>
               <Text style={styles.heading}>{S.heading}</Text>
               <Text style={styles.hint}>{S.hint}</Text>
 
               {USE_MOCK && (
                 <View style={styles.mockWarningBox}>
-                  <MaterialIcon name="info" size={16} color={COLORS.secondary} />
+                  <MaterialIcon name="info" size={16} color={colors.secondary} />
                   <Text style={styles.mockWarningText}>{S.mockWarning}</Text>
                 </View>
               )}
@@ -153,9 +156,9 @@ export default function LinkSepayTokenScreen() {
                 disabled={!token.trim() || phase === 'linking'}
               >
                 {phase === 'linking' ? (
-                  <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
-                  <MaterialIcon name="link" size={18} color={COLORS.onPrimary} />
+                  <MaterialIcon name="link" size={18} color={colors.onPrimary} />
                 )}
                 <Text style={styles.primaryBtnText}>
                   {phase === 'linking' ? S.linking : S.linkBtn}
@@ -164,7 +167,7 @@ export default function LinkSepayTokenScreen() {
             </>
           ) : phase === 'success' ? (
             <View style={styles.statusWrap}>
-              <MaterialIcon name="check_circle" size={64} color={COLORS.tertiary} />
+              <MaterialIcon name="check_circle" size={64} color={colors.tertiary} />
               <Text style={styles.statusTitle}>{S.successTitle}</Text>
               <Text style={styles.statusSubtitle}>
                 Đã đồng bộ {syncCount} giao dịch từ ngân hàng của bạn.
@@ -179,7 +182,7 @@ export default function LinkSepayTokenScreen() {
             </View>
           ) : (
             <View style={styles.statusWrap}>
-              <MaterialIcon name="error" size={64} color={COLORS.error} />
+              <MaterialIcon name="error" size={64} color={colors.error} />
               <Text style={styles.statusTitle}>{S.errorTitle}</Text>
               <Text style={styles.statusSubtitle}>{errorMessage}</Text>
               <TouchableOpacity
@@ -197,40 +200,42 @@ export default function LinkSepayTokenScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
-  },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.primary, textAlign: 'center',
-  },
-  content: { padding: SPACING[5], gap: SPACING[3] },
-  iconWrap: { alignItems: 'center', marginBottom: SPACING[2] },
-  heading: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, textAlign: 'center' },
-  hint: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: SPACING[2] },
-  mockWarningBox: {
-    flexDirection: 'row', gap: SPACING[2], alignItems: 'flex-start',
-    backgroundColor: `${COLORS.secondary}15`, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: `${COLORS.secondary}30`,
-    padding: SPACING[3], marginBottom: SPACING[2],
-  },
-  mockWarningText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.secondary, lineHeight: 16 },
-  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
-  primaryBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
-    backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
-    // paddingHorizontal matters in the success/error phases: statusWrap centers its
-    // children, so the button shrinks to its content instead of filling the width.
-    paddingVertical: SPACING[4], paddingHorizontal: SPACING[6], marginTop: SPACING[4],
-  },
-  primaryBtnDisabled: { opacity: 0.5 },
-  primaryBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onPrimary },
-  statusWrap: { alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[10] },
-  statusTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, textAlign: 'center' },
-  statusSubtitle: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', lineHeight: 20 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
+    },
+    headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: {
+      flex: 1, fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold,
+      color: colors.primary, textAlign: 'center',
+    },
+    content: { padding: SPACING[5], gap: SPACING[3] },
+    iconWrap: { alignItems: 'center', marginBottom: SPACING[2] },
+    heading: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, textAlign: 'center' },
+    hint: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: SPACING[2] },
+    mockWarningBox: {
+      flexDirection: 'row', gap: SPACING[2], alignItems: 'flex-start',
+      backgroundColor: withAlpha(colors.secondary, 0.08), borderRadius: BORDER_RADIUS.lg,
+      borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.19),
+      padding: SPACING[3], marginBottom: SPACING[2],
+    },
+    mockWarningText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.secondary, lineHeight: 16 },
+    fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
+    primaryBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
+      backgroundColor: colors.primary, borderRadius: BORDER_RADIUS.lg,
+      // paddingHorizontal matters in the success/error phases: statusWrap centers its
+      // children, so the button shrinks to its content instead of filling the width.
+      paddingVertical: SPACING[4], paddingHorizontal: SPACING[6], marginTop: SPACING[4],
+    },
+    primaryBtnDisabled: { opacity: 0.5 },
+    primaryBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onPrimary },
+    statusWrap: { alignItems: 'center', gap: SPACING[3], paddingVertical: SPACING[10] },
+    statusTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, textAlign: 'center' },
+    statusSubtitle: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center', lineHeight: 20 },
+  });
+}
