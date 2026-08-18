@@ -36,12 +36,15 @@ import {
   useUpdateTransaction,
   useDeleteTransaction,
   useCreateRule,
+  useCategorizeTransaction,
+  useOverrideCategorization,
 } from '@/hooks';
 import { CATEGORIES, getCategoryTypeForTransaction } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVND } from '@/utils/formatters';
 import { getApiErrorMessage } from '@/utils/errors';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
+import type { CategorizationOutcome } from '@/types';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Route: /transactions/[id]?mode=full|category
@@ -76,6 +79,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const updateMutation = useUpdateTransaction();
   const deleteMutation = useDeleteTransaction();
   const createRuleMutation = useCreateRule();
+  const categorizeMutation = useCategorizeTransaction();
+  const overrideMutation = useOverrideCategorization();
 
   const [amountRaw, setAmountRaw] = useState('');
   const [description, setDescription] = useState('');
@@ -87,6 +92,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
   const [amountFocused, setAmountFocused] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<CategorizationOutcome | null>(null);
 
   useEffect(() => {
     if (!tx) return;
@@ -96,6 +102,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
     setCategoryId(tx.categoryId);
     setWalletId(tx.walletId);
     setDateIso(tx.transactionDate);
+    setAiSuggestion(null);
   }, [tx]);
 
   // Hooks MUST run before the early returns below (rules of hooks) — these
@@ -215,6 +222,43 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
     ]);
   };
 
+  const handleAiSuggest = () => {
+    setAiSuggestion(null);
+    categorizeMutation.mutate(txId, {
+      onSuccess: (outcome) => {
+        if (outcome.applied && outcome.categoryId) {
+          setCategoryId(outcome.categoryId);
+          const catName = CATEGORIES.find((c) => c.id === outcome.categoryId)?.nameVi ?? outcome.categoryName ?? '';
+          Alert.alert(S.aiSuggestAppliedTitle, S.aiSuggestAppliedMsg(catName));
+          return;
+        }
+        if (outcome.source === 'AI_SUGGESTION' && outcome.suggestedCategoryId) {
+          setAiSuggestion(outcome);
+          return;
+        }
+        Alert.alert(S.aiSuggestErrorTitle, S.aiSuggestNoneMsg);
+      },
+      onError: (error) =>
+        Alert.alert(S.aiSuggestErrorTitle, getApiErrorMessage(error, S.aiSuggestErrorMsg)),
+    });
+  };
+
+  const handleApplySuggestion = () => {
+    if (!aiSuggestion?.suggestedCategoryId) return;
+    const suggestedId = aiSuggestion.suggestedCategoryId;
+    overrideMutation.mutate(
+      { transactionId: txId, categoryId: suggestedId },
+      {
+        onSuccess: () => {
+          setCategoryId(suggestedId);
+          setAiSuggestion(null);
+        },
+        onError: (error) =>
+          Alert.alert(S.aiSuggestErrorTitle, getApiErrorMessage(error, S.aiSuggestApplyErrorMsg)),
+      },
+    );
+  };
+
   const formatDateDisplay = (iso: string) => {
     const p = iso.split('-');
     return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
@@ -280,6 +324,65 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
               </View>
               <MaterialIcon name="chevron_right" size={20} color={colors.outlineVariant} />
             </TouchableOpacity>
+          ) : null}
+
+          {/* AI category suggestion — offered only while uncategorized (e.g. a SePay-synced
+              transaction the backend's default suggest_only mode never auto-applied). */}
+          {!isTransfer && !selectedCategory ? (
+            aiSuggestion?.suggestedCategoryId ? (
+              <View style={[styles.fieldRow, styles.aiSuggestCard]}>
+                <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.tertiary, 0.13) }]}>
+                  <MaterialIcon name="auto_awesome" size={20} color={colors.tertiary} />
+                </View>
+                <View style={styles.fieldTextWrap}>
+                  <Text style={styles.fieldLabel}>{S.aiSuggestCardTitle}</Text>
+                  <Text style={styles.fieldValue}>{aiSuggestion.suggestedCategoryName}</Text>
+                  {aiSuggestion.confidence != null ? (
+                    <Text style={styles.aiSuggestConfidence}>
+                      {S.aiSuggestConfidence(Math.round(aiSuggestion.confidence * 100))}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.aiSuggestActions}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => setAiSuggestion(null)}
+                    disabled={overrideMutation.isPending}
+                  >
+                    <Text style={styles.aiSuggestDismiss}>{S.aiSuggestDismiss}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.aiSuggestApplyBtn}
+                    onPress={handleApplySuggestion}
+                    disabled={overrideMutation.isPending}
+                  >
+                    {overrideMutation.isPending
+                      ? <ActivityIndicator size="small" color={colors.onTertiary} />
+                      : <Text style={styles.aiSuggestApplyText}>{S.aiSuggestApply}</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.aiSuggestButton}
+                onPress={handleAiSuggest}
+                disabled={categorizeMutation.isPending}
+              >
+                {categorizeMutation.isPending ? (
+                  <>
+                    <ActivityIndicator size="small" color={colors.tertiary} />
+                    <Text style={styles.aiSuggestButtonText}>{S.aiSuggestLoading}</Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcon name="auto_awesome" size={18} color={colors.tertiary} />
+                    <Text style={styles.aiSuggestButtonText}>{S.aiSuggestButton}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )
           ) : null}
 
           {/* Wallet */}
@@ -522,6 +625,24 @@ function createStyles(colors: ThemeColors) {
   fieldLabel: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginBottom: 2 },
   fieldValue: { fontSize: FONT_SIZE.base, color: colors.onSurface, fontWeight: FONT_WEIGHT.medium },
   fieldPlaceholder: { color: colors.outlineVariant, fontWeight: FONT_WEIGHT.normal },
+
+  // AI category suggestion
+  aiSuggestButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
+    borderRadius: BORDER_RADIUS.xl, borderWidth: 1, borderStyle: 'dashed',
+    borderColor: withAlpha(colors.tertiary, 0.4), backgroundColor: withAlpha(colors.tertiary, 0.06),
+    paddingVertical: SPACING[3],
+  },
+  aiSuggestButtonText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.tertiary },
+  aiSuggestCard: { backgroundColor: withAlpha(colors.tertiary, 0.08), alignItems: 'flex-start' },
+  aiSuggestConfidence: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: 2 },
+  aiSuggestActions: { alignItems: 'flex-end', gap: SPACING[2] },
+  aiSuggestDismiss: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+  aiSuggestApplyBtn: {
+    backgroundColor: colors.tertiary, borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING[3], paddingVertical: SPACING[1] + 2, minWidth: 72, alignItems: 'center',
+  },
+  aiSuggestApplyText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.bold, color: colors.onTertiary },
 
   // Actions
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },

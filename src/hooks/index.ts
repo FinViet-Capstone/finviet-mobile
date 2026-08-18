@@ -59,6 +59,8 @@ export {
   useCreateChatSession,
   useSendChatMessage,
   useGenerateWeeklyReport,
+  useCategorizeTransaction,
+  useOverrideCategorization,
 } from './useReports';
 export {
   useNotifications,

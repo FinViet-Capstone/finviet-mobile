@@ -69,4 +69,18 @@ export const TX_DETAIL_STRINGS = {
     n > 0
       ? `Đã áp dụng cho ${n} giao dịch tương tự.`
       : "Quy tắc sẽ được áp dụng cho các giao dịch sau này.",
+
+  // AI category suggestion (uncategorized transaction, e.g. from SePay sync)
+  aiSuggestButton: "Gợi ý danh mục bằng AI",
+  aiSuggestLoading: "Đang phân tích...",
+  aiSuggestErrorTitle: "Không thể gợi ý",
+  aiSuggestErrorMsg: "AI hiện không thể đề xuất danh mục cho giao dịch này. Hãy chọn thủ công.",
+  aiSuggestNoneMsg: "AI không tìm được danh mục phù hợp cho giao dịch này. Hãy chọn thủ công.",
+  aiSuggestAppliedTitle: "Đã tự động phân loại",
+  aiSuggestAppliedMsg: (category: string) => `AI đã gán danh mục "${category}".`,
+  aiSuggestCardTitle: "AI đề xuất danh mục",
+  aiSuggestConfidence: (pct: number) => `Độ tin cậy ${pct}%`,
+  aiSuggestApply: "Áp dụng",
+  aiSuggestDismiss: "Bỏ qua",
+  aiSuggestApplyErrorMsg: "Không áp dụng được danh mục gợi ý.",
 } as const;

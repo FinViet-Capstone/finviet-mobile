@@ -8,9 +8,11 @@ import {
   createChatSession,
   sendChatMessage,
   generateWeeklyReport,
+  categorizeTransaction,
+  overrideCategorization,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
-import type { ChatMessage, ChatSession } from '@/types';
+import type { ChatMessage, ChatSession, CategorizationOutcome } from '@/types';
 
 /**
  * Invalidate the AI-derived numbers that move with the customer's own money —
@@ -98,5 +100,39 @@ export const useGenerateWeeklyReport = () => {
   return useMutation({
     mutationFn: () => generateWeeklyReport(),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.reports.weekly() }),
+  });
+};
+
+/**
+ * Run AI categorization on an existing (usually uncategorized) transaction, e.g. one that
+ * landed uncategorized from SePay sync. Only invalidates dependents when the outcome was
+ * actually `applied` — the default `suggest_only` AI mode returns a suggestion
+ * (`suggestedCategoryId`/`suggestedCategoryName`) without writing it, which the caller must
+ * offer the customer via `useOverrideCategorization` instead.
+ */
+export const useCategorizeTransaction = () => {
+  const qc = useQueryClient();
+  return useMutation<CategorizationOutcome, Error, string>({
+    mutationFn: (transactionId) => categorizeTransaction(transactionId),
+    onSuccess: (outcome) => {
+      if (!outcome.applied) return;
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+      invalidateAiDerived(qc);
+    },
+  });
+};
+
+/** Force-apply a category to a transaction (accepting an AI suggestion, or a manual pick),
+ * bypassing the AI mode gate — always writes, unlike `useCategorizeTransaction`. */
+export const useOverrideCategorization = () => {
+  const qc = useQueryClient();
+  return useMutation<CategorizationOutcome, Error, { transactionId: string; categoryId: string }>({
+    mutationFn: ({ transactionId, categoryId }) => overrideCategorization(transactionId, categoryId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+      invalidateAiDerived(qc);
+    },
   });
 };
