@@ -61,7 +61,7 @@ const S = {
   pickerError: 'Không thể đọc file. Vui lòng thử lại.',
   parseErrorTitle: 'Không đọc được file CSV',
   parseErrorNoColumns: 'Không tìm thấy cột ngày hoặc số tiền. Hãy dùng file mẫu để đúng định dạng.',
-  parseErrorNoRows: 'Không tìm thấy giao dịch hợp lệ nào trong file.',
+  parseErrorNoRows: "Không tìm thấy giao dịch hợp lệ nào trong file. Vui lòng đảm bảo file CSV của bạn có các cột 'Ngày', 'Nội dung' và 'Số tiền' giống với file mẫu.",
   templateErrorTitle: 'Không thể tạo file mẫu',
   templateShareTitle: 'File mẫu CSV',
 };

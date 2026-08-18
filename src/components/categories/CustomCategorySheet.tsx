@@ -22,8 +22,8 @@ export interface CustomCategoryInput {
   name: string;
   bucketId: BucketId;
   color: string;
-  pickedUri: string;
-  ext: 'svg' | 'png';
+  pickedUri?: string;
+  ext?: 'svg' | 'png';
 }
 
 interface Props {
@@ -104,11 +104,11 @@ export function CustomCategorySheet({ visible, onClose, onSubmit, loading }: Pro
     setPicked({ uri: asset.uri, ext });
   };
 
-  const canSubmit = name.trim().length > 0 && !!bucket && !!color && !!picked;
+  const canSubmit = name.trim().length > 0 && !!bucket && !!color;
 
   const handleSubmit = () => {
-    if (!canSubmit || !bucket || !color || !picked) return;
-    onSubmit({ name: name.trim(), bucketId: bucket, color, pickedUri: picked.uri, ext: picked.ext });
+    if (!canSubmit || !bucket || !color) return;
+    onSubmit({ name: name.trim(), bucketId: bucket, color, pickedUri: picked?.uri, ext: picked?.ext });
   };
 
   return (

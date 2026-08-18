@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,15 @@ export function OnboardingWallet({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (isBalanceFocused) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [isBalanceFocused]);
 
   const handleNumberPress = (num: string) => {
     const currentValue = walletBalance.replace(/\./g, '');
@@ -73,6 +82,7 @@ export function OnboardingWallet({
     >
       <TouchableWithoutFeedback onPress={handleDismissKeypad}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.container}
           contentContainerStyle={[
             styles.contentContainer,

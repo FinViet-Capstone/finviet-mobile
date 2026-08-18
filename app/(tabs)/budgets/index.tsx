@@ -251,7 +251,9 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
       {hasLimit ? (
         <View style={styles.categoryRight}>
           <Text style={[styles.categoryPct, { color: barColor }]}>
-            {budget.percentage.toFixed(0)}%
+            {budget.percentage > 100 
+              ? `${S.over} ${(budget.percentage - 100).toFixed(0)}%` 
+              : `${budget.percentage.toFixed(0)}%`}
           </Text>
           <View style={styles.categoryBarTrack}>
             <View
