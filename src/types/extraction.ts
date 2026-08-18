@@ -20,7 +20,12 @@ export interface PhotoExtractionResult {
 export interface CsvExtractionRow {
   amount: number;
   type: 'income' | 'expense';
+  /** Counterparty/beneficiary name when the source file had a distinct column for it; falls
+   * back to `description` when it didn't (same value as `description` in that case). */
   merchant: string | null;
+  /** Raw transaction description/note — kept separate from `merchant` so a distinct
+   * counterparty name, when present, isn't lost by collapsing the two into one field. */
+  description: string | null;
   transactionDate: string;
   /** AI-suggested category — null when the model couldn't classify the row. */
   categoryId: string | null;

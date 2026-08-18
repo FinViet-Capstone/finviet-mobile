@@ -109,6 +109,7 @@ function toCsvRow(row: ExtractedRowDto): CsvExtractionResult['rows'][number] {
     amount: row.amount ?? 0,
     type: (row.type ?? '').toUpperCase() === 'INCOME' ? 'income' : 'expense',
     merchant: row.merchant ?? row.description ?? null,
+    description: row.description ?? null,
     transactionDate: (row.transactionDate ?? '').slice(0, 10),
     categoryId: row.categoryId ?? null,
     categoryName: row.categoryName ?? null,
@@ -120,6 +121,11 @@ function toCsvRow(row: ExtractedRowDto): CsvExtractionResult['rows'][number] {
  * POST /extract/csv — multipart upload of a bank-statement export (.csv,
  * .xlsx, .xls). Parse-only, nothing persisted server-side; the caller still
  * confirms/imports each row via the normal createTransaction flow.
+ *
+ * A large statement can need many per-row AI classification calls server-side
+ * (batched/parallelized backend-side, but still one HTTP round trip overall),
+ * so this uses the same longer timeout as the other slow AI calls in
+ * real/reports.ts rather than the shared api instance's 20s default.
  */
 export async function extractFromCsv(
   fileUri: string,
@@ -140,6 +146,7 @@ export async function extractFromCsv(
 
   const res = await api.post('/extract/csv', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
   });
   const data = unwrap<ExtractResponseDto>(res);
   return {

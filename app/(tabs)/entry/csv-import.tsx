@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,14 +16,6 @@ import * as Sharing from 'expo-sharing';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { CategoryPickerSheet } from '@/components/categories';
-import { useWallets } from '@/hooks/useWallets';
-import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
-import { useRules, useExtractFromCsv } from '@/hooks';
-import { getCategoryById } from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
-import type { Wallet, Transaction, Rule } from '@/types';
-import { getApiErrorMessage } from '@/utils/errors';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -44,26 +36,9 @@ const S = {
     { title: 'Tra cứu lịch sử giao dịch', body: 'Vào mục Tài khoản > Lịch sử giao dịch, chọn khoảng thời gian cần xuất.' },
     { title: 'Tải xuống định dạng CSV', body: 'Tìm nút "Xuất file" hoặc "Tải xuống" và chọn định dạng Excel/CSV.' },
   ],
-  confirmBtn: (n: number) => `Nhập ${n} giao dịch đã chọn`,
-  cancelBtn: 'Huỷ',
-  selectAll: 'Chọn tất cả',
-  deselectAll: 'Bỏ chọn tất cả',
-  duplicate: 'Có thể trùng',
-  uncategorized: 'Chưa phân loại',
-  pickCategory: 'Chọn danh mục',
-  successMsg: (n: number) => `Đã nhập ${n} giao dịch thành công`,
-  noWallets: 'Không có ví nào',
-  selectWalletFirst: 'Vui lòng chọn ví trước',
-  importError: 'Không thể nhập giao dịch.',
   startBtn: 'Chọn file & phân tích',
-  step2Title: 'Chọn ví',
-  step2Hint: 'Giao dịch sẽ được nhập vào ví này',
-  step3Title: 'Xem trước dữ liệu',
-  step3Hint: 'Kiểm tra và xác nhận trước khi nhập',
   pickerError: 'Không thể đọc file. Vui lòng thử lại.',
   parseErrorTitle: 'Không đọc được file CSV',
-  parseErrorNoColumns: 'Không tìm thấy cột ngày hoặc số tiền. Hãy dùng file mẫu để đúng định dạng.',
-  parseErrorNoRows: "Không tìm thấy giao dịch hợp lệ nào trong file. Vui lòng đảm bảo file CSV của bạn có các cột 'Ngày', 'Nội dung' và 'Số tiền' giống với file mẫu.",
   templateErrorTitle: 'Không thể tạo file mẫu',
   templateShareTitle: 'File mẫu CSV',
 };
@@ -73,133 +48,24 @@ const TEMPLATE_CSV =
   '2026-08-01,Cà phê Highlands,-45000\n' +
   '2026-08-05,Lương tháng 8,12000000\n';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ParsedRow {
-  id: string;
-  date: string;
-  merchant: string;
-  amount: number;
-  type: 'expense' | 'income';
-  suggestedCategoryId: string | null;
-  isDuplicate: boolean;
-  selected: boolean;
-}
-
-// ─── CSV parsing ──────────────────────────────────────────────────────────────
-// Parsing itself happens server-side (POST /extract/csv, handles .csv/.xlsx/.xls
-// and runs AI categorization per row). This screen only maps the response onto
-// its ParsedRow UI state and applies a merchant-rule fallback when the AI
-// couldn't suggest a category.
-
 const BOM_CHAR = String.fromCharCode(0xfeff);
 
-/** Longest-keyword-wins substring match against the customer's saved merchant rules. */
-function suggestCategoryFromMerchant(merchant: string, rules: Rule[]): string | null {
-  const lower = merchant.toLowerCase();
-  let best: Rule | null = null;
-  for (const rule of rules) {
-    if (lower.includes(rule.merchantKeyword.toLowerCase())) {
-      if (!best || rule.merchantKeyword.length > best.merchantKeyword.length) best = rule;
-    }
-  }
-  return best?.categoryId ?? null;
-}
-
-function formatVND(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: boolean; onPress: () => void }) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <TouchableOpacity activeOpacity={0.7} style={[styles.walletCard, selected && styles.walletCardActive]} onPress={onPress}>
-      <MaterialIcon name="account_balance_wallet" size={18} color={selected ? colors.primary : colors.onSurfaceVariant} />
-      <View style={styles.walletCardText}>
-        <Text style={[styles.walletCardName, selected && { color: colors.primary }]} numberOfLines={1}>{wallet.name}</Text>
-        <Text style={styles.walletCardBalance}>{formatVND(wallet.balance)}</Text>
-      </View>
-      {selected && <MaterialIcon name="check_circle" size={16} color={colors.primary} />}
-    </TouchableOpacity>
-  );
-}
-
-function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggle: () => void; onEditCategory: () => void }) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const cat = row.suggestedCategoryId ? getCategoryById(row.suggestedCategoryId) : null;
-  const icon = cat ? getCategoryIcon(cat.icon) : 'more_horiz';
-  const isIncome = row.type === 'income';
-  const needsCategoryEdit = !row.suggestedCategoryId;
-
-  return (
-    <TouchableOpacity activeOpacity={0.7} style={[styles.previewRow, !row.selected && styles.previewRowDeselected, row.isDuplicate && styles.previewRowDuplicate]} onPress={onToggle}>
-      {/* Checkbox */}
-      <MaterialIcon name={row.selected ? 'check_box' : 'check_box_outline_blank'} size={20} color={row.selected ? colors.primary : colors.onSurfaceVariant} />
-      {/* Category icon — tappable if uncategorized */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={needsCategoryEdit ? onEditCategory : undefined}
-        style={[styles.rowIconWrap, { backgroundColor: cat ? withAlpha(cat.color, 0.15) : withAlpha(colors.secondary, 0.13) }, needsCategoryEdit && styles.rowIconWrapUncategorized]}
-      >
-        <MaterialIcon name={icon} size={14} color={needsCategoryEdit ? colors.secondary : (cat?.color ?? colors.onSurfaceVariant)} />
-      </TouchableOpacity>
-      {/* Info */}
-      <View style={styles.rowInfo}>
-        <Text style={[styles.rowMerchant, !row.selected && styles.dimText]} numberOfLines={1}>{row.merchant}</Text>
-        <Text style={styles.rowDate}>{row.date}</Text>
-      </View>
-      {/* Right */}
-      <View style={styles.rowRight}>
-        <Text style={[styles.rowAmount, { color: isIncome ? colors.tertiary : colors.onSurface }, !row.selected && styles.dimText]}>
-          {isIncome ? '+' : '-'}{formatVND(row.amount)}
-        </Text>
-        {row.isDuplicate && <View style={styles.dupBadge}><Text style={styles.dupBadgeText}>{S.duplicate}</Text></View>}
-        {needsCategoryEdit && (
-          <TouchableOpacity activeOpacity={0.7} onPress={onEditCategory} style={styles.uncatBadge}>
-            <Text style={styles.uncatBadgeText}>{S.uncategorized}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+// This screen only picks a file and hands it off to csv-review.tsx, which runs
+// the (potentially slow — one AI call per row) extraction and hosts the
+// wallet-picker/preview/import step, so that work gets a dedicated loading state
+// instead of appearing inline on this upload screen.
 
 export default function CsvImportScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data: walletsData } = useWallets();
-  const { data: existingTx } = useTransactions();
-  const { data: rules } = useRules();
-  const createTx = useCreateTransaction();
-  const extractCsv = useExtractFromCsv();
 
-  const wallets = (walletsData as any)?.wallets ?? (Array.isArray(walletsData) ? walletsData : []) as Wallet[];
+  const [isPicking, setIsPicking] = useState(false);
 
-  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [rows, setRows] = useState<ParsedRow[]>([]);
-  const [isParsing, setIsParsing] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [editingRowId, setEditingRowId] = useState<string | null>(null);
-
-  // Only basic wallets can receive imported rows — bank-linked wallets are read-only
-  // (their transactions come from provider sync).
-  const importableWallets = wallets.filter((w: Wallet) => w.type !== 'linked');
-
-  // Auto-select the first importable wallet so the "Accept" button isn't stuck disabled.
-  useEffect(() => {
-    if (!selectedWalletId && importableWallets.length > 0) {
-      setSelectedWalletId(importableWallets[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importableWallets.length]);
-
-  const handleParse = useCallback(async () => {
+  const handlePickFile = useCallback(async () => {
     let result: DocumentPicker.DocumentPickerResult;
+    setIsPicking(true);
     try {
       result = await DocumentPicker.getDocumentAsync({
         type: [
@@ -212,48 +78,18 @@ export default function CsvImportScreen() {
         copyToCacheDirectory: true,
       });
     } catch {
+      setIsPicking(false);
       Alert.alert(S.parseErrorTitle, S.pickerError);
       return;
     }
+    setIsPicking(false);
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-
-    setIsParsing(true);
-    try {
-      const response = await extractCsv.mutateAsync({
-        fileUri: asset.uri,
-        fileName: asset.name ?? 'statement.csv',
-      });
-      if (response.rows.length === 0) {
-        Alert.alert(S.parseErrorTitle, S.parseErrorNoRows);
-        return;
-      }
-      const existing = (existingTx ?? []) as Transaction[];
-      const parsed: ParsedRow[] = response.rows.map((row, i) => {
-        const merchant = row.merchant || 'Không rõ nội dung';
-        const isDuplicate = existing.some(
-          (t) => t.transactionDate === row.transactionDate && t.amount === row.amount
-            && (t.merchant ?? '').toLowerCase() === merchant.toLowerCase(),
-        );
-        return {
-          id: `csv_${i}_${row.transactionDate}_${row.amount}`,
-          date: row.transactionDate,
-          merchant,
-          amount: row.amount,
-          type: row.type,
-          suggestedCategoryId:
-            row.categoryId ?? (row.type === 'expense' ? suggestCategoryFromMerchant(merchant, rules ?? []) : null),
-          isDuplicate,
-          selected: !isDuplicate,
-        };
-      });
-      setRows(parsed);
-    } catch (err) {
-      Alert.alert(S.parseErrorTitle, getApiErrorMessage(err, S.pickerError));
-    } finally {
-      setIsParsing(false);
-    }
-  }, [extractCsv, rules, existingTx]);
+    router.push({
+      pathname: '/(tabs)/entry/csv-review' as const,
+      params: { fileUri: asset.uri, fileName: asset.name ?? 'statement.csv' },
+    });
+  }, [router]);
 
   const handleDownloadTemplate = useCallback(async () => {
     try {
@@ -274,49 +110,6 @@ export default function CsvImportScreen() {
     }
   }, []);
 
-  const handleToggleRow = useCallback((id: string) => {
-    setRows((prev) => prev.map((r) => r.id === id ? { ...r, selected: !r.selected } : r));
-  }, []);
-
-  const handleToggleAll = useCallback(() => {
-    setRows((prev) => {
-      const shouldSelectAll = !prev.every((r) => r.selected);
-      return prev.map((r) => ({ ...r, selected: shouldSelectAll }));
-    });
-  }, []);
-
-  const handleEditCategory = useCallback((id: string) => {
-    setEditingRowId(id);
-  }, []);
-
-  const handleCategorySelect = useCallback((categoryId: string) => {
-    setRows((prev) => prev.map((r) => r.id === editingRowId ? { ...r, suggestedCategoryId: categoryId } : r));
-    setEditingRowId(null);
-  }, [editingRowId]);
-
-  const handleImport = useCallback(async () => {
-    if (!selectedWalletId) { Alert.alert('', S.selectWalletFirst); return; }
-    const toImport = rows.filter((r) => r.selected);
-    if (!toImport.length) return;
-    setIsImporting(true);
-    let imported = 0;
-    try {
-      for (const row of toImport) {
-        await createTx.mutateAsync({ walletId: selectedWalletId, categoryId: row.suggestedCategoryId, amount: row.amount, type: row.type, description: null, merchant: row.merchant, transactionDate: row.date, entryMethod: 'csv_import' });
-        imported++;
-      }
-      Alert.alert('', S.successMsg(toImport.length), [{ text: 'OK', onPress: () => router.back() }]);
-    } catch (err) {
-      // Surface the backend reason (e.g. insufficient balance) and report partial progress.
-      Alert.alert('', `${getApiErrorMessage(err, S.importError)} (${imported}/${toImport.length})`);
-    } finally { setIsImporting(false); }
-  }, [selectedWalletId, rows, createTx, router]);
-
-  const selectedCount = rows.filter((r) => r.selected).length;
-  const allSelected = rows.length > 0 && selectedCount === rows.length;
-  const noneSelected = selectedCount === 0;
-  const canStart = !!selectedWalletId && selectedCount > 0;
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -332,9 +125,9 @@ export default function CsvImportScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Upload area */}
-        <TouchableOpacity activeOpacity={0.75} style={styles.uploadArea} onPress={handleParse} disabled={isParsing}>
+        <TouchableOpacity activeOpacity={0.75} style={styles.uploadArea} onPress={handlePickFile} disabled={isPicking}>
           <View style={styles.uploadIconWrap}>
-            {isParsing
+            {isPicking
               ? <ActivityIndicator size="small" color={colors.primary} />
               : <MaterialIcon name={S.uploadIcon} size={32} color={colors.primary} />}
           </View>
@@ -353,45 +146,6 @@ export default function CsvImportScreen() {
           <MaterialIcon name={S.templateIcon} size={16} color={colors.primary} />
           <Text style={styles.templateBtnText}>{S.templateBtn}</Text>
         </TouchableOpacity>
-
-        {/* Step: Wallet */}
-        {rows.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.stepTitle}>{S.step2Title}</Text>
-            <Text style={styles.stepHint}>{S.step2Hint}</Text>
-            {importableWallets.length === 0
-              ? <Text style={styles.emptyText}>{S.noWallets}</Text>
-              : (
-                <View style={styles.walletList}>
-                  {importableWallets.map((w: Wallet) => (
-                    <WalletCard key={w.id} wallet={w} selected={selectedWalletId === w.id} onPress={() => setSelectedWalletId(w.id)} />
-                  ))}
-                </View>
-              )}
-          </View>
-        )}
-
-        {/* Step 3: Preview */}
-        {rows.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.stepTitleRow}>
-              <Text style={styles.stepTitle}>{S.step3Title}</Text>
-              <Text style={styles.selectedCount}>{selectedCount}/{rows.length} được chọn</Text>
-            </View>
-            <Text style={styles.stepHint}>{S.step3Hint}</Text>
-            <TouchableOpacity activeOpacity={0.7} style={styles.selectAllRow} onPress={handleToggleAll}>
-              <MaterialIcon
-                name={allSelected ? 'check_box' : noneSelected ? 'check_box_outline_blank' : 'indeterminate_check_box'}
-                size={20}
-                color={noneSelected ? colors.onSurfaceVariant : colors.primary}
-              />
-              <Text style={styles.selectAllText}>{allSelected ? S.deselectAll : S.selectAll}</Text>
-            </TouchableOpacity>
-            {rows.map((row) => (
-              <PreviewRow key={row.id} row={row} onToggle={() => handleToggleRow(row.id)} onEditCategory={() => handleEditCategory(row.id)} />
-            ))}
-          </View>
-        )}
 
         {/* Guide */}
         <View style={styles.guideCard}>
@@ -415,45 +169,17 @@ export default function CsvImportScreen() {
 
       {/* Bottom action */}
       <View style={styles.bottomBar}>
-        {rows.length > 0 ? (
-          <>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
-              <Text style={styles.cancelText}>{S.cancelBtn}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[styles.confirmBtn, (!canStart || isImporting) && styles.confirmBtnDisabled]}
-              onPress={handleImport}
-              disabled={!canStart || isImporting}
-            >
-              {isImporting
-                ? <ActivityIndicator size="small" color={colors.onBackground} />
-                : <Text style={styles.confirmText}>{S.confirmBtn(selectedCount)}</Text>}
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[styles.startBtn, isParsing && styles.confirmBtnDisabled]}
-            disabled={isParsing}
-            onPress={handleParse}
-          >
-            {isParsing
-              ? <ActivityIndicator size="small" color={colors.onBackground} />
-              : <Text style={styles.confirmText}>{S.startBtn}</Text>}
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[styles.startBtn, isPicking && styles.confirmBtnDisabled]}
+          disabled={isPicking}
+          onPress={handlePickFile}
+        >
+          {isPicking
+            ? <ActivityIndicator size="small" color={colors.onBackground} />
+            : <Text style={styles.confirmText}>{S.startBtn}</Text>}
+        </TouchableOpacity>
       </View>
-
-      {/* Category picker for uncategorized rows */}
-      <CategoryPickerSheet
-        visible={editingRowId !== null}
-        onClose={() => setEditingRowId(null)}
-        title={S.pickCategory}
-        entryType={rows.find((r) => r.id === editingRowId)?.type ?? 'expense'}
-        selectedCategoryId={rows.find((r) => r.id === editingRowId)?.suggestedCategoryId}
-        onSelect={handleCategorySelect}
-      />
     </SafeAreaView>
   );
 }
@@ -515,16 +241,6 @@ function createStyles(colors: ThemeColors) {
     },
     templateBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
 
-    // Section
-    section: { gap: SPACING[3] },
-    stepTitle: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
-    stepTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    stepHint: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: -SPACING[2] },
-    selectedCount: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
-    emptyText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
-    selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], paddingVertical: SPACING[1] },
-    selectAllText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
-
     // AI badge
     aiBadge: {
       flexDirection: 'row',
@@ -538,53 +254,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: withAlpha(colors.primary, 0.08),
     },
     aiBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
-
-    // Wallets
-    walletList: { gap: SPACING[2] },
-    walletCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING[3],
-      padding: SPACING[3],
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.surfaceContainer,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
-      minHeight: 56,
-    },
-    walletCardActive: { borderColor: colors.primary, backgroundColor: withAlpha(colors.primary, 0.08) },
-    walletCardText: { flex: 1 },
-    walletCardName: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
-    walletCardBalance: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 2 },
-
-    // Preview rows
-    previewRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING[2],
-      padding: SPACING[3],
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.surfaceContainerLow,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
-      minHeight: 56,
-    },
-    previewRowDeselected: { opacity: 0.5 },
-    previewRowDuplicate: { borderColor: withAlpha(colors.secondary, 0.31), backgroundColor: withAlpha(colors.secondary, 0.03) },
-    rowIconWrap: { width: 30, height: 30, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    rowIconWrapUncategorized: { borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.31), borderStyle: 'dashed' },
-    rowInfo: { flex: 1, minWidth: 0 },
-    rowMerchant: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: colors.onSurface },
-    rowDate: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 2 },
-    dimText: { color: colors.onSurfaceVariant },
-    rowRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-    rowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold },
-    dupBadge: { backgroundColor: withAlpha(colors.secondary, 0.13), paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
-    dupBadgeText: { fontSize: 10, color: colors.secondary, fontWeight: FONT_WEIGHT.semibold },
-    uncatBadge: { backgroundColor: withAlpha(colors.secondary, 0.13), paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
-    uncatBadgeText: { fontSize: 10, color: colors.secondary, fontWeight: FONT_WEIGHT.semibold },
-
-    // Category picker sheet
 
     // Guide
     guideCard: {
@@ -622,24 +291,6 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: 1,
       borderTopColor: colors.outlineVariant,
       backgroundColor: colors.background,
-    },
-    cancelBtn: {
-      flex: 1,
-      height: 52,
-      borderRadius: BORDER_RADIUS.lg,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    cancelText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
-    confirmBtn: {
-      flex: 2,
-      height: 52,
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.inversePrimary,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     confirmBtnDisabled: { opacity: 0.45 },
     confirmText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onBackground },

@@ -108,11 +108,19 @@ export interface ChatSession {
 // AI Categorization (auto-classify a transaction to a category)
 // -------------------------------------------------------------------------
 
-/** Where a category assignment came from. */
-export type CategorizationSource = 'RULE' | 'AI' | 'FALLBACK';
+/**
+ * Where a category assignment came from — matches the backend's
+ * `CategorizationOutcome.Source` values exactly (MANUAL/RULE locked-in categories,
+ * AI_AUTO applied automatically above the confidence threshold, AI_SUGGESTION produced
+ * but not applied — see `Applied`/`suggestedCategoryId`, OFF when the customer disabled
+ * AI categorization, FALLBACK when nothing resolved).
+ */
+export type CategorizationSource = 'MANUAL' | 'RULE' | 'AI_AUTO' | 'AI_SUGGESTION' | 'OFF' | 'FALLBACK';
 
 /** Preview of what the AI would classify a free-text description as. */
 export interface AiClassificationResult {
+  /** Predicted category id, resolved from categoryName server-side (undefined when unresolved). */
+  categoryId?: string;
   /** Predicted category name (may be undefined when the model abstains). */
   categoryName?: string;
   /** Model confidence, 0–1. */
@@ -122,12 +130,22 @@ export interface AiClassificationResult {
 /** Outcome of applying (or overriding) a categorization to a transaction. */
 export interface CategorizationOutcome {
   transactionId: string;
+  /** The category id actually written to the transaction — only set when `applied` is true. */
   categoryId?: string;
   categoryName?: string;
   confidence?: number;
   isAiClassified: boolean;
   /** True when the work was queued asynchronously rather than resolved inline. */
   queued: boolean;
+  /** True when categoryId above was actually written to the transaction. When false and
+   * source is AI_SUGGESTION, the suggestion sits in suggestedCategoryId/Name awaiting the
+   * customer's acceptance. */
+  applied: boolean;
+  /** The AI's suggestion when `applied` is false (e.g. default suggest_only mode). */
+  suggestedCategoryId?: string;
+  suggestedCategoryName?: string;
+  /** Why the outcome landed where it did, e.g. "manual_locked", "below_threshold", "rate_limited". */
+  reason?: string;
   source: CategorizationSource;
 }
 

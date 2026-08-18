@@ -556,3 +556,268 @@ non-production EAS/provider credential setup remain before the feature can be ma
   mismatch on goal withdrawals) — deliberately short, since most of what looked like backend
   gaps from a mobile-only read turned out to be mobile-side mock/real drift once checked against
   actual backend source. Not committed/pushed in either repo.
+- 2026-08-18 — User reported AI can't auto-categorize transactions from SMS, photo, CSV entry,
+  or SePay-linked-wallet sync. Deep-inspected the full pipeline across both repos (two parallel
+  Explore passes, read-only). **Mobile side is not the source**: `real/extraction.ts`'s
+  SMS/CSV/Photo mappers pass through the backend's `categoryId` correctly with nothing dropped
+  or reset, and all three review screens (`sms.tsx`, `csv-import.tsx`, `photo-confirm.tsx`)
+  display it correctly. **Real backend causes found**: (1) the shared categorizer
+  (`AiCategorizationService.CategorizeTransactionAsync`, called by SMS/CSV extraction's
+  `PreviewAsync` and by SePay sync's `CategorizeAsync` helper) catches any
+  `AiProviderUnavailableException` from the Gemini call and silently falls back to
+  `categoryId: null`, logged only as a warning — never surfaced to the app. Git history shows
+  the Gemini model config (`FlashModel` + fallback chain) changed three times in the days just
+  before this report (commits `c83a331`→`80d5e33`→`460fc9c`), landing on
+  `gemini-3.1-flash-lite`; an invalid/decommissioned model ID anywhere in that fallback chain
+  would exhaust every attempt and silently degrade every SMS/CSV/SePay categorization to
+  uncategorized — the most likely proximate cause, but unconfirmed since this environment can't
+  read the deployed `Gemini:ApiKey` secret or backend logs. (2) A separate, independent bug:
+  `POST /extract/photo` never calls the categorization service at all (unlike SMS/CSV), so
+  every photo-extracted row is uncategorized by construction regardless of Gemini's health —
+  not fixed this round, flagged as a backend follow-up. **Also found**: `real/reports.ts`'s
+  `categorizeTransaction`/`overrideCategorization` (AI re-categorize endpoints) have zero UI
+  consumers anywhere in the mobile app — no screen offers a manual "re-suggest AI category"
+  action on an existing uncategorized transaction (e.g. one that landed uncategorized from
+  SePay sync). Not fixed this round either. **Stale docs corrected**: `project-spec.md` and
+  `architecture.md` both still claimed photo OCR "always responds 503, `IReceiptOcrService` is
+  an intentional placeholder" — that's no longer true (`finviet-be` commit `aff76cc` wired in a
+  real Gemini OCR provider); both docs updated to describe the actual current gap (OCR works,
+  categorization on that path doesn't) instead. User's chosen scope for this round: report +
+  doc correction only — the two code bugs above (photo-extraction categorization gap, missing
+  mobile AI-recategorize UI) are follow-up candidates, not implemented. No code changed besides
+  these context docs. Not committed/pushed.
+- 2026-08-18 — User asked to implement the flagged code bugs. Investigating further before
+  writing code surfaced a bigger, always-reproducing root cause than the earlier "occasional
+  Gemini failure" framing: `finviet-be`'s `AiClassificationResult` (the DTO `PreviewAsync`
+  returns, used by SMS/CSV extraction) only ever carried `CategoryName`/`Confidence`, never a
+  `CategoryId` — `ExtractedTransactionItem.CategoryId` was explicitly commented "reserved...
+  not populated by the preview." So every SMS/CSV row categorized by the AI path (not an exact
+  merchant-rule match) came back with a real category *name* but no *id* — permanently, on
+  every successful AI call, not just on provider failures — and the mobile app only ever reads
+  `categoryId`. Separately, for SePay-synced transactions, `CategorizeTransactionAsync` only
+  writes `txn.CategoryId` when the customer's AI preference mode is `high_confidence_auto`;
+  the default (no preference row) is `suggest_only`, so by design the AI produces a confident
+  guess (`AiCategoryGuess`) that's never applied — correct-by-design, but with zero mobile UI
+  to ever surface or accept the suggestion, so linked-wallet transactions stayed uncategorized
+  indefinitely. Confirmed with the user which fixes to do this round (all three): the SMS/CSV
+  CategoryId gap, photo-extraction's missing categorization call, and a mobile UI to accept
+  AI suggestions.
+- 2026-08-18 — Implemented across both repos, on new branches
+  (`fix/ai-categorization-suggestions` in both `finviet-mobile` and `finviet-be`, backend off
+  `feature/gemini-receipt-ocr` since it already carries the working photo-OCR wiring this fix
+  builds on). Not committed/pushed in either repo; not merged. **Backend** (`finviet-be`):
+  `AiClassificationResult` gained a `CategoryId` property, resolved in
+  `AiCategorizationService.PreviewAsync` from the model's chosen category name against the same
+  `expenseCategories` dictionary `CategorizeTransactionAsync` already uses (mirrors that
+  method's existing name→id resolution, just applied to the preview path too).
+  `TransactionExtractService`'s per-row rule-then-AI logic (previously inlined in
+  `BuildResponseAsync`) was extracted into a shared `ApplyCategorizationAsync` helper, now also
+  setting `item.CategoryId` from the AI branch (previously only `CategoryName`/`Confidence`). A
+  new `ITransactionExtractService.CategorizeItemAsync(customerId, item, ct)` exposes that same
+  rule-then-AI logic for a single already-extracted row; `ExtractController.ExtractPhoto` now
+  calls it on the OCR result before returning, so photo rows get the same category suggestion
+  SMS/CSV rows always got (previously: no categorization call existed for photo at all). Fixed
+  two stale doc spots the investigation surfaced: `ExtractedTransactionItem.CategoryId`'s
+  "reserved, not populated" comment, and `docs/api-reference.md`'s three remaining "photo OCR
+  always 503 / `ocr_not_configured`" lines (already known-stale per the mobile-repo doc fix
+  earlier the same day, just not yet corrected in the backend's own docs). Added
+  `PreviewAsync_ResolvesCategoryIdFromCategoryName` +
+  `PreviewAsync_UnresolvableCategoryName_LeavesCategoryIdNull` to
+  `AiCategorizationServiceTests.cs`, and a new `TransactionExtractServiceTests.cs` (5 tests:
+  AI-branch CategoryId propagation, rule-precedence-over-AI, AI-exception leaves row
+  uncategorized without throwing, income rows skip categorization entirely, and the new
+  `CategorizeItemAsync` photo path). Verified: `dotnet build` 0 errors (6 pre-existing warnings,
+  none new); `FinViet.Application.UnitTests` 256/256 (249 pre-existing + 7 new), no
+  regressions. **Mobile** (`finviet-mobile`): fixed a second, independently-discovered
+  contract-drift bug while wiring the new UI — `real/reports.ts`'s
+  `CategorizationOutcomeDto`/`toOutcome`/`toSource` only recognized backend source values
+  `RULE`/`AI`/`FALLBACK`, but the real backend's `CategorizationOutcome.Source` is
+  `MANUAL`/`RULE`/`AI_AUTO`/`AI_SUGGESTION`/`OFF`/`FALLBACK` — every other value was silently
+  collapsing to `FALLBACK`, and `applied`/`suggestedCategoryId`/`suggestedCategoryName`/`reason`
+  weren't mapped at all, which would have made the new "accept suggestion" UI unable to tell an
+  applied result from a pending suggestion. Fixed
+  `CategorizationSource`/`AiClassificationResult`/`CategorizationOutcome` in `src/types/ai.ts`
+  and the DTO/mapper in `real/reports.ts` to match the backend exactly. Added
+  `useCategorizeTransaction`/`useOverrideCategorization` to `useReports.ts` (same
+  invalidate-transactions/budgets/AI-derived pattern as the existing transaction mutations,
+  exported through the hooks barrel). Added the UI itself to the transaction detail screen
+  (`app/(tabs)/transactions/[id].tsx`): when a non-transfer transaction is uncategorized, a
+  dashed "Gợi ý danh mục bằng AI" button calls `categorizeTransaction`; an `applied` outcome
+  sets the category directly with a confirmation alert, an `AI_SUGGESTION` outcome renders an
+  inline suggestion card (category name + confidence %) with Áp dụng/Bỏ qua, and Áp dụng calls
+  `overrideCategorization` (which always writes, unlike the suggest_only-gated
+  `categorizeTransaction`) to actually apply it. New Vietnamese strings added to
+  `transactionDetailData.ts` per the i18n convention. Added 4 new tests to
+  `src/services/real/__tests__/reports.test.ts` covering the categoryId passthrough and every
+  backend source value (including the "unknown value still falls back to FALLBACK" case).
+  Verified: `npm run type-check` clean; `npm run lint` 0 errors (77 pre-existing warnings, same
+  set as before this change — the one new warning line is the pre-existing tolerated
+  `set-state-in-effect` class firing on a line added inside an already-flagged effect, not a
+  new warning category); `npm test` 25/25 suites, 129/129 tests (7 new). No
+  physical-device/emulator verification in this environment (none available) — manual
+  on-device check of the actual "Gợi ý danh mục bằng AI" flow (both the immediate-apply and
+  suggest-then-accept paths) is the user's to do before merging.
+- 2026-08-18 — Backend PR opened: `finviet-be` [#67](https://github.com/FinViet-Capstone/finviet-be/pull/67)
+  (`fix/ai-categorization-suggestions` → `dev`), carrying only the categorization-fix commit —
+  confirmed `feature/gemini-receipt-ocr` (the branch it was cut from) is already an ancestor of
+  `origin/dev` via PR #65, so the diff doesn't re-bundle the OCR wiring. Not merged yet.
+  User separately reported (with a screenshot of the CSV review screen showing 158/158 rows
+  stuck "Chưa phân loại") that once AI categorization actually works, up to 158 sequential
+  per-row Gemini calls during CSV extraction need a real loading state — the previous UI only
+  showed a small spinner inside the upload button while the whole batch parsed inline on the
+  same screen as the wallet/review step. Requested: (1) move CSV review to its own screen, and
+  (2) show a proper "AI is categorizing" loading state during extraction. Implemented on
+  `fix/ai-categorization-suggestions` (mobile): split `app/(tabs)/entry/csv-import.tsx` down to
+  just the file-picker/template/guide screen — `handlePickFile` now only opens the document
+  picker and pushes `/(tabs)/entry/csv-review` with `fileUri`/`fileName` route params (same
+  pattern `photo.tsx` → `photo-confirm.tsx` already uses for handing off to a review screen).
+  New `app/(tabs)/entry/csv-review.tsx` receives those params, calls `extractFromCsv` itself on
+  mount, and renders three states: a full-screen "AI đang phân loại giao dịch..." loading view
+  (icon + spinner + a "may take a moment for large files" subtext) while the request is in
+  flight, an error view with a "Quay lại" button on failure/zero-rows, and — once ready — the
+  wallet-picker + preview-list + duplicate-detection + category-picker + import UI that
+  previously lived inline in `csv-import.tsx` (moved verbatim: `WalletCard`, `PreviewRow`,
+  `ParsedRow`, `suggestCategoryFromMerchant`, `formatVND`, and all the selection/import
+  handlers). No backend or hook changes needed — this is purely a screen split. Verified:
+  `npm run type-check` clean; changed-file lint 0 errors (2 pre-existing tolerated
+  `set-state-in-effect` warnings — the wallet-auto-select effect carried over unchanged, plus
+  one new instance of the same tolerated class in the new extraction effect); full `npm test`
+  25/25 suites, 129/129 tests (no existing test file covered `csv-import.tsx` before this
+  split, matching the untested-navigation-screen pattern `photo.tsx` already has). Not
+  committed — user asked to test the mobile change locally before it goes to PR, unlike the
+  backend fix above which was explicitly asked to PR straight to `dev`.
+- 2026-08-19 — User reported the CSV screenshot from 2026-08-18 (158/158 "Chưa phân loại")
+  was reproduced again after merging PR #67. Diagnosed as a pure deploy gap, not a code bug:
+  `finviet-be`'s `deploy-render.yml` only deploys on push to `main`, and the categorization
+  fix (`79e6d62`/PR #67) was merged into `dev` but hadn't reached `main` yet, so the live
+  Render backend the app talks to (`.env.local`/`eas.json`'s `EXPO_PUBLIC_API_BASE_URL`) was
+  still running pre-fix code. User merged `dev` → `main` themselves to trigger the deploy.
+  Re-testing then surfaced a **new** regression: CSV import now fails outright with "Không đọc
+  được file CSV". A user-supplied Sentry share link (`REACT-NATIVE-A`,
+  `AxiosError: timeout of 20000ms exceeded`) confirmed the cause: the categorization fix made
+  `TransactionExtractService.BuildResponseAsync`'s per-row `foreach` loop call the AI
+  classifier once per row, sequentially — for a 158-row file that's up to 158 sequential
+  Gemini round trips in one request, blowing past `src/lib/api.ts`'s shared 20s axios timeout
+  (`extractFromCsv` had no per-request override). While designing the parallelization fix,
+  found a second, more fundamental blocker: `PostgresAiRateLimiter`'s default quota
+  (`AiLimitsOptions`: 6 calls/minute, 100/day per customer, no override in either
+  `appsettings.json`) applies to the same `"classification_preview"` feature CSV/SMS
+  extraction uses — meaning even perfectly parallelized, a large import would still come back
+  mostly uncategorized (quickly, instead of via timeout). User chose to give bulk import its
+  own separate, higher quota rather than raise the global limit or cap AI calls per import.
+  Separately, user proposed letting the customer switch tabs/background the app during
+  extraction instead of blocking on the loading screen, with a notify-when-done trigger;
+  scoped down (after a feasibility check) to the **light version** — survives tab switches and
+  brief backgrounding (the app process staying alive), not a force-quit, which would need
+  `/extract/csv` to become a real persisted async job (deferred). Implemented on new branches
+  (`fix/csv-extraction-timeout` in `finviet-be`, continuing on `fix/ai-categorization-suggestions`
+  in `finviet-mobile`): **Backend** — `PostgresAiRateLimiter` switched from an injected scoped
+  `FinVietDbContext` to `IDbContextFactory<FinVietDbContext>` (mirroring `AiTelemetryRecorder`'s
+  existing pattern) so it's safe to call concurrently, and now branches its per-minute/per-day
+  limit pair on the feature name — new `AiLimitsOptions.BulkImportPerMinute`/`BulkImportPerDay`
+  (100/1000) apply only to a new `"classification_batch"` feature key, leaving the existing
+  6/100 limits untouched for single-transaction flows. `IAiCategorizationService` gained
+  `PreviewManyAsync(customerId, inputs, ct)`, hoisting the once-per-request preference/category-
+  catalog DB reads out of the per-row path and running the remaining Gemini calls with bounded
+  concurrency (`SemaphoreSlim`, degree 6) via `Task.WhenAll`; each input's failure (AI error or
+  hitting the bulk quota) degrades independently, matching the old single-row behavior.
+  `TransactionExtractService.BuildResponseAsync` now does a synchronous rule-match pass per row
+  first (unchanged precedence), then one batched `PreviewManyAsync` call for whatever's left,
+  instead of one `PreviewAsync` call per row; `ApplyCategorizationAsync`/single-row `PreviewAsync`
+  are untouched and still serve the photo path (`CategorizeItemAsync`), which doesn't need
+  batching at one row. **Mobile** — `extractFromCsv` now passes `{ timeout: 120_000 }` on its
+  `api.post` call (matching the convention already used by `reports.ts`'s other slow-AI calls)
+  instead of inheriting the shared instance's 20s default; `extractFromPhoto` left alone
+  (single-row, no batching risk). For notify-when-done: new `useEphemeralBannerStore` (Zustand)
+  + root-mounted `EphemeralBanner` component — deliberately **not** routed through
+  `NotificationProvider`'s `AppNotification` queue, since that type/UI is closed over backend
+  notification types (`budget_alert|weekly_report|goal_milestone|announcement`) and would have
+  needed widening a backend-contract type for a client-only event; new
+  `scheduleCsvImportReadyNotification` in `src/lib/notifications.ts` for the backgrounded case
+  (`expo-notifications`' `scheduleNotificationAsync` with `trigger: null` — first local-notification
+  use in this codebase, previously only push-token registration existed). `csv-review.tsx` tracks
+  focus (`useIsFocused`) via a ref (so the async extraction effect reads live focus state at
+  resolve time, not mount time) and checks `AppState.currentState`; on completion while
+  off-screen, shows the banner (foregrounded elsewhere) or schedules the OS notification
+  (backgrounded), covering both success and failure. Added `csvImportReadyRoute` to
+  `src/lib/notificationRouting.ts` (a pure `data → Href | null` helper, deliberately placed
+  there rather than in `lib/notifications.ts` so routing logic/tests don't pull in the heavy
+  `expo-notifications` SDK) — `NotificationProvider`'s response and receive listeners both now
+  check it first and skip their generic backend-notification handling for a match, so a local
+  notification tap routes straight back to `csv-review` with its original `fileUri`/`fileName`
+  instead of falling through to the generic "no pushData → /notifications" fallback. Also
+  disabled the header back button while `status === 'loading'` — unlike a tab switch, backing
+  out via the stack really does unmount the screen and silently drop the in-flight result under
+  this light-version scope. Added 6 new backend tests (`PreviewManyAsync` empty/mode-off/
+  ordering/isolation/rate-limit degradation in `AiCategorizationServiceTests.cs`, one multi-row
+  batching test in `TransactionExtractServiceTests.cs`, all four pre-existing `ExtractSmsAsync_*`
+  tests updated to mock `PreviewManyAsync` instead of `PreviewAsync`) and 4 new mobile tests
+  (`csvImportReadyRoute` in `notificationRouting.test.ts`). Verified: backend `dotnet build`
+  clean, `FinViet.Application.UnitTests` 262/262 (256 pre-existing + 6 new); mobile
+  `npm run type-check` clean, `npm run lint` 0 errors/78 warnings (only the 2 pre-existing
+  tolerated `set-state-in-effect` warnings on unchanged `csv-review.tsx` lines), `npm test`
+  25/25 suites, 133/133 tests (129 pre-existing + 4 new). No live-backend timing verification or
+  physical-device notify-flow check in this environment (none available) — confirming the
+  actual wall-clock speedup and the tab-switch/background notify UX end-to-end is the user's to
+  do. Backend committed and PR'd: `finviet-be`
+  [#69](https://github.com/FinViet-Capstone/finviet-be/pull/69)
+  (`fix/csv-extraction-timeout` → `dev`), not merged yet. Mobile left uncommitted, same as the
+  CSV-review screen split above — user wants to test the notify-when-done flow on-device first.
+- 2026-08-19 — User confirmed AI categorization itself now works after PR #69's fix (screenshot
+  of a 3-row CSV import, all correctly categorized), then asked for two UI/data changes on the
+  new labeled-field `csv-review.tsx` cards: (1) let the merchant title wrap/grow instead of
+  truncating to one line, and (2) flagged a suspicion — from a screenshot with long raw bank-note
+  titles like "Thanh toan hoa don tien nuoc SAWACO..." — that a distinct recipient/beneficiary
+  name might be getting parsed but silently dropped or merged into that title. Diagnosed via
+  `finviet-be` source before proposing anything: confirmed both are possible depending on the
+  source file — the app's own 3-column template (`Ngày,Nội dung,Số tiền`) genuinely has no
+  separate recipient data (nothing lost), but a fuller bank-statement export with a distinct
+  correspondent/beneficiary column *did* have that value momentarily separate in
+  `BankStatementRowParser.cs` before being concatenated straight into the single `Note` string
+  (`"{description} | Doi ung: {correspondent}"`, `ParsedTransactionDto` had no field to keep it
+  structured) — and the header aliases recognized for that column (`"doi ung"`,
+  `"correspondent"`, `"beneficiary"`, exact-match only) likely miss common real Vietnamese bank
+  header phrasing like "Tên đối tác"/"Người thụ hưởng" anyway. User confirmed wanting the
+  robustness fix, since which bank-CSV shape a customer uploads isn't knowable in advance
+  ("sao kê" formats differ by bank). Implemented on the same branches as the fix above
+  (`fix/csv-extraction-timeout` backend, `fix/ai-categorization-suggestions` mobile — this is a
+  continuation of the same CSV-review work, not a new branch): **Backend** — `ParsedTransactionDto`
+  gained `CorrespondentName` (`TransactionImportDto.cs`), kept as its own field instead of being
+  folded into `Note`, in both `BankStatementRowParser.ParseNamedRow` and
+  `ParseLegacyPositionalRow`; `CorrespondentAliases` broadened (`doi tac`, `thu huong`,
+  `nguoi nhan`, `nguoi gui`, `doi tuong giao dich`, `ten khach hang doi ung`) and — since bank
+  header phrasing varies far more than date/description/amount headers do — switched from exact
+  header-string equality to substring matching (`IsCorrespondentHeader`) for this one column, so
+  e.g. "Tên đối tác giao dịch" still resolves via the "doi tac" substring without every exact
+  bank phrase needing to be enumerated. `TransactionExtractService.BuildResponseAsync` now sets
+  `Merchant`/`Description` from genuinely separate values (`Merchant = CorrespondentName ??
+  Note`, `Description = Note`, versus both being the same `Note` string before), and combines
+  both texts for rule-matching/AI-categorization input (`"{Note} {CorrespondentName}"`) so
+  categorization quality doesn't regress now that the two are stored separately instead of
+  pre-merged. Updated the one existing test that asserted the old merged-into-Note string, and
+  added 5 new backend tests (correspondent kept separate, absent-correspondent leaves the field
+  null, 4 header-variant cases proving the substring match) plus 1 new
+  `TransactionExtractServiceTests.cs` test proving Merchant/Description end up genuinely distinct
+  while categorization still sees both. **Mobile** — `CsvExtractionRow`/`toCsvRow()` gained a
+  `description` field alongside `merchant`; `csv-review.tsx`'s `ParsedRow` and its mapping carry
+  a `description` only when it's genuinely different from `merchant` (most rows still have none);
+  `PreviewRow` shows it as a new "Nội dung" labeled field between Số tiền and Danh mục, only when
+  present — most CSV rows show exactly what they did before. Also removed the merchant title's
+  `numberOfLines={1}` truncation and switched the top row from center- to top-alignment so a
+  wrapped multi-line title still looks right against the checkbox/duplicate badge. Verified:
+  backend `dotnet build` clean, `FinViet.Application.UnitTests` 268/268 (262 pre-existing + 6
+  new); mobile `npm run type-check` clean, `npm run lint` 0 errors/78 warnings (same 2
+  pre-existing tolerated `set-state-in-effect` warnings as before, line numbers only shifted),
+  `npm test` 25/25 suites, 133/133 tests (unchanged count — no new mobile test file for this
+  purely presentational change). User confirmed committing the backend side; discovered PR #69
+  had already been merged into `dev` by then (local `dev` branch had drifted to it mid-session),
+  so this landed as a new branch/PR instead of an addition to #69: `finviet-be`
+  [#71](https://github.com/FinViet-Capstone/finviet-be/pull/71) (`fix/csv-correspondent-name` →
+  `dev`), not merged yet.
+- 2026-08-19 — Committed and PR'd the mobile side of this whole branch (AI category suggestions,
+  the CSV import/review rework, notify-when-done, and the CSV review redesign), split into three
+  commits on `fix/ai-categorization-suggestions`: `feat: let users accept AI category suggestions
+  on uncategorized transactions`, `refactor: split CSV import into upload/review screens, speed
+  up categorization, add notify-when-done`, and `docs: update feature context notes`. PR'd as
+  `finviet-mobile` [#41](https://github.com/FinViet-Capstone/finviet-mobile/pull/41) →
+  `dev`, not merged yet.

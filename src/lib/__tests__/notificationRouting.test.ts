@@ -1,4 +1,5 @@
 import {
+  csvImportReadyRoute,
   notificationDetailRoute,
   notificationRoute,
   parseNotificationPushData,
@@ -64,5 +65,37 @@ describe('notification routing', () => {
       entityId: null,
     });
     expect(parseNotificationPushData({ type: 'announcement' })).toBeNull();
+  });
+});
+
+describe('csvImportReadyRoute', () => {
+  it('routes a local CSV-import-ready payload back to the review screen with its params', () => {
+    expect(csvImportReadyRoute({
+      localKind: 'csv_import_ready',
+      fileUri: 'file:///tmp/statement.csv',
+      fileName: 'statement.csv',
+    })).toEqual({
+      pathname: '/(tabs)/entry/csv-review',
+      params: { fileUri: 'file:///tmp/statement.csv', fileName: 'statement.csv' },
+    });
+  });
+
+  it('falls back to a default file name when missing', () => {
+    expect(csvImportReadyRoute({ localKind: 'csv_import_ready', fileUri: 'file:///tmp/x.csv' }))
+      .toEqual({
+        pathname: '/(tabs)/entry/csv-review',
+        params: { fileUri: 'file:///tmp/x.csv', fileName: 'statement.csv' },
+      });
+  });
+
+  it('returns null for a real backend notification payload, never confusing the two', () => {
+    expect(csvImportReadyRoute({
+      notificationId: 'notification-id',
+      type: 'announcement',
+    })).toBeNull();
+  });
+
+  it('returns null for an empty payload', () => {
+    expect(csvImportReadyRoute({})).toBeNull();
   });
 });
