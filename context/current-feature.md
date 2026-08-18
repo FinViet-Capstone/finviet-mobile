@@ -1,8 +1,153 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Remove the mock service layer + fix Photo/CSV/Settings bugs that surfaced while
+testing against the real backend (branch `feature/remove-mock-layer`). User reported: Photo
+entry never parses the actual receipt and its flashlight button does nothing; CSV import has
+no select-all/deselect-all across up to 158 rows; Settings looked "still mock" and theme
+changes didn't stick on the real API. A 5-pass Explore audit (both `finviet-mobile` and
+`finviet-be`) found concrete causes: `real/extraction.ts` unconditionally re-exports mock's
+`extractFromPhoto` regardless of `USE_MOCK` (never calls the real, intentionally-503ing
+`POST /extract/photo`); the flashlight button only toggles an icon glyph (capture goes
+through `expo-image-picker`'s native camera, which has no torch hook); CSV/photo review
+screens have per-row-only selection with no bulk toggle anywhere in the codebase to copy;
+Settings' theme/notification mutations have no `onError` handling so real-API failures are
+invisible; and `real/auth.ts`'s `toCustomer` hardcodes `notifications: {budget:true,
+report:true, goals:true}` on every login/profile fetch because the backend has no field at
+all for those three toggles (confirmed via `finviet-be` — `UpdateProfileSettingsRequest`
+only has `Theme` and a `NotifBudgetThresholds` threshold pair, not per-category booleans).
+Given that audit, the user decided to delete the mock layer outright (`src/services/mock/*`,
+the `USE_MOCK` flag) rather than keep patching drift, with three domain-specific decisions:
+Photo OCR calls the real endpoint and shows an honest "coming soon" error instead of fake
+data; the three backend-less notification toggles persist locally per customer (SecureStore,
+like the existing `themeCache`) instead of round-tripping a nonexistent API; and Subscriptions
+(confirmed via `finviet-be`: a real `POST /subscriptions/subscribe`/VNPay endpoint exists, but
+plan-catalog and status-check are `Admin`-only, no customer-facing equivalent) gets its
+Settings entry hidden entirely until backend adds those two endpoints, rather than half-wired.
+Full plan at the session's plan file; ordering rule: wire/fix the real side only in the first
+four steps, touch nothing under `src/services/mock/` until the final wholesale-deletion step.
+
+## Status
+
+Implemented — all five plan steps done, `npm run type-check` clean (one pre-existing unrelated
+error in `app/settings/categories.tsx` untouched), `npm run lint` 0 errors / 70 warnings (down
+from a higher pre-branch count — several warnings disappeared along with the deleted files;
+none newly introduced beyond two pre-existing `axios`-named-export-style warnings matching the
+one already present in `src/utils/errors.ts`), `npm test` 24/24 suites, 120/120 tests (the 5
+mock-only test suites were deleted along with `src/services/mock/`, their subjects confirmed
+dead — real mode gets that computation from the backend already, nothing needed porting). No
+physical-device/emulator verification in this environment (none available); manual on-device
+check of the actual UI flows is the user's to do. Not committed/pushed.
+
+## Notes
+
+- Steps 1–4 (Settings error surfacing + local notification-prefs cache; Photo real OCR wiring
+  + flashlight removal; CSV/photo select-all UX; Subscriptions entry-point hiding + backend
+  handoff doc) only touched `real/*`, hooks, and screens — `src/services/mock/` was left
+  completely untouched until step 5's wholesale deletion, per the user's explicit ordering
+  instruction.
+- Step 5 surfaced two bugs beyond the original plan, both fixed as directly-caused follow-ups
+  rather than new scope: (1) renaming the service-layer auth input types off their `Mock*`
+  prefix collided with pre-existing, unrelated form-validation types of the same name in
+  `src/validators/auth.schema.ts` — resolved by adopting the codebase's own pre-existing (if
+  previously unused) `*Payload` naming convention instead (`LoginPayload`, `RegisterPayload`,
+  `ChangePasswordPayload`, `ResetPasswordPayload`), and deleting the now-doubly-redundant dead
+  `*Payload` types that already existed unused in `src/types/customer.ts`. (2) Found and
+  deleted several other confirmed-zero-consumer dead type scaffolds while relocating types out
+  of `mock/*` (`src/types/api.ts` — an entirely unused "planned backend envelope" file whose own
+  docstring referenced the mock layer; unused legacy `*Payload` types in `budget.ts`/`goal.ts`/
+  `wallet.ts`; `src/types/subscription.ts`, orphaned once the Subscriptions UI was removed) —
+  verified each via grep for zero consumers before deleting, not assumed.
+- `getCustomer` (barrel-exported from `mock/user.ts`, unconditional regardless of `USE_MOCK`)
+  turned out to have zero runtime consumers — `useCustomer()` reads from the Zustand auth store
+  instead, populated by `real/auth.ts`'s `toCustomer` at login/bootstrap — so it was dropped
+  outright rather than needing a real replacement. Same for `getIncomeAllocationHistory`
+  (confirmed no backend endpoint and no callers).
+- `app/(auth)/index.tsx`'s Google-OAuth button was previously gated behind `USE_MOCK &&` (a
+  demo-only affordance, since `real/auth.ts`'s `googleOAuth` always throws a clear "not
+  available yet, use email/password" error). Rather than deleting the button along with the
+  flag, it's now shown unconditionally — consistent with the Photo OCR treatment elsewhere in
+  this same change (call the real path, surface its honest error) rather than hiding a
+  already-working error message.
+- `.fallowrc.jsonc`'s `duplicate-exports: off` was re-verified against the new no-mock world
+  (temporarily flipped on, ran `fallow dead-code`, confirmed the findings are the ordinary
+  barrel re-export pattern in `src/services/index.ts`, not anything mock-related) and its
+  justifying comment updated accordingly; the rule itself stays off.
+- `context/architecture.md` and `context/project-spec.md` updated throughout to remove
+  `USE_MOCK`/mock-layer framing and describe the current real-only state, including the
+  Photo-OCR-503 and Subscriptions-hidden exceptions.
+
+Feature: Savings Goals ↔ Budget Adherence ↔ AI Spending Score integration — cross-repo work
+with `finviet-be` (branch `fix/savings-bucket-goal-netting` there; this repo's branch is
+`fix/savings-goal-budget-score-integration`). Started from an inspection of how the three
+features relate: found the Budgets-bucket "Savings" spend figure was blind to Saving Goal
+money entirely (backend excluded it by design), mobile's own client-side workaround for that
+had a data-loss clamp bug, the real backend's `allocationPct`/`uncategorizedRatio` scale
+(0-100) didn't match the mobile mock's assumed 0-1 fraction, the AI score's colour bands
+(≥80/≥50 backend-side) didn't match the 70/40 the mobile FE assumed everywhere, and the score
+was never refreshed after a transaction/goal/budget mutation.
+
+## Status
+
+<!-- Not Started | In Progress | Completed -->
+Completed — backend fix implemented and verified (`dotnet build` 0 errors/warnings,
+`FinViet.Application.UnitTests` 238/238); all three tiers of the mobile fix implemented and
+verified (`npm run type-check` clean, `npm run lint` 0 errors/93 pre-existing warnings,
+`npm test` 28/28 suites, 162/162 tests). Backend handoff doc written
+(`finviet-be/docs/saving-goals-todo.md`) for the remaining genuinely open product questions.
+Not committed/pushed in either repo yet.
+
+## Goals
+
+<!-- Goals and requirements -->
+- **Backend** (`BudgetService.ComputeBucketSpentAsync`): net `cat_savings_goal`
+  contributions minus withdrawals into the Savings bucket's `Spent`, instead of excluding the
+  category outright — a goal contribution is functionally the customer fulfilling their
+  Savings allocation.
+- **Mobile Tier 1 (correctness)**: invalidate the AI score's query keys on
+  transaction/goal/budget mutations + add pull-to-refresh to the score detail screen; fix
+  `useBucketSpend`'s clamp to floor only the goal-net component, not the whole Savings
+  accumulator; normalize `allocationPct`/`uncategorizedRatio` from the real backend's 0-100
+  scale to the mock's 0-1 contract; fix the score detail screen's period label/duplicate-
+  comment/view-param bugs and stop re-deriving colour from the raw score number; add a
+  regression test locking in the allocation-percentage exact-sum-100 invariant (hardened with
+  integer basis-point arithmetic after the test caught real floating-point summation noise).
+- **Mobile Tier 2 (integration)**: surface the AI score's `spikeScore`/`budgetScore`/
+  `savingsScore`/`weights` sub-scores on the score detail screen, with copy that accurately
+  describes what `savingsScore` actually measures; exclude the savings bucket from the mock's
+  `budgetAdherenceScore`, matching the real backend's already-correct formula; warn on the
+  goals list when active goals collectively need more than the customer's own Savings
+  allocation cap.
+- **Mobile Tier 3 (consistency)**: reconcile the mock's `getBudgetBuckets` bucket assignment
+  and goal-netting with the corrected backend rule; unify the Needs/Wants spend-status colour
+  thresholds (previously three different sets: 60/80, >60/>80, >85/>60) into one shared
+  `getBudgetStatus`; fix savings category rows to never show red over 100%; hide the
+  "Cần X/tháng" line for a deadline-less goal instead of fabricating a value; correct two
+  stale docstrings.
+- No schema/migration change on the backend side — this is a query-logic change inside an
+  existing service method.
+
+## Notes
+
+<!-- Any extra notes -->
+- Full inspection notes (both repos, exact file:line citations, and the reasoning behind each
+  finding) live in this session's plan file and are summarized in
+  `finviet-be/docs/saving-goals-todo.md`'s "Context" section.
+- The mobile-only reading of several findings turned out to be wrong once checked against
+  actual backend source: the "100× allocationCap bug" and "score penalizes ahead-of-pace
+  saving" were both confirmed to be mobile mock/real drift, with the real backend already
+  correct — fixed on the mobile side only, no backend change needed for those two.
+- Deadline-less goals (no `monthsRemaining`/`monthlySavingNeeded`) are unreachable through
+  either app's own create flow today (`SavingGoalService.ValidateCreate` requires a deadline
+  on the backend; `NewGoalSheet` always defaults+requires one on mobile) — the mobile display
+  fix for this case is defensive only, not fixing a live bug.
+- No `.env`, API key, commit, push, deployment, production database change, or credential
+  change without explicit permission, in either repo.
+
+---
+
 Feature: reliable notification delivery with foreground in-app banners, background/terminated
-OS push, unread visibility, and exact entity deep links.
+OS push, unread visibility, and a static notification-detail screen.
 
 ## Status
 
@@ -19,9 +164,9 @@ non-production EAS/provider credential setup remain before the feature can be ma
   without replaying the customer's historical unread inbox after login.
 - Keep the Notification Center as the canonical durable inbox, add a visible unread count on the
   Home bell, poll/refetch while foregrounded, and deduplicate push and polling arrivals by ID.
-- Mark a notification read and deep-link to its exact goal, budget, report, or wallet when either
-  the in-app banner or OS notification is tapped; fall back to Notification Center for invalid or
-  unsupported targets.
+- Mark a notification read and open a static notification-detail screen (title + body only) when
+  either the in-app banner, OS notification, or a Notification Center row is tapped — replaces the
+  earlier per-entity deep-link routing (see 2026-08-18 note below).
 - Suppress duplicate foreground OS presentation in favor of the custom banner while preserving
   normal background/terminated push behavior through EAS/Expo Notifications.
 - Keep permission denial and push-provider failure non-fatal: persisted notification rows and the
@@ -45,6 +190,24 @@ non-production EAS/provider credential setup remain before the feature can be ma
   queue/cache state when the authenticated customer changes.
 - No commit, push, deployment, production database migration, credential change, or branch deletion
   without explicit permission.
+- 2026-08-17 — Diagnosed the AI chat history layout regression: `AIChatbotSheet` renders the history
+  drawer in normal document flow immediately above the message `FlatList`, so opening it consumes up
+  to 280 points and pushes the chat viewport downward. The drawer also renders sessions with
+  `sessions.map` inside a non-scrollable `View`; a long history can overflow its `maxHeight` and cover
+  the chat/input area. Approved fix scope: make the history drawer an absolutely positioned overlay
+  below the header, render sessions in a bounded vertical `FlatList`, preserve session selection and
+  chat behavior, and add focused regression coverage. No API or backend change is required.
+- 2026-08-17 — Implemented on `fix/chat-history-layout`: the history drawer is now an absolutely
+  positioned overlay below the fixed chat header, so opening it no longer participates in the flex
+  layout or reduces the message viewport. Sessions now render in a vertically scrollable `FlatList`
+  constrained to 280 points, with explicit shrink behavior for long histories on iOS and Android.
+  Added accessible expanded-state labels to the history toggle and a component regression test that
+  verifies the bounded overlay and independent history list. Verified: TypeScript clean; changed-test
+  ESLint clean; full main-workspace ESLint 0 errors / 86 pre-existing warnings; focused Jest 1/1 and
+  full main-workspace Jest 23/23 suites, 122/122 tests pass; `git diff --check` clean. Raw full-repo
+  Jest also passed 107/107 suites and 578/578 tests but redundantly scanned four temporary `.claude`
+  worktrees; raw ESLint likewise scanned those checkouts, so the authoritative reruns excluded them.
+  No physical-device acceptance, commit, or push.
 - 2026-08-17 — Diagnosed a linked-wallet uncategorized income transaction that failed when the
   customer selected `Ăn uống`: the transaction-detail picker exposed every system category instead
   of filtering by transaction type, so the backend correctly rejected the expense category with
@@ -100,6 +263,21 @@ non-production EAS/provider credential setup remain before the feature can be ma
   tests pass; backend notification tests 10/10, all Application tests
   210/210, Domain tests 1/1, and solution build 0 warnings / 0 errors. No commit, push, deployment,
   provider credential change, production migration, or physical-device acceptance was performed.
+- 2026-08-18 — User asked to stop deep-linking notification taps to the entity's own tab/screen and
+  instead open a static detail page (title + content only), for every tap surface (Notification
+  Center row, in-app banner, and OS push tap on background/terminated). Implemented: added
+  `app/notification-detail.tsx` (simple header + title + body, no entity awareness); replaced
+  `notificationEntityRoute` in `src/lib/notificationRouting.ts` with `notificationDetailRoute`,
+  which every tap path now uses (`notificationRoute` for the Notification Center list and banner —
+  both already have the full `AppNotification`; the OS-response handler in `NotificationProvider`
+  now builds it from `response.notification.request.content.title`/`.body` since the push payload
+  itself only carries IDs). `AppNotification.entityType`/`entityId` and `parseNotificationPushData`
+  are unchanged and still populated (backend contract, cache identity) — only routing stopped
+  consuming them; updated their doc comments to say so instead of claiming they drive navigation.
+  Verified: `npm run type-check` clean; `npm run lint` 0 errors / 93 pre-existing warnings (none
+  newly introduced); `npm test` 29/29 suites, 160/160 tests (3 new routing tests replacing the 3
+  removed `notificationEntityRoute` cases). No physical-device acceptance (no device access in this
+  environment), commit, or push.
 
 ## History
 
@@ -239,3 +417,64 @@ non-production EAS/provider credential setup remain before the feature can be ma
   type-check clean; lint clean on all changed files (pre-existing warnings elsewhere
   untouched). Not fully re-verified live end-to-end after the last emulator crash — worth a
   fresh Maestro pass next session before trusting these fixes fully.
+  **Correction (2026-08-17):** direct inspection of `finviet-be` source confirmed this was
+  never a backend bug — `BudgetService.cs` computes `AllocationCap = income * pct / 100m`
+  correctly server-side, and `AllocationPct` is deliberately a raw 0–100 percent by design,
+  matching `Customer.NeedsPct` storage. The 100× mismatch was entirely `real/budgets.ts`'s own
+  passthrough disagreeing with the mock's pre-divided 0–1 contract. Fixed in `toBucket()` — see
+  the entry below.
+- 2026-08-17 — Inspected how Saving Goals, Budget Adherence, and the AI Spending Score relate
+  to each other, across both `finviet-mobile` and `finviet-be`, prompted by a user question
+  about whether the three surfaces stacked on Home actually form one coherent system. Found the
+  UI implies they do (score card above budget card above goal card, plus the score screen's own
+  copy claiming the score factors in "đều đặn tiết kiệm") but the Budgets-bucket "Savings" spend
+  figure was backend-blind to goal money entirely — `ComputeBucketSpentAsync` excluded
+  `cat_savings_goal` outright, not by oversight but in a way that made the bucket effectively
+  unfillable for anyone who actually uses Goals. Recommended fixing this at the source rather
+  than deepening the mobile-only workaround (`useBucketSpend`'s ad hoc netting, which itself had
+  a real data-loss clamp bug — a goal withdrawal larger than that month's contributions could
+  zero out an unrelated `cat_savings` expense logged the same month). User confirmed doing both
+  repos in one coordinated effort.
+- 2026-08-17 — Implemented across both repos. **Backend** (`fix/savings-bucket-goal-netting`):
+  `ComputeBucketSpentAsync`'s Savings bucket now nets `cat_savings_goal` contributions minus
+  withdrawals (floored at 0) via a new `ComputeGoalNetSavingsAsync`; `CalculateFlatBudgetAdherenceScore`'s
+  separate needs/wants-only exclusion left untouched (a different, correct design choice). New
+  `BudgetServiceTests.cs` (3 tests, EF Core InMemory pattern) prove the netting formula and the
+  exact data-loss repro reported from mobile. `dotnet build` 0 errors/warnings, full
+  `FinViet.Application.UnitTests` 238/238 (235 pre-existing + 3 new), no regressions.
+  **Mobile** (`fix/savings-goal-budget-score-integration`), all three tiers: Tier 1 — score
+  query invalidation on transaction/goal/budget mutations + pull-to-refresh on the score detail
+  screen; `useBucketSpend`'s clamp fixed to floor only the goal-net sub-total; `real/budgets.ts`'s
+  `toBucket()` now divides `allocationPct`/`uncategorizedRatio` by 100 to match the mock's 0-1
+  contract (the confirmed root cause of the "100x bug" noted above); score detail screen's period
+  label/duplicate-AI-comment/view-param bugs fixed and its colour now always comes from
+  `score.color` instead of re-deriving a 70/40 band from the raw number (backend's real bands are
+  80/50); new shared `src/utils/allocationRedistribution.ts` consolidates the two allocation
+  screens' redistribution math (previously duplicated) with a regression test for the
+  exact-sum-100 invariant — the test itself caught a real subtlety (naive JS `+` on three
+  individually-correct 2-decimal percentages can show floating-point noise like
+  `99.99999999999999` even though each value round-trips correctly through JSON to the backend's
+  exact decimal type), which led to hardening the production math with integer basis-point
+  arithmetic rather than just patching the test. Tier 2 — `SpendingScore` gained optional
+  `spikeScore`/`budgetScore`/`savingsScore`/`weights`, mapped from the real DTO and surfaced as a
+  three-row breakdown on the score detail screen (replacing the prose-only note) with copy that
+  correctly describes `savingsScore` as a blended income-rate model rather than "goal
+  regularity"; mock's `budgetAdherenceScore` now excludes the savings bucket, matching the real
+  backend's already-correct formula; goals list now warns when active goals' summed
+  `requiredMonthlySaving` exceeds the customer's own Savings allocation cap. Tier 3 — mock's
+  `getBudgetBuckets` now honors the customer's bucket override and nets goal transactions the
+  same way the corrected backend does; Needs/Wants spend-status colour thresholds unified into
+  one shared `getBudgetStatus` (previously three drifted sets: 60/80, >60/>80, >85/>60); savings
+  category rows no longer turn red over 100%; the "Cần X/tháng" line is hidden rather than
+  fabricated for a deadline-less goal (confirmed unreachable via either app's real create flow
+  today); two stale docstrings corrected (`hideGoalContributions`'s actual caller,
+  `deleteTransactionSync`'s stale claim about `goals.ts`). Verified: `npm run type-check` clean;
+  `npm run lint` 0 errors / 93 pre-existing warnings (none newly introduced); `npm test` 28/28
+  suites, 162/162 tests (23 new: allocation redistribution ×22, budget status ×3, mock budgets
+  score ×4, getBudgetBuckets reconciliation ×3, goal affordability ×5, real budgets scale ×1,
+  real reports sub-scores ×2 — some overlap across categories). Backend handoff doc written at
+  `finviet-be/docs/saving-goals-todo.md` covering the three genuinely open product questions
+  (score threshold finality, `savingsScore`'s flat 20% target, the income/expense category-type
+  mismatch on goal withdrawals) — deliberately short, since most of what looked like backend
+  gaps from a mobile-only read turned out to be mobile-side mock/real drift once checked against
+  actual backend source. Not committed/pushed in either repo.

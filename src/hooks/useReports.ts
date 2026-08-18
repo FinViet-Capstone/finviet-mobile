@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   getSpendingScore,
   getWeeklyReport,
@@ -11,6 +11,20 @@ import {
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 import type { ChatMessage, ChatSession } from '@/types';
+
+/**
+ * Invalidate the AI-derived numbers that move with the customer's own money —
+ * the spending score and weekly report — without touching chat history/sessions.
+ * Called from transaction/goal/budget mutations so "Điểm chi tiêu" reflects what
+ * the customer just did instead of sitting on a stale value for STALE_TIME.long
+ * (5 min), or indefinitely on the score detail screen, which has no other refresh
+ * trigger. Deliberately scoped narrower than `reports.all()` — chat has no reason
+ * to refetch just because a transaction was logged.
+ */
+export function invalidateAiDerived(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: queryKeys.reports.score() });
+  qc.invalidateQueries({ queryKey: queryKeys.reports.weekly() });
+}
 
 export const useSpendingScore = (view: 'weekly' | 'monthly' = 'weekly') =>
   useQuery({

@@ -1,29 +1,28 @@
 /**
  * real/extraction.ts — real .NET transaction-extraction service.
  *
- * Mirrors src/services/mock/extraction.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/extract/* (ExtractController), ApiResponse<T> envelope.
- *   - POST /extract/sms  { text }                       → ExtractResponse { rows[], totalScanned, skipped, errors }
- *   - POST /extract/csv  multipart: file, maxRows?       → ExtractResponse (same shape)
+ *   - POST /extract/sms   { text }                      → ExtractResponse { rows[], totalScanned, skipped, errors }
+ *   - POST /extract/csv   multipart: file, maxRows?      → ExtractResponse (same shape)
+ *   - POST /extract/photo multipart: file                → ExtractResponse (same shape, ≤1 row)
  *
- * The SMS screen consumes a SINGLE PhotoExtractionResult (one candidate
- * transaction), while the backend returns an array of parsed rows — we map
- * the first recognised row onto that shape. Amount/date/merchant are parsed
- * deterministically server-side, so they carry high confidence when present;
- * the category is the only AI guess, so its confidence comes from the row's
- * model score. CSV extraction surfaces the full row array instead (the
- * review-list UX needs every row, not just the first).
+ * The SMS/photo screens each consume a SINGLE PhotoExtractionResult (one
+ * candidate transaction), while the backend returns an array of parsed rows —
+ * we map the first recognised row onto that shape. Amount/date/merchant are
+ * parsed deterministically server-side, so they carry high confidence when
+ * present; the category is the only AI guess, so its confidence comes from
+ * the row's model score. CSV extraction surfaces the full row array instead
+ * (the review-list UX needs every row, not just the first).
  *
- * There is NO backend photo/OCR endpoint (the backend parses SMS text and CSV/XLSX
- * statements, not receipt images), so extractFromPhoto stays on the mock.
+ * extractFromPhoto's endpoint exists but `IReceiptOcrService` is an
+ * intentional placeholder server-side (no OCR provider configured yet) — it
+ * always throws a 503 with code `ocr_not_configured`. Callers must surface
+ * that honestly (see BUSINESS_RULE_MESSAGES_VI) rather than treat it as
+ * "zero rows found."
  */
 
 import { api, unwrap } from '@/lib/api';
 import type { CsvExtractionResult, PhotoExtractionResult } from '@/types/extraction';
-
-// Photo/receipt OCR has no backend counterpart — keep the mock implementation.
-export { extractFromPhoto } from '@/services/mock/extraction';
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
 
@@ -77,6 +76,27 @@ function toExtractionResult(row: ExtractedRowDto): PhotoExtractionResult {
 
 export async function extractFromSMS(text: string): Promise<PhotoExtractionResult> {
   const res = await api.post('/extract/sms', { text });
+  const data = unwrap<ExtractResponseDto>(res);
+  const first = data.rows?.[0];
+  return first ? toExtractionResult(first) : EMPTY_RESULT;
+}
+
+/**
+ * POST /extract/photo — multipart upload of a receipt photo. Throws (via the
+ * axios interceptor → getApiErrorMessage) when the backend's OCR provider
+ * isn't configured — see the file header comment above.
+ */
+export async function extractFromPhoto(uri: string): Promise<PhotoExtractionResult> {
+  const name = uri.split('/').pop() || 'receipt.jpg';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'heic' ? 'image/heic' : 'image/jpeg';
+  const form = new FormData();
+  // React Native FormData file part shape ({ uri, name, type }).
+  form.append('file', { uri, name, type: mime } as unknown as Blob);
+
+  const res = await api.post('/extract/photo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   const data = unwrap<ExtractResponseDto>(res);
   const first = data.rows?.[0];
   return first ? toExtractionResult(first) : EMPTY_RESULT;

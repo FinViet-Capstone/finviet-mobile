@@ -1,10 +1,7 @@
 /**
  * real/wallets.ts — real .NET wallet service.
  *
- * Mirrors the exported signatures of src/services/mock/wallets.ts so the barrel
- * (src/services/index.ts) can swap mock ⇄ real with zero hook/screen changes.
- * Reads are async here (HTTP) where the mock was synchronous — every consumer
- * goes through TanStack Query's queryFn, which awaits either shape.
+ * Reads are async here (HTTP), driven through TanStack Query's queryFn.
  *
  * Backend: api/wallets/* (WalletsController). Responses use the ApiResponse<T>
  * envelope; unwrap() peels off `.data`.
@@ -12,15 +9,17 @@
 
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { Wallet, WalletSummary, WalletType } from '@/types';
 import type {
+  Wallet,
+  WalletSummary,
+  WalletType,
   CreateWalletInput,
   UpdateWalletInput,
   WithdrawInput,
   WithdrawResult,
   WalletLedgerQuery,
   WalletLedgerPage,
-} from '@/services/mock/wallets';
+} from '@/types';
 
 // ─── Backend DTO shapes (camelCase over the wire) ─────────────────────────────
 
@@ -87,11 +86,14 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
   return toWallet(unwrap<WalletDto>(res));
 }
 
+// Uses PUT rather than PATCH — React Native's on-device networking layer has a
+// known history of dropping the request body specifically on PATCH requests.
+// The backend route accepts both verbs.
 export async function updateWallet(
   id: string,
   patch: UpdateWalletInput,
 ): Promise<Wallet> {
-  const res = await api.patch(`/wallets/${id}`, {
+  const res = await api.put(`/wallets/${id}`, {
     ...(patch.name !== undefined ? { walletName: patch.name.trim() } : {}),
     ...(patch.type !== undefined ? { walletType: patch.type } : {}),
   });

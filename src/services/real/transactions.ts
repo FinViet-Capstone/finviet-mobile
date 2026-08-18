@@ -1,8 +1,6 @@
 /**
  * real/transactions.ts — real .NET transaction service.
  *
- * Mirrors src/services/mock/transactions.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/transactions/* (TransactionsController). Like every other
  * controller, these endpoints are wrapped in ApiResponse<T> — read via unwrap().
  *
@@ -21,15 +19,17 @@
 
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { Transaction, TransactionType, EntryMethod } from '@/types';
 import type {
+  Transaction,
+  TransactionType,
+  EntryMethod,
   TransactionFilters,
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateTransferInput,
   CreateTransferResult,
   TransactionSummary,
-} from '@/services/mock/transactions';
+} from '@/types';
 
 // Maximum page size accepted by the backend. Calendar queries may span multiple
 // pages; fetch all of them before applying the mock-compatible refinements.
@@ -265,15 +265,18 @@ export async function updateTransaction(
 }
 
 /**
- * PATCH /transactions/{id}/classify — recategorize a transaction. Distinct from
- * PUT (which the backend also limits to categoryId); classify is the intent-named
- * endpoint used by the recategorize UX.
+ * PUT /transactions/{id}/classify — recategorize a transaction. Distinct from
+ * PUT /transactions/{id} (which the backend also limits to categoryId);
+ * classify is the intent-named endpoint used by the recategorize UX. Called
+ * via PUT rather than PATCH (its original verb) — React Native's on-device
+ * networking layer has a known history of dropping the request body
+ * specifically on PATCH requests; the backend route accepts both verbs.
  */
 export async function classifyTransaction(
   id: string,
   categoryId: string | null,
 ): Promise<Transaction> {
-  const res = await api.patch(`/transactions/${id}/classify`, {
+  const res = await api.put(`/transactions/${id}/classify`, {
     categoryId: categoryId ?? null,
   });
   return toTransaction(unwrap<TransactionDto>(res));

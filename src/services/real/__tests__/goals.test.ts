@@ -64,7 +64,7 @@ describe('real goals service', () => {
   });
 
   it('omits an unchanged deadline and sends supplied idempotency keys', async () => {
-    mock.onPatch('/saving-goals/goal%2Fone').reply((config) => {
+    mock.onPut('/saving-goals/goal%2Fone').reply((config) => {
       expect(JSON.parse(config.data)).toEqual({ goalName: 'Tên mới' });
       return [200, success(GOAL_DTO)];
     });

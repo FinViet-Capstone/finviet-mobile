@@ -16,3 +16,18 @@ export interface Rule {
   createdAt: string;
   updatedAt: string;
 }
+
+// -------------------------------------------------------------------------
+// Rule service input/return contracts (services/real/rules.ts)
+// -------------------------------------------------------------------------
+
+export interface CreateRuleInput {
+  merchantKeyword: string;
+  categoryId: string;
+}
+
+export interface CreateRuleResult {
+  rule: Rule;
+  /** How many existing transactions were retroactively re-categorised. */
+  appliedCount: number;
+}

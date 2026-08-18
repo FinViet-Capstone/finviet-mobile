@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
+import { getBudgetStatus } from '@/utils/budgetStatus';
 
 const TICK_COUNT = 10;
 
@@ -17,9 +18,7 @@ function getPctColor(spent: number, limit: number, colors: ThemeColors, goalMode
   const pct = (spent / limit) * 100;
   // Savings (goalMode): đạt/vượt mục tiêu = xanh; dưới mục tiêu = trung tính, KHÔNG đỏ.
   if (goalMode) return pct >= 100 ? colors.budget.safe : colors.onSurfaceVariant;
-  if (pct > 85) return colors.budget.danger;
-  if (pct > 60) return colors.budget.warning;
-  return colors.budget.safe;
+  return colors.budget[getBudgetStatus(pct)];
 }
 
 interface BucketRow {

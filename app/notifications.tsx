@@ -6,6 +6,7 @@ import {
   SectionList,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -212,27 +213,20 @@ export default function NotificationsScreen() {
 
       {/* Filter chips */}
       <View style={styles.filtersWrap}>
-        <SectionList
-          data={[]}
-          sections={[]}
-          renderItem={() => null}
-          ListHeaderComponent={
-            <View style={styles.filterChips}>
-              {S.filters.map((f) => (
-                <TouchableOpacity
-                  key={f.key}
-                  activeOpacity={0.7}
-                  style={[styles.chip, filter === f.key && styles.chipActive]}
-                  onPress={() => setFilter(f.key as FilterKey)}
-                >
-                  <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          }
-        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+          {S.filters.map((f) => (
+            <TouchableOpacity
+              key={f.key}
+              activeOpacity={0.7}
+              style={[styles.chip, filter === f.key && styles.chipActive]}
+              onPress={() => setFilter(f.key as FilterKey)}
+            >
+              <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Notification list */}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import axios from "axios";
 import {
   BORDER_RADIUS,
   FONT_SIZE,
@@ -27,6 +28,7 @@ import { CategoryPickerSheet } from "@/components/categories";
 import { formatVND } from "@/utils/formatters";
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
+import { getApiErrorMessage } from "@/utils/errors";
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -35,7 +37,15 @@ const S = {
   back: "arrow_back",
   processing: "Đang phân tích ảnh...",
   failedExtraction: "Không đọc được ảnh. Vui lòng nhập thủ công.",
+  ocrUnavailableTitle: "Tính năng đang phát triển",
+  ocrUnavailableMsg:
+    "Tính năng quét ảnh hóa đơn bằng AI đang được phát triển. Vui lòng nhập giao dịch thủ công.",
+  stay: "Ở lại",
+  goManual: "Nhập thủ công",
   uncertainNotice: "Các trường màu cam cần kiểm tra lại.",
+  selectAll: "Chọn tất cả",
+  deselectAll: "Bỏ chọn tất cả",
+  selectedCount: (selected: number, total: number) => `${selected}/${total} đã chọn`,
   confirmAll: "Chấp nhận tất cả",
   needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
   needCategory: "Chọn danh mục →",
@@ -68,6 +78,7 @@ interface ExtractedRow {
   categoryUncertain: boolean;
   selected: boolean;
   isDuplicate: boolean;
+  failedMessage?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -79,6 +90,13 @@ function todayISO(): string {
 function formatDate(iso: string): string {
   const p = iso.split("-");
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+}
+
+/** True when the backend rejected the request because no OCR provider is
+ * configured server-side yet (finviet-be's IReceiptOcrService placeholder),
+ * as opposed to a transient/per-image failure. */
+function isOcrNotConfigured(err: unknown): boolean {
+  return axios.isAxiosError(err) && err.response?.data?.code === "ocr_not_configured";
 }
 
 function isUncertain(row: ExtractedRow): boolean {
@@ -166,7 +184,7 @@ function ReviewRow({
         </View>
 
         {isFailed ? (
-          <Text style={styles.failedText}>{S.failedExtraction}</Text>
+          <Text style={styles.failedText}>{row.failedMessage ?? S.failedExtraction}</Text>
         ) : (
           <>
             {/* Amount */}
@@ -310,6 +328,7 @@ export default function PhotoConfirmScreen() {
   );
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const ocrUnavailableAlertShown = useRef(false);
 
   // Extract each image
   useEffect(() => {
@@ -353,14 +372,29 @@ export default function PhotoConfirmScreen() {
             });
           });
         },
-        onError: () => {
+        onError: (err) => {
+          const failedMessage = getApiErrorMessage(err, S.failedExtraction);
           setRows((prev) =>
             prev.map((r, i) =>
               i === idx
-                ? { ...r, status: "failed" as const, selected: false }
+                ? { ...r, status: "failed" as const, selected: false, failedMessage }
                 : r,
             ),
           );
+          if (isOcrNotConfigured(err) && !ocrUnavailableAlertShown.current) {
+            ocrUnavailableAlertShown.current = true;
+            Alert.alert(S.ocrUnavailableTitle, S.ocrUnavailableMsg, [
+              { text: S.stay, style: "cancel" },
+              {
+                text: S.goManual,
+                onPress: () =>
+                  router.replace({
+                    pathname: "/(tabs)/entry/manual",
+                    ...(dateParam ? { params: { date: dateParam } } : {}),
+                  }),
+              },
+            ]);
+          }
         },
       });
     });
@@ -374,6 +408,13 @@ export default function PhotoConfirmScreen() {
     setRows((prev) =>
       prev.map((r, i) => (i === idx ? { ...r, selected: !r.selected } : r)),
     );
+  }, []);
+
+  const handleToggleAll = useCallback(() => {
+    setRows((prev) => {
+      const shouldSelectAll = !prev.every((r) => r.selected);
+      return prev.map((r) => ({ ...r, selected: shouldSelectAll }));
+    });
   }, []);
 
   const handleCategorySelect = useCallback(
@@ -442,6 +483,9 @@ export default function PhotoConfirmScreen() {
     (r) => r.categoryId === null,
   ).length;
   const isReadyToSubmit = savableRows.length > 0 && unresolvedCount === 0;
+  const selectedCount = rows.filter((r) => r.selected).length;
+  const allSelected = rows.length > 0 && selectedCount === rows.length;
+  const noneSelected = selectedCount === 0;
 
   if (allProcessing) {
     return (
@@ -480,6 +524,34 @@ export default function PhotoConfirmScreen() {
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
       </View>
+
+      {rows.length > 1 && (
+        <View style={styles.selectAllRow}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.selectAllToggle}
+            onPress={handleToggleAll}
+          >
+            <MaterialIcon
+              name={
+                allSelected
+                  ? "check_box"
+                  : noneSelected
+                    ? "check_box_outline_blank"
+                    : "indeterminate_check_box"
+              }
+              size={20}
+              color={noneSelected ? colors.onSurfaceVariant : colors.primary}
+            />
+            <Text style={styles.selectAllText}>
+              {allSelected ? S.deselectAll : S.selectAll}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.selectedCountText}>
+            {S.selectedCount(selectedCount, rows.length)}
+          </Text>
+        </View>
+      )}
 
       <FlatList
         data={rows}
@@ -579,6 +651,29 @@ function createStyles(colors: ThemeColors) {
     padding: SPACING[4],
     gap: SPACING[3],
     paddingBottom: SPACING[4],
+  },
+
+  selectAllRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+  },
+  selectAllToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[2],
+  },
+  selectAllText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: colors.onSurface,
+  },
+  selectedCountText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: colors.primary,
   },
 
   // Review row

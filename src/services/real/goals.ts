@@ -1,8 +1,6 @@
 /**
  * real/goals.ts — real .NET saving-goal service.
  *
- * Mirrors src/services/mock/goals.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/saving-goals/* (SavingGoalsController), ApiResponse<T> envelope.
  * The backend computes all progress fields server-side (SavingGoalResponse), so
  * we map them straight across rather than recomputing.
@@ -18,13 +16,14 @@
 import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { SavingsGoalWithProgress, GoalContribution } from '@/types';
 import type {
+  SavingsGoalWithProgress,
+  GoalContribution,
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
   WithdrawGoalInput,
-} from '@/services/mock/goals';
+} from '@/types';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 
@@ -141,11 +140,14 @@ export async function createGoal(
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
+// Uses PUT rather than PATCH — React Native's on-device networking layer has a
+// known history of dropping the request body specifically on PATCH requests.
+// The backend route accepts both verbs.
 export async function updateGoal(
   id: string,
   patch: UpdateGoalInput,
 ): Promise<SavingsGoalWithProgress> {
-  const res = await api.patch(`/saving-goals/${encodeURIComponent(id)}`, {
+  const res = await api.put(`/saving-goals/${encodeURIComponent(id)}`, {
     ...(patch.name !== undefined ? { goalName: patch.name.trim() } : {}),
     ...(patch.targetAmount !== undefined ? { targetAmount: patch.targetAmount } : {}),
     ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),

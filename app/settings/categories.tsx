@@ -84,6 +84,26 @@ export default function CategoriesRoute() {
       const target = zoneForAbsoluteY(absoluteY);
       if (target && dragInfo) {
         setPendingMoves((prev) => {
+          const currentBucket = prev.get(dragInfo.subId)?.targetBucket 
+            ?? originalBucketOf(dragInfo.subId, dragInfo.isCustom);
+            
+          if (target !== currentBucket && currentBucket) {
+             let itemsInCurrent = 0;
+             for (const c of (cats ?? [])) {
+               const b = prev.get(c.id)?.targetBucket ?? c.bucketId;
+               if (b === currentBucket) itemsInCurrent++;
+             }
+             for (const c of (customCats ?? [])) {
+               const b = prev.get(c.id)?.targetBucket ?? c.bucketId;
+               if (b === currentBucket) itemsInCurrent++;
+             }
+             
+             if (itemsInCurrent <= 1) {
+               Alert.alert('', 'Mỗi hũ phải có ít nhất 1 danh mục.');
+               return prev;
+             }
+          }
+
           const next = new Map(prev);
           // Dragging an item back to its original server bucket cancels the pending move.
           if (target === originalBucketOf(dragInfo.subId, dragInfo.isCustom)) {
@@ -101,7 +121,7 @@ export default function CategoriesRoute() {
       setDragActive(false);
       setDragInfo(null);
     },
-    [dragInfo, originalBucketOf],
+    [dragInfo, originalBucketOf, cats, customCats],
   );
 
   /** Returns whether the save actually succeeded — callers that navigate away afterward need to know. */

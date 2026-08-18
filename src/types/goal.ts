@@ -32,21 +32,33 @@ export interface GoalContribution {
   transactionId?: string;
 }
 
-export interface CreateGoalPayload {
+// -------------------------------------------------------------------------
+// Goal service input contracts (services/real/goals.ts)
+// -------------------------------------------------------------------------
+
+export interface CreateGoalInput {
   name: string;
   iconEmoji?: string;
   targetAmount: number;
   deadline: string;
   fundingWalletId?: string;
+  initialAmount?: number;
 }
 
-export interface UpdateGoalPayload {
+export interface UpdateGoalInput {
   name?: string;
   targetAmount?: number;
   deadline?: string;
 }
 
-export interface AddContributionPayload {
+export interface AddContributionInput {
   amount: number;
+  note?: string;
+  fundingWalletId?: string;
+}
+
+export interface WithdrawGoalInput {
+  amount: number;
+  walletId: string;
   note?: string;
 }

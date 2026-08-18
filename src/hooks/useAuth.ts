@@ -23,10 +23,10 @@ import {
   uploadAvatar,
   deleteAccount,
   unregisterNotificationDevice,
-  type MockLoginInput,
-  type MockRegisterInput,
-  type MockChangePasswordInput,
-  type ResetPasswordInput,
+  type LoginPayload,
+  type RegisterPayload,
+  type ChangePasswordPayload,
+  type ResetPasswordPayload,
 } from '@/services';
 import { getRefreshToken } from '@/lib/mmkv';
 import { getNotificationInstallationId } from '@/lib/notificationStorage';
@@ -36,7 +36,7 @@ import type { Customer } from '@/types';
 
 export const useLogin = () => {
   const setSession = useAuthStore((s) => s.setSession);
-  return useMutation<Customer, Error, MockLoginInput>({
+  return useMutation<Customer, Error, LoginPayload>({
     mutationFn: (input) => login(input),
     onSuccess: (user) => setSession(user),
   });
@@ -45,7 +45,7 @@ export const useLogin = () => {
 export const useRegister = () =>
   // Register issues no tokens (verify-email-first) — do NOT open a session here.
   // The screen routes to verify-email using the returned customer's email.
-  useMutation<Customer, Error, MockRegisterInput>({
+  useMutation<Customer, Error, RegisterPayload>({
     mutationFn: (input) => register(input),
   });
 
@@ -63,7 +63,7 @@ export const useForgotPassword = () =>
   });
 
 export const useResetPassword = () =>
-  useMutation<void, Error, ResetPasswordInput>({
+  useMutation<void, Error, ResetPasswordPayload>({
     mutationFn: (input) => resetPassword(input),
   });
 
@@ -78,7 +78,7 @@ export const useVerifyEmail = () =>
   });
 
 export const useChangePassword = () =>
-  useMutation<void, Error, MockChangePasswordInput>({
+  useMutation<void, Error, ChangePasswordPayload>({
     mutationFn: (input) => changePassword(input),
   });
 

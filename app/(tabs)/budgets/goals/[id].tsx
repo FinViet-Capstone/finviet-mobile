@@ -61,7 +61,7 @@ const S = {
   saveError: 'Không thể lưu. Hãy thử lại.',
   available: (s: string) => `Số dư khả dụng: ${s}`,
   errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
-  errOverRemaining: (s: string) => `Vượt số tiền còn thiếu (${s})`,
+  errOverRemaining: (s: string) => `Chỉ cần ${s} là đủ`,
   zeroBalance: (name: string) => `Ví ${name} đã hết số dư. Vui lòng chọn ví khác.`,
   archiveTitle: 'Lưu trữ mục tiêu?',
   archiveMsg: 'Mục tiêu sẽ chuyển vào mục Đã lưu trữ. Lịch sử đóng góp và giao dịch vẫn được giữ nguyên.',
@@ -547,10 +547,10 @@ export default function GoalDetailScreen() {
   const [deleteVisible, setDeleteVisible] = useState(false);
 
   const openArchiveWithdrawal = useCallback(() => {
-    InteractionManager.runAfterInteractions(() => {
+    setTimeout(() => {
       setIsArchiveWithdrawal(true);
       setWithdrawVisible(true);
-    });
+    }, 500);
   }, []);
 
   const handleArchivePress = useCallback(() => {
@@ -675,7 +675,12 @@ export default function GoalDetailScreen() {
             </View>
           </View>
 
-          {!goal.isCompleted && !goal.isDeleted && (
+          {/* monthlySavingNeeded/deadline text are both undefined without a
+              deadline (both mock and real agree) — hide the whole row rather
+              than showing a fabricated 0đ/tháng or remaining/1 figure next to
+              a blank date. Unreachable via the app's own create flow today
+              (deadline is required), kept defensive. */}
+          {!goal.isCompleted && !goal.isDeleted && goal.deadline && (
             <View style={styles.monthlyRow}>
               <MaterialIcon name="savings" size={16} color={colors.primary} />
               <Text style={styles.monthlyText}>

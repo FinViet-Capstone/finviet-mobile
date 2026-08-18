@@ -3,7 +3,7 @@
  * icons (svg/png only). Per context/fe-plan-2026-07-revamp.md item 1, the icon
  * file itself never leaves the device — no upload to R2 or the backend, ever.
  * Only the category's metadata (name/bucket/color/type) is a normal syncable
- * record (see services/mock/customCategories.ts).
+ * record (see types/customCategory.ts).
  *
  * expo-file-system's synchronous File/Directory API (SDK 54+) means every
  * operation here is sync — no async plumbing needed. An in-memory Map is
