@@ -1,6 +1,59 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Three user-reported fixes (cross-repo with `finviet-be`; mobile branch
+`fix/score-no-data-and-budget-pct`, backend branch `fix/custom-category-id-and-score-no-data`).
+(1) Custom category creation always fails with the backend 500 fallback "An unexpected error
+occurred." — the image is NOT the cause (the FE already treats it as optional and never sends
+it): `CategoryService.CreateCustomCategoryAsync` generates `custom_{Guid}` = 43 chars into a
+`varchar(40)` `categories.id` column, so Postgres rejects every insert. Backend fix: generate
+`custom_{Guid:N}` (39 chars, fits everywhere `category_id` appears) — no migration needed.
+(2) The AI Spending Score shows a hardcoded neutral 50/100 + an LLM "trung bình" comment even
+when the selected week/month has zero transactions (`SpendingScoreService` line ~73: neutral
+baseline when no metric has data), and the spike metric counts spike days from a trailing
+30-day window that crosses period boundaries. Backend fix: add `HasData` to
+`SpendingScoreResult` (false when the customer has no expense transactions inside
+`[periodStart, periodEnd]`; comment generation skipped), and count spike days only within the
+period while keeping the trailing 30 days as the mean/std baseline. Mobile fix: map `hasData`
+through the DTO/type and render a "Chưa có giao dịch" empty state on the Home score card and
+score detail screen instead of a fake score.
+(3) Budgets category rows: revert the "Vượt +X₫" overspend badge to always showing the raw
+percentage (user's explicit choice, e.g. 500%; the bar stays capped at 100%).
+
+## Status
+
+Implemented — both repos verified. Backend: `dotnet build` 0 errors (6 pre-existing warnings in
+untouched transaction files), `FinViet.Application.UnitTests` 267/267 (262 pre-existing + 5 new
+in `SpendingScoreServiceTests.cs`: HasData false/true/income-only, spike-outside-period not
+penalized, spike-inside-period penalized). Mobile: `npm run type-check` clean; changed-file
+ESLint 0 errors (2 pre-existing warnings on untouched lines of `budgets/index.tsx`); Jest 25/25
+suites, 127/127 tests (2 new `hasData` mapping tests in `reports.test.ts`). No physical-device
+acceptance (no device in this environment), commit, or push.
+
+## Notes
+
+- Backend changes: `CategoryService.cs` id generation `custom_{Guid:N}` (39 ≤ varchar(40));
+  `SpendingScoreResult.HasData` (default true); `SpendingScoreService.ComputeAsync` computes
+  `HasExpenseInPeriodAsync` and skips the LLM comment when false; `ComputeSpikeAsync` now takes
+  `periodStart` and counts spike days only inside the period (trailing 30 days remain the
+  mean/std baseline only). `ComputeCurrentAsync`/interface signatures unchanged; snapshot
+  persistence unchanged.
+- Mobile changes: `hasData` mapped through `SpendingScoreDto` → `toSpendingScore` →
+  `SpendingScore` (`?? true` so an older backend still shows scores); `SpendingScoreCard`
+  renders a "Chưa có giao dịch trong tuần/tháng này" empty state replacing ring + AI insight;
+  the score detail screen reuses its existing `EmptyState` branch with period-specific copy;
+  `budgets/index.tsx` category rows always show the raw percentage (user explicitly chose e.g.
+  500% over the "Vượt +X₫" badge from 2026-08-18 — that change is reverted; bar still capped
+  at 100%), unused `S.over` removed.
+- `HasData` is expense-only on purpose: the score assesses spending, so an income-only period
+  still reads as "no data" (locked by a test).
+- The score's savings metric (monthly view, 3–6-month consistency window) is deliberately
+  untouched — it measures long-horizon consistency by design.
+- No commit, push, deployment, production DB migration, or credential change without explicit
+  permission, in either repo.
+
+---
+
 Feature: Remove the mock service layer + fix Photo/CSV/Settings bugs that surfaced while
 testing against the real backend (branch `feature/remove-mock-layer`). User reported: Photo
 entry never parses the actual receipt and its flashlight button does nothing; CSV import has

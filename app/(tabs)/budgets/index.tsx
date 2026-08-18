@@ -40,7 +40,6 @@ const S = {
   setLimit: 'Đặt hạn mức',
   spent: 'Đã chi',
   of: '/',
-  over: 'Vượt',
   left: 'Còn lại',
   noLimit: 'Chưa có hạn mức',
   months: [
@@ -251,9 +250,7 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
       {hasLimit ? (
         <View style={styles.categoryRight}>
           <Text style={[styles.categoryPct, { color: barColor }]} numberOfLines={1}>
-            {budget.percentage > 100
-              ? `${S.over} +${formatVND(budget.spent - budget.monthlyLimit)}đ`
-              : `${budget.percentage.toFixed(0)}%`}
+            {`${budget.percentage.toFixed(0)}%`}
           </Text>
           <View style={styles.categoryBarTrack}>
             <View
