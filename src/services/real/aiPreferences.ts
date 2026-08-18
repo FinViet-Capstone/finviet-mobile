@@ -1,8 +1,5 @@
 import { api, unwrap } from '@/lib/api';
-import type {
-  AiPreferences,
-  UpdateAiPreferencesInput,
-} from '@/services/mock/aiPreferences';
+import type { AiPreferences, UpdateAiPreferencesInput } from '@/types';
 
 export async function getAiPreferences(): Promise<AiPreferences> {
   const response = await api.get('/profile/ai-preferences');

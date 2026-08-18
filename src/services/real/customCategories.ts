@@ -15,9 +15,8 @@
  */
 
 import { api, unwrap } from '@/lib/api';
-import type { CustomCategory } from '@/types/customCategory';
+import type { CustomCategory, CreateCustomCategoryInput, BulkBucketMove } from '@/types/customCategory';
 import type { BucketType } from '@/constants/categories';
-import type { CreateCustomCategoryInput, BulkBucketMove } from '@/services/mock/customCategories';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 

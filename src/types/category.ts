@@ -32,3 +32,12 @@ export interface CustomerCategory {
   updatedAt: string;
 }
 
+// -------------------------------------------------------------------------
+// moveBucket input (services/real/categories.ts)
+// -------------------------------------------------------------------------
+
+export interface MoveBucketPayload {
+  customerCategoryId: string;
+  targetBucket: BucketType;
+}
+

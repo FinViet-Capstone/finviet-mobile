@@ -1,8 +1,6 @@
 /**
  * real/rules.ts — real .NET merchant-keyword rule service.
  *
- * Mirrors src/services/mock/rules.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/rules/* (RulesController), ApiResponse<T> envelope.
  *   - GET    /rules            → RuleResponse[]
  *   - POST   /rules            → CreateRuleResponse { rule, appliedCount }  (201)
@@ -13,8 +11,7 @@
  */
 
 import { api, unwrap } from '@/lib/api';
-import type { Rule } from '@/types';
-import type { CreateRuleInput, CreateRuleResult } from '@/services/mock/rules';
+import type { Rule, CreateRuleInput, CreateRuleResult } from '@/types';
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
 

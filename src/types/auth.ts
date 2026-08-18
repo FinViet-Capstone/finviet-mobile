@@ -68,3 +68,52 @@ export function authErrorMessage(e: unknown): string {
   if (isAuthError(e)) return AUTH_ERROR_MESSAGES_VI[e.code];
   return AUTH_ERROR_MESSAGES_VI.unknown;
 }
+
+// -------------------------------------------------------------------------
+// Auth service request payloads (services/real/auth.ts's login()/register()/
+// changePassword()/etc.). Named *Payload rather than *Input to stay distinct
+// from the same-named form-validation types in validators/auth.schema.ts
+// (e.g. LoginInput there includes only what the login form collects; this
+// LoginPayload is what actually gets sent to the backend).
+// -------------------------------------------------------------------------
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  displayName: string;
+  email: string;
+  password: string;
+}
+
+export interface ResetPasswordPayload {
+  /** 6-char code from the reset email. */
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UpdateProfileInput {
+  fullName: string;
+  monthlyIncomeExpected?: number | null;
+  gender?: 'male' | 'female' | 'other' | null;
+  /** 'YYYY-MM-DD' */
+  dateOfBirth?: string | null;
+  /** 50-30-20 budget bucket allocation — send all three together or omit all three. */
+  needsPct?: number;
+  wantsPct?: number;
+  savingsPct?: number;
+}
+
+export interface UpdateProfileSettingsInput {
+  theme?: 'light' | 'dark' | 'system';
+  /** [warningPct, exceededPct] for budget_alert notifications. */
+  notifBudgetThresholds?: [number, number];
+}

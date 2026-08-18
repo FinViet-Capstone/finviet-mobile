@@ -1,26 +1,37 @@
 # Architecture Decisions
 
-## Mock ⇄ real service swap (the central pattern)
+## Service layer barrel (no mock layer — removed 2026-08-18)
 
-`src/services/index.ts` is a barrel that re-exports either the mock or the real
-implementation of every domain function, chosen **once per function** by the
-`USE_MOCK` flag from `src/lib/env.ts` (`EXPO_PUBLIC_USE_MOCK` env var, defaults to
-mock). Screens and hooks import **only from `@/services`**, never from
-`src/services/mock/*` or `src/services/real/*` directly — that's what lets the swap
-happen with zero call-site changes. Input/return types always come from the `mock/*`
-module (the shared contract both sides honor).
+`src/services/index.ts` is a barrel that re-exports every domain function from
+`src/services/real/*`. Screens and hooks import **only from `@/services`**,
+never from `src/services/real/*` directly — that keeps the barrel as the
+single import surface (and lets a future domain swap happen with zero
+call-site changes, same reasoning as before, just without a live second
+implementation today). Input/return types are re-exported from `@/types`,
+which is where every domain's request/response contract now lives (moved out
+of the old `mock/*` modules when they were deleted).
 
-Current wiring: auth,
-wallets, transactions, budgets, saving goals, categories, reports/AI,
-notifications, rules, SMS extraction, and bank-linking (SePay OAuth2 —
-the only linking provider; Finverse was removed 2026-07) all hit the real backend
-when `EXPO_PUBLIC_USE_MOCK=false`. Subscriptions and
-photo/receipt OCR extraction have no backend counterpart and stay mock-only
-permanently — check `src/services/index.ts`'s header comment before assuming
-something is real. There is no category-request feature (never had an
-admin-approval UI, removed as a concept months ago) — don't reintroduce it.
+Every domain hits the real .NET backend: auth, wallets, transactions,
+budgets, saving goals, categories, reports/AI, notifications, rules, SMS/CSV
+extraction, and bank-linking (SePay OAuth2 — the only linking provider;
+Finverse was removed 2026-07). Two exceptions have their entry points hidden
+client-side rather than wired against nothing:
+- **Photo/receipt OCR extraction** — `real/extraction.ts`'s `extractFromPhoto`
+  calls the real `POST /extract/photo` endpoint, but the backend's OCR
+  provider isn't configured yet (`IReceiptOcrService` is an intentional
+  placeholder that always 503s with code `ocr_not_configured`). The photo
+  entry flow calls it for real and shows an honest "feature coming soon"
+  message on that specific error instead of faking a result.
+- **Subscriptions** — the backend has a real `POST /api/subscriptions/subscribe`
+  (VNPay) endpoint, but no customer-facing plan-catalog or
+  current-subscription-status endpoint (only `Admin`-role CRUD exists). The
+  Settings → "Gói dịch vụ" entry is removed until those two land — see
+  `finviet-be/docs/subscriptions-customer-endpoints-todo.md`.
 
-## Data flow: screen → hook → services barrel → mock or real
+There is no category-request feature (never had an admin-approval UI, removed
+as a concept months ago) — don't reintroduce it.
+
+## Data flow: screen → hook → services barrel → real backend
 
 - All entity data goes through TanStack Query hooks in `src/hooks/` (`useWallets`,
   `useTransactions`, etc.) — never call `@/services` functions directly from a
@@ -95,9 +106,9 @@ new component files rather than the generic convention.
 - `TouchableOpacity activeOpacity={0.7}` or `Pressable` for tappable elements.
 - Vietnamese UI strings live as named constants in data files (`src/data/`,
   `src/constants/`), not inlined in JSX.
-- `.fallowrc.jsonc` disables the `duplicate-exports` dead-code rule specifically
-  because `mock/*` and `real/*` intentionally mirror each other's export surface —
-  don't "fix" that pattern.
+- `.fallowrc.jsonc` disables the `duplicate-exports` dead-code rule because the
+  services barrel (`src/services/index.ts`) intentionally re-exports every
+  `real/*` function under the same name — don't "fix" that pattern.
 - `eslint.config.js` intentionally downgrades several `react-hooks` v6
   compiler-readiness rules (`refs`, `set-state-in-effect`, `immutability`,
   `purity`) to warnings — the React Compiler is not enabled in this project

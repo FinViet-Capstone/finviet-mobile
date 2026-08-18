@@ -2,11 +2,12 @@
   // FinViet Mobile — fallow configuration.
 
   "rules": {
-    // OFF by design: src/services/mock/* and src/services/real/* intentionally
-    // export identical surfaces so the barrel (src/services/index.ts) can swap
-    // mock ⇄ real implementations at runtime with zero hook/screen changes.
-    // Every duplicate-export finding comes from this pattern, so the rule only
-    // produces noise here.
+    // OFF by design: src/services/index.ts is a barrel that re-exports every
+    // domain function from src/services/real/* under the same name, by
+    // design (screens/hooks import only from the barrel — see
+    // context/architecture.md). That's an intentional barrel re-export
+    // pattern, not accidental duplication, and it's the overwhelming
+    // majority of what this rule flags here.
     "duplicate-exports": "off"
   },
 

@@ -1,8 +1,6 @@
 /**
  * real/transactions.ts — real .NET transaction service.
  *
- * Mirrors src/services/mock/transactions.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/transactions/* (TransactionsController). Like every other
  * controller, these endpoints are wrapped in ApiResponse<T> — read via unwrap().
  *
@@ -21,15 +19,17 @@
 
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { Transaction, TransactionType, EntryMethod } from '@/types';
 import type {
+  Transaction,
+  TransactionType,
+  EntryMethod,
   TransactionFilters,
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateTransferInput,
   CreateTransferResult,
   TransactionSummary,
-} from '@/services/mock/transactions';
+} from '@/types';
 
 // Maximum page size accepted by the backend. Calendar queries may span multiple
 // pages; fetch all of them before applying the mock-compatible refinements.

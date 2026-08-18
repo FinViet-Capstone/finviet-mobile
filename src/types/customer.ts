@@ -78,41 +78,6 @@ export interface Customer {
 }
 
 // -------------------------------------------------------------------------
-// Auth payloads
-// -------------------------------------------------------------------------
-
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  email: string;
-  password: string;
-  displayName: string;
-}
-
-export interface ForgotPasswordPayload {
-  email: string;
-}
-
-export interface ResetPasswordPayload {
-  token: string;
-  newPassword: string;
-}
-
-export interface ChangePasswordPayload {
-  currentPassword: string;
-  newPassword: string;
-}
-
-// -------------------------------------------------------------------------
 // Onboarding & profile update payloads
 // -------------------------------------------------------------------------
 

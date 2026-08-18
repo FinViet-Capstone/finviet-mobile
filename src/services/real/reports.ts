@@ -1,8 +1,6 @@
 /**
  * real/reports.ts — real .NET AI service (spending score, weekly report, chat).
  *
- * Mirrors src/services/mock/reports.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/ai/* (AiController), ApiResponse<T> envelope.
  *   - GET  /ai/score?period=WEEKLY|MONTHLY  → SpendingScoreResult
  *   - GET  /ai/reports                      → WeeklyReportResponse[]  (history, newest handling below)

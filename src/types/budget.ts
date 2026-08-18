@@ -51,19 +51,58 @@ export interface BudgetWithSpend extends Budget {
   status: BudgetStatus;
 }
 
-/**
- * @deprecated Prefer BudgetWithSpend -- retained for backward compatibility.
- */
-export type BudgetWithProgress = BudgetWithSpend;
-
 // -------------------------------------------------------------------------
-// API payload for creating or updating a budget (upsert)
+// Budget service input/return contracts (services/real/budgets.ts)
 // -------------------------------------------------------------------------
 
-export interface UpsertBudgetPayload {
+export interface CreateBudgetInput {
   categoryId: string;
-  /** Monthly spending cap in whole VND */
   monthlyLimit: number;
-  /** Defaults to 1 if omitted */
-  resetDay?: number;
+}
+
+export interface UpdateBudgetInput {
+  monthlyLimit?: number;
+}
+
+export interface MonthRange {
+  startDate: string;
+  endDate: string;
+}
+
+// -------------------------------------------------------------------------
+// Bucket summary (50/30/20 pacing — GET /budgets/buckets)
+// -------------------------------------------------------------------------
+
+export interface BucketSummary {
+  /** 'needs' | 'wants' | 'savings' */
+  bucket: string;
+  /** Target share of income for this bucket, 0–1 (e.g. 0.5). */
+  allocationPct: number;
+  /** Income × allocationPct — the monthly cap for the bucket. */
+  allocationCap: number;
+  /** Sum of category budget limits assigned to this bucket. */
+  categoryLimitTotal: number;
+  spent: number;
+  remaining: number;
+  /** spent / allocationCap × 100. */
+  percentage: number;
+  /** categoryLimitTotal exceeds the allocationCap. */
+  overAllocated: boolean;
+  /** Straight-line expected spend by today (cap × elapsed-fraction of month). */
+  expectedSpent: number;
+  /** spent − expectedSpent (positive = ahead of pace / overspending). */
+  paceDeviation: number;
+  /** 'ahead' | 'on_track' | 'behind' relative to straight-line pace. */
+  paceStatus: string;
+}
+
+export interface BucketSummaryList {
+  /** 'YYYY-MM' */
+  month: string;
+  monthlyIncome: number;
+  budgetAdherenceScore: number;
+  /** Uncategorized share of total expense, 0–1 (e.g. 0.1 = 10%). */
+  uncategorizedRatio: number;
+  uncategorizedWarning: boolean;
+  buckets: BucketSummary[];
 }

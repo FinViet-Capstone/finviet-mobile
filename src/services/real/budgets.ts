@@ -1,8 +1,6 @@
 /**
  * real/budgets.ts — real .NET budget service.
  *
- * Mirrors src/services/mock/budgets.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/budgets/* (BudgetsController), ApiResponse<T> envelope.
  *   - GET /budgets?month=YYYY-MM     → BudgetResponse[]
  *   - POST /budgets  (upsert)        → BudgetResponse
@@ -16,14 +14,15 @@
 
 import { api, unwrap } from '@/lib/api';
 import { getCategoryById } from '@/constants/categories';
-import type { BudgetWithSpend, BudgetStatus } from '@/types';
 import type {
+  BudgetWithSpend,
+  BudgetStatus,
   CreateBudgetInput,
   UpdateBudgetInput,
   MonthRange,
   BucketSummary,
   BucketSummaryList,
-} from '@/services/mock/budgets';
+} from '@/types';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 

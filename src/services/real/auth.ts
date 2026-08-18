@@ -1,9 +1,6 @@
 /**
  * real/auth.ts — real .NET auth service (email/password).
  *
- * Mirrors the signatures of src/services/mock/auth.ts so the barrel
- * (src/services/index.ts) can swap mock ⇄ real with zero hook/screen changes.
- *
  * The backend has no machine-readable error code — only HTTP status + a message
  * string (see ApiResponse / ExceptionHandlingMiddleware). We map those onto the
  * FE AuthErrorCode union so AuthErrorBanner renders consistent Vietnamese copy.
@@ -16,15 +13,16 @@ import axios from 'axios';
 import { api, unwrap, type AuthResponsePayload } from '@/lib/api';
 import { setAuthTokens } from '@/lib/mmkv';
 import { AuthError, type AuthErrorCode } from '@/types/auth';
-import type { Customer } from '@/types';
+import { getNotificationPrefs } from '@/lib/notificationPrefsCache';
 import type {
-  MockLoginInput,
-  MockRegisterInput,
-  MockChangePasswordInput,
+  Customer,
+  LoginPayload,
+  RegisterPayload,
+  ChangePasswordPayload,
   UpdateProfileInput,
   UpdateProfileSettingsInput,
-  ResetPasswordInput,
-} from '@/services/mock/auth';
+  ResetPasswordPayload,
+} from '@/types';
 
 /**
  * Google sign-in is NOT mocked in real mode. The backend (`POST /auth/google-login`)
@@ -105,7 +103,7 @@ function toThresholds(raw: number[] | undefined): [number, number] {
   return raw && raw.length === 2 ? [raw[0], raw[1]] : [80, 100];
 }
 
-function toCustomer(p: AuthResponsePayload['profile']): Customer {
+async function toCustomer(p: AuthResponsePayload['profile']): Promise<Customer> {
   const monthlyIncome = p.monthlyIncomeExpected ?? null;
   return {
     id: p.customerId,
@@ -125,7 +123,10 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
     theme: toTheme(p.theme),
     isActive: p.isActive,
     emailVerified: p.isEmailVerified,
-    notifications: { budget: true, report: true, goals: true },
+    // budget/report/goals toggles have no backend field to round-trip through
+    // (see notificationPrefsCache.ts) — seed from the device-local cache
+    // instead of hardcoding true, so a saved choice survives the next login.
+    notifications: await getNotificationPrefs(p.customerId),
     notifBudgetThresholds: toThresholds(p.notifBudgetThresholds),
     fcmToken: null,
     // ProfileDto carries no onboarding flag; monthly income is the only signal
@@ -144,7 +145,7 @@ function toCustomer(p: AuthResponsePayload['profile']): Customer {
  */
 export async function getProfile(): Promise<Customer> {
   const res = await api.get('/profile');
-  return toCustomer(unwrap<AuthResponsePayload['profile']>(res));
+  return await toCustomer(unwrap<AuthResponsePayload['profile']>(res));
 }
 
 // ─── update profile (onboarding / settings) ───────────────────────────────────
@@ -225,7 +226,7 @@ export async function deleteAccount(): Promise<void> {
  * token keeps working until it naturally expires, but the next silent
  * refresh will fail and route back to login.
  */
-export async function changePassword(input: MockChangePasswordInput): Promise<void> {
+export async function changePassword(input: ChangePasswordPayload): Promise<void> {
   try {
     await api.post('/auth/change-password', {
       currentPassword: input.currentPassword,
@@ -244,7 +245,7 @@ export async function changePassword(input: MockChangePasswordInput): Promise<vo
 
 // ─── login ────────────────────────────────────────────────────────────────────
 
-export async function login(input: MockLoginInput): Promise<Customer> {
+export async function login(input: LoginPayload): Promise<Customer> {
   try {
     const res = await api.post('/auth/login', {
       email: input.email,
@@ -256,7 +257,7 @@ export async function login(input: MockLoginInput): Promise<Customer> {
       refreshToken: payload.refreshToken,
       accessTokenExpiry: payload.accessTokenExpiry,
     });
-    return toCustomer(payload.profile);
+    return await toCustomer(payload.profile);
   } catch (err) {
     throw toAuthError(err, (status, message) => {
       if (status === 401) return 'invalid_credentials';
@@ -274,7 +275,7 @@ export async function login(input: MockLoginInput): Promise<Customer> {
  * (verify-email-first). We return a partial Customer so the screen can route to
  * the verify-email screen with the email; the caller must NOT open a session.
  */
-export async function register(input: MockRegisterInput): Promise<Customer> {
+export async function register(input: RegisterPayload): Promise<Customer> {
   try {
     const res = await api.post('/auth/register', {
       fullName: input.displayName,
@@ -291,7 +292,7 @@ export async function register(input: MockRegisterInput): Promise<Customer> {
         'Đăng ký thành công nhưng không gửi được email xác minh. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
       );
     }
-    return toCustomer({
+    return await toCustomer({
       customerId: '',
       fullName: input.displayName,
       email: input.email,
@@ -330,7 +331,7 @@ export async function forgotPassword(email: string): Promise<void> {
  * POST /auth/reset-password — confirm the 6-char code from the reset email and
  * set a new password. Backend body: { token, newPassword, confirmPassword }.
  */
-export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+export async function resetPassword(input: ResetPasswordPayload): Promise<void> {
   try {
     await api.post('/auth/reset-password', {
       token: input.token.trim(),

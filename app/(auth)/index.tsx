@@ -19,7 +19,6 @@ import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useRegister, useGoogleOAuth } from '@/hooks';
-import { USE_MOCK } from '@/lib/env';
 import { isAuthError } from '@/types/auth';
 import {
   loginSchema,
@@ -370,31 +369,29 @@ export default function AuthScreen() {
             )}
 
             {/* ── Divider & Google Auth ───────────────────────────────── */}
-            {/* Google sign-in needs Firebase + a dev build, so it cannot run against
-                the real backend inside Expo Go. Show it only in mock mode. */}
-            {USE_MOCK && (
-              <>
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>hoặc</Text>
-                  <View style={styles.dividerLine} />
-                </View>
+            {/* Google sign-in needs Firebase + a dev build, so it can't run
+                inside Expo Go — tapping it surfaces the backend's honest
+                "not available yet, use email/password" error instead of
+                pretending to work. */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>hoặc</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
-                <Button
-                  title={
-                    googleMutation.isPending
-                      ? 'Đang kết nối Google...'
-                      : activeTab === 'login'
-                      ? 'Đăng nhập với Google'
-                      : 'Đăng ký với Google'
-                  }
-                  onPress={handleGoogleAuth}
-                  variant="secondary"
-                  loading={googleMutation.isPending}
-                  disabled={isBusy}
-                />
-              </>
-            )}
+            <Button
+              title={
+                googleMutation.isPending
+                  ? 'Đang kết nối Google...'
+                  : activeTab === 'login'
+                  ? 'Đăng nhập với Google'
+                  : 'Đăng ký với Google'
+              }
+              onPress={handleGoogleAuth}
+              variant="secondary"
+              loading={googleMutation.isPending}
+              disabled={isBusy}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

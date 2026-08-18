@@ -1,10 +1,7 @@
 /**
  * real/wallets.ts — real .NET wallet service.
  *
- * Mirrors the exported signatures of src/services/mock/wallets.ts so the barrel
- * (src/services/index.ts) can swap mock ⇄ real with zero hook/screen changes.
- * Reads are async here (HTTP) where the mock was synchronous — every consumer
- * goes through TanStack Query's queryFn, which awaits either shape.
+ * Reads are async here (HTTP), driven through TanStack Query's queryFn.
  *
  * Backend: api/wallets/* (WalletsController). Responses use the ApiResponse<T>
  * envelope; unwrap() peels off `.data`.
@@ -12,15 +9,17 @@
 
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { Wallet, WalletSummary, WalletType } from '@/types';
 import type {
+  Wallet,
+  WalletSummary,
+  WalletType,
   CreateWalletInput,
   UpdateWalletInput,
   WithdrawInput,
   WithdrawResult,
   WalletLedgerQuery,
   WalletLedgerPage,
-} from '@/services/mock/wallets';
+} from '@/types';
 
 // ─── Backend DTO shapes (camelCase over the wire) ─────────────────────────────
 

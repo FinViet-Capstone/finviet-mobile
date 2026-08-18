@@ -19,17 +19,16 @@ import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { TextInput } from '@/components/common/TextInput';
 import { useLinkSepayWithToken } from '@/hooks/useWallets';
-import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
-import { USE_MOCK, API_BASE_URL } from '@/lib/env';
+import { API_BASE_URL } from '@/lib/env';
 import { getApiErrorMessage } from '@/utils/errors';
 
 const S = {
   title: 'Liên kết SePay',
   heading: 'Nhập API token SePay',
   hint: 'Lấy token tại my.sepay.vn → Công ty → Cấu hình API (API Access). Token dùng để đồng bộ giao dịch từ tài khoản ngân hàng đã kết nối.',
-  mockWarning: 'Liên kết SePay luôn gọi máy chủ thật, kể cả khi ứng dụng đang ở chế độ dữ liệu mẫu (mock) — cần một máy chủ .NET đang chạy để dùng tính năng này.',
-  noBackendError: 'Chưa cấu hình địa chỉ máy chủ thật (EXPO_PUBLIC_API_BASE_URL trống). Tính năng liên kết SePay cần một máy chủ .NET đang chạy — không thể dùng ở chế độ dữ liệu mẫu.',
+  noBackendError: 'Chưa cấu hình địa chỉ máy chủ (EXPO_PUBLIC_API_BASE_URL trống). Tính năng liên kết SePay cần một máy chủ .NET đang chạy.',
   tokenLabel: 'API Token',
   tokenPlaceholder: 'Dán token của bạn vào đây',
   accountLabel: 'Số tài khoản (không bắt buộc)',
@@ -61,10 +60,8 @@ export default function LinkSepayTokenScreen() {
     const trimmed = token.trim();
     if (!trimmed) return;
 
-    // SePay's OAuth2/token linking always hits the real backend — it bypasses
-    // USE_MOCK entirely (an OAuth flow can't be meaningfully mocked). Fail fast
-    // with a clear reason instead of letting a request against an empty
-    // baseURL surface as a cryptic network error.
+    // Fail fast with a clear reason instead of letting a request against an
+    // empty baseURL surface as a cryptic network error.
     if (!API_BASE_URL) {
       setErrorMessage(S.noBackendError);
       setPhase('error');
@@ -118,13 +115,6 @@ export default function LinkSepayTokenScreen() {
               </View>
               <Text style={styles.heading}>{S.heading}</Text>
               <Text style={styles.hint}>{S.hint}</Text>
-
-              {USE_MOCK && (
-                <View style={styles.mockWarningBox}>
-                  <MaterialIcon name="info" size={16} color={colors.secondary} />
-                  <Text style={styles.mockWarningText}>{S.mockWarning}</Text>
-                </View>
-              )}
 
               <Text style={styles.fieldLabel}>{S.tokenLabel}</Text>
               <TextInput
@@ -217,13 +207,6 @@ function createStyles(colors: ThemeColors) {
     iconWrap: { alignItems: 'center', marginBottom: SPACING[2] },
     heading: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, textAlign: 'center' },
     hint: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: SPACING[2] },
-    mockWarningBox: {
-      flexDirection: 'row', gap: SPACING[2], alignItems: 'flex-start',
-      backgroundColor: withAlpha(colors.secondary, 0.08), borderRadius: BORDER_RADIUS.lg,
-      borderWidth: 1, borderColor: withAlpha(colors.secondary, 0.19),
-      padding: SPACING[3], marginBottom: SPACING[2],
-    },
-    mockWarningText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.secondary, lineHeight: 16 },
     fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
     primaryBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],

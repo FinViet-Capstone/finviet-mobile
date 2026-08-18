@@ -1,8 +1,6 @@
 /**
  * real/notifications.ts — real .NET notification service.
  *
- * Mirrors src/services/mock/notifications.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/notifications/* (NotificationsController), ApiResponse<T> envelope.
  *   - GET    /notifications?unread=bool  → NotificationResponse[]
  *   - PATCH  /notifications/{id}/read    → 200 / 404
