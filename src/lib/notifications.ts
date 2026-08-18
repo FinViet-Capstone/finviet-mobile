@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { CSV_IMPORT_READY_KIND, type CsvImportReadyData } from '@/lib/notificationRouting';
 
 // The handler runs only while the app is foregrounded. The global FinViet banner
 // owns that experience, avoiding a duplicate OS banner for the same push.
@@ -48,4 +49,23 @@ export async function getExpoNotificationToken(
 export function notificationPlatform(): 'ios' | 'android' | null {
   if (Platform.OS === 'ios' || Platform.OS === 'android') return Platform.OS;
   return null;
+}
+
+/** Fires an immediate local OS notification — used when CSV categorization finishes while
+ * the app is backgrounded, so there's no server round trip or AppNotification row involved. */
+export async function scheduleCsvImportReadyNotification(params: {
+  title: string;
+  body: string;
+  fileUri: string;
+  fileName: string;
+}): Promise<void> {
+  const data: CsvImportReadyData = {
+    localKind: CSV_IMPORT_READY_KIND,
+    fileUri: params.fileUri,
+    fileName: params.fileName,
+  };
+  await Notifications.scheduleNotificationAsync({
+    content: { title: params.title, body: params.body, data },
+    trigger: null,
+  });
 }

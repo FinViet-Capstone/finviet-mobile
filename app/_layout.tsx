@@ -12,6 +12,7 @@ import { useBootstrapSession } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
 import { ThemeProvider, useThemeScheme } from '@/providers/ThemeProvider';
 import { NotificationProvider } from '@/providers/NotificationProvider';
+import { EphemeralBanner } from '@/components/common/EphemeralBanner';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { initSentry, captureException } from '@/lib/sentry';
 import * as Sentry from '@sentry/react-native';
@@ -50,6 +51,7 @@ export default Sentry.wrap(function RootLayout() {
                 <Stack.Screen name="onboarding" />
                 <Stack.Screen name="(tabs)" />
               </Stack>
+              <EphemeralBanner />
             </NotificationProvider>
           </SafeAreaProvider>
         </ThemeProvider>
