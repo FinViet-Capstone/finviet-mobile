@@ -1,6 +1,12 @@
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { api } from '@/lib/api';
-import { getWeeklyReport, getSpendingScore } from '@/services/real/reports';
+import {
+  getWeeklyReport,
+  getSpendingScore,
+  previewCategorization,
+  categorizeTransaction,
+  overrideCategorization,
+} from '@/services/real/reports';
 
 // A single shared adapter for the whole file — constructing a second
 // AxiosMockAdapter against the same `api` instance in a nested describe
@@ -88,5 +94,93 @@ describe('real spending score service', () => {
     // so the UI's fallback text actually renders instead of a blank box.
     expect(score.reasonVi).toBeNull();
     expect(score.commentaryVi).toBeNull();
+  });
+});
+
+describe('AI categorization service', () => {
+  it('previewCategorization passes through the backend-resolved categoryId', async () => {
+    mock.onPost('/ai/categorize/preview').reply(200, {
+      success: true,
+      data: { categoryId: 'cat_food', categoryName: 'Ăn uống', confidence: 0.9 },
+    });
+
+    const result = await previewCategorization('Highlands Coffee');
+
+    expect(result).toEqual({ categoryId: 'cat_food', categoryName: 'Ăn uống', confidence: 0.9 });
+  });
+
+  it('categorizeTransaction maps an AI_SUGGESTION outcome (default suggest_only mode) without applying it', async () => {
+    mock.onPost('/ai/categorize/tx-1').reply(200, {
+      success: true,
+      data: {
+        transactionId: 'tx-1',
+        categoryId: null,
+        categoryName: null,
+        confidence: 0.92,
+        isAiClassified: false,
+        queued: false,
+        applied: false,
+        suggestedCategoryId: 'cat_food',
+        suggestedCategoryName: 'Ăn uống',
+        reason: 'suggest_only',
+        source: 'AI_SUGGESTION',
+      },
+    });
+
+    const outcome = await categorizeTransaction('tx-1');
+
+    expect(outcome.applied).toBe(false);
+    expect(outcome.source).toBe('AI_SUGGESTION');
+    expect(outcome.suggestedCategoryId).toBe('cat_food');
+    expect(outcome.suggestedCategoryName).toBe('Ăn uống');
+    expect(outcome.reason).toBe('suggest_only');
+  });
+
+  it('categorizeTransaction maps every backend source value, defaulting only truly unknown values to FALLBACK', async () => {
+    for (const source of ['MANUAL', 'RULE', 'AI_AUTO', 'AI_SUGGESTION', 'OFF', 'FALLBACK']) {
+      mock.onPost('/ai/categorize/tx-src').reply(200, {
+        success: true,
+        data: {
+          transactionId: 'tx-src',
+          isAiClassified: false,
+          queued: false,
+          applied: false,
+          source,
+        },
+      });
+
+      const outcome = await categorizeTransaction('tx-src');
+      expect(outcome.source).toBe(source);
+    }
+
+    mock.onPost('/ai/categorize/tx-unknown').reply(200, {
+      success: true,
+      data: { transactionId: 'tx-unknown', isAiClassified: false, queued: false, applied: false, source: 'WEIRD' },
+    });
+    const unknown = await categorizeTransaction('tx-unknown');
+    expect(unknown.source).toBe('FALLBACK');
+  });
+
+  it('overrideCategorization maps an applied outcome', async () => {
+    mock.onPost('/ai/transactions/tx-2/override').reply(200, {
+      success: true,
+      data: {
+        transactionId: 'tx-2',
+        categoryId: 'cat_food',
+        categoryName: 'Ăn uống',
+        isAiClassified: false,
+        queued: false,
+        applied: true,
+        source: 'MANUAL',
+      },
+    });
+
+    const outcome = await overrideCategorization('tx-2', 'cat_food');
+
+    expect(outcome.applied).toBe(true);
+    expect(outcome.categoryId).toBe('cat_food');
+    expect(mock.history.post[mock.history.post.length - 1].data).toBe(
+      JSON.stringify({ categoryId: 'cat_food' }),
+    );
   });
 });

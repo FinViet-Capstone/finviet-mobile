@@ -17,10 +17,13 @@ navigation, wallets/transactions/budgets/goals/categories data layer, entry flow
 this codebase anymore (removed 2026-08-18). The AI layer (`src/services/real/reports.ts` →
 `/ai/score`, `/ai/reports`, `/ai/chat`, backed by an LLM/RAG pipeline) computes real
 scores/reports/chat replies from the customer's actual data, matching the "AI-Powered
-Personal Finance Tracker and Spending Advisor" tagline. Two domains remain permanently
-unreachable in the UI for lack of a real customer-facing backend contract — Subscriptions and
-photo/receipt OCR extraction — see Tech Stack and Features §A/§E below for exactly what's
-missing on the backend side for each.
+Personal Finance Tracker and Spending Advisor" tagline. One domain remains permanently
+unreachable in the UI for lack of a real customer-facing backend contract — Subscriptions —
+see Tech Stack and Monetization below for exactly what's missing on the backend side. Photo/
+receipt OCR extraction is no longer in that category: as of backend commit `aff76cc` it's
+wired to a real Gemini-backed OCR provider and returns genuine extracted fields, but (found
+2026-08-18) that extraction path never calls the categorization step SMS/CSV extraction does —
+see Features §A for the current, narrower gap.
 
 ## Users
 ---
@@ -44,12 +47,20 @@ A. Wallets & Multi-Method Transaction Entry
   (`'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste'`): **Manual** (no AI assist),
   **SMS paste** (extraction preview), **Photo/receipt scan** (batch up to 5, review-list UX),
   **CSV import** (bank export, multi-row review-list UX). All three (SMS, CSV, and photo)
-  call a real backend endpoint (`POST /extract/sms`, `/extract/csv`, `/extract/photo`) with
-  genuine AI categorization. Photo/receipt OCR is the one exception that doesn't actually
-  work yet: the endpoint exists but its backend OCR provider isn't configured
-  (`IReceiptOcrService` is an intentional placeholder), so it always responds 503 with code
-  `ocr_not_configured` — the app calls it for real and shows an honest "feature coming soon"
-  message on that specific error rather than faking a result.
+  call a real backend endpoint (`POST /extract/sms`, `/extract/csv`, `/extract/photo`) and
+  return genuine extracted fields. **Correction (2026-08-18):** photo/receipt OCR is no longer
+  the 503 placeholder previously documented here — `IReceiptOcrService` is now wired to a real
+  Gemini-backed provider (`finviet-be` commit `aff76cc`) and the endpoint returns real
+  extracted amount/merchant/date data. However, unlike SMS and CSV extraction, the photo path
+  never calls the shared categorization service at all
+  (`AiCategorizationService`/`PreviewAsync`, only wired into `TransactionExtractService` for
+  SMS/CSV) — so every photo-extracted row currently comes back with `categoryId: null` by
+  construction, regardless of AI provider health. Not yet fixed; tracked as a backend follow-up.
+  Separately, SMS/CSV/SePay-sync categorization can silently degrade to `categoryId: null` for
+  every transaction if the backend's Gemini call fails (rule match first, then Gemini; any
+  provider failure is caught and swallowed to "uncategorized" with only a warning log, never
+  surfaced to the app) — worth checking backend logs/config directly if AI categorization stops
+  working across the board, since the FE has no way to detect or surface this itself.
 - Internal wallet-to-wallet transfers create two linked `Transaction` records
   (`type: 'transfer_out'`/`'transfer_in'`) sharing a real `transferPairId`; deleting either leg
   deletes both and reverses both wallet balances. (There is no "pending cash-withdrawal
@@ -225,8 +236,9 @@ modules that implement them.
 - Axios for HTTP
 - No mock service layer or `USE_MOCK` flag (removed 2026-08-18) — `src/services/index.ts` is
   a barrel re-exporting every domain straight from `src/services/real/*`. Photo/receipt OCR
-  extraction calls its real endpoint but always 503s (no OCR provider configured server-side
-  yet); Subscriptions has its Settings entry point hidden client-side (no customer-facing
+  extraction calls its real, now-working Gemini-backed endpoint, but that path skips AI
+  categorization entirely (rows return uncategorized regardless of AI health — see Features
+  §A); Subscriptions has its Settings entry point hidden client-side (no customer-facing
   plan-catalog/status endpoint yet, though the actual VNPay subscribe flow is real) — see
   Features §A and Monetization.
 - Backend is a separate repo not present in this codebase — this app only assumes a REST API

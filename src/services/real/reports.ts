@@ -269,6 +269,7 @@ export async function generateWeeklyReport(): Promise<WeeklyReport> {
 // ─── AI categorization ──────────────────────────────────────────────────────────
 
 interface AiClassificationDto {
+  categoryId?: string | null;
   categoryName?: string | null;
   confidence: number;
 }
@@ -280,16 +281,33 @@ interface CategorizationOutcomeDto {
   confidence?: number | null;
   isAiClassified: boolean;
   queued: boolean;
+  applied: boolean;
+  suggestedCategoryId?: string | null;
+  suggestedCategoryName?: string | null;
+  reason?: string | null;
   source: string;
 }
 
 function toClassification(dto: AiClassificationDto): AiClassificationResult {
-  return { categoryName: dto.categoryName ?? undefined, confidence: dto.confidence };
+  return {
+    categoryId: dto.categoryId ?? undefined,
+    categoryName: dto.categoryName ?? undefined,
+    confidence: dto.confidence,
+  };
 }
+
+const CATEGORIZATION_SOURCES: CategorizationSource[] = [
+  'MANUAL',
+  'RULE',
+  'AI_AUTO',
+  'AI_SUGGESTION',
+  'OFF',
+  'FALLBACK',
+];
 
 function toSource(raw: string): CategorizationSource {
   const v = (raw ?? '').toUpperCase();
-  return v === 'RULE' || v === 'AI' || v === 'FALLBACK' ? (v as CategorizationSource) : 'FALLBACK';
+  return (CATEGORIZATION_SOURCES as string[]).includes(v) ? (v as CategorizationSource) : 'FALLBACK';
 }
 
 function toOutcome(dto: CategorizationOutcomeDto): CategorizationOutcome {
@@ -300,6 +318,10 @@ function toOutcome(dto: CategorizationOutcomeDto): CategorizationOutcome {
     confidence: dto.confidence ?? undefined,
     isAiClassified: dto.isAiClassified,
     queued: dto.queued,
+    applied: dto.applied,
+    suggestedCategoryId: dto.suggestedCategoryId ?? undefined,
+    suggestedCategoryName: dto.suggestedCategoryName ?? undefined,
+    reason: dto.reason ?? undefined,
     source: toSource(dto.source),
   };
 }

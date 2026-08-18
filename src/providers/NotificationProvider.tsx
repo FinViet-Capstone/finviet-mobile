@@ -11,6 +11,7 @@ import {
 } from '@/lib/notificationArrivals';
 import { insertNotificationInCache, markNotificationReadInCache } from '@/lib/notificationCache';
 import {
+  csvImportReadyRoute,
   notificationDetailRoute,
   notificationRoute,
   parseNotificationPushData,
@@ -88,6 +89,14 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   ) => {
     if (!isAuthenticated) {
       pendingResponseRef.current = response;
+      return;
+    }
+
+    const csvRoute = csvImportReadyRoute(
+      response.notification.request.content.data as Record<string, unknown>,
+    );
+    if (csvRoute) {
+      router.push(csvRoute);
       return;
     }
 
@@ -180,6 +189,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       if (!session.isAuthenticated || !activeCustomerId) return;
 
       const content = event.request.content;
+      if (csvImportReadyRoute(content.data as Record<string, unknown>)) return;
+
       const pushData = parseNotificationPushData(content.data);
       if (!pushData) {
         queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() });
