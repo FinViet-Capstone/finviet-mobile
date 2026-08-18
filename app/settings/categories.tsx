@@ -228,7 +228,10 @@ export default function CategoriesRoute() {
           onSuccess: (created) => {
             // The icon file is saved locally only after the category record
             // exists, so it's keyed by the record's real id — never uploaded.
-            saveCategoryIcon(created.id, input.pickedUri, input.ext);
+            // Icon is optional since CustomCategorySheet allows submitting without one.
+            if (input.pickedUri && input.ext) {
+              saveCategoryIcon(created.id, input.pickedUri, input.ext);
+            }
             setSheetVisible(false);
           },
           onError: (err) => {

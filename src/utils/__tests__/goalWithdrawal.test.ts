@@ -24,13 +24,13 @@ describe('runSingleFlight', () => {
 });
 
 describe('executeGoalWithdrawal', () => {
-  it('advances archive-triggered full withdrawals after success', async () => {
+  it('advances goal-draining withdrawals after success', async () => {
     const onSuccess = jest.fn();
     const onError = jest.fn();
 
     await executeGoalWithdrawal({
       mutate: jest.fn().mockResolvedValue(undefined),
-      wasWithdrawAll: true,
+      drainedGoal: true,
       onSuccess,
       onError,
     });
@@ -39,12 +39,12 @@ describe('executeGoalWithdrawal', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('does not mark ordinary partial withdrawals as archive-triggered', async () => {
+  it('does not mark ordinary partial withdrawals as goal-draining', async () => {
     const onSuccess = jest.fn();
 
     await executeGoalWithdrawal({
       mutate: jest.fn().mockResolvedValue(undefined),
-      wasWithdrawAll: false,
+      drainedGoal: false,
       onSuccess,
       onError: jest.fn(),
     });
@@ -59,7 +59,7 @@ describe('executeGoalWithdrawal', () => {
 
     await executeGoalWithdrawal({
       mutate: jest.fn().mockRejectedValue(error),
-      wasWithdrawAll: true,
+      drainedGoal: true,
       onSuccess,
       onError,
     });

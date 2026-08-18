@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import Animated, {
   runOnJS,
@@ -35,14 +35,34 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
   const { height: windowHeight } = useWindowDimensions();
   const maxSheetHeight = Math.round(windowHeight * 0.85);
 
+  // Keep the subtree mounted while the exit animation runs — unmounting on
+  // `visible === false` alone would cut the slide-down short and pop the
+  // sheet out instead of animating it away.
+  const [mounted, setMounted] = useState(visible);
+
   useEffect(() => {
-    if (visible) {
-      translateY.value = 0;
-      backdropOpacity.value = withTiming(1, { duration: 200 });
-    } else {
-      backdropOpacity.value = withTiming(0, { duration: 200 });
-    }
-  }, [visible]);
+    if (!visible) return;
+    // Start fully offscreen so the entrance springs up instead of the sheet
+    // appearing at its final position in the same frame it mounts (which
+    // read as a pop/freeze when opened right as a native Alert dismisses).
+    translateY.value = windowHeight;
+    backdropOpacity.value = 0;
+    setMounted(true);
+  }, [visible, windowHeight]);
+
+  useEffect(() => {
+    if (!visible || !mounted) return;
+    translateY.value = withSpring(0, SPRING_CONFIG);
+    backdropOpacity.value = withTiming(1, { duration: 200 });
+  }, [visible, mounted]);
+
+  useEffect(() => {
+    if (visible || !mounted) return;
+    translateY.value = withTiming(windowHeight, { duration: 250 }, (finished) => {
+      if (finished) runOnJS(setMounted)(false);
+    });
+    backdropOpacity.value = withTiming(0, { duration: 200 });
+  }, [visible, mounted, windowHeight]);
 
   const pan = Gesture.Pan()
     .activeOffsetY(10)
@@ -72,7 +92,7 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
     opacity: backdropOpacity.value,
   }));
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={styles.root} pointerEvents="box-none">

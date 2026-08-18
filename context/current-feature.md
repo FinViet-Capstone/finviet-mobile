@@ -241,6 +241,62 @@ non-production EAS/provider credential setup remain before the feature can be ma
   Verified: TypeScript clean; changed-file ESLint clean; full main-workspace ESLint 0 errors / 87
   pre-existing warnings; focused Jest 3/3 suites and 20/20 tests; full main-workspace Jest 22/22 suites
   and 121/121 tests pass; `git diff --check` clean. No physical-device acceptance, commit, or push.
+- 2026-08-18 — Diagnosed "rút tất cả tiền bị lag" (lag after tapping "Rút toàn bộ" in the
+  archive-withdrawal Alert): `openArchiveWithdrawal` opened the WithdrawSheet via a hardcoded
+  `setTimeout(500)` (commit `b47c17b` swapped in for `InteractionManager.runAfterInteractions` from
+  the earlier `bcf3787` "withdraw freeze" fix — the native Alert dismissal isn't a JS-tracked
+  interaction, so both were workarounds for the same collision), and `DraggableSheet` had no
+  entrance/exit animation: it set `translateY.value = 0` on open and unmounted instantly on close,
+  so the sheet popped in abruptly. Net effect: tap → alert closes → 500ms dead screen → pop-in.
+  Approved fix: give `DraggableSheet` a real spring slide-up entrance and timed slide-down exit
+  (staying mounted until the exit finishes; API unchanged, all 10 sheet consumers benefit), and
+  open the archive withdrawal sheet immediately — no delay, no unused `InteractionManager` import.
+  Also fixed a pre-existing type error blocking `type-check` on this branch's HEAD (not from the
+  lag fix): `b47c17b` made `CustomCategoryInput.pickedUri`/`ext` optional but left
+  `saveCategoryIcon(created.id, input.pickedUri, input.ext)` in `app/settings/categories.tsx`
+  unguarded — now only called when both are present.
+  Verified on `fix/some-ux`: type-check clean; changed-file lint 0 errors (remaining warnings are
+  the project-tolerated `react-hooks` v6 class, 4 of them pre-existing on untouched lines); full
+  Jest 28/28 suites, 162/162 tests (run with `--testPathIgnorePatterns "\\.claude"` to skip the
+  stale locked worktree checkouts that fail module resolution). No physical-device acceptance,
+  commit, or push.
+- 2026-08-18 — User reported the withdraw-all flow still lagged after the animation fix, and
+  proposed the design change themselves: drop the two-button (Hủy/Rút toàn bộ) alert — show an
+  info-only alert (single "Đã hiểu" button) telling the customer to withdraw first, and let them
+  use the screen's regular "Rút tiền" button. This removes the alert-dismissal → sheet-open
+  transition (the collision source) entirely. Implemented on `fix/some-ux` with two approved
+  refinements: the WithdrawSheet gained a "Tất cả" quick-fill chip (fills the full saved amount,
+  closes the numpad — the only zero-balance path without typing the whole number by hand), and a
+  withdrawal that drains the goal (`drainedGoal: parsedAmount >= goal.currentAmount`, renamed
+  from `wasWithdrawAll` in `executeGoalWithdrawal` + its tests) still auto-opens the archive
+  confirm. Removed the `withdrawAll` prop, `isArchiveWithdrawal` state, `openArchiveWithdrawal`,
+  and the now-unused `S.withdrawAll` string. Verified: type-check clean; changed-file lint
+  0 errors (4 pre-existing tolerated `set-state-in-effect` warnings on untouched lines); full
+  Jest 28/28 suites, 162/162 tests. No physical-device acceptance, commit, or push.
+- 2026-08-18 — User reported the Budgets category-row overspend badge shows an absurdly high
+  percentage (e.g. "Vượt 400%" when spending 500K against a 100K limit) and asked for a saner
+  representation. Confirmed this was the only unclamped >100% percentage display in the app
+  (goal progress and the Home savings row are already capped). Approved change: show the real
+  overspend amount instead — "Vượt +400Kđ" via `formatVND(budget.spent - budget.monthlyLimit)`;
+  widened `categoryRight` 64→84px so the longer text fits, `numberOfLines={1}` as a guard.
+  Under-limit rows still show the plain percentage. Verified: type-check clean; changed-file
+  lint 0 errors (2 pre-existing warnings on untouched lines); full Jest 28/28 suites, 162/162
+  tests. No physical-device acceptance, commit, or push.
+- 2026-08-18 — Clarified the "% quá cao" report actually pointed at the Transactions screen's
+  three-column summary banner, whose month-over-month trend badges could show huge percentages
+  (e.g. ↑1700% after a low-spend baseline month). User's decision on reflection: drop the number
+  entirely — arrows only. `TransactionSummaryBanner`'s `pctTrend` became a direction-only
+  `trendState`, `TrendBadge` now renders just the up/down arrow (dash when unchanged or no
+  baseline), with Vietnamese `accessibilityLabel`s keeping the trend readable for screen readers
+  now that the visible text is gone; unused `trendText` style removed. The earlier Budgets
+  category-row change ("Vượt +400Kđ") was a different spot and stays. Verified: type-check
+  clean; changed-file lint 0 problems; full Jest 28/28 suites, 162/162 tests. No
+  physical-device acceptance, commit, or push.
+- 2026-08-18 — User sent a reference screenshot of the arrow style they wanted (image not
+  viewable in-session); picked the diagonal variant from mockups: the trend arrows are now
+  `north_east`/`south_east` (↗/↘) instead of `arrow_upward`/`arrow_downward`. Same file,
+  one-line icon swap. Verified: type-check clean; changed-file lint 0 problems; full Jest
+  28/28 suites, 162/162 tests. No physical-device acceptance, commit, or push.
 - 2026-08-15 — Started after confirming the current app only requests notification permission: it
   does not register an Expo token, install receive/response listeners, poll unread notifications,
   show a global banner, or expose the unread count. Backend push is incomplete: customer-token push
@@ -278,6 +334,28 @@ non-production EAS/provider credential setup remain before the feature can be ma
   newly introduced); `npm test` 29/29 suites, 160/160 tests (3 new routing tests replacing the 3
   removed `notificationEntityRoute` cases). No physical-device acceptance (no device access in this
   environment), commit, or push.
+- 2026-08-18 — User reported an on-device `Cài đặt` (Settings) alert, "The request field is
+  required.", when changing the theme. Diagnosed against live `finviet-be` source (not guessed):
+  `real/auth.ts`'s `FE_THEME_TO_BE` sent theme as a capitalized string (`'Light'`/`'Dark'`/
+  `'System'`) in the `PUT /profile/settings` body, but the backend has no
+  `JsonStringEnumConverter` registered anywhere (`FinViet.Api/Program.cs`'s `AddJsonOptions` only
+  sets `ReferenceHandler.IgnoreCycles`), so `System.Text.Json` requires the `AppTheme` enum as a
+  raw integer — same convention the FE's own `GENDER_TO_INT` already follows for `Gender`, just
+  not mirrored for `Theme`. The string body fails to deserialize, `ProfileController`'s
+  `[FromBody] UpdateProfileSettingsRequest request` binds to `null`, and ASP.NET's automatic
+  `ApiController` validation reports the generic "The request field is required." on the
+  parameter itself. Fixed `FE_THEME_TO_BE` to map to ints (`Light=0, Dark=1, System=2`, matching
+  the backend enum's declared order) — no backend change needed. While fixing, found and fixed
+  the mirror-image bug on the read side: `BE_THEME_TO_FE`/`toTheme` (used by `getProfile`/
+  `login`) expected the same wrong string shape back from the backend, and separately used
+  `raw && BE_THEME_TO_FE[raw]`, which would have silently mis-mapped `0` (Light) to `'system'`
+  even after switching to ints, since `0` is falsy in JS — changed the lookup keys to numbers and
+  the guard to an explicit `raw !== undefined` check. Added
+  `src/services/real/__tests__/auth.test.ts` (5 tests: int-body assertion on save, all three
+  raw-int → FE-string mappings on read including the `0`/Light edge case, and the
+  no-theme-in-response fallback). Verified: `npm run type-check` clean; `npm run lint` 0 errors on
+  changed/new files; `npm test` 25/25 suites, 125/125 tests (5 new). No physical-device
+  acceptance, commit, or push.
 
 ## History
 

@@ -59,7 +59,8 @@ export interface AuthResponsePayload {
     needsPct?: number;
     wantsPct?: number;
     savingsPct?: number;
-    theme?: 'Light' | 'Dark' | 'System';
+    /** Backend AppTheme enum, serialized as an integer (0 Light, 1 Dark, 2 System). */
+    theme?: number;
     /** [warningPct, exceededPct] for budget_alert notifications. */
     notifBudgetThresholds?: number[];
   };

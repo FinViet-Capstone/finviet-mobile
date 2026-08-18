@@ -9,7 +9,6 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -69,13 +68,14 @@ const S = {
   withdrawBeforeArchiveTitle: 'Rút hết tiền trước khi lưu trữ',
   withdrawBeforeArchiveMsg:
     'Hãy rút toàn bộ số tiền còn lại về một ví thường. Sau khi số dư mục tiêu bằng 0đ, bạn có thể lưu trữ mục tiêu.',
-  withdrawAll: 'Rút toàn bộ',
+  gotIt: 'Đã hiểu',
   archiveError: 'Không thể lưu trữ mục tiêu. Vui lòng thử lại.',
   archived: 'Đã lưu trữ',
   noDeadline: 'Không có thời hạn',
   noHistory: 'Chưa có lần nào đóng góp',
   withdraw: 'Rút tiền',
   withdrawTitle: 'Rút tiền tiết kiệm',
+  fillAll: 'Tất cả',
   destLabel: 'Ví nhận tiền',
   destPlaceholder: 'Chọn ví nhận tiền',
   errOverSaved: (s: string) => `Vượt số tiền đã tiết kiệm (${s})`,
@@ -312,15 +312,13 @@ function ContributionSheet({
 function WithdrawSheet({
   visible,
   goal,
-  withdrawAll,
   onClose,
   onSuccess,
 }: {
   visible: boolean;
   goal: SavingsGoalWithProgress;
-  withdrawAll?: boolean;
   onClose: () => void;
-  onSuccess: (wasWithdrawAll: boolean) => void;
+  onSuccess: (drainedGoal: boolean) => void;
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -332,9 +330,9 @@ function WithdrawSheet({
   const [amountFocused, setAmountFocused] = useState(true);
   useEffect(() => {
     if (!visible) return;
-    setAmountRaw(withdrawAll ? String(goal.currentAmount) : '');
-    setAmountFocused(!withdrawAll);
-  }, [goal.currentAmount, visible, withdrawAll]);
+    setAmountRaw('');
+    setAmountFocused(true);
+  }, [visible]);
 
   // Only basic wallets can receive a withdrawal — crediting a bank-linked wallet
   // would desync it from the real account, same restriction as contributions.
@@ -375,6 +373,13 @@ function WithdrawSheet({
   const handleBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
   const handleClear = useCallback(() => setAmountRaw(''), []);
 
+  // Quick-fill the full saved amount — the only way to reach a zero balance
+  // (required before archiving) without typing the whole number by hand.
+  const handleFillAll = useCallback(() => {
+    setAmountRaw(String(goal.currentAmount));
+    setAmountFocused(false);
+  }, [goal.currentAmount]);
+
   const handleSave = useCallback(async () => {
     if (!canSave || !selectedWalletId) return;
 
@@ -387,12 +392,12 @@ function WithdrawSheet({
           note: note.trim() || undefined,
         },
       }),
-      wasWithdrawAll: !!withdrawAll,
-      onSuccess: (wasWithdrawAll) => {
+      drainedGoal: parsedAmount >= goal.currentAmount,
+      onSuccess: (drainedGoal) => {
         setAmountRaw('');
         setNote('');
         onClose();
-        onSuccess(wasWithdrawAll);
+        onSuccess(drainedGoal);
       },
       onError: (withdrawError) => {
         Alert.alert('', getApiErrorMessage(withdrawError, S.withdrawError));
@@ -404,8 +409,8 @@ function WithdrawSheet({
     note,
     selectedWalletId,
     goal.id,
+    goal.currentAmount,
     withdraw,
-    withdrawAll,
     onClose,
     onSuccess,
   ]);
@@ -447,7 +452,18 @@ function WithdrawSheet({
           </TouchableOpacity>
         )}
 
-        <Text style={styles.fieldLabel}>{S.amountLabel}</Text>
+        <View style={styles.amountLabelRow}>
+          <Text style={[styles.fieldLabel, styles.fieldLabelInRow]}>{S.amountLabel}</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.fillAllChip}
+            onPress={handleFillAll}
+            accessibilityRole="button"
+            accessibilityLabel={S.fillAll}
+          >
+            <Text style={styles.fillAllText}>{S.fillAll}</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.amountDisplay, hasError && styles.amountDisplayError]}
@@ -543,32 +559,27 @@ export default function GoalDetailScreen() {
   const deleteGoal = useDeleteGoal();
   const [contribVisible, setContribVisible] = useState(false);
   const [withdrawVisible, setWithdrawVisible] = useState(false);
-  const [isArchiveWithdrawal, setIsArchiveWithdrawal] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
 
-  const openArchiveWithdrawal = useCallback(() => {
-    setTimeout(() => {
-      setIsArchiveWithdrawal(true);
-      setWithdrawVisible(true);
-    }, 500);
-  }, []);
-
+  // Withdrawing everything is done through the regular "Rút tiền" sheet — the
+  // alert only informs, it never opens the sheet itself (opening it straight
+  // from the alert's button press collided with the alert's dismissal
+  // animation and read as a freeze).
   const handleArchivePress = useCallback(() => {
     if (!goal || goal.isDeleted) return;
 
     if (goal.currentAmount > 0) {
       Alert.alert(S.withdrawBeforeArchiveTitle, S.withdrawBeforeArchiveMsg, [
-        { text: S.cancel, style: 'cancel' },
-        { text: S.withdrawAll, onPress: openArchiveWithdrawal },
+        { text: S.gotIt },
       ]);
       return;
     }
 
     setDeleteVisible(true);
-  }, [goal, openArchiveWithdrawal]);
+  }, [goal]);
 
-  const handleWithdrawSuccess = useCallback((wasWithdrawAll: boolean) => {
-    if (wasWithdrawAll) setDeleteVisible(true);
+  const handleWithdrawSuccess = useCallback((drainedGoal: boolean) => {
+    if (drainedGoal) setDeleteVisible(true);
   }, []);
 
   const handleDelete = useCallback(async () => {
@@ -703,10 +714,7 @@ export default function GoalDetailScreen() {
             )}
             {goal.currentAmount > 0 && (
               <TouchableOpacity activeOpacity={0.7} style={styles.withdrawBtn}
-                onPress={() => {
-                  setIsArchiveWithdrawal(false);
-                  setWithdrawVisible(true);
-                }}>
+                onPress={() => setWithdrawVisible(true)}>
                 <MaterialIcon name="arrow_upward" size={20} color={colors.primary} />
                 <Text style={styles.withdrawText}>{S.withdraw}</Text>
               </TouchableOpacity>
@@ -731,11 +739,7 @@ export default function GoalDetailScreen() {
       <WithdrawSheet
         visible={withdrawVisible}
         goal={goal}
-        withdrawAll={isArchiveWithdrawal}
-        onClose={() => {
-          setWithdrawVisible(false);
-          setIsArchiveWithdrawal(false);
-        }}
+        onClose={() => setWithdrawVisible(false)}
         onSuccess={handleWithdrawSuccess}
       />
 
@@ -883,6 +887,18 @@ function createStyles(colors: ThemeColors) {
   },
   sheetTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, marginBottom: SPACING[2] },
   fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, marginBottom: SPACING[1], marginTop: SPACING[3] },
+  amountLabelRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: SPACING[3], marginBottom: SPACING[1],
+  },
+  fieldLabelInRow: { marginTop: 0, marginBottom: 0 },
+  fillAllChip: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SPACING[3], paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1, borderColor: colors.primary,
+  },
+  fillAllText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
   fieldInput: {
     backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1, borderColor: colors.outlineVariant,
