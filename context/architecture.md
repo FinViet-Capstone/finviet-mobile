@@ -12,21 +12,28 @@ which is where every domain's request/response contract now lives (moved out
 of the old `mock/*` modules when they were deleted).
 
 Every domain hits the real .NET backend: auth, wallets, transactions,
-budgets, saving goals, categories, reports/AI, notifications, rules, SMS/CSV
-extraction, and bank-linking (SePay OAuth2 — the only linking provider;
-Finverse was removed 2026-07). Two exceptions have their entry points hidden
+budgets, saving goals, categories, reports/AI, notifications, rules, SMS/CSV/
+photo extraction, and bank-linking (SePay OAuth2 — the only linking provider;
+Finverse was removed 2026-07). One exception has its entry point hidden
 client-side rather than wired against nothing:
-- **Photo/receipt OCR extraction** — `real/extraction.ts`'s `extractFromPhoto`
-  calls the real `POST /extract/photo` endpoint, but the backend's OCR
-  provider isn't configured yet (`IReceiptOcrService` is an intentional
-  placeholder that always 503s with code `ocr_not_configured`). The photo
-  entry flow calls it for real and shows an honest "feature coming soon"
-  message on that specific error instead of faking a result.
 - **Subscriptions** — the backend has a real `POST /api/subscriptions/subscribe`
   (VNPay) endpoint, but no customer-facing plan-catalog or
   current-subscription-status endpoint (only `Admin`-role CRUD exists). The
   Settings → "Gói dịch vụ" entry is removed until those two land — see
   `finviet-be/docs/subscriptions-customer-endpoints-todo.md`.
+
+**Correction (2026-08-18):** Photo/receipt OCR extraction was previously documented here as
+permanently 503ing (`IReceiptOcrService` as an intentional placeholder). That's stale —
+`finviet-be` commit `aff76cc` wired it to a real Gemini-backed OCR provider, and
+`real/extraction.ts`'s `extractFromPhoto` now gets genuine extracted fields back. The current,
+narrower gap: the photo extraction path never calls the shared categorization service
+(`AiCategorizationService`/`PreviewAsync`) the way SMS/CSV extraction does
+(`TransactionExtractService.BuildResponseAsync`), so every photo-extracted row comes back
+`categoryId: null` by construction — not fixed yet, tracked as a backend follow-up. Separately,
+note that `AiCategorizationService.CategorizeTransactionAsync` (used by SMS, CSV, and SePay
+sync) silently falls back to `categoryId: null` on any Gemini provider failure, logged only as
+a warning — if AI categorization stops working across all of SMS/CSV/SePay at once, check that
+backend log path and the configured Gemini model/API key before assuming a code bug.
 
 There is no category-request feature (never had an admin-approval UI, removed
 as a concept months ago) — don't reintroduce it.
