@@ -11,15 +11,16 @@ FinViet is a mobile-first personal finance tracker for Vietnamese Gen Z that rem
 friction (manual entry, photo/receipt scan, bank SMS paste, CSV import, and bank-linked
 auto-sync wallets) and layers an "AI Spending Score," AI-labeled weekly reports, and a
 chatbot advisor on top — all in Vietnamese. **Current implementation status:** the app's UI,
-navigation, wallets/transactions/budgets/goals/categories data layer, and entry flows are
-real, working logic against an in-memory mock service layer (swappable to a real REST API per
-domain via a `USE_MOCK` flag). The "AI" layer (spending score, weekly report, chatbot) has a
-**mock fallback** (two hardcoded score objects and canned report/chat text, used when
-`USE_MOCK=true`) but is also **fully wired to the real backend** (`src/services/real/reports.ts`
-→ `/ai/score`, `/ai/reports`, `/ai/chat`, backed by an LLM/RAG pipeline) — set
-`EXPO_PUBLIC_USE_MOCK=false` and it computes real scores/reports/chat replies from the
-customer's actual data, matching the "AI-Powered Personal Finance Tracker and Spending Advisor"
-tagline. The mock objects remain the dev-mode fallback, not the shipped behavior.
+navigation, wallets/transactions/budgets/goals/categories data layer, entry flows, and the
+"AI" layer (spending score, weekly report, chatbot) are real, working logic against the real
+.NET backend (`src/services/real/*`) — there is no mock service layer or `USE_MOCK` flag in
+this codebase anymore (removed 2026-08-18). The AI layer (`src/services/real/reports.ts` →
+`/ai/score`, `/ai/reports`, `/ai/chat`, backed by an LLM/RAG pipeline) computes real
+scores/reports/chat replies from the customer's actual data, matching the "AI-Powered
+Personal Finance Tracker and Spending Advisor" tagline. Two domains remain permanently
+unreachable in the UI for lack of a real customer-facing backend contract — Subscriptions and
+photo/receipt OCR extraction — see Tech Stack and Features §A/§E below for exactly what's
+missing on the backend side for each.
 
 ## Users
 ---
@@ -42,11 +43,13 @@ A. Wallets & Multi-Method Transaction Entry
 - Four entry methods behind a single "+" tab chooser, matching the real `EntryMethod` union
   (`'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste'`): **Manual** (no AI assist),
   **SMS paste** (extraction preview), **Photo/receipt scan** (batch up to 5, review-list UX),
-  **CSV import** (bank export, multi-row review-list UX). SMS and CSV extraction both call a
-  real backend endpoint (`POST /extract/sms`, `POST /extract/csv`) with genuine AI
-  categorization when `USE_MOCK=false`. Photo-based OCR extraction stays mock-only in this
-  codebase — a backend endpoint exists (`POST /extract/photo`) but has no real OCR provider
-  wired in yet, so it always responds 503.
+  **CSV import** (bank export, multi-row review-list UX). All three (SMS, CSV, and photo)
+  call a real backend endpoint (`POST /extract/sms`, `/extract/csv`, `/extract/photo`) with
+  genuine AI categorization. Photo/receipt OCR is the one exception that doesn't actually
+  work yet: the endpoint exists but its backend OCR provider isn't configured
+  (`IReceiptOcrService` is an intentional placeholder), so it always responds 503 with code
+  `ocr_not_configured` — the app calls it for real and shows an honest "feature coming soon"
+  message on that specific error rather than faking a result.
 - Internal wallet-to-wallet transfers create two linked `Transaction` records
   (`type: 'transfer_out'`/`'transfer_in'`) sharing a real `transferPairId`; deleting either leg
   deletes both and reverses both wallet balances. (There is no "pending cash-withdrawal
@@ -112,26 +115,23 @@ D. Savings Goals
 
 E. AI Spending Score, Weekly Report & Advisor Chat
 - `SpendingScore` (`view: 'weekly'|'monthly'`, `score`, `color: 'green'|'amber'|'red'`,
-  `verdictVi`, `reasonVi`, `commentaryVi`) is real end to end when `USE_MOCK=false`:
-  `real/reports.ts` calls `GET /ai/score?period=WEEKLY|MONTHLY`, which computes a genuine score
-  from the customer's transactions/budgets and returns a `colorBadge` + Vietnamese `comment`.
-  The mock fallback (used only when `USE_MOCK=true`) still selects between two hardcoded literal
-  objects (score 72/green for weekly, 54/amber for monthly) — that's a dev convenience, not the
-  shipped behavior. Note the backend returns a single `comment` string, not separate
-  verdict/reason/commentary fields — the FE derives a short verdict from the color band and
-  reuses the comment for the rest; when the AI provider is unavailable the backend returns
-  `comment: null`, which the FE shows as fallback text rather than a blank box.
+  `verdictVi`, `reasonVi`, `commentaryVi`) is real end to end: `real/reports.ts` calls
+  `GET /ai/score?period=WEEKLY|MONTHLY`, which computes a genuine score from the customer's
+  transactions/budgets and returns a `colorBadge` + Vietnamese `comment`. Note the backend
+  returns a single `comment` string, not separate verdict/reason/commentary fields — the FE
+  derives a short verdict from the color band and reuses the comment for the rest; when the
+  AI provider is unavailable the backend returns `comment: null`, which the FE shows as
+  fallback text rather than a blank box.
 - Weekly reports (`GET /ai/reports`, `POST /ai/reports/generate`) and the advisor chatbot
   (`POST /ai/chat`, `GET /ai/chat/history`) are likewise real — genuine LLM-backed Vietnamese
-  narratives/replies, not canned text, once `USE_MOCK=false`. The backend keeps a single flat
-  chat history per customer (no server-side "session" concept); the FE folds it into one
-  synthetic session so the existing session-list UI keeps working. The mock versions (canned
-  report text, templated echo reply) remain only the `USE_MOCK=true` dev fallback.
+  narratives/replies, not canned text. The backend keeps a single flat chat history per
+  customer (no server-side "session" concept); the FE folds it into one synthetic session so
+  the existing session-list UI keeps working.
 - UI-wise this is a real, built feature (score card with weekly/monthly toggle, a score-detail
-  screen, and a bottom-sheet chat), and as of this doc's last update the computation/generation
-  behind it is real too — the only thing gating it from "live" is the `USE_MOCK` flag and a
-  running backend with an AI provider configured (the backend is mid-switch from local Ollama
-  to Gemini/Google AI Studio as its provider — a backend-side config change, no FE impact).
+  screen, and a bottom-sheet chat), and the computation/generation behind it is real too — it
+  just needs a running backend with an AI provider configured (the backend is mid-switch from
+  local Ollama to Gemini/Google AI Studio as its provider — a backend-side config change, no
+  FE impact).
 
 F. Notifications
 - `AppNotification` types: `budget_alert`, `weekly_report`, `goal_milestone`, `announcement`,
@@ -140,13 +140,14 @@ F. Notifications
 
 G. Settings & Utilities
 - Real, routed screens under `app/settings/`: profile/preferences home, budget-allocation
-  sliders (needs/wants/savings %), category bucket management, data export, account deletion,
-  and subscription management.
+  sliders (needs/wants/savings %), category bucket management, data export, and account
+  deletion. Subscription management is not currently reachable — its Settings entry was
+  removed 2026-08-18 (see Monetization below).
 
 ## Data
 ---
-Field lists below are taken directly from `src/types/*.ts` and the mock service layer that
-implements them.
+Field lists below are taken directly from `src/types/*.ts` and the `src/services/real/*`
+modules that implement them.
 
 ### Customer
 - id, email, passwordHash/googleId, displayName, avatarUrl
@@ -196,17 +197,10 @@ implements them.
   title, body, entityType ('budget'|'goal'|'report'|'wallet'|'system'), entityId, isRead,
   sentAt
 
-### Subscription
-- SubscriptionPlan: planCode, nameVi, nameEn, monthlyPrice, annualPrice, featuresVi[],
-  isPopular?
-- CustomerSubscription: id, customerId, planCode, billingCycle ('monthly'|'annual'),
-  status ('active'|'cancelled'|'expired'|'trial'), currentPeriodEnd, cancelAtPeriodEnd
-- `PlanCode = 'free' | 'premium'`
-
 ### Rule (merchant → category)
 - id, customerId, merchantKeyword, categoryId, createdAt, updatedAt
 
-### AI (score/report/chat — currently mock-backed, see Features §E)
+### AI (score/report/chat — real, see Features §E)
 - SpendingScore, WeeklyReport, ChatMessage/ChatSession, AiClassificationResult,
   CategorizationOutcome (`source: 'RULE'|'AI'|'FALLBACK'`)
 
@@ -229,26 +223,25 @@ implements them.
 - `expo-secure-store`, `expo-image-picker`, `expo-notifications`, `expo-router`,
   `expo-constants`, `expo-linking`
 - Axios for HTTP
-- A `USE_MOCK` toggle in `src/services/index.ts` swaps each domain between
-  `src/services/mock/*` and `src/services/real/*` with identical function signatures — this
-  swap is already implemented for wallets/transactions/budgets/goals/customer-categories/
-  notifications/rules/SMS-extraction/CSV-extraction/AI score-report-chat and bank-linking
-  (SePay only); photo-OCR extraction and subscriptions are the only domains that remain
-  mock-only (no backend endpoint for subscriptions; a backend photo-OCR endpoint exists but has
-  no real OCR provider wired in, so it always 503s).
+- No mock service layer or `USE_MOCK` flag (removed 2026-08-18) — `src/services/index.ts` is
+  a barrel re-exporting every domain straight from `src/services/real/*`. Photo/receipt OCR
+  extraction calls its real endpoint but always 503s (no OCR provider configured server-side
+  yet); Subscriptions has its Settings entry point hidden client-side (no customer-facing
+  plan-catalog/status endpoint yet, though the actual VNPay subscribe flow is real) — see
+  Features §A and Monetization.
 - Backend is a separate repo not present in this codebase — this app only assumes a REST API
   reachable at `EXPO_PUBLIC_API_BASE_URL`; no specific backend technology is asserted here.
 
 ## Monetization
 ---
-A real 3-tier catalog exists in the mock subscription service:
-- **free** — 0đ
-- **premium** — 59.000đ/month or 590.000đ/year (marked `isPopular`)
-
-The mock customer defaults to `planCode: 'free'`, `status: 'active'`. A Settings →
-Subscription screen exists for upgrade/cancel. No feature-gating logic tying `planCode` to
-actual feature access was found in this codebase — this currently reads as a pricing
-catalog/upgrade-flow scaffold rather than an enforced paywall.
+The backend has a real, VNPay-integrated `POST /api/subscriptions/subscribe` endpoint and an
+admin-only plan-catalog CRUD (`/api/admin/subscription-plans`), but no customer-facing
+endpoint to list plans or read one's own current subscription status — so a plan catalog
+(free/premium tiers, pricing) can't currently be rendered or acted on from this app. The
+Settings → "Gói dịch vụ" entry point was removed 2026-08-18 rather than half-wire a screen
+against an incomplete contract; see `finviet-be/docs/subscriptions-customer-endpoints-todo.md`
+for the two missing endpoints. No feature-gating logic tying a plan to actual feature access
+exists in this codebase either way.
 
 ## UI/UX
 ---

@@ -26,8 +26,6 @@ const S = {
   title: 'Scan ảnh',
   galleryBtn: 'photo_library',
   tip: 'Căn chỉnh hóa đơn vào khung để quét chính xác nhất.',
-  flashOff: 'flash_off',
-  flashOn: 'flash_on',
   galleryIcon: 'image',
   cameraPermErr: 'Camera chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.',
   galleryPermErr: 'Thư viện ảnh chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.',
@@ -47,7 +45,6 @@ export default function PhotoEntryScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
-  const [flashOn, setFlashOn] = useState(false);
 
   const buildConfirmHref = (uris: string[]) => ({
     pathname: '/(tabs)/entry/photo-confirm' as const,
@@ -152,18 +149,8 @@ export default function PhotoEntryScreen() {
 
         {/* Controls row */}
         <View style={styles.controlsRow}>
-          {/* Flash toggle */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.controlBtn}
-            onPress={() => setFlashOn((v) => !v)}
-          >
-            <MaterialIcon
-              name={flashOn ? S.flashOn : S.flashOff}
-              size={26}
-              color={colors.onSurface}
-            />
-          </TouchableOpacity>
+          {/* Spacer to keep the shutter centered against the gallery button */}
+          <View style={styles.controlSpacer} />
 
           {/* Shutter */}
           <TouchableOpacity
@@ -358,6 +345,10 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
     borderRadius: BORDER_RADIUS.full,
     backgroundColor: colors.surfaceContainerHighest,
+  },
+  controlSpacer: {
+    width: 48,
+    height: 48,
   },
 
   // Shutter

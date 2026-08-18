@@ -1,6 +1,82 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Remove the mock service layer + fix Photo/CSV/Settings bugs that surfaced while
+testing against the real backend (branch `feature/remove-mock-layer`). User reported: Photo
+entry never parses the actual receipt and its flashlight button does nothing; CSV import has
+no select-all/deselect-all across up to 158 rows; Settings looked "still mock" and theme
+changes didn't stick on the real API. A 5-pass Explore audit (both `finviet-mobile` and
+`finviet-be`) found concrete causes: `real/extraction.ts` unconditionally re-exports mock's
+`extractFromPhoto` regardless of `USE_MOCK` (never calls the real, intentionally-503ing
+`POST /extract/photo`); the flashlight button only toggles an icon glyph (capture goes
+through `expo-image-picker`'s native camera, which has no torch hook); CSV/photo review
+screens have per-row-only selection with no bulk toggle anywhere in the codebase to copy;
+Settings' theme/notification mutations have no `onError` handling so real-API failures are
+invisible; and `real/auth.ts`'s `toCustomer` hardcodes `notifications: {budget:true,
+report:true, goals:true}` on every login/profile fetch because the backend has no field at
+all for those three toggles (confirmed via `finviet-be` — `UpdateProfileSettingsRequest`
+only has `Theme` and a `NotifBudgetThresholds` threshold pair, not per-category booleans).
+Given that audit, the user decided to delete the mock layer outright (`src/services/mock/*`,
+the `USE_MOCK` flag) rather than keep patching drift, with three domain-specific decisions:
+Photo OCR calls the real endpoint and shows an honest "coming soon" error instead of fake
+data; the three backend-less notification toggles persist locally per customer (SecureStore,
+like the existing `themeCache`) instead of round-tripping a nonexistent API; and Subscriptions
+(confirmed via `finviet-be`: a real `POST /subscriptions/subscribe`/VNPay endpoint exists, but
+plan-catalog and status-check are `Admin`-only, no customer-facing equivalent) gets its
+Settings entry hidden entirely until backend adds those two endpoints, rather than half-wired.
+Full plan at the session's plan file; ordering rule: wire/fix the real side only in the first
+four steps, touch nothing under `src/services/mock/` until the final wholesale-deletion step.
+
+## Status
+
+Implemented — all five plan steps done, `npm run type-check` clean (one pre-existing unrelated
+error in `app/settings/categories.tsx` untouched), `npm run lint` 0 errors / 70 warnings (down
+from a higher pre-branch count — several warnings disappeared along with the deleted files;
+none newly introduced beyond two pre-existing `axios`-named-export-style warnings matching the
+one already present in `src/utils/errors.ts`), `npm test` 24/24 suites, 120/120 tests (the 5
+mock-only test suites were deleted along with `src/services/mock/`, their subjects confirmed
+dead — real mode gets that computation from the backend already, nothing needed porting). No
+physical-device/emulator verification in this environment (none available); manual on-device
+check of the actual UI flows is the user's to do. Not committed/pushed.
+
+## Notes
+
+- Steps 1–4 (Settings error surfacing + local notification-prefs cache; Photo real OCR wiring
+  + flashlight removal; CSV/photo select-all UX; Subscriptions entry-point hiding + backend
+  handoff doc) only touched `real/*`, hooks, and screens — `src/services/mock/` was left
+  completely untouched until step 5's wholesale deletion, per the user's explicit ordering
+  instruction.
+- Step 5 surfaced two bugs beyond the original plan, both fixed as directly-caused follow-ups
+  rather than new scope: (1) renaming the service-layer auth input types off their `Mock*`
+  prefix collided with pre-existing, unrelated form-validation types of the same name in
+  `src/validators/auth.schema.ts` — resolved by adopting the codebase's own pre-existing (if
+  previously unused) `*Payload` naming convention instead (`LoginPayload`, `RegisterPayload`,
+  `ChangePasswordPayload`, `ResetPasswordPayload`), and deleting the now-doubly-redundant dead
+  `*Payload` types that already existed unused in `src/types/customer.ts`. (2) Found and
+  deleted several other confirmed-zero-consumer dead type scaffolds while relocating types out
+  of `mock/*` (`src/types/api.ts` — an entirely unused "planned backend envelope" file whose own
+  docstring referenced the mock layer; unused legacy `*Payload` types in `budget.ts`/`goal.ts`/
+  `wallet.ts`; `src/types/subscription.ts`, orphaned once the Subscriptions UI was removed) —
+  verified each via grep for zero consumers before deleting, not assumed.
+- `getCustomer` (barrel-exported from `mock/user.ts`, unconditional regardless of `USE_MOCK`)
+  turned out to have zero runtime consumers — `useCustomer()` reads from the Zustand auth store
+  instead, populated by `real/auth.ts`'s `toCustomer` at login/bootstrap — so it was dropped
+  outright rather than needing a real replacement. Same for `getIncomeAllocationHistory`
+  (confirmed no backend endpoint and no callers).
+- `app/(auth)/index.tsx`'s Google-OAuth button was previously gated behind `USE_MOCK &&` (a
+  demo-only affordance, since `real/auth.ts`'s `googleOAuth` always throws a clear "not
+  available yet, use email/password" error). Rather than deleting the button along with the
+  flag, it's now shown unconditionally — consistent with the Photo OCR treatment elsewhere in
+  this same change (call the real path, surface its honest error) rather than hiding a
+  already-working error message.
+- `.fallowrc.jsonc`'s `duplicate-exports: off` was re-verified against the new no-mock world
+  (temporarily flipped on, ran `fallow dead-code`, confirmed the findings are the ordinary
+  barrel re-export pattern in `src/services/index.ts`, not anything mock-related) and its
+  justifying comment updated accordingly; the rule itself stays off.
+- `context/architecture.md` and `context/project-spec.md` updated throughout to remove
+  `USE_MOCK`/mock-layer framing and describe the current real-only state, including the
+  Photo-OCR-503 and Subscriptions-hidden exceptions.
+
 Feature: Savings Goals ↔ Budget Adherence ↔ AI Spending Score integration — cross-repo work
 with `finviet-be` (branch `fix/savings-bucket-goal-netting` there; this repo's branch is
 `fix/savings-goal-budget-score-integration`). Started from an inspection of how the three

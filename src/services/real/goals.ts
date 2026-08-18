@@ -1,8 +1,6 @@
 /**
  * real/goals.ts — real .NET saving-goal service.
  *
- * Mirrors src/services/mock/goals.ts so the barrel can swap mock ⇄ real.
- *
  * Backend: api/saving-goals/* (SavingGoalsController), ApiResponse<T> envelope.
  * The backend computes all progress fields server-side (SavingGoalResponse), so
  * we map them straight across rather than recomputing.
@@ -18,13 +16,14 @@
 import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
-import type { SavingsGoalWithProgress, GoalContribution } from '@/types';
 import type {
+  SavingsGoalWithProgress,
+  GoalContribution,
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
   WithdrawGoalInput,
-} from '@/services/mock/goals';
+} from '@/types';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 

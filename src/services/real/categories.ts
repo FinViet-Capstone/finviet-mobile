@@ -1,10 +1,6 @@
 /**
  * real/categories.ts — real .NET category service (customer category set).
  *
- * Mirrors the surface of src/services/mock/customerCategories.ts that the app
- * consumes (getCustomerCategories / moveBucket / seedDefaultCategories) so the
- * barrel can swap mock ⇄ real.
- *
  * Backend reality: the .NET API exposes a GLOBAL category catalog
  * (GET /api/categories) where each expense category carries a `expenseClass`
  * (needs | wants | savings) — the same 3-bucket model the FE calls bucketId.
@@ -16,10 +12,9 @@
  */
 
 import { api, unwrap } from '@/lib/api';
-import type { CustomerCategory } from '@/types/category';
+import type { CustomerCategory, MoveBucketPayload } from '@/types/category';
 import type { BucketType } from '@/constants/categories';
 import { getCategoryById } from '@/constants/categories';
-import type { MoveBucketPayload } from '@/services/mock/customerCategories';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 

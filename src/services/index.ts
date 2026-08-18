@@ -1,69 +1,45 @@
 /**
  * FinViet Service Layer barrel.
  *
- * Screens/hooks import from this barrel only — never from individual mock/real
- * files. Each feature branches on USE_MOCK: when EXPO_PUBLIC_USE_MOCK="false" the
- * real .NET-backed module is used, otherwise the in-memory mock. Input/return
- * types always come from the mock modules (the shared contract both sides honour),
- * so the swap needs zero hook/screen changes.
+ * Screens/hooks import from this barrel only — never from individual real/*
+ * files directly (mock/* no longer exists; every domain is real). Input/return
+ * types are re-exported here from @/types so this barrel stays the single
+ * import surface, matching the pre-existing convention.
  *
- * Wired to the real backend: auth, wallets, transactions, budgets, saving-goals,
- * categories (customer category buckets), custom categories, reports/AI
- * (spending score, weekly report, multi-session chat, customer AI preferences),
- * notifications, rules, SMS
- * extraction, CSV/XLSX extraction, and SePay bank-linking (see real/sepay.ts).
- * Still mock: subscriptions (no backend) and photo/receipt OCR extraction (a
- * backend endpoint exists but has no real OCR provider wired in yet — always
- * responds 503).
+ * Two domains have no real backend and their entry points are hidden
+ * client-side rather than wired against nothing: Subscriptions (no
+ * customer-facing plan-catalog/status endpoints yet — see
+ * finviet-be/docs/subscriptions-customer-endpoints-todo.md) and photo/receipt
+ * OCR extraction, whose real endpoint exists but always 503s until a backend
+ * OCR provider is configured (surfaced honestly, not faked — see
+ * real/extraction.ts).
  */
 
-import { USE_MOCK } from '@/lib/env';
+import * as auth from './real/auth';
+import * as wallets from './real/wallets';
+import * as transactions from './real/transactions';
+import * as budgets from './real/budgets';
+import * as incomeAllocation from './real/incomeAllocation';
+import * as goals from './real/goals';
+import * as customerCategories from './real/categories';
+import * as customCategories from './real/customCategories';
+import * as reports from './real/reports';
+import * as aiPreferences from './real/aiPreferences';
+import * as notifications from './real/notifications';
+import * as extraction from './real/extraction';
+import * as rules from './real/rules';
 
-import * as mockAuth from './mock/auth';
-import * as realAuth from './real/auth';
-import * as mockWallets from './mock/wallets';
-import * as realWallets from './real/wallets';
-import * as mockTransactions from './mock/transactions';
-import * as realTransactions from './real/transactions';
-import * as mockBudgets from './mock/budgets';
-import * as realBudgets from './real/budgets';
-import * as mockIncomeAllocation from './mock/incomeAllocation';
-import * as realIncomeAllocation from './real/incomeAllocation';
-import * as mockGoals from './mock/goals';
-import * as realGoals from './real/goals';
-import * as mockCustomerCategories from './mock/customerCategories';
-import * as realCustomerCategories from './real/categories';
-import * as mockCustomCategories from './mock/customCategories';
-import * as realCustomCategories from './real/customCategories';
-import * as mockReports from './mock/reports';
-import * as realReports from './real/reports';
-import * as mockAiPreferences from './mock/aiPreferences';
-import * as realAiPreferences from './real/aiPreferences';
-import * as mockNotifications from './mock/notifications';
-import * as realNotifications from './real/notifications';
-import * as mockExtraction from './mock/extraction';
-import * as realExtraction from './real/extraction';
-import * as mockRules from './mock/rules';
-import * as realRules from './real/rules';
-
-/**
- * USE_MOCK / API_BASE_URL live in @/lib/env (dependency-free) to avoid an import
- * cycle with the Axios layer. Re-exported here for backward compatibility.
- */
-export { USE_MOCK, API_BASE_URL } from '@/lib/env';
-
-// Customer
-export { getCustomer } from './mock/user';
+/** @/lib/env is dependency-free to avoid an import cycle with the Axios layer. */
+export { API_BASE_URL } from '@/lib/env';
 
 // ─── Wallets ────────────────────────────────────────────────────────────────
-const walletsImpl = USE_MOCK ? mockWallets : realWallets;
-export const getWallets = walletsImpl.getWallets;
-export const getWalletById = walletsImpl.getWalletById;
-export const createWallet = walletsImpl.createWallet;
-export const updateWallet = walletsImpl.updateWallet;
-export const deleteWallet = walletsImpl.deleteWallet;
-export const withdrawFromWallet = walletsImpl.withdrawFromWallet;
-export const getWalletTransactions = walletsImpl.getWalletTransactions;
+export const getWallets = wallets.getWallets;
+export const getWalletById = wallets.getWalletById;
+export const createWallet = wallets.createWallet;
+export const updateWallet = wallets.updateWallet;
+export const deleteWallet = wallets.deleteWallet;
+export const withdrawFromWallet = wallets.withdrawFromWallet;
+export const getWalletTransactions = wallets.getWalletTransactions;
 export type {
   CreateWalletInput,
   UpdateWalletInput,
@@ -72,19 +48,18 @@ export type {
   WalletLedgerQuery,
   WalletLedgerEntry,
   WalletLedgerPage,
-} from './mock/wallets';
+} from '@/types';
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
-const transactionsImpl = USE_MOCK ? mockTransactions : realTransactions;
-export const getTransactions = transactionsImpl.getTransactions;
-export const getTransactionById = transactionsImpl.getTransactionById;
-export const getRecentTransactions = transactionsImpl.getRecentTransactions;
-export const getTransactionSummary = transactionsImpl.getTransactionSummary;
-export const createTransaction = transactionsImpl.createTransaction;
-export const updateTransaction = transactionsImpl.updateTransaction;
-export const classifyTransaction = transactionsImpl.classifyTransaction;
-export const deleteTransaction = transactionsImpl.deleteTransaction;
-export const createTransfer = transactionsImpl.createTransfer;
+export const getTransactions = transactions.getTransactions;
+export const getTransactionById = transactions.getTransactionById;
+export const getRecentTransactions = transactions.getRecentTransactions;
+export const getTransactionSummary = transactions.getTransactionSummary;
+export const createTransaction = transactions.createTransaction;
+export const updateTransaction = transactions.updateTransaction;
+export const classifyTransaction = transactions.classifyTransaction;
+export const deleteTransaction = transactions.deleteTransaction;
+export const createTransfer = transactions.createTransfer;
 export type {
   TransactionFilters,
   CreateTransactionInput,
@@ -95,144 +70,119 @@ export type {
   TransactionSummaryCategory,
   TransactionSummaryDay,
   TransactionSummaryBeneficiary,
-} from './mock/transactions';
+} from '@/types';
 
 // ─── Budgets ────────────────────────────────────────────────────────────────
-const budgetsImpl = USE_MOCK ? mockBudgets : realBudgets;
-export const getBudgets = budgetsImpl.getBudgets;
-export const getBudgetById = budgetsImpl.getBudgetById;
-export const getBudgetBuckets = budgetsImpl.getBudgetBuckets;
-export const createBudget = budgetsImpl.createBudget;
-export const updateBudget = budgetsImpl.updateBudget;
-export const deleteBudget = budgetsImpl.deleteBudget;
+export const getBudgets = budgets.getBudgets;
+export const getBudgetById = budgets.getBudgetById;
+export const getBudgetBuckets = budgets.getBudgetBuckets;
+export const createBudget = budgets.createBudget;
+export const updateBudget = budgets.updateBudget;
+export const deleteBudget = budgets.deleteBudget;
 export type {
   CreateBudgetInput,
   UpdateBudgetInput,
   MonthRange,
   BucketSummary,
   BucketSummaryList,
-} from './mock/budgets';
+} from '@/types';
 
 // ─── Income / allocation history ──────────────────────────────────────────────
-const incomeAllocationImpl = USE_MOCK ? mockIncomeAllocation : realIncomeAllocation;
-export const getEffectiveIncomeAllocation = incomeAllocationImpl.getEffectiveIncomeAllocation;
-export const getIncomeAllocationHistory = incomeAllocationImpl.getIncomeAllocationHistory;
-export const getScheduledIncomeAllocation = incomeAllocationImpl.getScheduledIncomeAllocation;
-export const scheduleIncomeAllocationChange = incomeAllocationImpl.scheduleIncomeAllocationChange;
-export type {
-  IncomeAllocationSetting,
-  ScheduleIncomeAllocationInput,
-} from './mock/incomeAllocation';
+export const getEffectiveIncomeAllocation = incomeAllocation.getEffectiveIncomeAllocation;
+export const getScheduledIncomeAllocation = incomeAllocation.getScheduledIncomeAllocation;
+export const scheduleIncomeAllocationChange = incomeAllocation.scheduleIncomeAllocationChange;
+export type { IncomeAllocationSetting, ScheduleIncomeAllocationInput } from '@/types';
 
 // ─── Goals ──────────────────────────────────────────────────────────────────
-const goalsImpl = USE_MOCK ? mockGoals : realGoals;
-export const getGoals = goalsImpl.getGoals;
-export const getGoalById = goalsImpl.getGoalById;
-export const createGoal = goalsImpl.createGoal;
-export const updateGoal = goalsImpl.updateGoal;
-export const deleteGoal = goalsImpl.deleteGoal;
-export const addGoalContribution = goalsImpl.addGoalContribution;
-export const getContributionsByGoalId = goalsImpl.getContributionsByGoalId;
-export const withdrawFromGoal = goalsImpl.withdrawFromGoal;
+export const getGoals = goals.getGoals;
+export const getGoalById = goals.getGoalById;
+export const createGoal = goals.createGoal;
+export const updateGoal = goals.updateGoal;
+export const deleteGoal = goals.deleteGoal;
+export const addGoalContribution = goals.addGoalContribution;
+export const getContributionsByGoalId = goals.getContributionsByGoalId;
+export const withdrawFromGoal = goals.withdrawFromGoal;
 export type {
   CreateGoalInput,
   UpdateGoalInput,
   AddContributionInput,
   WithdrawGoalInput,
-} from './mock/goals';
+} from '@/types';
 
 // ─── Customer categories (bucket model) ───────────────────────────────────────
-const customerCategoriesImpl = USE_MOCK
-  ? mockCustomerCategories
-  : realCustomerCategories;
-export const getCustomerCategories = customerCategoriesImpl.getCustomerCategories;
-export const moveBucket = customerCategoriesImpl.moveBucket;
-export const bulkMoveBucket = customerCategoriesImpl.bulkMoveBucket;
-export const seedDefaultCategories = customerCategoriesImpl.seedDefaultCategories;
-export type { MoveBucketPayload } from './mock/customerCategories';
+export const getCustomerCategories = customerCategories.getCustomerCategories;
+export const moveBucket = customerCategories.moveBucket;
+export const bulkMoveBucket = customerCategories.bulkMoveBucket;
+export const seedDefaultCategories = customerCategories.seedDefaultCategories;
+export type { MoveBucketPayload } from '@/types';
 
 // ─── Custom categories (customer-created, user-picked icon) ───────────────────
-const customCategoriesImpl = USE_MOCK ? mockCustomCategories : realCustomCategories;
-export const getCustomCategories = customCategoriesImpl.getCustomCategories;
-export const createCustomCategory = customCategoriesImpl.createCustomCategory;
-export const deleteCustomCategory = customCategoriesImpl.deleteCustomCategory;
-export const updateCustomCategoryBucket = customCategoriesImpl.updateCustomCategoryBucket;
-export const bulkUpdateCustomCategoryBucket = customCategoriesImpl.bulkUpdateCustomCategoryBucket;
-export type { CreateCustomCategoryInput, BulkBucketMove } from './mock/customCategories';
+export const getCustomCategories = customCategories.getCustomCategories;
+export const createCustomCategory = customCategories.createCustomCategory;
+export const deleteCustomCategory = customCategories.deleteCustomCategory;
+export const updateCustomCategoryBucket = customCategories.updateCustomCategoryBucket;
+export const bulkUpdateCustomCategoryBucket = customCategories.bulkUpdateCustomCategoryBucket;
+export type { CreateCustomCategoryInput, BulkBucketMove } from '@/types';
 
 // ─── Reports & AI ─────────────────────────────────────────────────────────────
-const reportsImpl = USE_MOCK ? mockReports : realReports;
-export const getSpendingScore = reportsImpl.getSpendingScore;
-export const getWeeklyReport = reportsImpl.getWeeklyReport;
-export const getChatHistory = reportsImpl.getChatHistory;
-export const getChatSessions = reportsImpl.getChatSessions;
-export const getChatSessionMessages = reportsImpl.getChatSessionMessages;
-export const createChatSession = reportsImpl.createChatSession;
-export const sendChatMessage = reportsImpl.sendChatMessage;
-export const generateWeeklyReport = reportsImpl.generateWeeklyReport;
-export const previewCategorization = reportsImpl.previewCategorization;
-export const categorizeTransaction = reportsImpl.categorizeTransaction;
-export const overrideCategorization = reportsImpl.overrideCategorization;
+export const getSpendingScore = reports.getSpendingScore;
+export const getWeeklyReport = reports.getWeeklyReport;
+export const getChatHistory = reports.getChatHistory;
+export const getChatSessions = reports.getChatSessions;
+export const getChatSessionMessages = reports.getChatSessionMessages;
+export const createChatSession = reports.createChatSession;
+export const sendChatMessage = reports.sendChatMessage;
+export const generateWeeklyReport = reports.generateWeeklyReport;
+export const previewCategorization = reports.previewCategorization;
+export const categorizeTransaction = reports.categorizeTransaction;
+export const overrideCategorization = reports.overrideCategorization;
 
 // ─── Customer AI preferences ──────────────────────────────────────────────────
-const aiPreferencesImpl = USE_MOCK ? mockAiPreferences : realAiPreferences;
-export const getAiPreferences = aiPreferencesImpl.getAiPreferences;
-export const updateAiPreferences = aiPreferencesImpl.updateAiPreferences;
-export type {
-  CategorizationMode,
-  AiPreferences,
-  UpdateAiPreferencesInput,
-} from './mock/aiPreferences';
+export const getAiPreferences = aiPreferences.getAiPreferences;
+export const updateAiPreferences = aiPreferences.updateAiPreferences;
+export type { CategorizationMode, AiPreferences, UpdateAiPreferencesInput } from '@/types';
 
 // ─── Notifications ────────────────────────────────────────────────────────────
-const notificationsImpl = USE_MOCK ? mockNotifications : realNotifications;
-export const getNotifications = notificationsImpl.getNotifications;
-export const getUnreadNotifications = notificationsImpl.getUnreadNotifications;
-export const registerNotificationDevice = notificationsImpl.registerNotificationDevice;
-export const unregisterNotificationDevice = notificationsImpl.unregisterNotificationDevice;
-export const markNotificationRead = notificationsImpl.markNotificationRead;
-export const markAllNotificationsRead = notificationsImpl.markAllNotificationsRead;
-export type { RegisterNotificationDeviceInput } from './mock/notifications';
+export const getNotifications = notifications.getNotifications;
+export const getUnreadNotifications = notifications.getUnreadNotifications;
+export const registerNotificationDevice = notifications.registerNotificationDevice;
+export const unregisterNotificationDevice = notifications.unregisterNotificationDevice;
+export const markNotificationRead = notifications.markNotificationRead;
+export const markAllNotificationsRead = notifications.markAllNotificationsRead;
+export type { RegisterNotificationDeviceInput } from '@/types';
 
 // ─── Photo / SMS / CSV Extraction ────────────────────────────────────────────────
-// SMS → real /extract/sms; CSV → real /extract/csv; photo/receipt OCR has no
-// working backend provider yet, so real re-exports the mock.
-const extractionImpl = USE_MOCK ? mockExtraction : realExtraction;
-export const extractFromPhoto = extractionImpl.extractFromPhoto;
-export const extractFromSMS = extractionImpl.extractFromSMS;
-export const extractFromCsv = extractionImpl.extractFromCsv;
+export const extractFromPhoto = extraction.extractFromPhoto;
+export const extractFromSMS = extraction.extractFromSMS;
+export const extractFromCsv = extraction.extractFromCsv;
 
 // ─── Rules (merchant → category auto-classification) ────────────────────────────
-const rulesImpl = USE_MOCK ? mockRules : realRules;
-export const getRules = rulesImpl.getRules;
-export const createRule = rulesImpl.createRule;
-export const deleteRule = rulesImpl.deleteRule;
-export type { CreateRuleInput, CreateRuleResult } from './mock/rules';
+export const getRules = rules.getRules;
+export const createRule = rules.createRule;
+export const deleteRule = rules.deleteRule;
+export type { CreateRuleInput, CreateRuleResult } from '@/types';
 
-// Auth — branch the implementation on USE_MOCK. Input types always come from the
-// mock module (plain shapes shared by both implementations).
-const authImpl = USE_MOCK ? mockAuth : realAuth;
-
-export const login = authImpl.login;
-export const register = authImpl.register;
-export const googleOAuth = authImpl.googleOAuth;
-export const forgotPassword = authImpl.forgotPassword;
-export const resetPassword = authImpl.resetPassword;
-export const resendVerification = authImpl.resendVerification;
-export const verifyEmail = authImpl.verifyEmail;
-export const changePassword = authImpl.changePassword;
-export const logout = authImpl.logout;
-export const getProfile = authImpl.getProfile;
-export const updateProfile = authImpl.updateProfile;
-export const updateProfileSettings = authImpl.updateProfileSettings;
-export const uploadAvatar = authImpl.uploadAvatar;
-export const deleteAccount = authImpl.deleteAccount;
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export const login = auth.login;
+export const register = auth.register;
+export const googleOAuth = auth.googleOAuth;
+export const forgotPassword = auth.forgotPassword;
+export const resetPassword = auth.resetPassword;
+export const resendVerification = auth.resendVerification;
+export const verifyEmail = auth.verifyEmail;
+export const changePassword = auth.changePassword;
+export const logout = auth.logout;
+export const getProfile = auth.getProfile;
+export const updateProfile = auth.updateProfile;
+export const updateProfileSettings = auth.updateProfileSettings;
+export const uploadAvatar = auth.uploadAvatar;
+export const deleteAccount = auth.deleteAccount;
 
 export type {
-  MockLoginInput,
-  MockRegisterInput,
-  MockChangePasswordInput,
+  LoginPayload,
+  RegisterPayload,
+  ChangePasswordPayload,
   UpdateProfileInput,
   UpdateProfileSettingsInput,
-  ResetPasswordInput,
-} from './mock/auth';
+  ResetPasswordPayload,
+} from '@/types';

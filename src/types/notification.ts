@@ -47,3 +47,13 @@ export interface AppNotification {
   /** ISO 8601 timestamp -- when the notification was dispatched */
   sentAt: string;
 }
+
+// -------------------------------------------------------------------------
+// Device registration for push delivery (services/real/notifications.ts)
+// -------------------------------------------------------------------------
+
+export interface RegisterNotificationDeviceInput {
+  token: string;
+  platform: 'ios' | 'android';
+  installationId: string;
+}

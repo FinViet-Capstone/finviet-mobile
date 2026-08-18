@@ -44,8 +44,10 @@ const S = {
     { title: 'Tra cứu lịch sử giao dịch', body: 'Vào mục Tài khoản > Lịch sử giao dịch, chọn khoảng thời gian cần xuất.' },
     { title: 'Tải xuống định dạng CSV', body: 'Tìm nút "Xuất file" hoặc "Tải xuống" và chọn định dạng Excel/CSV.' },
   ],
-  confirmBtn: 'Chấp nhận tất cả',
+  confirmBtn: (n: number) => `Nhập ${n} giao dịch đã chọn`,
   cancelBtn: 'Huỷ',
+  selectAll: 'Chọn tất cả',
+  deselectAll: 'Bỏ chọn tất cả',
   duplicate: 'Có thể trùng',
   uncategorized: 'Chưa phân loại',
   pickCategory: 'Chọn danh mục',
@@ -276,6 +278,13 @@ export default function CsvImportScreen() {
     setRows((prev) => prev.map((r) => r.id === id ? { ...r, selected: !r.selected } : r));
   }, []);
 
+  const handleToggleAll = useCallback(() => {
+    setRows((prev) => {
+      const shouldSelectAll = !prev.every((r) => r.selected);
+      return prev.map((r) => ({ ...r, selected: shouldSelectAll }));
+    });
+  }, []);
+
   const handleEditCategory = useCallback((id: string) => {
     setEditingRowId(id);
   }, []);
@@ -304,6 +313,8 @@ export default function CsvImportScreen() {
   }, [selectedWalletId, rows, createTx, router]);
 
   const selectedCount = rows.filter((r) => r.selected).length;
+  const allSelected = rows.length > 0 && selectedCount === rows.length;
+  const noneSelected = selectedCount === 0;
   const canStart = !!selectedWalletId && selectedCount > 0;
 
   return (
@@ -368,6 +379,14 @@ export default function CsvImportScreen() {
               <Text style={styles.selectedCount}>{selectedCount}/{rows.length} được chọn</Text>
             </View>
             <Text style={styles.stepHint}>{S.step3Hint}</Text>
+            <TouchableOpacity activeOpacity={0.7} style={styles.selectAllRow} onPress={handleToggleAll}>
+              <MaterialIcon
+                name={allSelected ? 'check_box' : noneSelected ? 'check_box_outline_blank' : 'indeterminate_check_box'}
+                size={20}
+                color={noneSelected ? colors.onSurfaceVariant : colors.primary}
+              />
+              <Text style={styles.selectAllText}>{allSelected ? S.deselectAll : S.selectAll}</Text>
+            </TouchableOpacity>
             {rows.map((row) => (
               <PreviewRow key={row.id} row={row} onToggle={() => handleToggleRow(row.id)} onEditCategory={() => handleEditCategory(row.id)} />
             ))}
@@ -409,7 +428,7 @@ export default function CsvImportScreen() {
             >
               {isImporting
                 ? <ActivityIndicator size="small" color={colors.onBackground} />
-                : <Text style={styles.confirmText}>{S.confirmBtn} ({selectedCount})</Text>}
+                : <Text style={styles.confirmText}>{S.confirmBtn(selectedCount)}</Text>}
             </TouchableOpacity>
           </>
         ) : (
@@ -503,6 +522,8 @@ function createStyles(colors: ThemeColors) {
     stepHint: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: -SPACING[2] },
     selectedCount: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
     emptyText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+    selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], paddingVertical: SPACING[1] },
+    selectAllText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
 
     // AI badge
     aiBadge: {

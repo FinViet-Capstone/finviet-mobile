@@ -27,37 +27,65 @@ export interface WalletSummary {
   totalBalance: number;
 }
 
-export interface TransferPayload {
-  fromWalletId: string;
-  toWalletId: string;
-  amount: number;
-  description?: string;
-  transferDate?: string;
-}
+// -------------------------------------------------------------------------
+// Wallet service input/return contracts (services/real/wallets.ts)
+// -------------------------------------------------------------------------
 
-export interface TransferResult {
-  fromTransaction: {
-    id: string;
-    walletId: string;
-    amount: number;
-    type: 'transfer_out';
-    transferPairId: string;
-  };
-  toTransaction: {
-    id: string;
-    walletId: string;
-    amount: number;
-    type: 'transfer_in';
-    transferPairId: string;
-  };
-}
-
-export interface CreateWalletPayload {
+export interface CreateWalletInput {
   name: string;
   type: WalletType;
-  initialBalance: number;
+  balance: number;
+  linkedMetadata?: LinkedWalletMetadata;
 }
 
-export interface UpdateWalletPayload {
+export interface UpdateWalletInput {
   name?: string;
+  type?: WalletType;
+}
+
+export interface WithdrawInput {
+  fromWalletId: string;
+  /** Optional destination wallet (move the money instead of pure expense). */
+  toWalletId?: string;
+  amount: number;
+  description?: string;
+}
+
+export interface WithdrawResult {
+  fromWalletId: string;
+  fromWalletBalance: number;
+  toWalletId?: string;
+  toWalletBalance?: number;
+}
+
+// -------------------------------------------------------------------------
+// Per-wallet ledger (GET /wallets/{id}/transactions)
+// -------------------------------------------------------------------------
+
+export interface WalletLedgerQuery {
+  page?: number;
+  pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  categoryId?: string;
+  transactionType?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface WalletLedgerEntry {
+  transactionId: string;
+  walletId: string;
+  categoryId: string | null;
+  transactionType: string;
+  amount: number;
+  transactionDate: string;
+  note: string | null;
+}
+
+export interface WalletLedgerPage {
+  items: WalletLedgerEntry[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }

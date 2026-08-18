@@ -14,17 +14,12 @@
  *   - POST → schedules a new entry, always effective next calendar month.
  *
  * getIncomeAllocationHistory has no backend equivalent (no full-history
- * listing endpoint exists) and stays on the mock — it isn't called from any
- * hook/screen today.
+ * listing endpoint exists) and isn't called from any hook/screen — dropped
+ * entirely rather than kept as a dead re-export.
  */
 
 import { api, unwrap } from '@/lib/api';
-import type {
-  IncomeAllocationSetting,
-  ScheduleIncomeAllocationInput,
-} from '@/services/mock/incomeAllocation';
-
-export { getIncomeAllocationHistory } from '@/services/mock/incomeAllocation';
+import type { IncomeAllocationSetting, ScheduleIncomeAllocationInput } from '@/types';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 

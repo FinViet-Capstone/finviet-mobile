@@ -135,6 +135,27 @@ export interface CategorizationOutcome {
 // Suggested prompt chips shown when the AI Advisor opens (SPEC requirement)
 // -------------------------------------------------------------------------
 
+// -------------------------------------------------------------------------
+// Customer AI preferences (services/real/aiPreferences.ts)
+// -------------------------------------------------------------------------
+
+export type CategorizationMode = 'off' | 'suggest_only' | 'high_confidence_auto';
+
+export interface AiPreferences {
+  categorizationMode: CategorizationMode;
+  autoCategorizationThreshold: number;
+  defaultHistoryEnabled: boolean;
+  weeklyReportEnabled: boolean;
+  shareBalances: boolean;
+  shareTransactions: boolean;
+  shareBudgets: boolean;
+  shareGoals: boolean;
+  shareReports: boolean;
+  ragEnabled: boolean;
+}
+
+export type UpdateAiPreferencesInput = Partial<AiPreferences>;
+
 export const SUGGESTED_PROMPTS_VI = [
   'Tháng này tôi tiêu nhiều nhất vào đâu?',
   'Tôi có đang chi tiêu quá mức không?',

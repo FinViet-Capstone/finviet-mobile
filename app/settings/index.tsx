@@ -48,7 +48,6 @@ const S = {
     theme: 'Giao diện',
     password: 'Đổi mật khẩu',
     export: 'Xuất dữ liệu',
-    subscription: 'Gói dịch vụ',
     logout: 'Đăng xuất',
     deleteAccount: 'Xóa tài khoản',
   },
@@ -181,7 +180,10 @@ export default function SettingsScreen() {
   const notifGoals = user?.notifications?.goals ?? true;
 
   const handleToggleNotif = useCallback((key: 'budget' | 'report' | 'goals', val: boolean) => {
-    updatePrefs.mutate({ notifications: { [key]: val } });
+    updatePrefs.mutate(
+      { notifications: { [key]: val } },
+      { onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể lưu tùy chọn thông báo.')) },
+    );
   }, [updatePrefs]);
 
   const handleLogout = useCallback(() => {
@@ -226,7 +228,10 @@ export default function SettingsScreen() {
 
   const handleSelectTheme = useCallback((theme: ThemePref) => {
     setThemePickerVisible(false);
-    updatePrefs.mutate({ theme });
+    updatePrefs.mutate(
+      { theme },
+      { onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể đổi giao diện.')) },
+    );
   }, [updatePrefs]);
 
   if (isLoading) return <LoadingSpinner />;
@@ -346,10 +351,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.account}</Text>
           <SectionCard>
-            <SettingsRow icon="workspace_premium" iconColor={colors.primary}
-              label={S.rows.subscription}
-              onPress={() => router.push({ pathname: '/settings/subscription' })} />
-            <Divider />
             <SettingsRow icon="key" label={S.rows.password} onPress={() => setPasswordVisible(true)} />
             <Divider />
             <SettingsRow icon="download" label={S.rows.export}

@@ -27,3 +27,19 @@ export interface CustomCategory {
   createdAt: string;
   updatedAt: string;
 }
+
+// -------------------------------------------------------------------------
+// Custom category service input contracts (services/real/customCategories.ts)
+// -------------------------------------------------------------------------
+
+export interface CreateCustomCategoryInput {
+  nameVi: string;
+  type: 'expense' | 'income';
+  bucketId: BucketType | null;
+  color: string;
+}
+
+export interface BulkBucketMove {
+  id: string;
+  bucketId: BucketType;
+}

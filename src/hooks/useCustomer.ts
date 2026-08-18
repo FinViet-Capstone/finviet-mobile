@@ -1,21 +1,19 @@
 /**
  * useCustomer -- reads & mutates the current session customer.
  *
- * The mock source of truth is the Zustand auth store. Wrapping it in useQuery
- * preserves the standard `{ data, isLoading, error }` shape and makes any
- * session change (login / logout / updateCustomer / OAuth) auto-rotate the cache
- * via the queryKey.
- *
- * On real-API day, queryFn becomes `api.get('/customers/me')` and the mutations
- * call `PATCH /customers/me` -- screens stay untouched.
+ * The source of truth is the Zustand auth store (populated by real/auth.ts's
+ * login/getProfile). Wrapping it in useQuery preserves the standard
+ * `{ data, isLoading, error }` shape and makes any session change
+ * (login / logout / updateCustomer / OAuth) auto-rotate the cache via the
+ * queryKey.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Customer } from '@/types';
-import { updateProfile, updateProfileSettings, USE_MOCK } from '@/services';
-import { updateMockCustomer } from '@/services/mock/user';
+import { updateProfile, updateProfileSettings } from '@/services';
+import { setNotificationPrefs } from '@/lib/notificationPrefsCache';
 
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -80,9 +78,7 @@ export const useUpdateProfile = () => {
 };
 
 export interface UpdatePreferencesInput {
-  language?: 'vi' | 'en';
   theme?: 'light' | 'dark' | 'system';
-  defaultCurrency?: string;
   notifications?: Partial<{ budget: boolean; report: boolean; goals: boolean }>;
   /** [warningPct, exceededPct] for budget_alert notifications. */
   notifBudgetThresholds?: [number, number];
@@ -95,11 +91,7 @@ export const useUpdatePreferences = () => {
   return useMutation({
     mutationFn: async (patch: UpdatePreferencesInput) => {
       const merged = {
-        ...(patch.language !== undefined ? { language: patch.language } : {}),
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
-        ...(patch.defaultCurrency !== undefined
-          ? { defaultCurrency: patch.defaultCurrency }
-          : {}),
         ...(patch.notifications !== undefined && currentCustomer
           ? {
               notifications: {
@@ -115,10 +107,11 @@ export const useUpdatePreferences = () => {
       };
 
       // theme + notifBudgetThresholds are real, backend-persisted settings
-      // (PATCH /profile/settings — swapped mock/real by the services barrel
-      // like everything else). language/defaultCurrency/notifications have no
-      // backend counterpart yet and stay local-only (mock store below, every
-      // mode) so a preference survives a logout/login instead of resetting.
+      // (PATCH /profile/settings). notifications (budget/report/goals
+      // toggles) has no backend field at all, so it persists device-locally
+      // via notificationPrefsCache instead so it survives a later login —
+      // see real/auth.ts's toCustomer, which reads this cache instead of
+      // hardcoding the defaults on every login/profile fetch.
       if (patch.theme !== undefined || patch.notifBudgetThresholds !== undefined) {
         await updateProfileSettings({
           theme: patch.theme,
@@ -127,9 +120,11 @@ export const useUpdatePreferences = () => {
       } else {
         await delay();
       }
+      if (patch.notifications !== undefined && currentCustomer) {
+        await setNotificationPrefs(currentCustomer.id, patch.notifications);
+      }
 
       updateCustomer(merged);
-      if (USE_MOCK) updateMockCustomer(merged);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.user.all() }),
   });

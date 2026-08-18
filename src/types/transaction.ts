@@ -97,3 +97,90 @@ export interface MonthlyAggregate {
   /** Top 5 merchants by total spend */
   topMerchants: MerchantSpend[];
 }
+
+// -------------------------------------------------------------------------
+// Transaction service input/return contracts (services/real/transactions.ts)
+// -------------------------------------------------------------------------
+
+export interface TransactionFilters {
+  walletId?: string;
+  /** Filter to a specific category. Ignored when uncategorizedOnly is true. */
+  categoryId?: string;
+  type?: TransactionType;
+  /** ISO date string YYYY-MM-DD — inclusive lower bound */
+  startDate?: string;
+  /** ISO date string YYYY-MM-DD — inclusive upper bound */
+  endDate?: string;
+  /** When true, returns only transactions with categoryId === null */
+  uncategorizedOnly?: boolean;
+  /**
+   * When true, filters out all cat_savings_goal transactions. Used by
+   * getBudgetBuckets for the "pure category spend" side of the Savings
+   * bucket — goal money is netted in separately there so it isn't
+   * double-counted via defaultBucket resolution. Default false — goal
+   * contributions appear in the full transaction history.
+   */
+  hideGoalContributions?: boolean;
+}
+
+export interface TransactionSummaryCategory {
+  categoryId: string | null;
+  categoryName: string | null;
+  total: number;
+}
+
+export interface TransactionSummaryDay {
+  /** 'YYYY-MM-DD' */
+  date: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface TransactionSummaryBeneficiary {
+  beneficiary: string;
+  total: number;
+}
+
+export interface TransactionSummary {
+  income: number;
+  expense: number;
+  net: number;
+  byCategory: TransactionSummaryCategory[];
+  byDay: TransactionSummaryDay[];
+  topBeneficiaries: TransactionSummaryBeneficiary[];
+}
+
+export interface CreateTransactionInput {
+  walletId: string;
+  categoryId: string | null;
+  amount: number;
+  type: 'expense' | 'income';
+  description: string | null;
+  merchant: string | null;
+  transactionDate: string;
+  entryMethod: EntryMethod;
+  externalId?: string | null;
+}
+
+export interface UpdateTransactionInput {
+  amount?: number;
+  description?: string | null;
+  merchant?: string | null;
+  categoryId?: string | null;
+  walletId?: string;
+  transactionDate?: string;
+}
+
+export interface CreateTransferInput {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  note?: string | null;
+  transactionDate?: string;
+}
+
+export interface CreateTransferResult {
+  outTx: Transaction;
+  inTx: Transaction;
+}
