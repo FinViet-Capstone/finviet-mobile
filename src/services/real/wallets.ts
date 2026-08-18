@@ -86,11 +86,14 @@ export async function createWallet(input: CreateWalletInput): Promise<Wallet> {
   return toWallet(unwrap<WalletDto>(res));
 }
 
+// Uses PUT rather than PATCH — React Native's on-device networking layer has a
+// known history of dropping the request body specifically on PATCH requests.
+// The backend route accepts both verbs.
 export async function updateWallet(
   id: string,
   patch: UpdateWalletInput,
 ): Promise<Wallet> {
-  const res = await api.patch(`/wallets/${id}`, {
+  const res = await api.put(`/wallets/${id}`, {
     ...(patch.name !== undefined ? { walletName: patch.name.trim() } : {}),
     ...(patch.type !== undefined ? { walletType: patch.type } : {}),
   });
