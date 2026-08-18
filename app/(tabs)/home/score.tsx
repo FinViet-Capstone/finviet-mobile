@@ -25,6 +25,8 @@ const S = {
   title: 'Chấm Điểm Ví',
   noScoreTitle: 'Chưa có điểm số',
   noScoreSubtitle: 'Cần thêm dữ liệu chi tiêu để tính điểm.',
+  noDataWeek: 'Chưa có giao dịch trong tuần này. Ghi lại chi tiêu để AI chấm điểm cho bạn.',
+  noDataMonth: 'Chưa có giao dịch trong tháng này. Ghi lại chi tiêu để AI chấm điểm cho bạn.',
   quickReview: 'Đánh giá nhanh',
   aiAnalysis: 'Phân tích chi tiết AI',
   aiUnavailable: 'Chưa có nhận xét AI cho giai đoạn này.',
@@ -102,11 +104,18 @@ export default function SpendingScoreDetail() {
 
   if (isLoading) return <LoadingSpinner />;
 
-  if (!score) {
+  // hasData === false: the backend found no expense transactions in the period,
+  // so score/comment are neutral fillers — show the empty state, not a fake 50.
+  if (!score || score.hasData === false) {
+    const subtitle = !score
+      ? S.noScoreSubtitle
+      : score.view === 'monthly'
+      ? S.noDataMonth
+      : S.noDataWeek;
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <Header onBack={() => router.back()} />
-        <EmptyState icon="bar_chart" title={S.noScoreTitle} subtitle={S.noScoreSubtitle} />
+        <EmptyState icon="bar_chart" title={S.noScoreTitle} subtitle={subtitle} />
       </SafeAreaView>
     );
   }

@@ -89,4 +89,49 @@ describe('real spending score service', () => {
     expect(score.reasonVi).toBeNull();
     expect(score.commentaryVi).toBeNull();
   });
+
+  it('maps hasData: false through so the UI can show the no-transactions empty state', async () => {
+    mock.onGet('/ai/score', { params: { period: 'WEEKLY' } }).reply(200, {
+      success: true,
+      data: {
+        periodType: 'WEEKLY',
+        periodStart: '2026-08-17',
+        periodEnd: '2026-08-19',
+        finalScore: 50, // neutral baseline, not a real assessment
+        spikeScore: null,
+        budgetScore: null,
+        savingsScore: null,
+        weights: {},
+        colorBadge: 'YELLOW',
+        comment: null,
+        hasData: false,
+      },
+    });
+
+    const score = await getSpendingScore('weekly');
+
+    expect(score.hasData).toBe(false);
+  });
+
+  it('defaults hasData to true when an older backend omits the field', async () => {
+    mock.onGet('/ai/score', { params: { period: 'WEEKLY' } }).reply(200, {
+      success: true,
+      data: {
+        periodType: 'WEEKLY',
+        periodStart: '2026-08-17',
+        periodEnd: '2026-08-19',
+        finalScore: 72,
+        spikeScore: 80,
+        budgetScore: 64,
+        savingsScore: null,
+        weights: { spike: 50, budget: 50 },
+        colorBadge: 'YELLOW',
+        comment: 'Ổn định.',
+      },
+    });
+
+    const score = await getSpendingScore('weekly');
+
+    expect(score.hasData).toBe(true);
+  });
 });

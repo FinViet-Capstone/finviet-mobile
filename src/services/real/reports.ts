@@ -52,6 +52,9 @@ interface SpendingScoreDto {
   weights: Record<string, number>;
   colorBadge: string; // "GREEN" | "YELLOW" | "RED"
   comment: string | null;
+  /** False = no expense transactions inside the period (score is the neutral baseline).
+   * Optional so an older backend without the field still parses as "has data". */
+  hasData?: boolean;
 }
 
 interface WeeklyReportDto {
@@ -123,6 +126,7 @@ function toSpendingScore(dto: SpendingScoreDto, view: 'weekly' | 'monthly'): Spe
     budgetScore: dto.budgetScore,
     savingsScore: dto.savingsScore,
     weights: dto.weights,
+    hasData: dto.hasData ?? true,
   };
 }
 
