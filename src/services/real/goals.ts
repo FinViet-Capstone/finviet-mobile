@@ -140,11 +140,14 @@ export async function createGoal(
   return toGoal(unwrap<SavingGoalDto>(res));
 }
 
+// Uses PUT rather than PATCH — React Native's on-device networking layer has a
+// known history of dropping the request body specifically on PATCH requests.
+// The backend route accepts both verbs.
 export async function updateGoal(
   id: string,
   patch: UpdateGoalInput,
 ): Promise<SavingsGoalWithProgress> {
-  const res = await api.patch(`/saving-goals/${encodeURIComponent(id)}`, {
+  const res = await api.put(`/saving-goals/${encodeURIComponent(id)}`, {
     ...(patch.name !== undefined ? { goalName: patch.name.trim() } : {}),
     ...(patch.targetAmount !== undefined ? { targetAmount: patch.targetAmount } : {}),
     ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),

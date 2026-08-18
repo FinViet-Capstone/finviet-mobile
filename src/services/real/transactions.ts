@@ -265,15 +265,18 @@ export async function updateTransaction(
 }
 
 /**
- * PATCH /transactions/{id}/classify — recategorize a transaction. Distinct from
- * PUT (which the backend also limits to categoryId); classify is the intent-named
- * endpoint used by the recategorize UX.
+ * PUT /transactions/{id}/classify — recategorize a transaction. Distinct from
+ * PUT /transactions/{id} (which the backend also limits to categoryId);
+ * classify is the intent-named endpoint used by the recategorize UX. Called
+ * via PUT rather than PATCH (its original verb) — React Native's on-device
+ * networking layer has a known history of dropping the request body
+ * specifically on PATCH requests; the backend route accepts both verbs.
  */
 export async function classifyTransaction(
   id: string,
   categoryId: string | null,
 ): Promise<Transaction> {
-  const res = await api.patch(`/transactions/${id}/classify`, {
+  const res = await api.put(`/transactions/${id}/classify`, {
     categoryId: categoryId ?? null,
   });
   return toTransaction(unwrap<TransactionDto>(res));

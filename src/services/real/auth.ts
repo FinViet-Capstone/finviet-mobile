@@ -183,13 +183,19 @@ const FE_THEME_TO_BE: Record<'light' | 'dark' | 'system', string> = {
 };
 
 /**
- * PATCH /api/profile/settings — theme + budget-alert notification thresholds.
+ * PUT /api/profile/settings — theme + budget-alert notification thresholds.
  * Upserts a CustomerSetting row server-side on first call. Distinct from
  * PUT /profile (updateProfile above), which the backend locks down for the
  * income/allocation trio once onboarding is done — settings has no such lock.
+ *
+ * Uses PUT rather than PATCH: React Native's on-device networking layer has a
+ * known history of dropping the request body specifically on PATCH requests
+ * (iOS in particular). The backend route accepts both verbs
+ * (`ProfileController.UpdateProfileSettings`), so this sidesteps the risk
+ * without needing a body-preserving PATCH workaround.
  */
 export async function updateProfileSettings(input: UpdateProfileSettingsInput): Promise<void> {
-  await api.patch('/profile/settings', {
+  await api.put('/profile/settings', {
     ...(input.theme !== undefined ? { theme: FE_THEME_TO_BE[input.theme] } : {}),
     ...(input.notifBudgetThresholds !== undefined
       ? { notifBudgetThresholds: input.notifBudgetThresholds }

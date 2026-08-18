@@ -40,7 +40,7 @@ describe('real AI preferences service', () => {
       shareTransactions: false,
       ragEnabled: false,
     };
-    mock.onPatch('/profile/ai-preferences', patch).reply(200, {
+    mock.onPut('/profile/ai-preferences', patch).reply(200, {
       success: true,
       data: { ...PREFERENCES, ...patch },
     });
@@ -49,6 +49,6 @@ describe('real AI preferences service', () => {
       ...PREFERENCES,
       ...patch,
     });
-    expect(JSON.parse(mock.history.patch[0].data)).toEqual(patch);
+    expect(JSON.parse(mock.history.put[0].data)).toEqual(patch);
   });
 });

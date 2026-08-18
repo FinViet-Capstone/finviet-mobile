@@ -169,11 +169,14 @@ export async function createBudget(
   return toBudget(unwrap<BudgetDto>(res));
 }
 
+// Uses PUT rather than PATCH — React Native's on-device networking layer has a
+// known history of dropping the request body specifically on PATCH requests.
+// The backend route accepts both verbs.
 export async function updateBudget(
   id: string,
   patch: UpdateBudgetInput,
 ): Promise<BudgetWithSpend> {
-  const res = await api.patch(`/budgets/${id}`, {
+  const res = await api.put(`/budgets/${id}`, {
     monthlyLimit: patch.monthlyLimit,
   });
   return toBudget(unwrap<BudgetDto>(res));

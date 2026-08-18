@@ -16,6 +16,7 @@ import { Image } from 'expo-image';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/theme';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { TextInput } from '@/components/common/TextInput';
 import { ChangePasswordSheet } from '@/components/auth/ChangePasswordSheet';
 import { EditProfileSheet } from '@/components/settings';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
@@ -58,6 +59,13 @@ const S = {
     exportCsv: 'Xuất CSV',
   },
   themePickerTitle: 'Giao diện',
+  budgetThresholdTitle: 'Mốc cảnh báo ngân sách',
+  budgetThresholdHint: 'Nhận thông báo khi chi tiêu trong danh mục đạt các mốc này.',
+  budgetThresholdWarningLabel: 'Mốc cảnh báo (%)',
+  budgetThresholdExceededLabel: 'Mốc vượt mức (%)',
+  budgetThresholdErrorRange: 'Mỗi mốc phải từ 1 đến 100.',
+  budgetThresholdErrorOrder: 'Mốc cảnh báo phải nhỏ hơn mốc vượt mức.',
+  save: 'Lưu',
   logoutConfirmTitle: 'Đăng xuất?',
   logoutConfirmMsg: 'Bạn có chắc muốn đăng xuất khỏi FinViet?',
   logoutConfirm: 'Đăng xuất',
@@ -174,6 +182,10 @@ export default function SettingsScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [thresholdModalVisible, setThresholdModalVisible] = useState(false);
+  const [warningInput, setWarningInput] = useState('');
+  const [exceededInput, setExceededInput] = useState('');
+  const [thresholdError, setThresholdError] = useState('');
 
   const notifBudget = user?.notifications?.budget ?? true;
   const notifReport = user?.notifications?.report ?? true;
@@ -233,6 +245,32 @@ export default function SettingsScreen() {
       { onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể đổi giao diện.')) },
     );
   }, [updatePrefs]);
+
+  const handleOpenThresholdModal = useCallback(() => {
+    const [w, e] = user?.notifBudgetThresholds ?? [80, 100];
+    setWarningInput(String(w));
+    setExceededInput(String(e));
+    setThresholdError('');
+    setThresholdModalVisible(true);
+  }, [user?.notifBudgetThresholds]);
+
+  const handleSaveThresholds = useCallback(() => {
+    const w = Number(warningInput);
+    const e = Number(exceededInput);
+    if (!Number.isInteger(w) || !Number.isInteger(e) || w < 1 || w > 100 || e < 1 || e > 100) {
+      setThresholdError(S.budgetThresholdErrorRange);
+      return;
+    }
+    if (w >= e) {
+      setThresholdError(S.budgetThresholdErrorOrder);
+      return;
+    }
+    setThresholdModalVisible(false);
+    updatePrefs.mutate(
+      { notifBudgetThresholds: [w, e] },
+      { onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể lưu mốc cảnh báo.')) },
+    );
+  }, [warningInput, exceededInput, updatePrefs]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -313,6 +351,7 @@ export default function SettingsScreen() {
             <Divider />
             <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
               label={S.rows.budgetAlert} value={budgetAlertValue}
+              onPress={handleOpenThresholdModal}
               rightElement={
                 <Switch
                   value={notifBudget}
@@ -415,6 +454,42 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Budget alert threshold editor */}
+      <Modal visible={thresholdModalVisible} transparent animationType="fade"
+        onRequestClose={() => setThresholdModalVisible(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1}
+          onPress={() => setThresholdModalVisible(false)} />
+        <View style={styles.confirmDialog}>
+          <Text style={styles.confirmTitle}>{S.budgetThresholdTitle}</Text>
+          <Text style={styles.confirmMsg}>{S.budgetThresholdHint}</Text>
+          <TextInput
+            label={S.budgetThresholdWarningLabel}
+            value={warningInput}
+            onChangeText={(t) => { setWarningInput(t); setThresholdError(''); }}
+            keyboardType="number-pad"
+            maxLength={3}
+          />
+          <TextInput
+            label={S.budgetThresholdExceededLabel}
+            value={exceededInput}
+            onChangeText={(t) => { setExceededInput(t); setThresholdError(''); }}
+            keyboardType="number-pad"
+            maxLength={3}
+            error={thresholdError || undefined}
+          />
+          <View style={styles.confirmActions}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn}
+              onPress={() => setThresholdModalVisible(false)}>
+              <Text style={styles.cancelText}>{S.cancel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} style={styles.saveBtn}
+              onPress={handleSaveThresholds}>
+              <Text style={styles.saveBtnText}>{S.save}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -526,6 +601,11 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.errorContainer, alignItems: 'center', justifyContent: 'center',
     },
     logoutBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onErrorContainer },
+    saveBtn: {
+      flex: 2, height: 48, borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+    },
+    saveBtnText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
     // Theme picker options
     themeOptions: { gap: SPACING[1] },
     themeOptionRow: {
