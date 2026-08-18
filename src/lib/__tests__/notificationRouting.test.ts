@@ -1,25 +1,41 @@
 import {
-  notificationEntityRoute,
+  notificationDetailRoute,
+  notificationRoute,
   parseNotificationPushData,
 } from '../notificationRouting';
+import type { AppNotification } from '@/types/notification';
 
 describe('notification routing', () => {
-  it.each([
-    ['goal', 'goal/id', '/(tabs)/budgets/goals/goal%2Fid'],
-    ['budget', 'budget-id', '/(tabs)/budgets'],
-    ['wallet', 'wallet/id', '/(tabs)/wallets/wallet%2Fid'],
-    ['system', null, '/notifications'],
-    [null, null, '/notifications'],
-  ] as const)('maps %s notifications to the supported route', (entityType, entityId, route) => {
-    expect(notificationEntityRoute(entityType, entityId)).toBe(route);
+  it('routes every notification to the static detail screen with its title and body', () => {
+    expect(notificationDetailRoute({ id: 'n-1', title: 'Tiêu đề', body: 'Nội dung' })).toEqual({
+      pathname: '/notification-detail',
+      params: { id: 'n-1', title: 'Tiêu đề', body: 'Nội dung' },
+    });
   });
 
-  it('opens the exact weekly report when its ID is present', () => {
-    expect(notificationEntityRoute('report', 'report-id')).toEqual({
-      pathname: '/(tabs)/home/weekly',
-      params: { reportId: 'report-id' },
+  it('falls back to empty strings for missing title/body', () => {
+    expect(notificationDetailRoute({ id: 'n-2', title: null, body: null })).toEqual({
+      pathname: '/notification-detail',
+      params: { id: 'n-2', title: '', body: '' },
     });
-    expect(notificationEntityRoute('report', null)).toBe('/(tabs)/home/weekly');
+  });
+
+  it('derives the detail route from a full notification regardless of entityType', () => {
+    const notification: AppNotification = {
+      id: 'n-3',
+      customerId: 'customer',
+      type: 'goal_milestone',
+      title: 'Mục tiêu',
+      body: 'Chi tiết mục tiêu',
+      entityType: 'goal',
+      entityId: 'goal-id',
+      isRead: false,
+      sentAt: '2026-08-15T00:00:00Z',
+    };
+    expect(notificationRoute(notification)).toEqual({
+      pathname: '/notification-detail',
+      params: { id: 'n-3', title: 'Mục tiêu', body: 'Chi tiết mục tiêu' },
+    });
   });
 
   it('parses canonical push metadata', () => {

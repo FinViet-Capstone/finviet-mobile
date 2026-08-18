@@ -11,7 +11,7 @@ import {
 } from '@/lib/notificationArrivals';
 import { insertNotificationInCache, markNotificationReadInCache } from '@/lib/notificationCache';
 import {
-  notificationEntityRoute,
+  notificationDetailRoute,
   notificationRoute,
   parseNotificationPushData,
 } from '@/lib/notificationRouting';
@@ -100,7 +100,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
 
     markReadBestEffort(pushData.notificationId);
-    router.push(notificationEntityRoute(pushData.entityType, pushData.entityId));
+    router.push(notificationDetailRoute({
+      id: pushData.notificationId,
+      title: response.notification.request.content.title ?? null,
+      body: response.notification.request.content.body ?? null,
+    }));
   }, [isAuthenticated, markReadBestEffort, router]);
 
   useEffect(() => {
