@@ -813,4 +813,11 @@ non-production EAS/provider credential setup remain before the feature can be ma
   had already been merged into `dev` by then (local `dev` branch had drifted to it mid-session),
   so this landed as a new branch/PR instead of an addition to #69: `finviet-be`
   [#71](https://github.com/FinViet-Capstone/finviet-be/pull/71) (`fix/csv-correspondent-name` →
-  `dev`), not merged yet. Mobile side still uncommitted, same as the rest of this branch.
+  `dev`), not merged yet.
+- 2026-08-19 — Committed and PR'd the mobile side of this whole branch (AI category suggestions,
+  the CSV import/review rework, notify-when-done, and the CSV review redesign), split into three
+  commits on `fix/ai-categorization-suggestions`: `feat: let users accept AI category suggestions
+  on uncategorized transactions`, `refactor: split CSV import into upload/review screens, speed
+  up categorization, add notify-when-done`, and `docs: update feature context notes`. PR'd as
+  `finviet-mobile` [#41](https://github.com/FinViet-Capstone/finviet-mobile/pull/41) →
+  `dev`, not merged yet.
