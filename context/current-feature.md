@@ -241,6 +241,38 @@ non-production EAS/provider credential setup remain before the feature can be ma
   Verified: TypeScript clean; changed-file ESLint clean; full main-workspace ESLint 0 errors / 87
   pre-existing warnings; focused Jest 3/3 suites and 20/20 tests; full main-workspace Jest 22/22 suites
   and 121/121 tests pass; `git diff --check` clean. No physical-device acceptance, commit, or push.
+- 2026-08-18 — Diagnosed "rút tất cả tiền bị lag" (lag after tapping "Rút toàn bộ" in the
+  archive-withdrawal Alert): `openArchiveWithdrawal` opened the WithdrawSheet via a hardcoded
+  `setTimeout(500)` (commit `b47c17b` swapped in for `InteractionManager.runAfterInteractions` from
+  the earlier `bcf3787` "withdraw freeze" fix — the native Alert dismissal isn't a JS-tracked
+  interaction, so both were workarounds for the same collision), and `DraggableSheet` had no
+  entrance/exit animation: it set `translateY.value = 0` on open and unmounted instantly on close,
+  so the sheet popped in abruptly. Net effect: tap → alert closes → 500ms dead screen → pop-in.
+  Approved fix: give `DraggableSheet` a real spring slide-up entrance and timed slide-down exit
+  (staying mounted until the exit finishes; API unchanged, all 10 sheet consumers benefit), and
+  open the archive withdrawal sheet immediately — no delay, no unused `InteractionManager` import.
+  Also fixed a pre-existing type error blocking `type-check` on this branch's HEAD (not from the
+  lag fix): `b47c17b` made `CustomCategoryInput.pickedUri`/`ext` optional but left
+  `saveCategoryIcon(created.id, input.pickedUri, input.ext)` in `app/settings/categories.tsx`
+  unguarded — now only called when both are present.
+  Verified on `fix/some-ux`: type-check clean; changed-file lint 0 errors (remaining warnings are
+  the project-tolerated `react-hooks` v6 class, 4 of them pre-existing on untouched lines); full
+  Jest 28/28 suites, 162/162 tests (run with `--testPathIgnorePatterns "\\.claude"` to skip the
+  stale locked worktree checkouts that fail module resolution). No physical-device acceptance,
+  commit, or push.
+- 2026-08-18 — User reported the withdraw-all flow still lagged after the animation fix, and
+  proposed the design change themselves: drop the two-button (Hủy/Rút toàn bộ) alert — show an
+  info-only alert (single "Đã hiểu" button) telling the customer to withdraw first, and let them
+  use the screen's regular "Rút tiền" button. This removes the alert-dismissal → sheet-open
+  transition (the collision source) entirely. Implemented on `fix/some-ux` with two approved
+  refinements: the WithdrawSheet gained a "Tất cả" quick-fill chip (fills the full saved amount,
+  closes the numpad — the only zero-balance path without typing the whole number by hand), and a
+  withdrawal that drains the goal (`drainedGoal: parsedAmount >= goal.currentAmount`, renamed
+  from `wasWithdrawAll` in `executeGoalWithdrawal` + its tests) still auto-opens the archive
+  confirm. Removed the `withdrawAll` prop, `isArchiveWithdrawal` state, `openArchiveWithdrawal`,
+  and the now-unused `S.withdrawAll` string. Verified: type-check clean; changed-file lint
+  0 errors (4 pre-existing tolerated `set-state-in-effect` warnings on untouched lines); full
+  Jest 28/28 suites, 162/162 tests. No physical-device acceptance, commit, or push.
 - 2026-08-15 — Started after confirming the current app only requests notification permission: it
   does not register an Expo token, install receive/response listeners, poll unread notifications,
   show a global banner, or expose the unread count. Backend push is incomplete: customer-token push

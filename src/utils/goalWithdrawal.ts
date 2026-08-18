@@ -18,20 +18,21 @@ export function runSingleFlight<T>(
 
 interface ExecuteGoalWithdrawalOptions {
   mutate: () => Promise<unknown>;
-  wasWithdrawAll: boolean;
-  onSuccess: (wasWithdrawAll: boolean) => void;
+  /** True when this withdrawal takes the goal's balance to zero. */
+  drainedGoal: boolean;
+  onSuccess: (drainedGoal: boolean) => void;
   onError: (error: unknown) => void;
 }
 
 export async function executeGoalWithdrawal({
   mutate,
-  wasWithdrawAll,
+  drainedGoal,
   onSuccess,
   onError,
 }: ExecuteGoalWithdrawalOptions): Promise<void> {
   try {
     await mutate();
-    onSuccess(wasWithdrawAll);
+    onSuccess(drainedGoal);
   } catch (error) {
     onError(error);
   }
