@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { DatePickerField } from '@/components/common/DatePickerField';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { DATA_EXPORT_STRINGS } from '@/data/settingsScreensData';
 import { useTransactions } from '@/hooks';
 import { useWallets } from '@/hooks/useWallets';
@@ -97,6 +98,8 @@ function buildSummary(from: Date, to: Date, count: number): string {
 }
 
 export function DataExportScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [selected, setSelected] = useState<RangeChip>('custom');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -212,7 +215,7 @@ export function DataExportScreen() {
               customTrigger={(openPicker) => (
                 <TouchableOpacity style={styles.dateButton} onPress={openPicker} activeOpacity={0.7}>
                   <Text style={styles.dateValue}>{formatDateVN(range.from)}</Text>
-                  <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
+                  <MaterialIcon name="calendar_month" size={20} color={colors.onSurfaceVariant} />
                 </TouchableOpacity>
               )}
             />
@@ -232,7 +235,7 @@ export function DataExportScreen() {
               customTrigger={(openPicker) => (
                 <TouchableOpacity style={styles.dateButton} onPress={openPicker} activeOpacity={0.7}>
                   <Text style={styles.dateValue}>{formatDateVN(range.to)}</Text>
-                  <MaterialIcon name="calendar_month" size={20} color={COLORS.onSurfaceVariant} />
+                  <MaterialIcon name="calendar_month" size={20} color={colors.onSurfaceVariant} />
                 </TouchableOpacity>
               )}
             />
@@ -241,7 +244,7 @@ export function DataExportScreen() {
 
         {/* Summary line */}
         <View style={styles.summaryRow}>
-          <MaterialIcon name="info" size={18} color={COLORS.primary} />
+          <MaterialIcon name="info" size={18} color={colors.primary} />
           <Text style={styles.summaryText}>
             {buildSummary(range.from, range.to, transactions.length)}
           </Text>
@@ -257,10 +260,10 @@ export function DataExportScreen() {
           disabled={isExporting}
         >
           {isExporting ? (
-            <ActivityIndicator size="small" color={COLORS.onPrimary} />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <>
-              <MaterialIcon name="download" size={20} color={COLORS.onPrimary} />
+              <MaterialIcon name="download" size={20} color={colors.onPrimary} />
               <Text style={styles.exportButtonText}>{DATA_EXPORT_STRINGS.exportButton}</Text>
             </>
           )}
@@ -271,10 +274,11 @@ export function DataExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   scroll: { flex: 1 },
   scrollContent: {
@@ -285,7 +289,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     maxWidth: 300,
     lineHeight: 24,
   },
@@ -300,28 +304,28 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[2],
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    backgroundColor: COLORS.surface,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   chipText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   chipTextActive: {
-    color: COLORS.onPrimary,
+    color: colors.onPrimary,
   },
   // Date card
   dateCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: COLORS.surfaceContainer,
+    borderColor: colors.surfaceContainer,
     gap: SPACING[4],
     overflow: 'hidden',
     position: 'relative',
@@ -333,45 +337,45 @@ const styles = StyleSheet.create({
     width: 128,
     height: 128,
     borderRadius: 64,
-    backgroundColor: COLORS.primary + '0D',
+    backgroundColor: withAlpha(colors.primary, 0.05),
   },
   dateField: { gap: SPACING[2] },
   dateLabel: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     letterSpacing: 1,
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[2],
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     minHeight: 48,
   },
   dateValue: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   // Summary
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    backgroundColor: COLORS.primaryContainer + '1A',
+    backgroundColor: withAlpha(colors.primaryContainer, 0.1),
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING[2],
     borderWidth: 1,
-    borderColor: COLORS.primaryContainer + '33',
+    borderColor: withAlpha(colors.primaryContainer, 0.2),
   },
   summaryText: {
     flex: 1,
     fontSize: FONT_SIZE.xs,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   // Bottom bar
   bottomBar: {
@@ -379,12 +383,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     paddingTop: SPACING[4],
     paddingBottom: SPACING[8],
     paddingHorizontal: SPACING[4],
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceContainerHighest,
+    borderTopColor: colors.surfaceContainerHighest,
     borderTopLeftRadius: BORDER_RADIUS.xl,
     borderTopRightRadius: BORDER_RADIUS.xl,
     gap: SPACING[2],
@@ -394,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING[2],
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     borderRadius: BORDER_RADIUS.full,
     paddingVertical: SPACING[4],
     height: 56,
@@ -405,12 +409,13 @@ const styles = StyleSheet.create({
   exportButtonText: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onPrimary,
+    color: colors.onPrimary,
   },
   exportNote: {
     textAlign: 'center',
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     paddingBottom: SPACING[2],
   },
-});
+  });
+}

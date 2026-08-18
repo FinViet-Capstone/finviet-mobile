@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -22,7 +22,8 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { TextInput } from '@/components/common/TextInput';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import {
   useChatSessions,
   useChatSessionMessages,
@@ -94,6 +95,8 @@ const INITIAL_MESSAGES: Message[] = [
 // ─── Typing indicator ─────────────────────────────────────────────────────────
 
 function TypingDots() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
 
   useEffect(() => {
@@ -123,6 +126,8 @@ function TypingDots() {
 // ─── Voice listening overlay ──────────────────────────────────────────────────
 
 function VoiceOverlay({ onStop }: { onStop: () => void }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const ring1 = useRef(new Animated.Value(0)).current;
   const ring2 = useRef(new Animated.Value(0)).current;
 
@@ -156,7 +161,7 @@ function VoiceOverlay({ onStop }: { onStop: () => void }) {
         <Animated.View style={[styles.voiceRing, ringStyle(ring1)]} />
         <Animated.View style={[styles.voiceRing, styles.voiceRing2, ringStyle(ring2)]} />
         <TouchableOpacity activeOpacity={0.85} style={styles.voiceMicBtn} onPress={onStop}>
-          <MaterialIcon name="mic" size={32} color={COLORS.onPrimary} filled />
+          <MaterialIcon name="mic" size={32} color={colors.onPrimary} filled />
         </TouchableOpacity>
       </View>
       <Text style={styles.voiceTapToStop}>{S.tapToStop}</Text>
@@ -167,6 +172,8 @@ function VoiceOverlay({ onStop }: { onStop: () => void }) {
 // ─── Message bubbles ──────────────────────────────────────────────────────────
 
 function UserBubble({ message }: { message: Message }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.userBubbleRow}>
       <View style={styles.userBubble}>
@@ -178,10 +185,12 @@ function UserBubble({ message }: { message: Message }) {
 }
 
 function AIBubble({ message, isTyping = false }: { message?: Message; isTyping?: boolean }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.aiBubbleRow}>
       <View style={styles.aiAvatar}>
-        <MaterialIcon name="auto_awesome" size={16} color={COLORS.primary} filled />
+        <MaterialIcon name="auto_awesome" size={16} color={colors.primary} filled />
       </View>
       <View style={styles.aiBubble}>
         <View style={styles.aiBubbleAccent} />
@@ -196,6 +205,8 @@ function AIBubble({ message, isTyping = false }: { message?: Message; isTyping?:
 }
 
 function ChatHistoryDrawer({ sessions, onSelectSession }: ChatHistoryDrawerProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const renderSession = useCallback(({ item: session }: { item: ChatSession }) => {
     const date = new Date(session.lastMessageAt);
     const dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
@@ -207,7 +218,7 @@ function ChatHistoryDrawer({ sessions, onSelectSession }: ChatHistoryDrawerProps
         onPress={() => onSelectSession(session.sessionId)}
       >
         <View style={styles.sessionIcon}>
-          <MaterialIcon name="chat" size={16} color={COLORS.primary} />
+          <MaterialIcon name="chat" size={16} color={colors.primary} />
         </View>
         <View style={styles.sessionInfo}>
           <Text style={styles.sessionPreview} numberOfLines={1}>{session.previewText}</Text>
@@ -217,10 +228,10 @@ function ChatHistoryDrawer({ sessions, onSelectSession }: ChatHistoryDrawerProps
               : `${dateStr} · ${S.messages(session.messageCount)}`}
           </Text>
         </View>
-        <MaterialIcon name="chevron_right" size={18} color={COLORS.onSurfaceVariant} />
+        <MaterialIcon name="chevron_right" size={18} color={colors.onSurfaceVariant} />
       </TouchableOpacity>
     );
-  }, [onSelectSession]);
+  }, [onSelectSession, colors, styles]);
 
   return (
     <View style={styles.historyDrawer} testID="chat-history-drawer">
@@ -243,6 +254,8 @@ function ChatHistoryDrawer({ sessions, onSelectSession }: ChatHistoryDrawerProps
 
 export function AIChatbotSheet({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -395,19 +408,19 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
                   accessibilityLabel={historyOpen ? S.closeHistory : S.openHistory}
                   accessibilityState={{ expanded: historyOpen }}
                 >
-                  <MaterialIcon name="history" size={22} color={historyOpen ? COLORS.primary : COLORS.onSurfaceVariant} />
+                  <MaterialIcon name="history" size={22} color={historyOpen ? colors.primary : colors.onSurfaceVariant} />
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={handleNewChat}>
-                  <MaterialIcon name="add" size={22} color={COLORS.onSurfaceVariant} />
+                  <MaterialIcon name="add" size={22} color={colors.onSurfaceVariant} />
                 </TouchableOpacity>
               </View>
               <View style={styles.headerTitle}>
-                <MaterialIcon name="auto_awesome" size={18} color={COLORS.primary} filled />
+                <MaterialIcon name="auto_awesome" size={18} color={colors.primary} filled />
                 <Text style={styles.headerTitleText}>{S.title}</Text>
               </View>
               <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn} onPress={onClose}
                 accessibilityRole="button" accessibilityLabel="Đóng">
-                <MaterialIcon name="close" size={22} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon name="close" size={22} color={colors.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
           </GestureDetector>
@@ -437,7 +450,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
           <View style={styles.inputArea}>
             <View style={styles.inputRow}>
               <TouchableOpacity activeOpacity={0.7} style={styles.inputIconBtn} onPress={handleMic}>
-                <MaterialIcon name="mic" size={22} color={isListening ? COLORS.primary : COLORS.onSurfaceVariant} />
+                <MaterialIcon name="mic" size={22} color={isListening ? colors.primary : colors.onSurfaceVariant} />
               </TouchableOpacity>
               <TextInput
                 variant="bare"
@@ -455,7 +468,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
                 onPress={() => handleSend(input)}
                 disabled={!input.trim()}
               >
-                <MaterialIcon name="send" size={18} color={COLORS.onPrimary} filled />
+                <MaterialIcon name="send" size={18} color={colors.onPrimary} filled />
               </TouchableOpacity>
             </View>
 
@@ -486,22 +499,23 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: `${COLORS.black}80`,
+    backgroundColor: withAlpha(colors.black, 0.5),
   },
   container: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: BORDER_RADIUS['2xl'],
     borderTopRightRadius: BORDER_RADIUS['2xl'],
     height: '90%',
     borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}33`,
+    borderColor: withAlpha(colors.outlineVariant, 0.2),
     overflow: 'hidden',
   },
   // Header
@@ -511,9 +525,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING[4],
     height: CHAT_HEADER_HEIGHT,
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderBottomWidth: 1,
-    borderBottomColor: `${COLORS.surfaceVariant}80`,
+    borderBottomColor: withAlpha(colors.surfaceVariant, 0.5),
     zIndex: 2,
   },
   headerBtn: {
@@ -533,9 +547,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     maxHeight: HISTORY_DRAWER_MAX_HEIGHT,
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     zIndex: 3,
@@ -548,14 +562,14 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: SPACING[2],
   },
   historyEmpty: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     paddingVertical: SPACING[3],
   },
@@ -565,13 +579,13 @@ const styles = StyleSheet.create({
     gap: SPACING[3],
     paddingVertical: SPACING[2],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    borderBottomColor: colors.outlineVariant,
   },
   sessionIcon: {
     width: 32,
     height: 32,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: `${COLORS.primary}20`,
+    backgroundColor: withAlpha(colors.primary, 0.13),
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -580,11 +594,11 @@ const styles = StyleSheet.create({
   sessionPreview: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   sessionMeta: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   headerTitle: {
@@ -595,7 +609,7 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   // Chat
   chatList: {
@@ -611,23 +625,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   userBubble: {
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     borderRadius: 20,
     borderTopRightRadius: 4,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     maxWidth: '85%',
     borderWidth: 1,
-    borderColor: `${COLORS.primary}20`,
+    borderColor: withAlpha(colors.primary, 0.13),
   },
   userBubbleText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     lineHeight: 20,
   },
   bubbleTime: {
     fontSize: 10,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 4,
     marginRight: SPACING[1],
   },
@@ -641,23 +655,23 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}50`,
+    borderColor: withAlpha(colors.outlineVariant, 0.31),
     flexShrink: 0,
     marginTop: 4,
   },
   aiBubble: {
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: 20,
     borderTopLeftRadius: 4,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[3],
     maxWidth: '85%',
     borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}30`,
+    borderColor: withAlpha(colors.outlineVariant, 0.19),
     overflow: 'hidden',
   },
   aiBubbleAccent: {
@@ -666,11 +680,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: `${COLORS.primary}40`,
+    backgroundColor: withAlpha(colors.primary, 0.25),
   },
   aiBubbleText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     lineHeight: 20,
   },
   // Typing dots
@@ -685,7 +699,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: COLORS.onSurfaceVariant,
+    backgroundColor: colors.onSurfaceVariant,
   },
   // Voice overlay
   voiceOverlay: {
@@ -694,9 +708,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 200,
-    backgroundColor: COLORS.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderTopWidth: 1,
-    borderTopColor: `${COLORS.surfaceVariant}80`,
+    borderTopColor: withAlpha(colors.surfaceVariant, 0.5),
     alignItems: 'center',
     justifyContent: 'center',
     borderTopLeftRadius: BORDER_RADIUS.xl,
@@ -707,7 +721,7 @@ const styles = StyleSheet.create({
     top: SPACING[4],
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -723,7 +737,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
   },
   voiceRing2: {
     width: 64,
@@ -734,10 +748,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
@@ -748,13 +762,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: SPACING[4],
     fontSize: FONT_SIZE.xs,
-    color: COLORS.outline,
+    color: colors.outline,
   },
   // Input area
   inputArea: {
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceContainerHighest,
+    borderTopColor: colors.surfaceContainerHighest,
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[3],
     paddingBottom: SPACING[3],
@@ -762,12 +776,12 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[1],
     borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}50`,
+    borderColor: withAlpha(colors.outlineVariant, 0.31),
     gap: SPACING[1],
   },
   inputIconBtn: {
@@ -781,7 +795,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     paddingHorizontal: SPACING[2],
     paddingVertical: 0,
     height: 40,
@@ -790,7 +804,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -809,12 +823,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: `${COLORS.outlineVariant}30`,
+    borderColor: withAlpha(colors.outlineVariant, 0.19),
   },
   chipText: {
     fontSize: 11,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
-});
+  });
+}

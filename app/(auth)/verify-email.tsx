@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,12 +16,13 @@ import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useResendVerification, useVerifyEmail } from '@/hooks';
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
-} from '@/constants/theme';
+  withAlpha,
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -32,6 +33,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // `password` is forwarded from the register screen so we can auto-login after
   // a successful verification (register itself issues no tokens).
   const { email, password } = useLocalSearchParams<{ email?: string; password?: string }>();
@@ -204,123 +207,125 @@ export default function VerifyEmailScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: SPACING[8],
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: SPACING[8],
+    },
 
-  // Hero
-  hero: {
-    alignItems: 'center',
-    paddingTop: SPACING[10],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[6],
-  },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING[5],
-  },
-  iconEmoji: {
-    fontSize: 44,
-  },
-  title: {
-    fontSize: FONT_SIZE['2xl'],
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onBackground,
-    textAlign: 'center',
-    marginBottom: SPACING[2],
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
-    marginBottom: SPACING[1],
-  },
-  email: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-    textAlign: 'center',
-  },
+    // Hero
+    hero: {
+      alignItems: 'center',
+      paddingTop: SPACING[10],
+      paddingBottom: SPACING[8],
+      paddingHorizontal: SPACING[6],
+    },
+    iconCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING[5],
+    },
+    iconEmoji: {
+      fontSize: 44,
+    },
+    title: {
+      fontSize: FONT_SIZE['2xl'],
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onBackground,
+      textAlign: 'center',
+      marginBottom: SPACING[2],
+    },
+    subtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      marginBottom: SPACING[1],
+    },
+    email: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+      textAlign: 'center',
+    },
 
-  // Card
-  card: {
-    marginHorizontal: SPACING[4],
-    marginTop: -SPACING[2],
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[6],
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  body: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
-    lineHeight: 22,
-    marginBottom: SPACING[3],
-  },
-  bodyBold: {
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onBackground,
-  },
-  codeField: {
-    marginBottom: SPACING[5],
-  },
-  helperNote: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-    lineHeight: 18,
-    marginBottom: SPACING[5],
-  },
+    // Card
+    card: {
+      marginHorizontal: SPACING[4],
+      marginTop: -SPACING[2],
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING[6],
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    body: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurface,
+      lineHeight: 22,
+      marginBottom: SPACING[3],
+    },
+    bodyBold: {
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onBackground,
+    },
+    codeField: {
+      marginBottom: SPACING[5],
+    },
+    helperNote: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+      lineHeight: 18,
+      marginBottom: SPACING[5],
+    },
 
-  // Success pill
-  successPill: {
-    backgroundColor: COLORS.primaryContainer,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '40',
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[3],
-    marginBottom: SPACING[4],
-  },
-  successText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onPrimaryContainer,
-    fontWeight: FONT_WEIGHT.medium,
-  },
+    // Success pill
+    successPill: {
+      backgroundColor: colors.primaryContainer,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.25),
+      borderRadius: BORDER_RADIUS.lg,
+      paddingVertical: SPACING[2],
+      paddingHorizontal: SPACING[3],
+      marginBottom: SPACING[4],
+    },
+    successText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onPrimaryContainer,
+      fontWeight: FONT_WEIGHT.medium,
+    },
 
-  // Actions
-  primaryAction: {
-    marginBottom: SPACING[3],
-  },
-  secondaryAction: {
-    alignItems: 'center',
-    paddingVertical: SPACING[3],
-  },
-  secondaryLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
-  },
-  disabledLabel: {
-    color: COLORS.outline,
-  },
-  tertiaryAction: {
-    alignItems: 'center',
-    paddingVertical: SPACING[2],
-  },
-  tertiaryLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
-  },
-});
+    // Actions
+    primaryAction: {
+      marginBottom: SPACING[3],
+    },
+    secondaryAction: {
+      alignItems: 'center',
+      paddingVertical: SPACING[3],
+    },
+    secondaryLabel: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.primary,
+    },
+    disabledLabel: {
+      color: colors.outline,
+    },
+    tertiaryAction: {
+      alignItems: 'center',
+      paddingVertical: SPACING[2],
+    },
+    tertiaryLabel: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+    },
+  });
+}

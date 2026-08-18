@@ -9,7 +9,7 @@ import {
   TextStyle,
   ViewStyle,
 } from 'react-native';
-import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 export type TextInputVariant = 'boxed' | 'multiline' | 'inline' | 'bare';

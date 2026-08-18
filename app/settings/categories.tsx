@@ -4,7 +4,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useSharedValue } from 'react-native-reanimated';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -40,6 +41,8 @@ interface PendingMove {
 
 export default function CategoriesRoute() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { data: cats, isLoading, isError, refetch } = useCustomerCategories();
@@ -222,11 +225,11 @@ export default function CategoriesRoute() {
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={() => router.back()} style={styles.btn}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name="arrow_back" size={22} color={COLORS.onSurface} />
+          <MaterialIcon name="arrow_back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.title}>Quản lý danh mục</Text>
         <TouchableOpacity activeOpacity={0.7} onPress={() => setSheetVisible(true)} style={styles.btn}>
-          <MaterialIcon name="add" size={24} color={COLORS.primary} />
+          <MaterialIcon name="add" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -265,7 +268,7 @@ export default function CategoriesRoute() {
             disabled={isSaving}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
               <Text style={styles.saveBtnText}>Lưu thay đổi ({pendingMoves.size})</Text>
             )}
@@ -291,38 +294,40 @@ export default function CategoriesRoute() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
-  },
-  btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: SPACING[4], paddingTop: SPACING[4], paddingBottom: SPACING[12] },
-  saveBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[3],
-    backgroundColor: COLORS.surfaceContainerHigh,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-  },
-  saveBtn: {
-    height: 48,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onPrimary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
+    },
+    btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    title: { flex: 1, textAlign: 'center', fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+    scroll: { flex: 1 },
+    scrollContent: { paddingHorizontal: SPACING[4], paddingTop: SPACING[4], paddingBottom: SPACING[12] },
+    saveBar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[3],
+      backgroundColor: colors.surfaceContainerHigh,
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+    },
+    saveBtn: {
+      height: 48,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveBtnDisabled: { opacity: 0.6 },
+    saveBtnText: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onPrimary,
+    },
+  });
+}

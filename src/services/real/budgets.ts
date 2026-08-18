@@ -128,8 +128,14 @@ interface BucketSummaryListDto {
   buckets: BucketSummaryDto[];
 }
 
+// Backend returns allocationPct/uncategorizedRatio as a whole 0-100 percent
+// (confirmed against finviet-be's BudgetService.cs: AllocationPct is the raw
+// stored Customer.NeedsPct/etc value, and UncategorizedRatio is
+// `uncategorizedSpent / totalSpent * 100`) — the mock's contract is a 0-1
+// fraction (see BucketSummary/BucketSummaryList JSDoc). Always divide by 100
+// here so both modes agree; this is a fixed backend convention, not a guess.
 function toBucket(dto: BucketSummaryDto): BucketSummary {
-  return { ...dto };
+  return { ...dto, allocationPct: dto.allocationPct / 100 };
 }
 
 /** GET /budgets/buckets?month=YYYY-MM — 50/30/20 bucket summary with pace. */
@@ -145,7 +151,7 @@ export async function getBudgetBuckets(
     month: d.month,
     monthlyIncome: d.monthlyIncome,
     budgetAdherenceScore: d.budgetAdherenceScore,
-    uncategorizedRatio: d.uncategorizedRatio,
+    uncategorizedRatio: d.uncategorizedRatio / 100,
     uncategorizedWarning: d.uncategorizedWarning,
     buckets: (d.buckets ?? []).map(toBucket),
   };

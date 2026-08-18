@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  COLORS,
   SPACING,
   FONT_SIZE,
   FONT_WEIGHT,
   BORDER_RADIUS,
   SHADOW,
-} from '@/constants/theme';
+} from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { useWeeklyReport } from '@/hooks';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -23,6 +23,8 @@ import { AIChatbotSheet } from '@/components/home/AIChatbotSheet';
 
 export default function WeeklyReportScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { reportId } = useLocalSearchParams<{ reportId?: string }>();
   const { data: report, isLoading } = useWeeklyReport(reportId);
   const [chatOpen, setChatOpen] = useState(false);
@@ -106,6 +108,8 @@ export default function WeeklyReportScreen() {
 }
 
 function Header({ onBack }: { onBack: () => void }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.header}>
       <TouchableOpacity style={styles.headerBtn} onPress={onBack}>
@@ -117,8 +121,9 @@ function Header({ onBack }: { onBack: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.gray[100] },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.gray[100] },
   scroll: { paddingBottom: SPACING[8] },
 
   header: {
@@ -126,25 +131,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: colors.gray[200],
   },
   headerBtn: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerIcon: { fontSize: 28, color: COLORS.gray[700] },
+  headerIcon: { fontSize: 28, color: colors.gray[700] },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
     fontSize: FONT_SIZE.lg,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.gray[900],
+    color: colors.gray[900],
   },
 
   heroCard: {
     margin: SPACING[5],
     padding: SPACING[6],
     alignItems: 'center',
-    backgroundColor: COLORS.brand[500],
+    backgroundColor: colors.brand[500],
     borderRadius: BORDER_RADIUS['2xl'],
     ...SHADOW.lg,
   },
@@ -152,7 +157,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.brand[400],
+    backgroundColor: colors.brand[400],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING[3],
@@ -161,25 +166,25 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: FONT_SIZE['2xl'],
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.white,
+    color: colors.white,
   },
   heroSubtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.brand[100],
+    color: colors.brand[100],
     marginTop: SPACING[1],
   },
 
   bodyCard: {
     marginHorizontal: SPACING[5],
     padding: SPACING[5],
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderRadius: BORDER_RADIUS.xl,
     marginBottom: SPACING[4],
     ...SHADOW.sm,
   },
   paragraph: {
     fontSize: FONT_SIZE.base,
-    color: COLORS.gray[800],
+    color: colors.gray[800],
     lineHeight: 26,
   },
   paragraphSpacing: { marginTop: SPACING[3] },
@@ -189,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: SPACING[5],
     padding: SPACING[4],
-    backgroundColor: COLORS.brand[50],
+    backgroundColor: colors.brand[50],
     borderRadius: BORDER_RADIUS.xl,
     gap: SPACING[3],
     marginBottom: SPACING[4],
@@ -199,16 +204,17 @@ const styles = StyleSheet.create({
   advisorTitle: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.brand[700],
+    color: colors.brand[700],
   },
-  advisorSub: { fontSize: FONT_SIZE.xs, color: COLORS.brand[600], marginTop: 2 },
-  chevron: { fontSize: FONT_SIZE.xl, color: COLORS.brand[600] },
+  advisorSub: { fontSize: FONT_SIZE.xs, color: colors.brand[600], marginTop: 2 },
+  chevron: { fontSize: FONT_SIZE.xl, color: colors.brand[600] },
 
   footnote: {
     paddingHorizontal: SPACING[5],
     fontSize: FONT_SIZE.xs,
-    color: COLORS.gray[400],
+    color: colors.gray[400],
     lineHeight: 18,
     textAlign: 'center',
   },
-});
+  });
+}

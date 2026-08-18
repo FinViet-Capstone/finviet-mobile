@@ -9,7 +9,9 @@ import type {
 import { USER_ID } from './walletStore';
 
 // ─── Mock Data — Spending Score ────────────────────────────────────────────────
-// Week of 18–24 May 2026. Score = 72 → green (≥70).
+// Week of 18–24 May 2026. Score = 72 → amber under the backend's real ≥80/≥50
+// bands (SpendingScoreService.cs) — color/verdict below are illustrative mock
+// literals, not derived from `score`; real mode always trusts colorBadge.
 
 const MOCK_SPENDING_SCORE_WEEKLY: SpendingScore = {
   id: 'score_2026w21_01',
@@ -28,9 +30,15 @@ const MOCK_SPENDING_SCORE_WEEKLY: SpendingScore = {
     'mức 80–85 vào tuần tới.',
   weekStart: '2026-05-18',
   generatedAt: '2026-05-18T06:00:00.000Z',
+  // Weekly view never computes savingsScore (backend: monthly-only). Weights
+  // match the seeded scoring_criteria defaults for WEEKLY (spike 50/budget 50).
+  spikeScore: 78,
+  budgetScore: 66,
+  savingsScore: null,
+  weights: { spike: 50, budget: 50 },
 };
 
-// Month of May 2026. Score = 54 → amber (40–69).
+// Month of May 2026. Score = 54 → amber (backend: ≥50).
 const MOCK_SPENDING_SCORE_MONTHLY: SpendingScore = {
   id: 'score_2026m05_01',
   customerId: USER_ID,
@@ -47,6 +55,12 @@ const MOCK_SPENDING_SCORE_MONTHLY: SpendingScore = {
     'Để cải thiện tháng tới, hãy đặt giới hạn cứng cho Mua sắm và kích hoạt thông báo khi đạt 80%.',
   weekStart: '2026-05-01',
   generatedAt: '2026-06-01T06:00:00.000Z',
+  // Matches the numbers already quoted in commentaryVi above, and the seeded
+  // scoring_criteria defaults for MONTHLY (spike 30/budget 40/savings 30).
+  spikeScore: 51,
+  budgetScore: 44,
+  savingsScore: 68,
+  weights: { spike: 30, budget: 40, savings: 30 },
 };
 
 // ─── Mock Data — Weekly Report ─────────────────────────────────────────────────

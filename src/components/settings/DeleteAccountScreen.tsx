@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { TextInput } from '@/components/common/TextInput';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { DELETE_ACCOUNT_STRINGS } from '@/data/settingsScreensData';
 import { useAuthStore } from '@/stores/authStore';
 import { useDeleteAccount } from '@/hooks';
@@ -22,6 +23,8 @@ interface DeleteAccountScreenProps {
 }
 
 export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreenProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const customer = useAuthStore((s) => s.customer);
   const userEmail = customer?.email ?? '';
   const deleteAccount = useDeleteAccount();
@@ -70,7 +73,7 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
         {/* Warning hero */}
         <View style={styles.warningHero}>
           <View style={styles.warningIconCircle}>
-            <MaterialIcon name="warning" size={32} color={COLORS.error} />
+            <MaterialIcon name="warning" size={32} color={colors.error} />
           </View>
           <Text style={styles.warningTitle}>{DELETE_ACCOUNT_STRINGS.warningTitle}</Text>
           <Text style={styles.warningBody}>{DELETE_ACCOUNT_STRINGS.warningBody}</Text>
@@ -84,7 +87,7 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
               <MaterialIcon
                 name={DELETE_ACCOUNT_STRINGS.dataIcons[i]}
                 size={20}
-                color={COLORS.onSurfaceVariant}
+                color={colors.onSurfaceVariant}
               />
               <Text style={styles.dataItemText}>{item}</Text>
             </View>
@@ -98,7 +101,7 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
             <Text style={styles.confirmEmail}>{userEmail}</Text>
           </Text>
           <TextInput
-            borderColor={isConfirmed ? COLORS.tertiary : focused ? COLORS.error : undefined}
+            borderColor={isConfirmed ? colors.tertiary : focused ? colors.error : undefined}
             value={inputEmail}
             onChangeText={setInputEmail}
             onFocus={() => setFocused(true)}
@@ -136,10 +139,11 @@ export function DeleteAccountScreen({ onCancel, onDeleted }: DeleteAccountScreen
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.surfaceContainerLowest,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   scroll: { flex: 1 },
   scrollContent: {
@@ -159,25 +163,25 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: COLORS.errorContainer + '33',
+    backgroundColor: withAlpha(colors.errorContainer, 0.2),
     alignItems: 'center',
     justifyContent: 'center',
   },
   warningTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.error,
+    color: colors.error,
     textAlign: 'center',
   },
   warningBody: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
   },
   // Data loss card
   dataLostCard: {
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     gap: SPACING[2],
@@ -185,7 +189,7 @@ const styles = StyleSheet.create({
   dataLostTitle: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     marginBottom: SPACING[2],
   },
   dataItem: {
@@ -196,7 +200,7 @@ const styles = StyleSheet.create({
   },
   dataItemText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     flex: 1,
   },
   // Confirm field
@@ -206,11 +210,11 @@ const styles = StyleSheet.create({
   confirmLabel: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
   },
   confirmEmail: {
-    color: COLORS.onSurface,
+    color: colors.onSurface,
     fontWeight: FONT_WEIGHT.bold,
   },
   // Bottom bar
@@ -222,35 +226,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[4],
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceVariant,
-    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopColor: colors.surfaceVariant,
+    backgroundColor: colors.surfaceContainerLowest,
     gap: SPACING[2],
   },
   deleteButton: {
     width: '100%',
     paddingVertical: SPACING[4],
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.error,
+    backgroundColor: colors.error,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
   },
   deleteButtonDisabled: {
-    backgroundColor: COLORS.error + '80',
+    backgroundColor: withAlpha(colors.error, 0.5),
   },
   deleteButtonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onError,
+    color: colors.onError,
   },
   deleteButtonTextDisabled: {
-    color: COLORS.onError + '80',
+    color: withAlpha(colors.onError, 0.5),
   },
   cancelButton: {
     width: '100%',
     paddingVertical: SPACING[4],
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.transparent,
+    backgroundColor: colors.transparent,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
@@ -258,6 +262,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
-});
+  });
+}

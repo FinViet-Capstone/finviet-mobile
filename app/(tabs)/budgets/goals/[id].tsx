@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -118,6 +119,8 @@ function ContributionSheet({
   goal: SavingsGoalWithProgress;
   onClose: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const addContrib = useAddContribution();
   const { data: walletData } = useWallets();
   const [amountRaw, setAmountRaw] = useState('');
@@ -212,7 +215,7 @@ function ContributionSheet({
         <Text style={styles.fieldLabel}>{S.sourceLabel}</Text>
         {basicWallets.length === 0 ? (
           <View style={styles.zeroBalanceBox}>
-            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <MaterialIcon name="account_balance_wallet" size={18} color={colors.error} />
             <Text style={styles.zeroBalanceText}>{S.noBasicWallet}</Text>
           </View>
         ) : (
@@ -221,20 +224,20 @@ function ContributionSheet({
             style={styles.walletSelectRow}
             onPress={() => { setAmountFocused(false); setWalletPickerVisible(true); }}
           >
-            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.primary} />
+            <MaterialIcon name="account_balance_wallet" size={18} color={colors.primary} />
             <Text style={[styles.walletSelectText, !fundingWallet && styles.amountPlaceholder]}>
               {fundingWallet ? fundingWallet.name : S.sourcePlaceholder}
             </Text>
             {fundingWallet ? (
               <Text style={styles.walletSelectBalance}>{formatFull(fundingWallet.balance)}</Text>
             ) : null}
-            <MaterialIcon name="expand_more" size={20} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="expand_more" size={20} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
 
         {zeroBalance ? (
           <View style={styles.zeroBalanceBox}>
-            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <MaterialIcon name="account_balance_wallet" size={18} color={colors.error} />
             <Text style={styles.zeroBalanceText}>{S.zeroBalance(fundingWallet?.name ?? '')}</Text>
           </View>
         ) : (
@@ -278,7 +281,7 @@ function ContributionSheet({
             style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
             onPress={handleSave} disabled={!canSave}>
             {addContrib.isPending
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              ? <ActivityIndicator size="small" color={colors.onPrimary} />
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
@@ -319,6 +322,8 @@ function WithdrawSheet({
   onClose: () => void;
   onSuccess: (wasWithdrawAll: boolean) => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const withdraw = useWithdrawFromGoal();
   const { data: walletData } = useWallets();
   const [amountRaw, setAmountRaw] = useState('');
@@ -422,7 +427,7 @@ function WithdrawSheet({
         <Text style={styles.fieldLabel}>{S.destLabel}</Text>
         {basicWallets.length === 0 ? (
           <View style={styles.zeroBalanceBox}>
-            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.error} />
+            <MaterialIcon name="account_balance_wallet" size={18} color={colors.error} />
             <Text style={styles.zeroBalanceText}>{S.noBasicWallet}</Text>
           </View>
         ) : (
@@ -431,14 +436,14 @@ function WithdrawSheet({
             style={styles.walletSelectRow}
             onPress={() => { setAmountFocused(false); setWalletPickerVisible(true); }}
           >
-            <MaterialIcon name="account_balance_wallet" size={18} color={COLORS.primary} />
+            <MaterialIcon name="account_balance_wallet" size={18} color={colors.primary} />
             <Text style={[styles.walletSelectText, !destWallet && styles.amountPlaceholder]}>
               {destWallet ? destWallet.name : S.destPlaceholder}
             </Text>
             {destWallet ? (
               <Text style={styles.walletSelectBalance}>{formatFull(destWallet.balance)}</Text>
             ) : null}
-            <MaterialIcon name="expand_more" size={20} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="expand_more" size={20} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
 
@@ -475,7 +480,7 @@ function WithdrawSheet({
             style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
             onPress={handleSave} disabled={!canSave}>
             {withdraw.isPending
-              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              ? <ActivityIndicator size="small" color={colors.onPrimary} />
               : <Text style={styles.saveText}>{S.save}</Text>}
           </TouchableOpacity>
         </View>
@@ -504,6 +509,8 @@ function WithdrawSheet({
 // ─── History Row ──────────────────────────────────────────────────────────────
 
 function HistoryRow({ item }: { item: GoalContribution }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isWithdrawal = item.type === 'withdrawal';
   const label = item.note || (isWithdrawal ? S.historyWithdrawNote : S.historyContribNote);
   return (
@@ -511,7 +518,7 @@ function HistoryRow({ item }: { item: GoalContribution }) {
       <MaterialIcon
         name={isWithdrawal ? 'arrow_upward' : 'savings'}
         size={18}
-        color={isWithdrawal ? COLORS.error : COLORS.primary}
+        color={isWithdrawal ? colors.error : colors.primary}
       />
       <View style={styles.historyRowText}>
         <Text style={styles.historyRowLabel} numberOfLines={1}>{label}</Text>
@@ -527,6 +534,8 @@ function HistoryRow({ item }: { item: GoalContribution }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GoalDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: goal, isLoading, isError, error, refetch } = useGoalById(id);
@@ -578,7 +587,7 @@ export default function GoalDetailScreen() {
 
   const pct = Math.min(100, goal.progressPercentage);
   const days = daysUntil(goal.deadline);
-  const barCol = goal.isCompleted ? COLORS.tertiary : pct >= 75 ? COLORS.primary : COLORS.secondary;
+  const barCol = goal.isCompleted ? colors.tertiary : pct >= 75 ? colors.primary : colors.secondary;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -587,13 +596,13 @@ export default function GoalDetailScreen() {
         <TouchableOpacity activeOpacity={0.7} style={styles.headerBtn}
           onPress={() => router.dismissTo('/(tabs)/budgets/goals')}
           accessibilityRole="button" accessibilityLabel="Quay lại">
-          <MaterialIcon name={S.back} size={22} color={COLORS.primary} />
+          <MaterialIcon name={S.back} size={22} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           {goal.iconEmoji ? (
             <Text style={styles.headerEmoji}>{goal.iconEmoji}</Text>
           ) : (
-            <MaterialIcon name="savings" size={20} color={COLORS.primary} />
+            <MaterialIcon name="savings" size={20} color={colors.primary} />
           )}
           <Text style={styles.headerTitle} numberOfLines={1}>{goal.name}</Text>
         </View>
@@ -607,14 +616,14 @@ export default function GoalDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel={S.archiveConfirm}
           >
-            <MaterialIcon name="archive" size={22} color={COLORS.onSurfaceVariant} />
+            <MaterialIcon name="archive" size={22} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.primary} />}>
+        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.primary} />}>
 
         {/* Progress card */}
         <View style={[styles.progressCard, goal.isCompleted && styles.progressCardCompleted]}>
@@ -624,12 +633,12 @@ export default function GoalDetailScreen() {
             <Text style={[styles.pctText, { color: barCol }]}>{pct.toFixed(0)}%</Text>
             {goal.isDeleted ? (
               <View style={styles.archivedBadge}>
-                <MaterialIcon name="archive" size={14} color={COLORS.onSurfaceVariant} />
+                <MaterialIcon name="archive" size={14} color={colors.onSurfaceVariant} />
                 <Text style={styles.archivedBadgeText}>{S.archived}</Text>
               </View>
             ) : goal.isCompleted ? (
               <View style={styles.completedBadge}>
-                <MaterialIcon name="check_circle" size={14} color={COLORS.tertiary} />
+                <MaterialIcon name="check_circle" size={14} color={colors.tertiary} />
                 <Text style={styles.completedBadgeText}>{S.completed}</Text>
               </View>
             ) : (
@@ -660,15 +669,20 @@ export default function GoalDetailScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>{S.remaining}</Text>
-              <Text style={[styles.statValue, { color: COLORS.onSurfaceVariant }]}>
+              <Text style={[styles.statValue, { color: colors.onSurfaceVariant }]}>
                 {formatFull(goal.remainingAmount)}
               </Text>
             </View>
           </View>
 
-          {!goal.isCompleted && !goal.isDeleted && (
+          {/* monthlySavingNeeded/deadline text are both undefined without a
+              deadline (both mock and real agree) — hide the whole row rather
+              than showing a fabricated 0đ/tháng or remaining/1 figure next to
+              a blank date. Unreachable via the app's own create flow today
+              (deadline is required), kept defensive. */}
+          {!goal.isCompleted && !goal.isDeleted && goal.deadline && (
             <View style={styles.monthlyRow}>
-              <MaterialIcon name="savings" size={16} color={COLORS.primary} />
+              <MaterialIcon name="savings" size={16} color={colors.primary} />
               <Text style={styles.monthlyText}>
                 {S.perMonth(formatVND(goal.requiredMonthlySaving) + 'đ')}
               </Text>
@@ -683,7 +697,7 @@ export default function GoalDetailScreen() {
             {!goal.isCompleted && (
               <TouchableOpacity activeOpacity={0.7} style={styles.addContribBtn}
                 onPress={() => setContribVisible(true)}>
-                <MaterialIcon name="add" size={20} color={COLORS.onPrimary} />
+                <MaterialIcon name="add" size={20} color={colors.onPrimary} />
                 <Text style={styles.addContribText}>{S.addContrib}</Text>
               </TouchableOpacity>
             )}
@@ -693,7 +707,7 @@ export default function GoalDetailScreen() {
                   setIsArchiveWithdrawal(false);
                   setWithdrawVisible(true);
                 }}>
-                <MaterialIcon name="arrow_upward" size={20} color={COLORS.primary} />
+                <MaterialIcon name="arrow_upward" size={20} color={colors.primary} />
                 <Text style={styles.withdrawText}>{S.withdraw}</Text>
               </TouchableOpacity>
             )}
@@ -740,7 +754,7 @@ export default function GoalDetailScreen() {
               style={[styles.deleteBtn, deleteGoal.isPending && styles.saveBtnDisabled]}
               onPress={handleDelete} disabled={deleteGoal.isPending}>
               {deleteGoal.isPending
-                ? <ActivityIndicator size="small" color={COLORS.onError} />
+                ? <ActivityIndicator size="small" color={colors.onError} />
                 : <Text style={styles.deleteText}>{S.archiveConfirm}</Text>}
             </TouchableOpacity>
           </View>
@@ -752,8 +766,9 @@ export default function GoalDetailScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[3],
@@ -761,145 +776,146 @@ const styles = StyleSheet.create({
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2] },
   headerEmoji: { fontSize: 20 },
-  headerTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
+  headerTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], gap: SPACING[4] },
   // Progress card
   progressCard: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING[4], borderWidth: 1, borderColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[4], borderWidth: 1, borderColor: colors.surfaceVariant,
     overflow: 'hidden', gap: SPACING[3],
   },
-  progressCardCompleted: { borderColor: `${COLORS.tertiary}30` },
-  completedAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: `${COLORS.tertiary}60` },
+  progressCardCompleted: { borderColor: withAlpha(colors.tertiary, 0.19) },
+  completedAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: withAlpha(colors.tertiary, 0.38) },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pctText: { fontSize: FONT_SIZE['2xl'], fontWeight: FONT_WEIGHT.bold },
-  deadlineText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant },
+  deadlineText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
   completedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: `${COLORS.tertiary}20`, paddingHorizontal: SPACING[2],
+    backgroundColor: withAlpha(colors.tertiary, 0.13), paddingHorizontal: SPACING[2],
     paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
   },
-  completedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: COLORS.tertiary },
+  completedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: colors.tertiary },
   archivedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: COLORS.surfaceVariant, paddingHorizontal: SPACING[2],
+    backgroundColor: colors.surfaceVariant, paddingHorizontal: SPACING[2],
     paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
   },
-  archivedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
-  barTrack: { height: 6, backgroundColor: COLORS.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
+  archivedBadgeText: { fontSize: 11, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  barTrack: { height: 6, backgroundColor: colors.surfaceVariant, borderRadius: BORDER_RADIUS.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
   statItem: { flex: 1, alignItems: 'center', gap: 2 },
-  statLabel: { fontSize: 10, color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statValue: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  statDivider: { width: 1, height: 32, backgroundColor: COLORS.outlineVariant },
+  statLabel: { fontSize: 10, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  statDivider: { width: 1, height: 32, backgroundColor: colors.outlineVariant },
   monthlyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
-  monthlyText: { fontSize: FONT_SIZE.sm, color: COLORS.primary, fontWeight: FONT_WEIGHT.medium },
-  deadlineFull: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  monthlyText: { fontSize: FONT_SIZE.sm, color: colors.primary, fontWeight: FONT_WEIGHT.medium },
+  deadlineFull: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
   // Add contrib / withdraw buttons
   actionsRow: { flexDirection: 'row', gap: SPACING[3] },
   addContribBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SPACING[2], backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING[2], backgroundColor: colors.primary, borderRadius: BORDER_RADIUS.lg,
     height: 56,
   },
-  addContribText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  addContribText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
   withdrawBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: SPACING[2], borderRadius: BORDER_RADIUS.lg, height: 56,
-    borderWidth: 1, borderColor: COLORS.primary,
+    borderWidth: 1, borderColor: colors.primary,
   },
-  withdrawText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.primary },
+  withdrawText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
   // History
   historySection: { gap: SPACING[2] },
-  historyLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  historyEmpty: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
+  historyLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  historyEmpty: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center', paddingVertical: SPACING[4] },
   historyRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
-    paddingVertical: SPACING[2], borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant,
+    paddingVertical: SPACING[2], borderBottomWidth: 1, borderBottomColor: colors.outlineVariant,
   },
   historyRowText: { flex: 1, gap: 2 },
-  historyRowLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: COLORS.onSurface },
-  historyRowDate: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
-  historyRowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.primary },
-  historyRowAmountNegative: { color: COLORS.error },
+  historyRowLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.medium, color: colors.onSurface },
+  historyRowDate: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
+  historyRowAmount: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
+  historyRowAmountNegative: { color: colors.error },
   // Sheet
   sheet: {
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[2],
     paddingBottom: SPACING[4],
   },
-  backdrop: { flex: 1, backgroundColor: `${COLORS.black}80` },
+  backdrop: { flex: 1, backgroundColor: withAlpha(colors.black, 0.5) },
   amountDisplay: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: colors.outlineVariant,
     paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
   },
-  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  amountDisplayError: { borderColor: COLORS.error },
-  amountPlaceholder: { color: COLORS.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
-  errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: SPACING[1] },
-  helperText: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant, marginTop: SPACING[1] },
+  amountText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  amountDisplayError: { borderColor: colors.error },
+  amountPlaceholder: { color: colors.onSurfaceVariant, fontWeight: FONT_WEIGHT.normal },
+  errorText: { fontSize: FONT_SIZE.xs, color: colors.error, marginTop: SPACING[1] },
+  helperText: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: SPACING[1] },
   zeroBalanceBox: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    backgroundColor: `${COLORS.error}15`, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: `${COLORS.error}40`,
+    backgroundColor: withAlpha(colors.error, 0.08), borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: withAlpha(colors.error, 0.25),
     padding: SPACING[3], marginTop: SPACING[2],
   },
-  zeroBalanceText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.error, lineHeight: 18 },
+  zeroBalanceText: { flex: 1, fontSize: FONT_SIZE.sm, color: colors.error, lineHeight: 18 },
   noteDisplay: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: colors.outlineVariant,
     paddingHorizontal: SPACING[4], height: 48, justifyContent: 'center',
   },
-  noteText: { fontSize: FONT_SIZE.sm, color: COLORS.onSurface },
+  noteText: { fontSize: FONT_SIZE.sm, color: colors.onSurface },
   walletSelectRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: colors.outlineVariant,
     paddingHorizontal: SPACING[4], height: 48,
   },
-  walletSelectText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurface },
-  walletSelectBalance: { fontSize: FONT_SIZE.xs, color: COLORS.onSurfaceVariant },
+  walletSelectText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+  walletSelectBalance: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
   sheetHandle: {
     width: 40, height: 4, borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.outlineVariant, alignSelf: 'center', marginBottom: SPACING[4],
+    backgroundColor: colors.outlineVariant, alignSelf: 'center', marginBottom: SPACING[4],
   },
-  sheetTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface, marginBottom: SPACING[2] },
-  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant, marginBottom: SPACING[1], marginTop: SPACING[3] },
+  sheetTitle: { fontSize: FONT_SIZE.xl, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, marginBottom: SPACING[2] },
+  fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, marginBottom: SPACING[1], marginTop: SPACING[3] },
   fieldInput: {
-    backgroundColor: COLORS.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    backgroundColor: colors.surfaceContainer, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: colors.outlineVariant,
     paddingHorizontal: SPACING[4], height: 48,
-    fontSize: FONT_SIZE.sm, color: COLORS.onSurface,
+    fontSize: FONT_SIZE.sm, color: colors.onSurface,
   },
   sheetActions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[6] },
   cancelBtn: {
     flex: 1, height: 56, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    borderWidth: 1, borderColor: colors.outlineVariant,
     alignItems: 'center', justifyContent: 'center',
   },
-  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: COLORS.onSurfaceVariant },
+  cancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
   saveBtn: {
     flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
   saveBtnDisabled: { opacity: 0.5 },
-  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onPrimary },
+  saveText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onPrimary },
   // Delete confirm dialog
   confirmDialog: {
     position: 'absolute', top: '35%', left: SPACING[6], right: SPACING[6],
-    backgroundColor: COLORS.surfaceContainerHigh, borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: colors.surfaceContainerHigh, borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[6], gap: SPACING[3],
-    borderWidth: 1, borderColor: COLORS.outlineVariant,
+    borderWidth: 1, borderColor: colors.outlineVariant,
   },
-  confirmTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: COLORS.onSurface },
-  confirmMsg: { fontSize: FONT_SIZE.sm, color: COLORS.onSurfaceVariant, lineHeight: 20 },
+  confirmTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+  confirmMsg: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, lineHeight: 20 },
   confirmActions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[2] },
   deleteBtn: {
     flex: 2, height: 56, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.errorContainer, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.errorContainer, alignItems: 'center', justifyContent: 'center',
   },
-  deleteText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: COLORS.onErrorContainer },
-});
+  deleteText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.bold, color: colors.onErrorContainer },
+  });
+}

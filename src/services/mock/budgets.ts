@@ -1,8 +1,11 @@
 import type { BudgetWithSpend } from '../../types';
-import { getCategoryById } from '@/constants/categories';
+import { getCategoryById, type BucketType } from '@/constants/categories';
 import { USER_ID } from './walletStore';
 import { getTransactions } from './transactions';
 import { getEffectiveIncomeAllocationSync } from './incomeAllocation';
+import { getCustomerCategoriesSync } from './customerCategories';
+
+const SAVINGS_GOAL_CATEGORY_ID = 'cat_savings_goal';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -178,9 +181,31 @@ export interface BucketSummaryList {
   month: string;
   monthlyIncome: number;
   budgetAdherenceScore: number;
+  /** Uncategorized share of total expense, 0–1 (e.g. 0.1 = 10%). */
   uncategorizedRatio: number;
   uncategorizedWarning: boolean;
   buckets: BucketSummary[];
+}
+
+/**
+ * Adherence proxy: 100 minus average over-pace percentage, needs/wants only.
+ * Savings is a TARGET, not a spending cap — saving ahead of pace must never
+ * lower this score. Matches the real backend's structural rule
+ * (CalculateFlatBudgetAdherenceScore, BudgetService.cs), which excludes the
+ * savings bucket from this sum entirely. Exported so the exclusion is
+ * directly testable without needing the full seeded mock transaction store.
+ */
+export function calculateBudgetAdherenceScore(
+  buckets: Pick<BucketSummary, 'bucket' | 'paceDeviation' | 'allocationCap'>[],
+): number {
+  const scoredBuckets = buckets.filter((b) => b.bucket !== 'savings');
+  if (scoredBuckets.length === 0) return 100;
+
+  const overPace = scoredBuckets.reduce(
+    (s, b) => s + Math.max(0, b.paceDeviation) / (b.allocationCap || 1),
+    0,
+  );
+  return Math.max(0, Math.round(100 - (overPace / scoredBuckets.length) * 100));
 }
 
 /**
@@ -203,7 +228,21 @@ export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
     savings: effective.savingsPct / 100,
   };
 
-  const expenses = getTransactions({ type: 'expense', startDate, endDate });
+  // Per-customer bucket override (a customer can drag a category into a
+  // different jar) — resolved the same way useBucketSpend already does, and
+  // now matching the real backend's ResolveCustomerBucket (BudgetService.cs).
+  const bucketOverride: Record<string, BucketType> = {};
+  for (const cc of getCustomerCategoriesSync(USER_ID)) {
+    bucketOverride[cc.categoryId] = cc.bucketId as BucketType;
+  }
+  const resolveBucket = (categoryId: string) =>
+    bucketOverride[categoryId] ?? getCategoryById(categoryId)?.defaultBucket;
+
+  // cat_savings_goal is excluded here (hideGoalContributions) and netted in
+  // separately below — a goal contribution/withdrawal is functionally the
+  // customer fulfilling their Savings allocation, not an ordinary spend
+  // category, matching the real backend's ComputeGoalNetSavingsAsync.
+  const expenses = getTransactions({ type: 'expense', startDate, endDate, hideGoalContributions: true });
   const spentByBucket: Record<'needs' | 'wants' | 'savings', number> = {
     needs: 0,
     wants: 0,
@@ -213,10 +252,19 @@ export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
   let totalExpense = 0;
   for (const t of expenses) {
     totalExpense += t.amount;
-    const bucket = t.categoryId ? getCategoryById(t.categoryId)?.defaultBucket : null;
+    const bucket = t.categoryId ? resolveBucket(t.categoryId) : null;
     if (bucket) spentByBucket[bucket] += t.amount;
     else uncategorized += t.amount;
   }
+
+  const goalTransactions = getTransactions({ categoryId: SAVINGS_GOAL_CATEGORY_ID, startDate, endDate });
+  const goalContributions = goalTransactions
+    .filter((t) => t.type === 'expense')
+    .reduce((s, t) => s + t.amount, 0);
+  const goalWithdrawals = goalTransactions
+    .filter((t) => t.type === 'income')
+    .reduce((s, t) => s + t.amount, 0);
+  spentByBucket.savings += Math.max(0, goalContributions - goalWithdrawals);
 
   const limitByBucket: Record<'needs' | 'wants' | 'savings', number> = {
     needs: 0,
@@ -224,7 +272,7 @@ export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
     savings: 0,
   };
   for (const b of BUDGETS) {
-    const bucket = getCategoryById(b.categoryId)?.defaultBucket;
+    const bucket = resolveBucket(b.categoryId);
     if (bucket) limitByBucket[bucket] += b.monthlyLimit;
   }
 
@@ -266,12 +314,7 @@ export function getBudgetBuckets(range?: MonthRange): BucketSummaryList {
   });
 
   const uncategorizedRatio = totalExpense > 0 ? uncategorized / totalExpense : 0;
-  // Simple adherence proxy: 100 minus average over-pace percentage.
-  const overPace = buckets.reduce(
-    (s, b) => s + Math.max(0, b.paceDeviation) / (b.allocationCap || 1),
-    0,
-  );
-  const budgetAdherenceScore = Math.max(0, Math.round(100 - (overPace / buckets.length) * 100));
+  const budgetAdherenceScore = calculateBudgetAdherenceScore(buckets);
 
   return {
     month,

@@ -121,6 +121,10 @@ function toSpendingScore(dto: SpendingScoreDto, view: 'weekly' | 'monthly'): Spe
     commentaryVi: comment,
     weekStart: dto.periodStart,
     generatedAt: new Date().toISOString(),
+    spikeScore: dto.spikeScore,
+    budgetScore: dto.budgetScore,
+    savingsScore: dto.savingsScore,
+    weights: dto.weights,
   };
 }
 

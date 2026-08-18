@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { BORDER_RADIUS, COLORS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVNDCompact } from '@/utils/formatters';
 import type { Transaction } from '@/types/transaction';
 import { getTransactionCardVisuals } from './transactionCardVisuals';
@@ -19,34 +20,6 @@ export interface TransactionCardProps {
 }
 
 /**
- * Entry-method tag — shows HOW the transaction was captured.
- * manual → nothing; photo → camera icon; csv_import → sheet icon;
- * sms_paste → "sms" text; linked → link icon.
- */
-function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
-  if (method === 'manual') return null;
-
-  if (method === 'sms_paste') {
-    return (
-      <View style={styles.methodTag}>
-        <Text style={styles.methodTagText}>{'SMS'}</Text>
-      </View>
-    );
-  }
-
-  const icon =
-    method === 'photo' ? 'photo_camera'
-    : method === 'csv_import' ? 'description'
-    : 'link'; // linked
-
-  return (
-    <View style={styles.methodTag}>
-      <MaterialIcon name={icon} size={11} color={COLORS.onSurfaceVariant} />
-    </View>
-  );
-}
-
-/**
  * Dense transaction list row (M3). Shows category icon, an entry-method tag
  * (how the tx was captured: photo / csv / sms / linked — manual shows none),
  * an amber left border + "classify now" hint when uncategorized, and the wallet
@@ -58,6 +31,8 @@ export const TransactionCard = React.memo(function TransactionCard({
   walletName = '',
   onPress,
 }: TransactionCardProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     iconName,
     iconColor,
@@ -67,7 +42,7 @@ export const TransactionCard = React.memo(function TransactionCard({
     title,
     subtitle,
     isUncategorized,
-  } = getTransactionCardVisuals(tx, walletName);
+  } = getTransactionCardVisuals(tx, colors, walletName);
 
   return (
     <TouchableOpacity
@@ -85,7 +60,7 @@ export const TransactionCard = React.memo(function TransactionCard({
           <MethodTag method={tx.entryMethod} />
         </View>
         <Text
-          style={[styles.txSubtitle, isUncategorized && { color: COLORS.secondary }]}
+          style={[styles.txSubtitle, isUncategorized && { color: colors.secondary }]}
           numberOfLines={1}
         >
           {subtitle}
@@ -102,76 +77,113 @@ export const TransactionCard = React.memo(function TransactionCard({
   );
 });
 
-const styles = StyleSheet.create({
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
-    backgroundColor: COLORS.surfaceContainerLow,
-    marginHorizontal: SPACING[4],
-    marginBottom: SPACING[2],
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING[3],
-  },
-  txRowUncat: {
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.secondary,
-  },
-  txIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  txMeta: {
-    flex: 1,
-    gap: 2,
-  },
-  txTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  txTitle: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
-    flexShrink: 1,
-  },
-  methodTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: COLORS.surfaceContainerHighest,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  methodTagText: {
-    fontSize: 9,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.3,
-  },
-  txSubtitle: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
-  },
-  txRight: {
-    alignItems: 'flex-end',
-    gap: 2,
-    flexShrink: 0,
-  },
-  txAmount: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.bold,
-  },
-  txWalletLabel: {
-    fontSize: 10,
-    color: COLORS.onSurfaceVariant,
-    maxWidth: 80,
-  },
-});
+// ─── Local subcomponents ───────────────────────────────────────────────────────
+
+/**
+ * Entry-method tag — shows HOW the transaction was captured.
+ * manual → nothing; photo → camera icon; csv_import → sheet icon;
+ * sms_paste → "sms" text; linked → link icon.
+ */
+function MethodTag({ method }: { method: Transaction['entryMethod'] }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (method === 'manual') return null;
+
+  if (method === 'sms_paste') {
+    return (
+      <View style={styles.methodTag}>
+        <Text style={styles.methodTagText}>{'SMS'}</Text>
+      </View>
+    );
+  }
+
+  const icon =
+    method === 'photo' ? 'photo_camera'
+    : method === 'csv_import' ? 'description'
+    : 'link'; // linked
+
+  return (
+    <View style={styles.methodTag}>
+      <MaterialIcon name={icon} size={11} color={colors.onSurfaceVariant} />
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    txRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
+      backgroundColor: colors.surfaceContainerLow,
+      marginHorizontal: SPACING[4],
+      marginBottom: SPACING[2],
+      borderRadius: BORDER_RADIUS.lg,
+      gap: SPACING[3],
+    },
+    txRowUncat: {
+      borderLeftWidth: 3,
+      borderLeftColor: colors.secondary,
+    },
+    txIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    txMeta: {
+      flex: 1,
+      gap: 2,
+    },
+    txTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[2],
+    },
+    txTitle: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+      flexShrink: 1,
+    },
+    methodTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      backgroundColor: colors.surfaceContainerHighest,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+      borderRadius: BORDER_RADIUS.sm,
+    },
+    methodTagText: {
+      fontSize: 9,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurfaceVariant,
+      letterSpacing: 0.3,
+    },
+    txSubtitle: {
+      fontSize: FONT_SIZE.xs,
+      color: colors.onSurfaceVariant,
+    },
+    txRight: {
+      alignItems: 'flex-end',
+      gap: 2,
+      flexShrink: 0,
+    },
+    txAmount: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: FONT_WEIGHT.bold,
+    },
+    txWalletLabel: {
+      fontSize: 10,
+      color: colors.onSurfaceVariant,
+      maxWidth: 80,
+    },
+  });
+}

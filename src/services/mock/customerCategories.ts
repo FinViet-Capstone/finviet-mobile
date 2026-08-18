@@ -46,6 +46,17 @@ export function seedDefaultCategories(customerId: string): CustomerCategory[] {
 
 export async function getCustomerCategories(customerId: string): Promise<CustomerCategory[]> {
   await delay();
+  return getCustomerCategoriesSync(customerId);
+}
+
+/**
+ * Synchronous read for callers that can't await — mirrors
+ * getEffectiveIncomeAllocationSync's pattern (mock/incomeAllocation.ts).
+ * Used by getBudgetBuckets (mock/budgets.ts) so bucket assignment there
+ * honors the customer's own drag-and-drop overrides, the same way
+ * useBucketSpend already does, instead of only the global default bucket.
+ */
+export function getCustomerCategoriesSync(customerId: string): CustomerCategory[] {
   let rows = _store.filter((c) => c.customerId === customerId);
   // Lazy default-seed so an already-onboarded (or demo) customer never has an empty set.
   // Real onboarding calls seedDefaultCategories() up front; this only fires as a fallback.

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
+import { getBudgetStatus } from '@/utils/budgetStatus';
 
 const TICK_COUNT = 10;
 
@@ -11,14 +13,12 @@ export function getDisplayedPercentage(spent: number, limit: number): number {
   return Math.min(100, Math.max(0, Math.round((spent / limit) * 100)));
 }
 
-function getPctColor(spent: number, limit: number, goalMode = false): string {
-  if (limit === 0) return COLORS.budget.safe;
+function getPctColor(spent: number, limit: number, colors: ThemeColors, goalMode = false): string {
+  if (limit === 0) return colors.budget.safe;
   const pct = (spent / limit) * 100;
   // Savings (goalMode): đạt/vượt mục tiêu = xanh; dưới mục tiêu = trung tính, KHÔNG đỏ.
-  if (goalMode) return pct >= 100 ? COLORS.budget.safe : COLORS.onSurfaceVariant;
-  if (pct > 85) return COLORS.budget.danger;
-  if (pct > 60) return COLORS.budget.warning;
-  return COLORS.budget.safe;
+  if (goalMode) return pct >= 100 ? colors.budget.safe : colors.onSurfaceVariant;
+  return colors.budget[getBudgetStatus(pct)];
 }
 
 interface BucketRow {
@@ -39,6 +39,8 @@ export interface BudgetOverviewCardProps {
 }
 
 function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number; activeColor: string }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const activeTicks = Math.round(
     (getDisplayedPercentage(spent, limit) / 100) * TICK_COUNT,
   );
@@ -49,7 +51,7 @@ function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number
           key={i}
           style={[
             styles.tick,
-            { backgroundColor: i < activeTicks ? activeColor : COLORS.surfaceContainerHighest },
+            { backgroundColor: i < activeTicks ? activeColor : colors.surfaceContainerHighest },
           ]}
         />
       ))}
@@ -58,16 +60,20 @@ function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number
 }
 
 function PctBadge({ spent, limit, goalMode }: { spent: number; limit: number; goalMode?: boolean }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pct = getDisplayedPercentage(spent, limit);
-  const color = getPctColor(spent, limit, goalMode);
+  const color = getPctColor(spent, limit, colors, goalMode);
   return (
-    <View style={[styles.pctBadge, { backgroundColor: `${color}26` }]}>
+    <View style={[styles.pctBadge, { backgroundColor: withAlpha(color, 0.15) }]}>
       <Text style={[styles.pctText, { color }]}>{pct}%</Text>
     </View>
   );
 }
 
 function BucketItem({ label, spent, limit, activeColor, goalMode }: BucketRow) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.bucketItem}>
       <View style={styles.bucketHeader}>
@@ -94,6 +100,8 @@ export function BudgetOverviewCard({
   savingsLimit,
 }: BudgetOverviewCardProps) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={styles.card}>
@@ -109,19 +117,19 @@ export function BudgetOverviewCard({
           label="Thiết yếu"
           spent={needsSpent}
           limit={needsLimit}
-          activeColor={COLORS.primary}
+          activeColor={colors.primary}
         />
         <BucketItem
           label="Mong muốn"
           spent={wantsSpent}
           limit={wantsLimit}
-          activeColor={COLORS.secondary}
+          activeColor={colors.secondary}
         />
         <BucketItem
           label="Tiết kiệm"
           spent={savingsSpent}
           limit={savingsLimit}
-          activeColor={COLORS.tertiary}
+          activeColor={colors.tertiary}
           goalMode
         />
       </View>
@@ -129,13 +137,14 @@ export function BudgetOverviewCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[5],
     borderWidth: 1,
-    borderColor: `${COLORS.outline}1A`,
+    borderColor: withAlpha(colors.outline, 0.1),
   },
   header: {
     flexDirection: 'row',
@@ -146,11 +155,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   detailLink: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.primary,
+    color: colors.primary,
     fontWeight: FONT_WEIGHT.medium,
   },
   bucketList: {
@@ -182,17 +191,17 @@ const styles = StyleSheet.create({
   },
   bucketLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   bucketAmount: {
     fontSize: FONT_SIZE.sm,
   },
   bucketSpent: {
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   bucketLimit: {
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   tickRow: {
     flexDirection: 'row',
@@ -204,4 +213,5 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 2,
   },
-});
+  });
+}

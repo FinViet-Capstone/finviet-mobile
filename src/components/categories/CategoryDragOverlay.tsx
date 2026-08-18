@@ -11,12 +11,13 @@
  * the hit-test is pure arithmetic against constants.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryIcon } from '@/components/common/CategoryIcon';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import type { BucketId } from './CategoryBucketCard';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -24,27 +25,36 @@ const ZONE_HEIGHT = 72;
 export const DROP_ZONES_HEIGHT = ZONE_HEIGHT * 3;
 export const DROP_ZONES_TOP = SCREEN_HEIGHT - DROP_ZONES_HEIGHT;
 
-const ZONE_ORDER: { id: BucketId; label: string; icon: string; color: string; containerColor: string }[] = [
-  { id: 'needs', label: 'Thiết yếu', icon: 'home', color: COLORS.primary, containerColor: COLORS.primaryContainer },
-  { id: 'wants', label: 'Mong muốn', icon: 'shopping_bag', color: COLORS.secondary, containerColor: COLORS.secondaryContainer },
-  { id: 'savings', label: 'Tiết kiệm', icon: 'savings', color: COLORS.tertiary, containerColor: COLORS.tertiaryContainer },
-];
+const ZONE_IDS: BucketId[] = ['needs', 'wants', 'savings'];
+
+type Zone = { id: BucketId; label: string; icon: string; color: string; containerColor: string };
+
+function getZoneOrder(colors: ThemeColors): Zone[] {
+  return [
+    { id: 'needs', label: 'Thiết yếu', icon: 'home', color: colors.primary, containerColor: colors.primaryContainer },
+    { id: 'wants', label: 'Mong muốn', icon: 'shopping_bag', color: colors.secondary, containerColor: colors.secondaryContainer },
+    { id: 'savings', label: 'Tiết kiệm', icon: 'savings', color: colors.tertiary, containerColor: colors.tertiaryContainer },
+  ];
+}
 
 /** Which drop zone (if any) a screen-absolute Y coordinate falls into. Exported for the parent's onEnd handler. */
 export function zoneForAbsoluteY(absoluteY: number): BucketId | null {
   if (absoluteY < DROP_ZONES_TOP) return null;
   const index = Math.floor((absoluteY - DROP_ZONES_TOP) / ZONE_HEIGHT);
-  return ZONE_ORDER[Math.min(Math.max(index, 0), ZONE_ORDER.length - 1)]?.id ?? null;
+  return ZONE_IDS[Math.min(Math.max(index, 0), ZONE_IDS.length - 1)] ?? null;
 }
 
-function Zone({ zone, index, dragY }: { zone: (typeof ZONE_ORDER)[number]; index: number; dragY: SharedValue<number> }) {
+function ZoneView({ zone, index, dragY, colors }: { zone: Zone; index: number; dragY: SharedValue<number>; colors: ThemeColors }) {
+  const hoverBg = withAlpha(zone.containerColor, 0.8);
+  const idleBg = withAlpha(colors.surfaceContainerHigh, 0.9);
+  const idleBorder = withAlpha(colors.outlineVariant, 0.5);
   const animStyle = useAnimatedStyle(() => {
     const zoneTop = DROP_ZONES_TOP + index * ZONE_HEIGHT;
     const zoneBottom = zoneTop + ZONE_HEIGHT;
     const isHover = dragY.value >= zoneTop && dragY.value < zoneBottom;
     return {
-      backgroundColor: isHover ? `${zone.containerColor}CC` : `${COLORS.surfaceContainerHigh}E6`,
-      borderColor: isHover ? zone.color : `${COLORS.outlineVariant}80`,
+      backgroundColor: isHover ? hoverBg : idleBg,
+      borderColor: isHover ? zone.color : idleBorder,
     };
   });
   return (
@@ -64,6 +74,8 @@ interface Props {
 }
 
 export function CategoryDragOverlay({ active, dragX, dragY, chipLabel, chipCategoryId }: Props) {
+  const colors = useThemeColors();
+  const zoneOrder = useMemo(() => getZoneOrder(colors), [colors]);
   const chipStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: dragX.value - 90 },
@@ -76,14 +88,14 @@ export function CategoryDragOverlay({ active, dragX, dragY, chipLabel, chipCateg
   return (
     <View style={styles.root} pointerEvents="none">
       <View style={styles.zones}>
-        {ZONE_ORDER.map((zone, index) => (
-          <Zone key={zone.id} zone={zone} index={index} dragY={dragY} />
+        {zoneOrder.map((zone, index) => (
+          <ZoneView key={zone.id} zone={zone} index={index} dragY={dragY} colors={colors} />
         ))}
       </View>
 
-      <Animated.View style={[styles.chip, chipStyle]}>
-        {chipCategoryId && <CategoryIcon categoryId={chipCategoryId} size={16} color={COLORS.onSurface} />}
-        {chipLabel && <Text style={styles.chipText} numberOfLines={1}>{chipLabel}</Text>}
+      <Animated.View style={[styles.chip, chipStyle, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outline, shadowColor: colors.black }]}>
+        {chipCategoryId && <CategoryIcon categoryId={chipCategoryId} size={16} color={colors.onSurface} />}
+        {chipLabel && <Text style={[styles.chipText, { color: colors.onSurface }]} numberOfLines={1}>{chipLabel}</Text>}
       </Animated.View>
     </View>
   );
@@ -121,14 +133,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    backgroundColor: COLORS.surfaceContainerHighest,
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
     borderWidth: 1,
-    borderColor: COLORS.outline,
     maxWidth: 180,
-    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -137,7 +146,6 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
     flexShrink: 1,
   },
 });

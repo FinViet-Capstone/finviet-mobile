@@ -10,7 +10,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 type Styles = ReturnType<typeof createStyles>;

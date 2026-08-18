@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -50,10 +51,10 @@ function walletIcon(wallet: Wallet): string {
   return 'account_balance_wallet';
 }
 
-function syncStatusColor(status: 'active' | 'error' | 'pending'): string {
-  if (status === 'active') return COLORS.tertiary;
-  if (status === 'error') return COLORS.error;
-  return COLORS.onSurfaceVariant;
+function syncStatusColor(colors: ThemeColors, status: 'active' | 'error' | 'pending'): string {
+  if (status === 'active') return colors.tertiary;
+  if (status === 'error') return colors.error;
+  return colors.onSurfaceVariant;
 }
 
 function syncStatusIcon(status: 'active' | 'error' | 'pending'): string {
@@ -81,22 +82,25 @@ function AddWalletSheet({
   onSelectBasic: () => void;
   onSelectSepay: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <DraggableSheet visible={visible} onClose={onClose}>
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>{S.addSheetTitle}</Text>
         <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.sheetCloseBtn}
           accessibilityRole="button" accessibilityLabel="Đóng">
-          <MaterialIcon name="close" size={20} color={COLORS.onSurfaceVariant} />
+          <MaterialIcon name="close" size={20} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
       <View style={styles.sheetOptions}>
         <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectBasic}>
-          <MaterialIcon name="account_balance_wallet" size={32} color={COLORS.primary} />
+          <MaterialIcon name="account_balance_wallet" size={32} color={colors.primary} />
           <Text style={styles.optionLabelActive}>{S.optionBasic}</Text>
         </TouchableOpacity>
         <TouchableOpacity activeOpacity={0.7} style={styles.optionActive} onPress={onSelectSepay}>
-          <MaterialIcon name="account_balance" size={32} color={COLORS.primary} />
+          <MaterialIcon name="account_balance" size={32} color={colors.primary} />
           <Text style={styles.optionLabelActive}>{S.optionSepay}</Text>
         </TouchableOpacity>
       </View>
@@ -116,6 +120,8 @@ function WalletCard({
   onPress: () => void;
   onSetBudget: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isLinked = wallet.type === 'linked';
   const syncStatus = wallet.linkedMetadata?.syncStatus;
   const isError = syncStatus === 'error';
@@ -130,7 +136,7 @@ function WalletCard({
         <MaterialIcon
           name={walletIcon(wallet)}
           size={22}
-          color={isError ? COLORS.error : isLinked ? COLORS.info : COLORS.tertiary}
+          color={isError ? colors.error : isLinked ? colors.info : colors.tertiary}
         />
       </View>
       <View style={styles.walletInfo}>
@@ -140,9 +146,9 @@ function WalletCard({
             <MaterialIcon
               name={syncStatusIcon(syncStatus)}
               size={12}
-              color={syncStatusColor(syncStatus)}
+              color={syncStatusColor(colors, syncStatus)}
             />
-            <Text style={[styles.syncLabel, { color: syncStatusColor(syncStatus) }]}>
+            <Text style={[styles.syncLabel, { color: syncStatusColor(colors, syncStatus) }]}>
               {syncStatusLabel(syncStatus)}
             </Text>
           </View>
@@ -151,7 +157,7 @@ function WalletCard({
         )}
       </View>
       <View style={styles.walletRight}>
-        <Text style={[styles.walletBalance, isError && { color: COLORS.error }]}>
+        <Text style={[styles.walletBalance, isError && { color: colors.error }]}>
           {formatVND(wallet.balance)}
         </Text>
         <TouchableOpacity
@@ -170,6 +176,8 @@ function WalletCard({
 
 export default function WalletsScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { data, isLoading, isError, error, refetch } = useWallets();
   const [sheetVisible, setSheetVisible] = useState(false);
 
@@ -213,7 +221,7 @@ export default function WalletsScreen() {
           style={styles.addBtn}
           onPress={() => setSheetVisible(true)}
         >
-          <MaterialIcon name="add" size={22} color={COLORS.primary} />
+          <MaterialIcon name="add" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -222,7 +230,7 @@ export default function WalletsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.primary} />
+          <RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.primary} />
         }
       >
         {/* Total balance card */}
@@ -249,7 +257,7 @@ export default function WalletsScreen() {
           style={styles.transferBtn}
           onPress={handleTransfer}
         >
-          <MaterialIcon name="swap_horiz" size={20} color={COLORS.primary} />
+          <MaterialIcon name="swap_horiz" size={20} color={colors.primary} />
           <Text style={styles.transferText}>{S.transfer}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -267,10 +275,11 @@ export default function WalletsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -282,13 +291,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   addBtn: {
     width: 32,
     height: 32,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -299,25 +308,25 @@ const styles = StyleSheet.create({
     gap: SPACING[3],
   },
   totalCard: {
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING[4],
     alignItems: 'center',
     gap: SPACING[1],
     borderWidth: 1,
-    borderColor: COLORS.surfaceContainerHigh,
+    borderColor: colors.surfaceContainerHigh,
   },
   totalLabel: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   totalAmount: {
     fontSize: FONT_SIZE['2xl'],
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   walletList: {
     gap: SPACING[2],
@@ -326,21 +335,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[3],
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING[3],
     borderWidth: 1,
-    borderColor: COLORS.surfaceContainerHigh,
+    borderColor: colors.surfaceContainerHigh,
     minHeight: 48,
   },
   walletCardError: {
-    borderColor: `${COLORS.errorContainer}80`,
+    borderColor: withAlpha(colors.errorContainer, 0.5),
   },
   walletIconWrap: {
     width: 40,
     height: 40,
     borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -352,11 +361,11 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   walletType: {
     fontSize: 11,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   syncRow: {
@@ -376,36 +385,36 @@ const styles = StyleSheet.create({
   walletBalance: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   setBudgetBtn: {
     paddingHorizontal: SPACING[2],
     paddingVertical: 3,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    borderColor: `${COLORS.primary}60`,
+    borderColor: withAlpha(colors.primary, 0.4),
   },
   setBudgetText: {
     fontSize: 10,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   transferBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING[2],
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: BORDER_RADIUS.xl,
     paddingVertical: SPACING[4],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: colors.outlineVariant,
     minHeight: 56,
   },
   transferText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -419,13 +428,13 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   sheetCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -440,9 +449,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING[2],
     padding: SPACING[6],
-    backgroundColor: `${COLORS.primaryContainer}20`,
+    backgroundColor: withAlpha(colors.primaryContainer, 0.13),
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
     borderRadius: BORDER_RADIUS.xl,
   },
   optionInactive: {
@@ -451,30 +460,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING[2],
     padding: SPACING[6],
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderWidth: 1,
-    borderColor: COLORS.transparent,
+    borderColor: colors.transparent,
     borderRadius: BORDER_RADIUS.xl,
   },
   optionLabelActive: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.primary,
+    color: colors.primary,
     textAlign: 'center',
   },
   optionLabelInactive: {
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
   },
   comingSoon: {
     fontSize: 10,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   sheetHint: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
   },
-});
+  });
+}

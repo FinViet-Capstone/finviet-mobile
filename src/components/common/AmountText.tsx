@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Text, StyleSheet, TextStyle } from 'react-native';
-import { COLORS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { TransactionType } from '@/types/transaction';
 import { formatVND } from '@/utils/formatters';
 
@@ -20,14 +21,16 @@ export interface AmountTextProps {
 }
 
 export function AmountText({ amount, type, size = 'base', style }: AmountTextProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isIncome = type === 'income' || type === 'transfer_in';
   const isExpense = type === 'expense' || type === 'transfer_out';
 
   const color = isIncome
-    ? COLORS.success
+    ? colors.success
     : isExpense
-    ? COLORS.danger
-    : COLORS.gray[700];
+    ? colors.danger
+    : colors.gray[700];
 
   const prefix = isIncome ? '+' : isExpense ? '−' : '';
 
@@ -38,8 +41,10 @@ export function AmountText({ amount, type, size = 'base', style }: AmountTextPro
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    fontWeight: FONT_WEIGHT.semibold,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    base: {
+      fontWeight: FONT_WEIGHT.semibold,
+    },
+  });
+}

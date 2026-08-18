@@ -58,16 +58,20 @@ budgets, entry — the main authenticated app), plus top-level modal-style route
 
 ## Design tokens & icons
 
-- All colors/spacing/radius/font come from `src/constants/theme.ts`
-  (`COLORS`, `SPACING`, `BORDER_RADIUS`, `FONT_SIZE`, `FONT_WEIGHT`, `SHADOW`) — no
-  hardcoded hex or raw numbers in component styles. Styling is plain RN
-  `StyleSheet`, not Tailwind/NativeWind or styled-components.
-- Light mode exists (`LIGHT_COLORS` in `theme.ts`, resolved via
-  `useThemeColors()`/`ThemeProvider`) and is a live, user-facing feature — see the
-  theme picker in `app/settings/index.tsx`. Migration is partial: `COLORS` is a
-  fixed dark-palette alias that most files still import directly instead of
-  `useThemeColors()`, so switching to light today only affects the handful of
-  migrated components. Prefer `useThemeColors()` in new/touched code.
+- All colors/spacing/radius/font come from `src/theme/` (`COLORS`, `SPACING`,
+  `BORDER_RADIUS`, `FONT_SIZE`, `FONT_WEIGHT`, `SHADOW`, `withAlpha`) — always
+  imported from the `@/theme` barrel (`src/theme/index.ts`), never from the
+  individual `colors.ts`/`spacing.ts`/`typography.ts`/`shadows.ts` files
+  directly. No hardcoded hex or raw numbers in component styles. Styling is
+  plain RN `StyleSheet`, not Tailwind/NativeWind or styled-components.
+- Light mode exists (`LIGHT_COLORS` in `src/theme/colors.ts`, resolved via
+  `useThemeColors()`/`ThemeProvider`) and is a live, user-facing feature — see
+  the theme picker in `app/settings/index.tsx`. Migration is complete: every
+  screen/component reads colors via `useThemeColors()`. The one exception is
+  `app/_layout.tsx`'s root `ErrorBoundary`, which imports the theme-invariant
+  `COLORS` (a fixed alias for `DARK_COLORS`) directly, since it can render
+  before `ThemeProvider` mounts — that's the only legitimate use of `COLORS`
+  in new code.
 - Icons are Material Symbols only, via `<MaterialIcon name="..." />`
   (`src/components/common/MaterialIcon.tsx`), rendered as ligature text in the
   `Material Symbols Outlined` font loaded in `app/_layout.tsx`. `ICON_MAP` in that

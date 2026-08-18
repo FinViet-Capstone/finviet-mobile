@@ -13,6 +13,7 @@ import {
   type UpdateTransactionInput,
 } from '@/services';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
+import { invalidateAiDerived } from './useReports';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,8 @@ function invalidateTransactionDependents(qc: ReturnType<typeof useQueryClient>) 
   qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
   qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
   qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+  // A transaction can move the spike/budget/savings inputs behind "Điểm chi tiêu".
+  invalidateAiDerived(qc);
 }
 
 export const useCreateTransaction = () => {

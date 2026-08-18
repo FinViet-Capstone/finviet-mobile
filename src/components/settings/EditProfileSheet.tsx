@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { useUpdateProfile } from '@/hooks/useCustomer';
 import { getApiErrorMessage } from '@/utils/errors';
-import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, FONT_SIZE, FONT_WEIGHT } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 interface Props {
   visible: boolean;
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export function EditProfileSheet({ visible, onClose, currentName }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [name, setName] = useState(currentName);
   const updateProfile = useUpdateProfile();
 
@@ -63,23 +66,25 @@ export function EditProfileSheet({ visible, onClose, currentName }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: SPACING[6],
-    paddingBottom: SPACING[8],
-    gap: SPACING[5],
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.onSurface,
-    textAlign: 'center',
-  },
-  field: {
-    marginBottom: 0,
-  },
-  actions: {
-    gap: SPACING[2],
-    marginTop: SPACING[2],
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    content: {
+      paddingHorizontal: SPACING[6],
+      paddingBottom: SPACING[8],
+      gap: SPACING[5],
+    },
+    title: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.onSurface,
+      textAlign: 'center',
+    },
+    field: {
+      marginBottom: 0,
+    },
+    actions: {
+      gap: SPACING[2],
+      marginTop: SPACING[2],
+    },
+  });
+}

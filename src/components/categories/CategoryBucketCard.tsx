@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, type SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { CategoryIcon } from '@/components/common/CategoryIcon';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '@/constants/theme';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
+import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 
 /** How long a row must be held before the pan gesture activates as a drag (ms). */
 const DRAG_ACTIVATION_DELAY_MS = 300;
@@ -69,17 +70,21 @@ interface Props {
   onDragEnd?: (absoluteY: number) => void;
 }
 
-const BUCKET_COLORS: Record<BucketId, string> = {
-  needs: COLORS.primary,
-  wants: COLORS.secondary,
-  savings: COLORS.tertiary,
-};
+function getBucketColors(colors: ThemeColors): Record<BucketId, string> {
+  return {
+    needs: colors.primary,
+    wants: colors.secondary,
+    savings: colors.tertiary,
+  };
+}
 
-const BUCKET_CONTAINER_COLORS: Record<BucketId, string> = {
-  needs: COLORS.primaryContainer,
-  wants: COLORS.secondaryContainer,
-  savings: COLORS.tertiaryContainer,
-};
+function getBucketContainerColors(colors: ThemeColors): Record<BucketId, string> {
+  return {
+    needs: colors.primaryContainer,
+    wants: colors.secondaryContainer,
+    savings: colors.tertiaryContainer,
+  };
+}
 
 function formatVND(amount: number): string {
   return `₫ ${amount.toLocaleString('vi-VN')}`;
@@ -93,11 +98,13 @@ export function CategoryBucketCard({
   onDragStart,
   onDragEnd,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(bucket.id === 'needs');
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set(['housing']));
 
-  const accentColor = BUCKET_COLORS[bucket.id];
-  const containerBg = BUCKET_CONTAINER_COLORS[bucket.id];
+  const accentColor = useMemo(() => getBucketColors(colors)[bucket.id], [colors, bucket.id]);
+  const containerBg = useMemo(() => getBucketContainerColors(colors)[bucket.id], [colors, bucket.id]);
 
   const toggleSub = (subId: string) => {
     setExpandedSubs((prev) => {
@@ -117,8 +124,8 @@ export function CategoryBucketCard({
         activeOpacity={0.7}
       >
         <View style={styles.bucketLeft}>
-          <MaterialIcon name="drag_indicator" size={20} color={COLORS.onSurfaceVariant} />
-          <View style={[styles.iconCircle, { backgroundColor: containerBg + '33' }]}>
+          <MaterialIcon name="drag_indicator" size={20} color={colors.onSurfaceVariant} />
+          <View style={[styles.iconCircle, { backgroundColor: withAlpha(containerBg, 0.2) }]}>
             <MaterialIcon name={bucket.icon} size={18} color={accentColor} />
           </View>
           <Text style={[styles.bucketName, { color: accentColor }]}>{bucket.name}</Text>
@@ -130,7 +137,7 @@ export function CategoryBucketCard({
           <MaterialIcon
             name={expanded ? 'expand_less' : 'expand_more'}
             size={20}
-            color={COLORS.onSurfaceVariant}
+            color={colors.onSurfaceVariant}
           />
         </View>
       </TouchableOpacity>
@@ -172,7 +179,7 @@ export function CategoryBucketCard({
             const subRowContent = (
               <View style={styles.subRow}>
                 <View style={styles.dragHandle}>
-                  <MaterialIcon name="drag_indicator" size={16} color={COLORS.onSurfaceVariant + '80'} />
+                  <MaterialIcon name="drag_indicator" size={16} color={withAlpha(colors.onSurfaceVariant, 0.5)} />
                 </View>
                 <TouchableOpacity
                   style={styles.subLeft}
@@ -188,7 +195,7 @@ export function CategoryBucketCard({
                       <MaterialIcon
                         name={isSubExpanded ? 'expand_less' : 'expand_more'}
                         size={16}
-                        color={COLORS.onSurfaceVariant}
+                        color={colors.onSurfaceVariant}
                       />
                     </TouchableOpacity>
                   )}
@@ -206,11 +213,11 @@ export function CategoryBucketCard({
                 {/* Nested items */}
                 {isSubExpanded && sub.items && (
                   <View style={styles.nestedContainer}>
-                    <View style={[styles.nestedLine, { backgroundColor: accentColor + '80' }]} />
+                    <View style={[styles.nestedLine, { backgroundColor: withAlpha(accentColor, 0.5) }]} />
                     {sub.items.map((item) => (
                       <View key={item.id} style={styles.nestedRow}>
                         <View style={styles.nestedLeft}>
-                          <MaterialIcon name="drag_indicator" size={14} color={COLORS.onSurfaceVariant + '4D'} />
+                          <MaterialIcon name="drag_indicator" size={14} color={withAlpha(colors.onSurfaceVariant, 0.3)} />
                           <Text style={styles.nestedName}>{item.name}</Text>
                         </View>
                         {item.amount !== undefined && (
@@ -232,8 +239,8 @@ export function CategoryBucketCard({
               onPress={() => onAddSubCategory(bucket.id)}
               activeOpacity={0.7}
             >
-              <MaterialIcon name="add_circle" size={16} color={accentColor + 'B3'} />
-              <Text style={[styles.addSubText, { color: accentColor + 'B3' }]}>Add Sub-category</Text>
+              <MaterialIcon name="add_circle" size={16} color={withAlpha(accentColor, 0.7)} />
+              <Text style={[styles.addSubText, { color: withAlpha(accentColor, 0.7) }]}>Add Sub-category</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -242,13 +249,14 @@ export function CategoryBucketCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BORDER_RADIUS['2xl'],
     padding: SPACING[4],
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant + '4D',
+    borderColor: withAlpha(colors.outlineVariant, 0.3),
     marginBottom: SPACING[4],
   },
   bucketHeader: {
@@ -278,14 +286,14 @@ const styles = StyleSheet.create({
     gap: SPACING[2],
   },
   pctBadge: {
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[1],
   },
   pctText: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   threadContainer: {
     position: 'relative',
@@ -327,7 +335,7 @@ const styles = StyleSheet.create({
   },
   subName: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.onSurface,
+    color: colors.onSurface,
   },
   nestedContainer: {
     position: 'relative',
@@ -356,11 +364,11 @@ const styles = StyleSheet.create({
   },
   nestedName: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   nestedAmount: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   addSubRow: {
     flexDirection: 'row',
@@ -373,4 +381,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.medium,
   },
-});
+  });
+}
