@@ -310,6 +310,28 @@ non-production EAS/provider credential setup remain before the feature can be ma
   newly introduced); `npm test` 29/29 suites, 160/160 tests (3 new routing tests replacing the 3
   removed `notificationEntityRoute` cases). No physical-device acceptance (no device access in this
   environment), commit, or push.
+- 2026-08-18 — User reported an on-device `Cài đặt` (Settings) alert, "The request field is
+  required.", when changing the theme. Diagnosed against live `finviet-be` source (not guessed):
+  `real/auth.ts`'s `FE_THEME_TO_BE` sent theme as a capitalized string (`'Light'`/`'Dark'`/
+  `'System'`) in the `PUT /profile/settings` body, but the backend has no
+  `JsonStringEnumConverter` registered anywhere (`FinViet.Api/Program.cs`'s `AddJsonOptions` only
+  sets `ReferenceHandler.IgnoreCycles`), so `System.Text.Json` requires the `AppTheme` enum as a
+  raw integer — same convention the FE's own `GENDER_TO_INT` already follows for `Gender`, just
+  not mirrored for `Theme`. The string body fails to deserialize, `ProfileController`'s
+  `[FromBody] UpdateProfileSettingsRequest request` binds to `null`, and ASP.NET's automatic
+  `ApiController` validation reports the generic "The request field is required." on the
+  parameter itself. Fixed `FE_THEME_TO_BE` to map to ints (`Light=0, Dark=1, System=2`, matching
+  the backend enum's declared order) — no backend change needed. While fixing, found and fixed
+  the mirror-image bug on the read side: `BE_THEME_TO_FE`/`toTheme` (used by `getProfile`/
+  `login`) expected the same wrong string shape back from the backend, and separately used
+  `raw && BE_THEME_TO_FE[raw]`, which would have silently mis-mapped `0` (Light) to `'system'`
+  even after switching to ints, since `0` is falsy in JS — changed the lookup keys to numbers and
+  the guard to an explicit `raw !== undefined` check. Added
+  `src/services/real/__tests__/auth.test.ts` (5 tests: int-body assertion on save, all three
+  raw-int → FE-string mappings on read including the `0`/Light edge case, and the
+  no-theme-in-response fallback). Verified: `npm run type-check` clean; `npm run lint` 0 errors on
+  changed/new files; `npm test` 25/25 suites, 125/125 tests (5 new). No physical-device
+  acceptance, commit, or push.
 
 ## History
 

@@ -89,14 +89,17 @@ function toAuthError(
 
 // ─── profile → Customer mapper ────────────────────────────────────────────────
 
-const BE_THEME_TO_FE: Record<string, Customer['theme']> = {
-  Light: 'light',
-  Dark: 'dark',
-  System: 'system',
+// Same integer serialization as GENDER_TO_INT/FE_THEME_TO_BE below — ProfileDto.Theme
+// is a plain AppTheme enum with no JsonStringEnumConverter, so it arrives as 0/1/2.
+const BE_THEME_TO_FE: Record<number, Customer['theme']> = {
+  0: 'light',
+  1: 'dark',
+  2: 'system',
 };
 
 function toTheme(raw: AuthResponsePayload['profile']['theme']): Customer['theme'] {
-  return (raw && BE_THEME_TO_FE[raw]) ?? 'system';
+  // raw ?? not raw && — 0 (Light) is a valid, falsy value that a truthiness check would skip.
+  return (raw !== undefined ? BE_THEME_TO_FE[raw] : undefined) ?? 'system';
 }
 
 function toThresholds(raw: number[] | undefined): [number, number] {
@@ -176,10 +179,13 @@ export async function updateProfile(input: UpdateProfileInput): Promise<void> {
   });
 }
 
-const FE_THEME_TO_BE: Record<'light' | 'dark' | 'system', string> = {
-  light: 'Light',
-  dark: 'Dark',
-  system: 'System',
+// Backend AppTheme enum is serialized as an integer (0 Light, 1 Dark, 2 System) —
+// same reasoning as GENDER_TO_INT above: no JsonStringEnumConverter is registered
+// server-side, so System.Text.Json requires enums as ints, not strings.
+const FE_THEME_TO_BE: Record<'light' | 'dark' | 'system', number> = {
+  light: 0,
+  dark: 1,
+  system: 2,
 };
 
 /**
