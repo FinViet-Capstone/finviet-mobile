@@ -250,9 +250,9 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
 
       {hasLimit ? (
         <View style={styles.categoryRight}>
-          <Text style={[styles.categoryPct, { color: barColor }]}>
-            {budget.percentage > 100 
-              ? `${S.over} ${(budget.percentage - 100).toFixed(0)}%` 
+          <Text style={[styles.categoryPct, { color: barColor }]} numberOfLines={1}>
+            {budget.percentage > 100
+              ? `${S.over} +${formatVND(budget.spent - budget.monthlyLimit)}đ`
               : `${budget.percentage.toFixed(0)}%`}
           </Text>
           <View style={styles.categoryBarTrack}>
@@ -812,7 +812,7 @@ function createStyles(colors: ThemeColors) {
   categoryRight: {
     alignItems: 'flex-end',
     gap: 4,
-    width: 64,
+    width: 84,
   },
   categoryPct: {
     fontSize: FONT_SIZE.xs,

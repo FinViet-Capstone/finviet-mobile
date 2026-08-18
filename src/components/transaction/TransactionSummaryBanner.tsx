@@ -13,33 +13,32 @@ export interface TransactionSummaryBannerProps {
   prevExpense: number;
 }
 
-/** Trend vs tháng trước: "—" = không có gốc so sánh; "–" = không đổi; else % thay đổi. */
-function pctTrend(curr: number, prev: number): { label: string; changed: boolean } {
-  if (prev === 0) return { label: '—', changed: false };     // không có baseline
-  if (curr === prev) return { label: '–', changed: false };  // không tăng/giảm
-  const pct = Math.round((Math.abs(curr - prev) / Math.abs(prev)) * 100);
-  return { label: `${pct}%`, changed: true };
+/** Trend vs tháng trước: chỉ hướng thay đổi — không có gốc so sánh / không đổi → gạch ngang. */
+function trendState(curr: number, prev: number): { changed: boolean; up: boolean } {
+  if (prev === 0) return { changed: false, up: false };      // không có baseline
+  if (curr === prev) return { changed: false, up: false };   // không tăng/giảm
+  return { changed: true, up: curr > prev };
 }
 
 function TrendBadge({ curr, prev, goodWhenUp }: { curr: number; prev: number; goodWhenUp: boolean }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const t = pctTrend(curr, prev);
-  if (!t.changed) {
+  const { changed, up } = trendState(curr, prev);
+  if (!changed) {
     return (
-      <View style={styles.trendRow}>
+      <View style={styles.trendRow} accessibilityLabel="Không đổi so với tháng trước">
         <MaterialIcon name="remove" size={11} color={colors.onSurfaceVariant} />
-        <Text style={[styles.trendText, { color: colors.onSurfaceVariant }]}>{t.label}</Text>
       </View>
     );
   }
-  const up = curr >= prev;
   const good = goodWhenUp ? up : !up;
   const color = good ? colors.tertiary : colors.error;
   return (
-    <View style={styles.trendRow}>
-      <MaterialIcon name={up ? 'arrow_upward' : 'arrow_downward'} size={11} color={color} />
-      <Text style={[styles.trendText, { color }]}>{t.label}</Text>
+    <View
+      style={styles.trendRow}
+      accessibilityLabel={up ? 'Tăng so với tháng trước' : 'Giảm so với tháng trước'}
+    >
+      <MaterialIcon name={up ? 'north_east' : 'south_east'} size={11} color={color} />
     </View>
   );
 }
@@ -124,10 +123,6 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 2,
-    },
-    trendText: {
-      fontSize: 10,
-      fontWeight: FONT_WEIGHT.medium,
     },
     summaryDivider: {
       width: 1,

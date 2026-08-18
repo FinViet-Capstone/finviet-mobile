@@ -179,6 +179,30 @@ non-production EAS/provider credential setup remain before the feature can be ma
   and the now-unused `S.withdrawAll` string. Verified: type-check clean; changed-file lint
   0 errors (4 pre-existing tolerated `set-state-in-effect` warnings on untouched lines); full
   Jest 28/28 suites, 162/162 tests. No physical-device acceptance, commit, or push.
+- 2026-08-18 — User reported the Budgets category-row overspend badge shows an absurdly high
+  percentage (e.g. "Vượt 400%" when spending 500K against a 100K limit) and asked for a saner
+  representation. Confirmed this was the only unclamped >100% percentage display in the app
+  (goal progress and the Home savings row are already capped). Approved change: show the real
+  overspend amount instead — "Vượt +400Kđ" via `formatVND(budget.spent - budget.monthlyLimit)`;
+  widened `categoryRight` 64→84px so the longer text fits, `numberOfLines={1}` as a guard.
+  Under-limit rows still show the plain percentage. Verified: type-check clean; changed-file
+  lint 0 errors (2 pre-existing warnings on untouched lines); full Jest 28/28 suites, 162/162
+  tests. No physical-device acceptance, commit, or push.
+- 2026-08-18 — Clarified the "% quá cao" report actually pointed at the Transactions screen's
+  three-column summary banner, whose month-over-month trend badges could show huge percentages
+  (e.g. ↑1700% after a low-spend baseline month). User's decision on reflection: drop the number
+  entirely — arrows only. `TransactionSummaryBanner`'s `pctTrend` became a direction-only
+  `trendState`, `TrendBadge` now renders just the up/down arrow (dash when unchanged or no
+  baseline), with Vietnamese `accessibilityLabel`s keeping the trend readable for screen readers
+  now that the visible text is gone; unused `trendText` style removed. The earlier Budgets
+  category-row change ("Vượt +400Kđ") was a different spot and stays. Verified: type-check
+  clean; changed-file lint 0 problems; full Jest 28/28 suites, 162/162 tests. No
+  physical-device acceptance, commit, or push.
+- 2026-08-18 — User sent a reference screenshot of the arrow style they wanted (image not
+  viewable in-session); picked the diagonal variant from mockups: the trend arrows are now
+  `north_east`/`south_east` (↗/↘) instead of `arrow_upward`/`arrow_downward`. Same file,
+  one-line icon swap. Verified: type-check clean; changed-file lint 0 problems; full Jest
+  28/28 suites, 162/162 tests. No physical-device acceptance, commit, or push.
 - 2026-08-15 — Started after confirming the current app only requests notification permission: it
   does not register an Expo token, install receive/response listeners, poll unread notifications,
   show a global banner, or expose the unread count. Backend push is incomplete: customer-token push
