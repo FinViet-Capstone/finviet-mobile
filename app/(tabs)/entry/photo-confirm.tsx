@@ -23,10 +23,12 @@ import {
 import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { CATEGORIES } from "@/constants/categories";
 import { CategoryPickerSheet } from "@/components/categories";
 import { formatVND } from "@/utils/formatters";
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
+import type { Wallet } from "@/types/wallet";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { getApiErrorMessage } from "@/utils/errors";
 
@@ -62,6 +64,11 @@ const S = {
   savedMsg: (n: number) => `Đã lưu ${n} giao dịch`,
   saveError: "Không lưu được. Hãy thử lại.",
   imageOf: (i: number, n: number) => `Ảnh ${i}/${n}`,
+  fieldWallet: "Ví",
+  pickWallet: "Chọn ví",
+  sheetWallet: "Chọn ví",
+  sheetWalletEmpty: "Chưa có ví nào. Hãy tạo ví ở tab Ví trước khi lưu.",
+  insufficient: (s: string) => `Số dư ví không đủ (hiện có: ${s})`,
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -328,7 +335,23 @@ export default function PhotoConfirmScreen() {
   );
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const ocrUnavailableAlertShown = useRef(false);
+
+  // Photo entries can only target basic wallets — bank-linked wallets are
+  // read-only (their transactions come from provider sync).
+  const basicWallets = (walletsData?.wallets ?? []).filter((w) => w.type !== "linked");
+  const selectedWallet =
+    basicWallets.find((w) => w.id === selectedWalletId) ?? basicWallets[0];
+
+  // Pre-select the first basic wallet so the confirm button isn't stuck disabled.
+  useEffect(() => {
+    if (!selectedWalletId && basicWallets.length > 0) {
+      setSelectedWalletId(basicWallets[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basicWallets.length]);
 
   // Extract each image
   useEffect(() => {
@@ -430,14 +453,7 @@ export default function PhotoConfirmScreen() {
   );
 
   const handleConfirmAll = useCallback(async () => {
-    const wallets = walletsData?.wallets ?? [];
-    // Photo entries can only target basic wallets — bank-linked wallets are
-    // read-only (their transactions come from provider sync), and the API
-    // rejects writes to them. There's no wallet picker in this flow yet, so
-    // this just needs to skip past any linked wallet rather than blindly
-    // using wallets[0].
-    const primary = wallets.find((w) => w.type !== "linked");
-    if (!primary) {
+    if (!selectedWallet) {
       Alert.alert(S.noWallet, S.noWalletMsg);
       return;
     }
@@ -450,11 +466,20 @@ export default function PhotoConfirmScreen() {
     // is already disabled while any savable row is uncategorized).
     if (toSave.some((r) => r.categoryId === null)) return;
 
+    // Client-side guard: the batch can't exceed the selected wallet's balance
+    // (the API enforces this too and returns 422 insufficient_balance — catch
+    // it early with a clear message instead of a mid-batch failure).
+    const totalAmount = toSave.reduce((sum, r) => sum + r.amount, 0);
+    if (totalAmount > selectedWallet.balance) {
+      Alert.alert("", S.insufficient(formatVND(selectedWallet.balance)));
+      return;
+    }
+
     setIsImporting(true);
     try {
       for (const row of toSave) {
         await createMutation.mutateAsync({
-          walletId: primary.id,
+          walletId: selectedWallet.id,
           categoryId: row.categoryId,
           amount: row.amount,
           type: "expense",
@@ -467,12 +492,12 @@ export default function PhotoConfirmScreen() {
       Alert.alert("", S.savedMsg(toSave.length), [
         { text: "OK", onPress: () => router.back() },
       ]);
-    } catch {
-      Alert.alert("", S.saveError);
+    } catch (err) {
+      Alert.alert("", getApiErrorMessage(err, S.saveError));
     } finally {
       setIsImporting(false);
     }
-  }, [rows, walletsData, createMutation, router]);
+  }, [rows, selectedWallet, createMutation, router]);
 
   // Strict gate (Path A): the batch can only be submitted when every selected,
   // successfully-extracted row has a category. Uncategorized selected rows block it.
@@ -524,6 +549,32 @@ export default function PhotoConfirmScreen() {
         <Text style={styles.headerTitle}>{S.title}</Text>
         <View style={styles.headerBtn} />
       </View>
+
+      {/* Wallet */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={styles.walletFieldRow}
+        onPress={() => setShowWalletModal(true)}
+      >
+        <View style={styles.walletFieldIconWrap}>
+          <MaterialIcon
+            name="account_balance_wallet"
+            size={18}
+            color={colors.primary}
+          />
+        </View>
+        <View style={styles.walletFieldTextWrap}>
+          <Text style={styles.walletFieldLabel}>{S.fieldWallet}</Text>
+          <Text style={styles.walletFieldValue}>
+            {selectedWallet?.name ?? S.pickWallet}
+          </Text>
+        </View>
+        <MaterialIcon
+          name="chevron_right"
+          size={20}
+          color={colors.outlineVariant}
+        />
+      </TouchableOpacity>
 
       {rows.length > 1 && (
         <View style={styles.selectAllRow}>
@@ -614,6 +665,50 @@ export default function PhotoConfirmScreen() {
         selectedCategoryId={editingIdx !== null ? rows[editingIdx]?.categoryId : undefined}
         onSelect={handleCategorySelect}
       />
+
+      {/* Wallet picker sheet */}
+      <DraggableSheet
+        visible={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+      >
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{S.sheetWallet}</Text>
+          <FlatList
+            data={basicWallets}
+            keyExtractor={(item: Wallet) => item.id}
+            style={styles.sheetList}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <Text style={styles.sheetEmpty}>{S.sheetWalletEmpty}</Text>
+            }
+            renderItem={({ item }: { item: Wallet }) => (
+              <TouchableOpacity
+                style={[
+                  styles.sheetRow,
+                  selectedWalletId === item.id && styles.sheetRowSelected,
+                ]}
+                onPress={() => {
+                  setSelectedWalletId(item.id);
+                  setShowWalletModal(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcon
+                  name="account_balance_wallet"
+                  size={18}
+                  color={colors.onSurfaceVariant}
+                />
+                <Text style={styles.sheetRowText}>
+                  {item.name} · {formatVND(item.balance)}
+                </Text>
+                {selectedWalletId === item.id && (
+                  <MaterialIcon name="check" size={18} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </DraggableSheet>
     </SafeAreaView>
   );
 }
@@ -651,6 +746,77 @@ function createStyles(colors: ThemeColors) {
     padding: SPACING[4],
     gap: SPACING[3],
     paddingBottom: SPACING[4],
+  },
+
+  walletFieldRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: SPACING[4],
+    marginTop: SPACING[3],
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING[3],
+    gap: SPACING[3],
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  walletFieldIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: withAlpha(colors.primary, 0.13),
+    flexShrink: 0,
+  },
+  walletFieldTextWrap: { flex: 1 },
+  walletFieldLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: colors.onSurfaceVariant,
+    marginBottom: 2,
+  },
+  walletFieldValue: {
+    fontSize: FONT_SIZE.sm,
+    color: colors.onSurface,
+    fontWeight: FONT_WEIGHT.semibold,
+  },
+
+  sheet: {
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
+  },
+  sheetList: { maxHeight: 380 },
+  sheetEmpty: {
+    paddingVertical: SPACING[6],
+    textAlign: "center",
+    color: colors.onSurfaceVariant,
+    fontSize: FONT_SIZE.sm,
+  },
+  sheetTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: colors.onSurface,
+    marginBottom: SPACING[3],
+  },
+  sheetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outlineVariant,
+    gap: SPACING[3],
+  },
+  sheetRowSelected: {
+    backgroundColor: withAlpha(colors.primary, 0.06),
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING[2],
+    borderBottomWidth: 0,
+    marginVertical: SPACING[1],
+  },
+  sheetRowText: {
+    flex: 1,
+    fontSize: FONT_SIZE.base,
+    color: colors.onSurface,
   },
 
   selectAllRow: {
