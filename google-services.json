@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "246804338541",
+    "project_id": "finviet-c900f",
+    "storage_bucket": "finviet-c900f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246804338541:android:b6c516ebaaee9919d5ac64",
+        "android_client_info": {
+          "package_name": "com.finviet.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "246804338541-3dlk0ii6b7vlgggafffjf071t808si0j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDR4QtRTu9VFvyy7LorA9nYY9SRQOQPl_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "246804338541-3dlk0ii6b7vlgggafffjf071t808si0j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246804338541:android:070827d5f4d26f03d5ac64",
+        "android_client_info": {
+          "package_name": "com.finviet.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "246804338541-3dlk0ii6b7vlgggafffjf071t808si0j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDR4QtRTu9VFvyy7LorA9nYY9SRQOQPl_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "246804338541-3dlk0ii6b7vlgggafffjf071t808si0j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
