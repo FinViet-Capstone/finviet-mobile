@@ -88,18 +88,6 @@ export default function CreateWalletScreen() {
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
 
-        {/* Type selector — only basic active */}
-        <View style={styles.typeRow}>
-          <View style={[styles.typeCard, styles.typeCardActive]}>
-            <MaterialIcon name="account_balance_wallet" size={28} color={colors.primary} />
-            <Text style={styles.typeActiveText}>{S.typeBasic}</Text>
-          </View>
-          <View style={styles.typeCard}>
-            <MaterialIcon name="account_balance" size={28} color={colors.onSurfaceVariant} />
-            <Text style={styles.typeInactiveText}>{S.typeLinked}</Text>
-            <Text style={styles.comingSoon}>{S.comingSoon}</Text>
-          </View>
-        </View>
 
         <Text style={styles.fieldLabel}>{S.nameLabel}</Text>
         <TextInput value={name} onChangeText={setName}

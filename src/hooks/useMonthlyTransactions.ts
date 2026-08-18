@@ -164,14 +164,15 @@ export function useMonthlyTransactions(
   const prevEnd = isoDate(prevYear, prevMonthIdx, new Date(prevYear, prevMonthIdx + 1, 0).getDate());
 
   // ── Data ─────────────────────────────────────────────────────────────────
+  const isSearching = searchQuery.trim().length > 0;
   const {
     data: txData,
     isLoading,
     isFetching: isMonthFetching,
     isFetched: hasLoadedMonth,
   } = useTransactions({
-    startDate: monthStart,
-    endDate: monthEnd,
+    startDate: isSearching ? undefined : monthStart,
+    endDate: isSearching ? undefined : monthEnd,
     walletId: selectedWalletId ?? undefined,
   }, { enabled });
   const { data: prevTxData } = useTransactions({
