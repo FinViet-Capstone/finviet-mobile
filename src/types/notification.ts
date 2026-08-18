@@ -20,9 +20,10 @@ export type NotificationType =
   | 'announcement';   // Admin-broadcast announcement
 
 /**
- * Typed destination for a notification. FE maps (entityType, entityId) → route
- * at render time instead of storing a brittle path string. Mirrors the
- * notification_entity_type DB ENUM. null = no actionable destination.
+ * Origin entity kind for a notification, as reported by the backend. Mirrors
+ * the notification_entity_type DB ENUM. Not currently used for FE routing —
+ * every notification tap opens the static detail screen instead — but kept
+ * for cache identity and any future entity-specific display.
  */
 export type NotificationEntityType = 'budget' | 'goal' | 'report' | 'wallet' | 'system';
 
@@ -38,7 +39,7 @@ export interface AppNotification {
   title: string | null;
   /** Body text of the notification */
   body: string | null;
-  /** Related entity kind; FE derives the route from this + entityId. null = no destination. */
+  /** Related entity kind, informational only — see NotificationEntityType. */
   entityType: NotificationEntityType | null;
   /** Id of the related entity (goalId / budgetId / walletId); null for report/system. */
   entityId: string | null;

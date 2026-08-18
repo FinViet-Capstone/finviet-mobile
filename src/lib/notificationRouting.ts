@@ -27,33 +27,27 @@ export interface NotificationPushData {
   entityId: string | null;
 }
 
-export function notificationEntityRoute(
-  entityType: NotificationEntityType | null,
-  entityId: string | null,
-): Href {
-  switch (entityType) {
-    case 'goal':
-      return entityId
-        ? `/(tabs)/budgets/goals/${encodeURIComponent(entityId)}`
-        : '/(tabs)/budgets/goals';
-    case 'budget':
-      return '/(tabs)/budgets';
-    case 'report':
-      return entityId
-        ? { pathname: '/(tabs)/home/weekly', params: { reportId: entityId } }
-        : '/(tabs)/home/weekly';
-    case 'wallet':
-      return entityId
-        ? `/(tabs)/wallets/${encodeURIComponent(entityId)}`
-        : '/(tabs)/wallets';
-    case 'system':
-    default:
-      return '/notifications';
-  }
+export function notificationDetailRoute(params: {
+  id: string;
+  title: string | null;
+  body: string | null;
+}): Href {
+  return {
+    pathname: '/notification-detail',
+    params: {
+      id: params.id,
+      title: params.title ?? '',
+      body: params.body ?? '',
+    },
+  };
 }
 
 export function notificationRoute(notification: AppNotification): Href {
-  return notificationEntityRoute(notification.entityType, notification.entityId);
+  return notificationDetailRoute({
+    id: notification.id,
+    title: notification.title,
+    body: notification.body,
+  });
 }
 
 export function parseNotificationPushData(

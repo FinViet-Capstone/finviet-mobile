@@ -71,7 +71,7 @@ Not committed/pushed in either repo yet.
 ---
 
 Feature: reliable notification delivery with foreground in-app banners, background/terminated
-OS push, unread visibility, and exact entity deep links.
+OS push, unread visibility, and a static notification-detail screen.
 
 ## Status
 
@@ -88,9 +88,9 @@ non-production EAS/provider credential setup remain before the feature can be ma
   without replaying the customer's historical unread inbox after login.
 - Keep the Notification Center as the canonical durable inbox, add a visible unread count on the
   Home bell, poll/refetch while foregrounded, and deduplicate push and polling arrivals by ID.
-- Mark a notification read and deep-link to its exact goal, budget, report, or wallet when either
-  the in-app banner or OS notification is tapped; fall back to Notification Center for invalid or
-  unsupported targets.
+- Mark a notification read and open a static notification-detail screen (title + body only) when
+  either the in-app banner, OS notification, or a Notification Center row is tapped — replaces the
+  earlier per-entity deep-link routing (see 2026-08-18 note below).
 - Suppress duplicate foreground OS presentation in favor of the custom banner while preserving
   normal background/terminated push behavior through EAS/Expo Notifications.
 - Keep permission denial and push-provider failure non-fatal: persisted notification rows and the
@@ -187,6 +187,21 @@ non-production EAS/provider credential setup remain before the feature can be ma
   tests pass; backend notification tests 10/10, all Application tests
   210/210, Domain tests 1/1, and solution build 0 warnings / 0 errors. No commit, push, deployment,
   provider credential change, production migration, or physical-device acceptance was performed.
+- 2026-08-18 — User asked to stop deep-linking notification taps to the entity's own tab/screen and
+  instead open a static detail page (title + content only), for every tap surface (Notification
+  Center row, in-app banner, and OS push tap on background/terminated). Implemented: added
+  `app/notification-detail.tsx` (simple header + title + body, no entity awareness); replaced
+  `notificationEntityRoute` in `src/lib/notificationRouting.ts` with `notificationDetailRoute`,
+  which every tap path now uses (`notificationRoute` for the Notification Center list and banner —
+  both already have the full `AppNotification`; the OS-response handler in `NotificationProvider`
+  now builds it from `response.notification.request.content.title`/`.body` since the push payload
+  itself only carries IDs). `AppNotification.entityType`/`entityId` and `parseNotificationPushData`
+  are unchanged and still populated (backend contract, cache identity) — only routing stopped
+  consuming them; updated their doc comments to say so instead of claiming they drive navigation.
+  Verified: `npm run type-check` clean; `npm run lint` 0 errors / 93 pre-existing warnings (none
+  newly introduced); `npm test` 29/29 suites, 160/160 tests (3 new routing tests replacing the 3
+  removed `notificationEntityRoute` cases). No physical-device acceptance (no device access in this
+  environment), commit, or push.
 
 ## History
 
