@@ -874,3 +874,36 @@ non-production EAS/provider credential setup remain before the feature can be ma
   up categorization, add notify-when-done`, and `docs: update feature context notes`. PR'd as
   `finviet-mobile` [#41](https://github.com/FinViet-Capstone/finviet-mobile/pull/41) →
   `dev`, not merged yet.
+
+---
+
+Feature: Collapsible transaction calendar (mobile-only, branch
+`fix/collapsible-transaction-calendar`). User reported the transaction-history list at the
+bottom of the Transactions screen was too small to scroll — the full month calendar grid inside
+the screen's sticky header (month nav + summary banner + calendar) always rendered every week
+row, so on 5–6-week months it consumed most of the viewport and left almost no room for the
+history list below.
+
+## Status
+
+Implemented and PR'd — `npm run type-check` clean; `npm run lint` 0 errors/warnings on both
+changed files; `npm test` 25/25 suites, 135/135 tests. No physical-device check in this
+environment (none available) — confirming the collapse/expand feel on-device is the user's to
+do. Committed and pushed: `fix: let calendar collapse to give transaction history more room`.
+PR'd as `finviet-mobile` [#44](https://github.com/FinViet-Capstone/finviet-mobile/pull/44) →
+`dev`, not merged yet.
+
+## Notes
+
+- `TransactionCalendar` (`src/components/transaction/TransactionCalendar.tsx`) gained
+  `expanded`/`onToggleExpanded` props: collapsed renders only the week row containing the
+  selected day (falling back to today's week, then the first week), instead of all weeks: less
+  vertical space, same day-selection/navigation behavior. A chevron handle
+  (`expand_less`/`expand_more`, same icon pair `CategoryBucketCard` already uses for its own
+  expand/collapse rows) below the grid toggles it.
+- `app/(tabs)/transactions/index.tsx` owns `calendarExpanded` state (default `true`, matching
+  prior always-expanded behavior) and animates the toggle with `LayoutAnimation.easeInEaseOut`
+  (no reanimated dependency needed since visible row count, not just height, changes between
+  states) — first use of `LayoutAnimation` in this codebase; the Android
+  `setLayoutAnimationEnabledExperimental` enable-call is a harmless no-op under the New
+  Architecture (default since Expo SDK 54), kept for older-device safety.
