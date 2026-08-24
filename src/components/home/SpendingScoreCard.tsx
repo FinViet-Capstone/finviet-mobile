@@ -43,6 +43,9 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
   const ringColor = getScoreColor(colors, score?.color);
   const progress = scoreValue / 100;
   const dashOffset = CIRCUMFERENCE * (1 - progress);
+  // hasData === false means the backend found no expense transactions in the
+  // selected period — its score/comment are neutral fillers, not an assessment.
+  const isEmptyPeriod = score?.hasData === false;
 
   return (
     <TouchableOpacity
@@ -80,52 +83,68 @@ export function SpendingScoreCard({ score, onToggleView }: SpendingScoreCardProp
         </View>
       </View>
 
-      <View style={styles.scoreRingWrapper}>
-        <View style={[styles.scoreRingOuter, { width: SCORE_ARC_SIZE, height: SCORE_ARC_SIZE }]}>
-          <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE}>
-            <Circle
-              cx={SCORE_ARC_SIZE / 2}
-              cy={SCORE_ARC_SIZE / 2}
-              r={RADIUS}
-              stroke={colors.surfaceContainerHighest}
-              strokeWidth={STROKE_WIDTH}
-              fill="none"
-            />
-            <Circle
-              cx={SCORE_ARC_SIZE / 2}
-              cy={SCORE_ARC_SIZE / 2}
-              r={RADIUS}
-              stroke={ringColor}
-              strokeWidth={STROKE_WIDTH}
-              strokeLinecap="round"
-              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-              strokeDashoffset={dashOffset}
-              fill="none"
-              rotation={-90}
-              origin={`${SCORE_ARC_SIZE / 2}, ${SCORE_ARC_SIZE / 2}`}
-            />
-          </Svg>
-          <View style={styles.scoreCenter}>
-            <Text style={[styles.scoreNumber, { color: colors.onSurface }]}>{scoreValue}</Text>
-            <Text style={styles.scoreOutOf}>/ 100</Text>
-          </View>
+      {isEmptyPeriod ? (
+        <View style={styles.emptyState}>
+          <MaterialIcon name="data_usage" size={40} color={colors.onSurfaceVariant} />
+          <Text style={styles.emptyTitle}>
+            {activeView === 'weekly'
+              ? 'Chưa có giao dịch trong tuần này'
+              : 'Chưa có giao dịch trong tháng này'}
+          </Text>
+          <Text style={styles.emptyText}>
+            Ghi lại chi tiêu để AI chấm điểm và đưa ra nhận xét cho bạn.
+          </Text>
         </View>
-      </View>
+      ) : (
+        <>
+          <View style={styles.scoreRingWrapper}>
+            <View style={[styles.scoreRingOuter, { width: SCORE_ARC_SIZE, height: SCORE_ARC_SIZE }]}>
+              <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE}>
+                <Circle
+                  cx={SCORE_ARC_SIZE / 2}
+                  cy={SCORE_ARC_SIZE / 2}
+                  r={RADIUS}
+                  stroke={colors.surfaceContainerHighest}
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                />
+                <Circle
+                  cx={SCORE_ARC_SIZE / 2}
+                  cy={SCORE_ARC_SIZE / 2}
+                  r={RADIUS}
+                  stroke={ringColor}
+                  strokeWidth={STROKE_WIDTH}
+                  strokeLinecap="round"
+                  strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                  strokeDashoffset={dashOffset}
+                  fill="none"
+                  rotation={-90}
+                  origin={`${SCORE_ARC_SIZE / 2}, ${SCORE_ARC_SIZE / 2}`}
+                />
+              </Svg>
+              <View style={styles.scoreCenter}>
+                <Text style={[styles.scoreNumber, { color: colors.onSurface }]}>{scoreValue}</Text>
+                <Text style={styles.scoreOutOf}>/ 100</Text>
+              </View>
+            </View>
+          </View>
 
-      <View style={styles.insightBox}>
-        <Text style={styles.insightLabel}>AI INSIGHT</Text>
-        <Text style={styles.insightText} numberOfLines={3}>
-          {score?.commentaryVi ?? score?.reasonVi ?? 'Chưa có nhận xét AI cho giai đoạn này.'}
-        </Text>
-        <TouchableOpacity
-          style={styles.insightLink}
-          onPress={() => router.push({ pathname: '/(tabs)/home/score', params: { view: activeView } })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.insightLinkText}>Xem phân tích chi tiết</Text>
-          <MaterialIcon name="arrow_forward" size={14} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.insightBox}>
+            <Text style={styles.insightLabel}>AI INSIGHT</Text>
+            <Text style={styles.insightText} numberOfLines={3}>
+              {score?.commentaryVi ?? score?.reasonVi ?? 'Chưa có nhận xét AI cho giai đoạn này.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.insightLink}
+              onPress={() => router.push({ pathname: '/(tabs)/home/score', params: { view: activeView } })}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.insightLinkText}>Xem phân tích chi tiết</Text>
+              <MaterialIcon name="arrow_forward" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </TouchableOpacity>
   );
 }
@@ -261,6 +280,25 @@ function createStyles(colors: ThemeColors) {
       fontSize: FONT_SIZE.sm,
       fontWeight: FONT_WEIGHT.semibold,
       color: colors.primary,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: SPACING[6],
+      gap: SPACING[2],
+      zIndex: 1,
+    },
+    emptyTitle: {
+      fontSize: FONT_SIZE.base,
+      fontWeight: FONT_WEIGHT.semibold,
+      color: colors.onSurface,
+      textAlign: 'center',
+    },
+    emptyText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 20,
+      paddingHorizontal: SPACING[4],
     },
   });
 }

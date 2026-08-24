@@ -55,6 +55,14 @@ export interface SpendingScore {
    * Keyed by lowercase metric name ("spike" | "budget" | "savings").
    */
   weights?: Record<string, number>;
+  /**
+   * False when the customer had no expense transactions inside the scored
+   * week/month — `score` then carries the backend's neutral baseline (50)
+   * rather than a real assessment, and the UI must render a "chưa có giao
+   * dịch" empty state instead of the ring/insight. Absent (older backend)
+   * means true.
+   */
+  hasData?: boolean;
 }
 
 // -------------------------------------------------------------------------
