@@ -1,9 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
+  LayoutAnimation,
+  Platform,
   SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
   ViewToken,
 } from "react-native";
@@ -37,6 +40,10 @@ import { sectionLabel, todayISO } from "@/utils/date";
 import { signedCompact } from "@/utils/formatters";
 import type { Transaction } from "@/types";
 
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const VIEWABILITY_CONFIG = {
   itemVisiblePercentThreshold: 30,
   minimumViewTime: 150,
@@ -61,6 +68,7 @@ export default function TransactionsScreen() {
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterVisible, setFilterVisible] = useState(false);
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
+  const [calendarExpanded, setCalendarExpanded] = useState(true);
 
   const sectionListRef = useRef<SectionList<Transaction, TxSection>>(null);
 
@@ -203,6 +211,11 @@ export default function TransactionsScreen() {
 
   const handleFilterType = useCallback((type: "all" | "income" | "expense") => {
     setFilterType(type);
+  }, []);
+
+  const handleToggleCalendar = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCalendarExpanded((v) => !v);
   }, []);
 
   const renderListHeader = useCallback(
@@ -352,6 +365,8 @@ export default function TransactionsScreen() {
           selectedISO={selectedISO}
           leadingBlanks={leadingBlanks}
           onDayPress={handleDayPress}
+          expanded={calendarExpanded}
+          onToggleExpanded={handleToggleCalendar}
         />
       </View>
 

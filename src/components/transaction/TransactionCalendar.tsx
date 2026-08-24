@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { FONT_SIZE, FONT_WEIGHT, SPACING } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVNDCompact } from '@/utils/formatters';
@@ -16,6 +17,9 @@ export interface TransactionCalendarProps {
   /** Leading blank cells before day 1 (Monday-first week). */
   leadingBlanks: number;
   onDayPress: (cell: DayCell) => void;
+  /** Full month grid when true; single active week when false. */
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }
 
 /** Month calendar grid: per-day income/expense traces, uncategorized dot, today/selected. */
@@ -24,10 +28,22 @@ export function TransactionCalendar({
   selectedISO,
   leadingBlanks,
   onDayPress,
+  expanded,
+  onToggleExpanded,
 }: TransactionCalendarProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const weeks = buildCalendarWeeks(dayCells, leadingBlanks);
+
+  const activeIso =
+    selectedISO || dayCells.find((c) => c.isToday)?.iso || dayCells[0]?.iso;
+  const activeWeekIndex = Math.max(
+    0,
+    weeks.findIndex((week) =>
+      week.some((gridCell) => gridCell.current?.iso === activeIso),
+    ),
+  );
+  const visibleWeeks = expanded ? weeks : weeks.slice(activeWeekIndex, activeWeekIndex + 1);
 
   return (
     <View style={styles.calendarCard}>
@@ -42,7 +58,7 @@ export function TransactionCalendar({
 
       {/* Day grid */}
       <View>
-        {weeks.map((week, weekIndex) => (
+        {visibleWeeks.map((week, weekIndex) => (
           <View key={`week-${weekIndex}`} style={styles.weekRow}>
             {week.map((gridCell) => {
               const cell = gridCell.current;
@@ -100,6 +116,20 @@ export function TransactionCalendar({
           </View>
         ))}
       </View>
+
+      <TouchableOpacity
+        style={styles.toggleHandle}
+        onPress={onToggleExpanded}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={expanded ? 'Thu gọn lịch' : 'Mở rộng lịch'}
+      >
+        <MaterialIcon
+          name={expanded ? 'expand_less' : 'expand_more'}
+          size={20}
+          color={colors.onSurfaceVariant}
+        />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -174,6 +204,10 @@ function createStyles(colors: ThemeColors) {
       fontWeight: FONT_WEIGHT.medium,
       lineHeight: 10,
       textAlign: 'center',
+    },
+    toggleHandle: {
+      alignItems: 'center',
+      paddingTop: SPACING[1],
     },
   });
 }
