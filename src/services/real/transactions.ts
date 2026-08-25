@@ -241,6 +241,8 @@ export async function createTransaction(
     description: input.description ?? null,
     merchant: input.merchant ?? null,
     entryMethod: input.entryMethod,
+    aiSource: input.aiSource ?? null,
+    aiConfidence: input.aiConfidence ?? null,
   }, idempotentConfig());
   return toTransaction(unwrap<TransactionDto>(res));
 }

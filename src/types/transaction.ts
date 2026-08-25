@@ -161,6 +161,11 @@ export interface CreateTransactionInput {
   transactionDate: string;
   entryMethod: EntryMethod;
   externalId?: string | null;
+  /** Set only when categoryId came from an AI/rule suggestion at import time (e.g. an
+   * unedited CSV/SMS/photo suggestion) — omitted for a manually chosen category. Backend uses
+   * this to write a categorization-decision audit record. */
+  aiSource?: string;
+  aiConfidence?: number;
 }
 
 export interface UpdateTransactionInput {
