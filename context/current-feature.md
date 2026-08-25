@@ -907,3 +907,63 @@ PR'd as `finviet-mobile` [#44](https://github.com/FinViet-Capstone/finviet-mobil
   states) — first use of `LayoutAnimation` in this codebase; the Android
   `setLayoutAnimationEnabledExperimental` enable-call is a harmless no-op under the New
   Architecture (default since Expo SDK 54), kept for older-device safety.
+
+---
+
+Feature: CSV import data loss + AI categorization pipeline fixes (cross-repo,
+branch `fix/csv-import-pipeline` in both repos; backend branch same name). Started
+from "what scalability metrics exist for the AI pipeline" (none did), which led to
+finding and fixing a `classification_preview` rate-limit bug (5.3% success rate,
+now deployed via `finviet-be` PR #77). Live-testing that fix with a real 138-row
+Vietcombank CSV then surfaced three symptoms: all rows uncategorized, saved
+transactions missing merchant/description despite the review screen showing them
+correctly, and the suggest-category button failing 100%. Root cause of the 138/138
+failure turned out to be a settings toggle (`categorization_mode = 'off'` on that
+account, unrelated to any code) — but the investigation found four real,
+independent defects underneath it that would have hit regardless: the backend
+silently drops `Merchant`/`Description` on every created transaction; the bulk
+CSV/SMS rate limit (100/min) is smaller than a routine import; unresolved
+categorizations fail with zero telemetry; and the app can't distinguish "AI is
+turned off" from "AI tried and failed."
+
+## Status
+
+Backend (`finviet-be`) implemented and verified: `dotnet build` clean,
+`FinViet.Application.UnitTests` 291/291 (287 pre-existing + 4 new). Mobile
+implemented and verified: `npm run type-check` clean, `npm run lint` 0 new (78
+pre-existing warnings untouched), `npm test` 25/25 suites, 135/135 tests. Both
+repos committed and PR'd to `dev` this session — see commit/PR links added when
+this entry was written. Not merged/deployed yet.
+
+## Goals
+
+- `csv-review.tsx`: send `description` (was hardcoded `null`, silently dropping
+  data the review screen itself displayed) and `aiSource`/`aiConfidence` (new,
+  tracked via a `categorySource` field on `ParsedRow` — `'ai'` when the backend's
+  extraction suggestion is used unedited, `'client_rule'` for the client-side
+  merchant-rule fallback, cleared to `null` the moment the user manually picks a
+  category) so the backend can write a categorization-decision audit record.
+- Import loop now continues past a failed row instead of aborting on the first
+  error, and reports a real "`N` imported, `M` failed" summary with per-row
+  reasons instead of a single opaque alert.
+- `app/(tabs)/transactions/[id].tsx`: the "Gợi ý danh mục bằng AI" button now
+  checks `outcome.source === 'OFF'` (a value the backend already returned for
+  this case, just never distinguished client-side) and shows "AI categorization
+  is turned off" with a direct link to `/settings/ai-preferences`, instead of the
+  generic "AI couldn't find a category" message that was actively misleading for
+  this case.
+- `CreateTransactionInput`/`real/transactions.ts`: two new optional wire fields,
+  `aiSource`/`aiConfidence`, passed straight through to the backend.
+
+## Notes
+
+- The backend side of this fix (merchant persistence, the new
+  `categorization_decision` audit log reusing `ai_audit_events`, the bulk rate
+  limit raise, and silent-failure logging) is the larger half of this change —
+  see `finviet-be/context/current-feature.md` for the full breakdown, since most
+  of the actual defects were backend-side.
+- No mobile UI change for the merchant/description fix itself beyond the one
+  `csv-review.tsx:312` line — the backend was silently discarding a field the
+  client was already sending correctly.
+- No physical-device verification in this environment; confirming the on-device
+  suggest-button/settings-link flow and a real CSV re-import is the user's to do.
