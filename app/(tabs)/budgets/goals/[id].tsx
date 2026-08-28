@@ -21,17 +21,19 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { TextInput } from '@/components/common/TextInput';
 import { WalletPickerSheet } from '@/components/transaction/WalletPickerSheet';
+import { DatePickerField } from '@/components/common/DatePickerField';
 import {
   useGoalById,
   useAddContribution,
   useDeleteGoal,
   useGoalContributions,
+  useUpdateGoal,
   useWithdrawFromGoal,
 } from '@/hooks/useGoals';
 import { useWallets } from '@/hooks/useWallets';
 import { getApiErrorMessage } from '@/utils/errors';
 import { executeGoalWithdrawal } from '@/utils/goalWithdrawal';
-import type { SavingsGoalWithProgress, GoalContribution } from '@/types/goal';
+import type { SavingsGoalWithProgress, GoalContribution, UpdateGoalInput } from '@/types/goal';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,19 @@ const S = {
   errInsufficient: (s: string) => `Số dư ví không đủ (Hiện có: ${s})`,
   errOverRemaining: (s: string) => `Chỉ cần ${s} là đủ`,
   zeroBalance: (name: string) => `Ví ${name} đã hết số dư. Vui lòng chọn ví khác.`,
+  edit: 'Sửa mục tiêu',
+  editTitle: 'Sửa mục tiêu',
+  editNameLabel: 'Tên mục tiêu',
+  editNamePlaceholder: 'VD: Mua MacBook Pro',
+  editTargetLabel: 'Số tiền mục tiêu',
+  editTargetPlaceholder: 'Nhập số tiền',
+  editDeadlineLabel: 'Thời hạn',
+  editSave: 'Lưu thay đổi',
+  editNoChange: 'Chưa có thay đổi nào',
+  // Mirrors the backend rule (target can't drop below what's already saved) so the user is told
+  // before they submit, instead of getting a server error back.
+  editTargetBelowSaved: (s: string) => `Không thể đặt thấp hơn số đã tiết kiệm (${s})`,
+  editError: 'Không lưu được thay đổi. Hãy thử lại.',
   archiveTitle: 'Lưu trữ mục tiêu?',
   archiveMsg: 'Mục tiêu sẽ chuyển vào mục Đã lưu trữ. Lịch sử đóng góp và giao dịch vẫn được giữ nguyên.',
   archiveConfirm: 'Lưu trữ',
@@ -522,6 +537,178 @@ function WithdrawSheet({
   );
 }
 
+// ─── Edit Sheet ───────────────────────────────────────────────────────────────
+
+/** YYYY-MM-DD for `days` from today (local time). */
+function isoDaysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The fields that actually changed, as a sparse patch.
+ *
+ * Exported so it's directly testable: the backend treats an omitted field as "leave alone" and
+ * re-validates every field it *is* given, so resending an untouched value can fail on a rule the
+ * user never triggered — most obviously a deadline that was valid when the goal was created and
+ * is now in the past. Returning `{}` means there is nothing to save.
+ */
+export function buildGoalPatch(
+  goal: Pick<SavingsGoalWithProgress, 'name' | 'targetAmount' | 'deadline'>,
+  draft: { name: string; targetAmount: number; deadline: string },
+): UpdateGoalInput {
+  const patch: UpdateGoalInput = {};
+  if (draft.name !== goal.name) patch.name = draft.name;
+  if (draft.targetAmount !== goal.targetAmount) patch.targetAmount = draft.targetAmount;
+  if (draft.deadline !== (goal.deadline ?? '')) patch.deadline = draft.deadline;
+  return patch;
+}
+
+/**
+ * Edits name / target / deadline. Sends only the fields that actually changed — the backend
+ * treats an omitted field as "leave alone", so submitting all three would re-validate (and could
+ * reject) values the user never touched, e.g. a deadline that has since passed.
+ */
+function EditGoalSheet({
+  goal,
+  visible,
+  onClose,
+}: {
+  goal: SavingsGoalWithProgress;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const updateGoal = useUpdateGoal();
+
+  // Seeded once per mount. The parent bumps this component's `key` each time the sheet opens,
+  // so a cancelled edit never lingers and the fields always follow the goal — without an effect
+  // that writes state on every render pass, and without unmounting on close (which would cut
+  // DraggableSheet's slide-down short).
+  const [name, setName] = useState(goal.name);
+  const [targetRaw, setTargetRaw] = useState(String(goal.targetAmount));
+  const [deadline, setDeadline] = useState(goal.deadline ?? isoDaysFromNow(90));
+  const [targetFocused, setTargetFocused] = useState(false);
+
+  const parsedTarget = parseInt(targetRaw || '0', 10);
+  const targetDisplay = parsedTarget > 0 ? parsedTarget.toLocaleString('vi-VN') + 'đ' : '';
+
+  const handleNumberPress = useCallback((key: string) => {
+    setTargetRaw((prev) => {
+      if (key === '000') return prev === '' ? '' : prev + '000';
+      return prev + key;
+    });
+  }, []);
+
+  const handleBackspace = useCallback(() => setTargetRaw((prev) => prev.slice(0, -1)), []);
+  const handleClear = useCallback(() => setTargetRaw(''), []);
+
+  const trimmedName = name.trim();
+  // The backend rejects a target below what's already saved; say so here rather than letting the
+  // user submit into a server error.
+  const belowSaved = parsedTarget > 0 && parsedTarget < goal.currentAmount;
+
+  const patch = useMemo(
+    () => buildGoalPatch(goal, { name: trimmedName, targetAmount: parsedTarget, deadline }),
+    [goal, trimmedName, parsedTarget, deadline],
+  );
+  const changed = Object.keys(patch).length > 0;
+
+  const isValid =
+    trimmedName.length > 0 &&
+    parsedTarget > 0 &&
+    !belowSaved &&
+    /^\d{4}-\d{2}-\d{2}$/.test(deadline) &&
+    changed;
+
+  const handleSave = useCallback(async () => {
+    if (!isValid) return;
+    try {
+      await updateGoal.mutateAsync({
+        id: goal.id,
+        patch,
+      });
+      onClose();
+    } catch (err) {
+      Alert.alert('', getApiErrorMessage(err, S.editError));
+    }
+  }, [isValid, updateGoal, goal.id, patch, onClose]);
+
+  return (
+    <>
+      <DraggableSheet visible={visible} onClose={onClose}>
+        <ScrollView
+          contentContainerStyle={[styles.sheet, targetFocused && { paddingBottom: NUMPAD_HEIGHT }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.sheetTitle}>{S.editTitle}</Text>
+
+          <Text style={styles.fieldLabel}>{S.editNameLabel}</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={S.editNamePlaceholder}
+            onFocus={() => setTargetFocused(false)}
+          />
+
+          <Text style={styles.fieldLabel}>{S.editTargetLabel}</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.fieldInput, styles.amountDisplay]}
+            onPress={() => setTargetFocused(true)}
+          >
+            <Text style={[styles.amountText, !targetDisplay && styles.amountPlaceholder]}>
+              {targetDisplay || S.editTargetPlaceholder}
+            </Text>
+            <MaterialIcon name="dialpad" size={16} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
+          {belowSaved && (
+            <Text style={styles.editWarning}>
+              {S.editTargetBelowSaved(formatFull(goal.currentAmount))}
+            </Text>
+          )}
+
+          <Text style={styles.fieldLabel}>{S.editDeadlineLabel}</Text>
+          <DatePickerField value={deadline} onChange={setDeadline} minDate={isoDaysFromNow(1)} />
+
+          <View style={styles.sheetActions}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={onClose}>
+              <Text style={styles.cancelText}>{S.cancel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.saveBtn, (!isValid || updateGoal.isPending) && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={!isValid || updateGoal.isPending}
+              accessibilityRole="button"
+              accessibilityLabel={S.editSave}
+              accessibilityState={{ disabled: !isValid || updateGoal.isPending }}
+            >
+              {updateGoal.isPending ? (
+                <ActivityIndicator size="small" color={colors.onPrimary} />
+              ) : (
+                <Text style={styles.saveText}>{changed ? S.editSave : S.editNoChange}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </DraggableSheet>
+      <NumericKeypad
+        visible={visible && targetFocused}
+        onClose={() => setTargetFocused(false)}
+        onNumberPress={handleNumberPress}
+        onBackspace={handleBackspace}
+        onClear={handleClear}
+        onDone={() => setTargetFocused(false)}
+      />
+    </>
+  );
+}
+
 // ─── History Row ──────────────────────────────────────────────────────────────
 
 function HistoryRow({ item }: { item: GoalContribution }) {
@@ -557,6 +744,15 @@ export default function GoalDetailScreen() {
   const { data: goal, isLoading, isError, error, refetch } = useGoalById(id);
   const { data: contributions } = useGoalContributions(id);
   const deleteGoal = useDeleteGoal();
+  const [editVisible, setEditVisible] = useState(false);
+  // Bumped on every open so EditGoalSheet remounts with fresh values; deliberately not touched
+  // on close, so the sheet stays mounted long enough to animate out.
+  const [editSession, setEditSession] = useState(0);
+
+  const handleEditPress = useCallback(() => {
+    setEditSession((n) => n + 1);
+    setEditVisible(true);
+  }, []);
   const [contribVisible, setContribVisible] = useState(false);
   const [withdrawVisible, setWithdrawVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -609,7 +805,7 @@ export default function GoalDetailScreen() {
           accessibilityRole="button" accessibilityLabel="Quay lại">
           <MaterialIcon name={S.back} size={22} color={colors.primary} />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
+        <View style={styles.headerCenterEditable}>
           {goal.iconEmoji ? (
             <Text style={styles.headerEmoji}>{goal.iconEmoji}</Text>
           ) : (
@@ -620,15 +816,26 @@ export default function GoalDetailScreen() {
         {goal.isDeleted ? (
           <View style={styles.headerBtn} />
         ) : (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.headerBtn}
-            onPress={handleArchivePress}
-            accessibilityRole="button"
-            accessibilityLabel={S.archiveConfirm}
-          >
-            <MaterialIcon name="archive" size={22} color={colors.onSurfaceVariant} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.headerBtn}
+              onPress={handleEditPress}
+              accessibilityRole="button"
+              accessibilityLabel={S.edit}
+            >
+              <MaterialIcon name="edit" size={22} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.headerBtn}
+              onPress={handleArchivePress}
+              accessibilityRole="button"
+              accessibilityLabel={S.archiveConfirm}
+            >
+              <MaterialIcon name="archive" size={22} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -735,6 +942,7 @@ export default function GoalDetailScreen() {
         </View>
       </ScrollView>
 
+      <EditGoalSheet key={editSession} visible={editVisible} goal={goal} onClose={() => setEditVisible(false)} />
       <ContributionSheet visible={contribVisible} goal={goal} onClose={() => setContribVisible(false)} />
       <WithdrawSheet
         visible={withdrawVisible}
@@ -779,6 +987,16 @@ function createStyles(colors: ThemeColors) {
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2] },
+  // Two 40px buttons sit on the right now (edit + archive) against one on the left, so the
+  // centre block can't be symmetric — let it shrink instead of pushing the title off-centre.
+  headerCenterEditable: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING[2], minWidth: 0,
+  },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  editWarning: {
+    fontSize: FONT_SIZE.xs, color: colors.error, marginTop: -SPACING[1], marginBottom: SPACING[1],
+  },
   headerEmoji: { fontSize: 20 },
   headerTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
   scroll: { flex: 1 },

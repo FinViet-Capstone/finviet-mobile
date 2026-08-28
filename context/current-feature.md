@@ -1,6 +1,55 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Edit a saving goal from the app (branch `automated-scale`). Goals could be created,
+contributed to, withdrawn from and archived — but never edited, so a wrong name, target or
+deadline meant archiving and starting over, losing the contribution history with it. This became
+acute alongside the savings-plan banner: its whole advice is "giãn thời hạn" or "hạ mục tiêu",
+and neither was possible without leaving the app.
+
+**Backend needed no change.** `PUT/PATCH /api/saving-goals/{id}` already existed, taking
+`{ goalName?, targetAmount?, deadline? }`, and `updateGoal` / `useUpdateGoal` were already wired
+on this side. Only the UI was missing.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both changed files
+0 errors and 4 warnings — the same 4 the file had before this change (pre-existing
+`set-state-in-effect` in ContributionSheet/WithdrawSheet, verified against the file at HEAD);
+`npx jest` **148/148 pass, 27/27 suites** (142 + 6 new). **Not committed/pushed yet.**
+Not yet exercised on device.
+
+## Goals
+
+- Pencil button in the goal detail header, next to archive; hidden for archived goals.
+- Sheet edits name / target / deadline, pre-filled from the goal, mirroring NewGoalSheet's
+  layout so both read the same.
+- `buildGoalPatch()` exported and unit-tested: sends **only the fields that changed**. The
+  backend treats an omitted field as "leave alone" and re-validates every field it *is* given,
+  so resending an untouched value can fail on a rule the user never triggered — most obviously
+  a deadline that was valid at creation and has since passed.
+- Client-side guard mirroring the backend rule that a target can't drop below what's already
+  saved, shown inline under the amount rather than as a server error after submit.
+- Save button reads "Chưa có thay đổi nào" and stays disabled until something actually differs.
+
+## Notes
+
+- **State is reset by remounting on open, not by an effect.** The parent bumps an `editSession`
+  counter used as the sheet's `key`, so each open starts fresh from the current goal — and
+  crucially the counter is *not* touched on close, so the component stays mounted long enough
+  for DraggableSheet to finish its slide-down. Conditional rendering (`{visible && <Sheet/>}`)
+  would have cut that animation short, which the sheet's own source calls out; a re-seeding
+  `useEffect` would have tripped `react-hooks/set-state-in-effect`, which is exactly the warning
+  the four pre-existing ones in this file are.
+- The icon/emoji is not editable, matching create — `UpdateSavingGoalRequest` has no
+  `IconEmoji` field and the create sheet has no picker either, so adding one here would need a
+  backend change and would be scope creep.
+- Editing a target or deadline already invalidates the savings-plan recommendation (added with
+  that feature), so the banner follows an edit immediately — including the intended flow of
+  stretching a deadline until an `infeasible` plan turns `adjustable`.
+
+---
+
 Feature: Make the `infeasible` savings-plan banner actionable (branch `automated-scale`,
 cross-repo with `finviet-be`'s branch of the same name). Follow-up to the entry below, from
 testing on a real device. `infeasible` showed the monthly ceiling and then three vague options
