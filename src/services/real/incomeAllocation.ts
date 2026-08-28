@@ -110,6 +110,9 @@ interface SavingsPlanRecommendationDto {
   proposedWantsCap: number | null;
   proposedSavingsCap: number | null;
   maxFundableMonthlySavings: number | null;
+  totalRemainingAmount: number;
+  minimumMonthsToFund: number | null;
+  maximumFundableTargetAmount: number | null;
 }
 
 /**
@@ -135,6 +138,9 @@ function toRecommendation(dto: SavingsPlanRecommendationDto): SavingsPlanRecomme
     proposedWantsCap: dto.proposedWantsCap,
     proposedSavingsCap: dto.proposedSavingsCap,
     maxFundableMonthlySavings: dto.maxFundableMonthlySavings,
+    totalRemainingAmount: dto.totalRemainingAmount,
+    minimumMonthsToFund: dto.minimumMonthsToFund,
+    maximumFundableTargetAmount: dto.maximumFundableTargetAmount,
   };
 }
 

@@ -1,6 +1,41 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Make the `infeasible` savings-plan banner actionable (branch `automated-scale`,
+cross-repo with `finviet-be`'s branch of the same name). Follow-up to the entry below, from
+testing on a real device. `infeasible` showed the monthly ceiling and then three vague options
+with no number attached, so the user had to guess what deadline would actually work — it was hit
+four times in a row during testing and each answer needed the algorithm run by hand. The backend
+now returns the minimum deadline and (for a single goal) the maximum target; this shows them.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the four changed
+files reports 0 problems; `npx jest` on the changed suite 7/7. **Not committed/pushed yet.**
+Requires the matching backend change to be deployed — before that the new fields arrive as
+`undefined` and the banner falls back to the generic sentence, so it degrades quietly rather
+than breaking.
+
+## Goals
+
+- `infeasible` banner now reads: the ceiling, then "Cần ít nhất N tháng tích luỹ, tức giãn thời
+  hạn tới tháng M/YYYY", then (single goal only) "Hoặc hạ mục tiêu xuống X nếu giữ nguyên thời
+  hạn."
+- `monthsFromNowLabel()` converts the backend's month count into a named month. The backend
+  returns "12 months" because a month count is what the arithmetic produces, but a user reading
+  that still has to work out what date to type into the picker — so the screen names it.
+- The generic three-option sentence is kept as a fallback for the one case with no number to
+  give (ceiling is 0: Savings at 0% and Wants already at the floor).
+
+## Notes
+
+- The two new fields are optional in practice: against a backend that predates them they arrive
+  `undefined`, `!== null` is false, and the banner shows the fallback. No version check needed.
+- `monthsFromNowLabel` uses `setMonth` overflow on purpose — `setMonth(month + 14)` rolls the
+  year correctly, which is the whole reason not to hand-roll the arithmetic.
+
+---
+
 Feature: Automatic balance between saving goals and suggested spending (branch
 `feature/savings-goal-spending-balance`, cross-repo with `finviet-be`'s branch of the same
 name). Closes the thesis-council finding of 19-08-2026: *"Cần có sự cân đối tự động giữa việc
