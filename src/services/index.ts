@@ -91,6 +91,8 @@ export type {
 export const getEffectiveIncomeAllocation = incomeAllocation.getEffectiveIncomeAllocation;
 export const getScheduledIncomeAllocation = incomeAllocation.getScheduledIncomeAllocation;
 export const scheduleIncomeAllocationChange = incomeAllocation.scheduleIncomeAllocationChange;
+export const getSavingsPlanRecommendation = incomeAllocation.getSavingsPlanRecommendation;
+export const applySavingsPlanRecommendation = incomeAllocation.applySavingsPlanRecommendation;
 export type { IncomeAllocationSetting, ScheduleIncomeAllocationInput } from '@/types';
 
 // ─── Goals ──────────────────────────────────────────────────────────────────

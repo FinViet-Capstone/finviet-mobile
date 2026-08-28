@@ -50,6 +50,8 @@ const S = {
   noWallets: 'Không có ví nào',
   selectWalletFirst: 'Vui lòng chọn ví trước',
   importError: 'Không thể nhập giao dịch.',
+  importPartialTitle: 'Nhập một phần giao dịch',
+  importPartialMsg: (imported: number, total: number) => `Đã nhập ${imported}/${total} giao dịch. Các giao dịch sau không nhập được:`,
   step2Title: 'Chọn ví',
   step2Hint: 'Giao dịch sẽ được nhập vào ví này',
   step3Title: 'Xem trước dữ liệu',
@@ -71,6 +73,11 @@ interface ParsedRow {
   amount: number;
   type: 'expense' | 'income';
   suggestedCategoryId: string | null;
+  /** How suggestedCategoryId was chosen — cleared once the user manually overrides it via the
+   * category picker, so only genuine AI/rule decisions get logged as a categorization decision. */
+  categorySource: 'ai' | 'client_rule' | null;
+  /** AI confidence for suggestedCategoryId, 0-1 — only set when categorySource is 'ai'. */
+  confidence: number | null;
   isDuplicate: boolean;
   selected: boolean;
 }
@@ -251,6 +258,7 @@ export default function CsvReviewScreen() {
           // Only worth its own field when it actually adds information — most rows have no
           // distinct correspondent column, so merchant/description end up identical.
           const description = row.description && row.description !== row.merchant ? row.description : null;
+          const clientRuleCategoryId = row.type === 'expense' ? suggestCategoryFromMerchant(merchant, rules ?? []) : null;
           return {
             id: `csv_${i}_${row.transactionDate}_${row.amount}`,
             date: row.transactionDate,
@@ -258,8 +266,9 @@ export default function CsvReviewScreen() {
             description,
             amount: row.amount,
             type: row.type,
-            suggestedCategoryId:
-              row.categoryId ?? (row.type === 'expense' ? suggestCategoryFromMerchant(merchant, rules ?? []) : null),
+            suggestedCategoryId: row.categoryId ?? clientRuleCategoryId,
+            categorySource: row.categoryId ? 'ai' : clientRuleCategoryId ? 'client_rule' : null,
+            confidence: row.categoryId ? row.confidence : null,
             isDuplicate,
             selected: !isDuplicate,
           };
@@ -297,7 +306,11 @@ export default function CsvReviewScreen() {
   }, []);
 
   const handleCategorySelect = useCallback((categoryId: string) => {
-    setRows((prev) => prev.map((r) => r.id === editingRowId ? { ...r, suggestedCategoryId: categoryId } : r));
+    // Manual pick overrides whatever suggested it — clear categorySource/confidence so the
+    // import doesn't log a stale AI/rule decision for a category the user chose themselves.
+    setRows((prev) => prev.map((r) => r.id === editingRowId
+      ? { ...r, suggestedCategoryId: categoryId, categorySource: null, confidence: null }
+      : r));
     setEditingRowId(null);
   }, [editingRowId]);
 
@@ -307,16 +320,40 @@ export default function CsvReviewScreen() {
     if (!toImport.length) return;
     setIsImporting(true);
     let imported = 0;
-    try {
-      for (const row of toImport) {
-        await createTx.mutateAsync({ walletId: selectedWalletId, categoryId: row.suggestedCategoryId, amount: row.amount, type: row.type, description: null, merchant: row.merchant, transactionDate: row.date, entryMethod: 'csv_import' });
+    const failures: string[] = [];
+    // Continue past a failed row instead of aborting the whole import — a single insufficient-
+    // balance or validation error on one row shouldn't silently drop the rest.
+    for (const row of toImport) {
+      try {
+        await createTx.mutateAsync({
+          walletId: selectedWalletId,
+          categoryId: row.suggestedCategoryId,
+          amount: row.amount,
+          type: row.type,
+          description: row.description,
+          merchant: row.merchant,
+          transactionDate: row.date,
+          entryMethod: 'csv_import',
+          aiSource: row.categorySource === 'ai' ? 'AI_BATCH' : row.categorySource === 'client_rule' ? 'RULE' : undefined,
+          aiConfidence: row.categorySource === 'ai' ? (row.confidence ?? undefined) : undefined,
+        });
         imported++;
+      } catch (err) {
+        failures.push(`${row.merchant}: ${getApiErrorMessage(err, S.importError)}`);
       }
-      Alert.alert('', S.successMsg(toImport.length), [{ text: 'OK', onPress: () => router.back() }]);
-    } catch (err) {
-      // Surface the backend reason (e.g. insufficient balance) and report partial progress.
-      Alert.alert('', `${getApiErrorMessage(err, S.importError)} (${imported}/${toImport.length})`);
-    } finally { setIsImporting(false); }
+    }
+    setIsImporting(false);
+
+    if (failures.length === 0) {
+      Alert.alert('', S.successMsg(imported), [{ text: 'OK', onPress: () => router.back() }]);
+      return;
+    }
+    const summary = failures.slice(0, 5).join('\n') + (failures.length > 5 ? `\n… (+${failures.length - 5})` : '');
+    Alert.alert(
+      S.importPartialTitle,
+      `${S.importPartialMsg(imported, toImport.length)}\n\n${summary}`,
+      [{ text: 'OK', onPress: () => { if (imported > 0) router.back(); } }],
+    );
   }, [selectedWalletId, rows, createTx, router]);
 
   const selectedCount = rows.filter((r) => r.selected).length;

@@ -236,6 +236,13 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           setAiSuggestion(outcome);
           return;
         }
+        if (outcome.source === 'OFF') {
+          Alert.alert(S.aiSuggestOffTitle, S.aiSuggestOffMsg, [
+            { text: S.aiSuggestOffSettingsBtn, onPress: () => router.push({ pathname: '/settings/ai-preferences' }) },
+            { text: S.ok, style: 'cancel' },
+          ]);
+          return;
+        }
         Alert.alert(S.aiSuggestErrorTitle, S.aiSuggestNoneMsg);
       },
       onError: (error) =>

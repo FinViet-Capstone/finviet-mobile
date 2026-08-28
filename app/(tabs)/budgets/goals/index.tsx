@@ -23,8 +23,13 @@ import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
 import { useArchivedGoals, useCreateGoal, useGoals } from '@/hooks/useGoals';
 import { useBudgetBuckets } from '@/hooks/useBudgets';
+import {
+  useApplySavingsPlanRecommendation,
+  useSavingsPlanRecommendation,
+} from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
+import type { SavingsPlanRecommendation } from '@/types/incomeAllocation';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +48,24 @@ const S = {
   needsPerMonth: (n: string) => `Cần ${n}/tháng`,
   affordabilityWarning: (needed: string, cap: string) =>
     `Các mục tiêu đang cần ${needed}/tháng, vượt quá phân bổ Tiết kiệm hiện tại (${cap}/tháng). Hãy điều chỉnh mục tiêu hoặc tăng phân bổ Tiết kiệm.`,
+  // ── Savings-plan recommendation (backend-computed) ──────────────────────────
+  planAdjustable: (needed: string, cap: string) =>
+    `Các mục tiêu đang cần ${needed}/tháng, vượt quá phân bổ Tiết kiệm hiện tại (${cap}/tháng).`,
+  planAdjustableFix: (savingsPct: string, wantsCap: string) =>
+    `Có thể nâng hũ Tiết kiệm lên ${savingsPct}% và giảm hũ Muốn còn ${wantsCap}/tháng. Hũ Cần giữ nguyên.`,
+  planApplyBtn: 'Áp dụng từ tháng sau',
+  planApplying: 'Đang áp dụng...',
+  planAppliedTitle: 'Đã đặt lịch',
+  planAppliedMsg: (savingsPct: string) =>
+    `Từ đầu tháng sau, hũ Tiết kiệm sẽ là ${savingsPct}%. Tháng này giữ nguyên.`,
+  planApplyError: 'Không áp dụng được. Hãy thử lại.',
+  planApplyStale: 'Mục tiêu vừa thay đổi nên đề xuất không còn phù hợp. Hãy kéo xuống để tải lại.',
+  planInfeasible: (needed: string, max: string) =>
+    `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần. Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.`,
+  planNoIncome: 'Chưa có thu nhập hàng tháng nên không tính được mức chi tiêu phù hợp. Hãy đặt thu nhập trong phần Phân bổ ngân sách.',
+  planNoDeadlineNote: (n: number) =>
+    `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên.`,
+  ok: 'OK',
   newGoalTitle: 'Tạo mục tiêu mới',
   nameLabel: 'Tên mục tiêu',
   namePlaceholder: 'VD: Mua MacBook Pro',
@@ -60,6 +83,11 @@ const S = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Drops a trailing `.00` so a whole percentage reads "25%", not "25.00%". */
+function formatPct(pct: number): string {
+  return String(Number(pct.toFixed(2)));
+}
 
 function formatVND(amount: number): string {
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}M`;
@@ -294,6 +322,97 @@ function GoalCard({ goal, onPress }: { goal: SavingsGoalWithProgress; onPress: (
   );
 }
 
+// ─── Savings-plan banner ──────────────────────────────────────────────────────
+
+/**
+ * Renders the backend's savings-plan verdict. Only the three statuses the
+ * customer can act on show anything — `on_track`, `no_goals` and
+ * `invalid_allocation` render nothing, because a banner saying "everything is
+ * fine" on a screen that already shows every goal's progress is just noise.
+ */
+function SavingsPlanBanner({
+  plan,
+  isApplying,
+  onApply,
+}: {
+  plan: SavingsPlanRecommendation;
+  isApplying: boolean;
+  onApply: () => void;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (plan.status !== 'adjustable' && plan.status !== 'infeasible' && plan.status !== 'no_income') {
+    return null;
+  }
+
+  // Only worth mentioning alongside a problem — on its own it would read as an
+  // error when nothing is actually wrong.
+  const deadlineNote =
+    plan.goalsWithoutDeadline > 0 ? S.planNoDeadlineNote(plan.goalsWithoutDeadline) : null;
+
+  if (plan.status === 'no_income') {
+    return (
+      <View style={styles.affordabilityBanner}>
+        <MaterialIcon name="warning" size={18} color={colors.secondary} />
+        <Text style={styles.affordabilityBannerText}>{S.planNoIncome}</Text>
+      </View>
+    );
+  }
+
+  if (plan.status === 'infeasible') {
+    return (
+      <View style={styles.affordabilityBanner}>
+        <MaterialIcon name="warning" size={18} color={colors.secondary} />
+        <View style={styles.planBannerBody}>
+          <Text style={styles.affordabilityBannerText}>
+            {S.planInfeasible(
+              formatVND(plan.requiredMonthlySavings),
+              formatVND(plan.maxFundableMonthlySavings ?? 0),
+            )}
+          </Text>
+          {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.affordabilityBanner}>
+      <MaterialIcon name="warning" size={18} color={colors.secondary} />
+      <View style={styles.planBannerBody}>
+        <Text style={styles.affordabilityBannerText}>
+          {S.planAdjustable(
+            formatVND(plan.requiredMonthlySavings),
+            formatVND(plan.currentSavingsCap),
+          )}
+        </Text>
+        <Text style={styles.affordabilityBannerText}>
+          {S.planAdjustableFix(
+            formatPct(plan.proposedSavingsPct ?? 0),
+            formatVND(plan.proposedWantsCap ?? 0),
+          )}
+        </Text>
+        {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[styles.planApplyBtn, isApplying && styles.planApplyBtnDisabled]}
+          onPress={onApply}
+          disabled={isApplying}
+          accessibilityRole="button"
+          accessibilityLabel={S.planApplyBtn}
+          accessibilityState={{ disabled: isApplying, busy: isApplying }}>
+          {isApplying ? (
+            <ActivityIndicator size="small" color={colors.onPrimary} />
+          ) : (
+            <Text style={styles.planApplyBtnText}>{S.planApplyBtn}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GoalsScreen() {
@@ -308,6 +427,8 @@ export default function GoalsScreen() {
     refetch: refetchArchived,
   } = useArchivedGoals();
   const { data: bucketAllocation } = useBudgetBuckets();
+  const { data: savingsPlan, refetch: refetchPlan } = useSavingsPlanRecommendation();
+  const applyPlan = useApplySavingsPlanRecommendation();
   const [newGoalVisible, setNewGoalVisible] = useState(false);
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
@@ -324,6 +445,26 @@ export default function GoalsScreen() {
     [activeGoals, savingsCap],
   );
 
+  // The backend now does this comparison and can also propose a fix, so prefer
+  // it. `savingsPlan` is null against a deployment that predates the endpoint
+  // (see real/incomeAllocation.ts) — fall back to the local check then, so the
+  // warning never silently disappears mid-rollout.
+  const showLocalWarning = !savingsPlan && isOverAllocated;
+
+  const handleApplyPlan = useCallback(() => {
+    applyPlan.mutate(undefined, {
+      onSuccess: (scheduled) => {
+        Alert.alert(S.planAppliedTitle, S.planAppliedMsg(formatPct(scheduled.savingsPct)));
+      },
+      onError: (err) => {
+        // A 422 here means the plan went stale between fetch and tap (a goal was
+        // edited or contributed to elsewhere) — the backend recomputes and
+        // refuses rather than writing a split that no longer fits.
+        Alert.alert(S.planApplyError, getApiErrorMessage(err, S.planApplyStale));
+      },
+    });
+  }, [applyPlan]);
+
   const completedGoals = useMemo(() =>
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && g.isCompleted),
     [goals]);
@@ -333,8 +474,8 @@ export default function GoalsScreen() {
   }, [router]);
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([refetch(), refetchArchived()]);
-  }, [refetch, refetchArchived]);
+    await Promise.all([refetch(), refetchArchived(), refetchPlan()]);
+  }, [refetch, refetchArchived, refetchPlan]);
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || isArchivedError)
@@ -387,13 +528,20 @@ export default function GoalsScreen() {
           </View>
         ) : (
           <>
-            {isOverAllocated && (
+            {showLocalWarning && (
               <View style={styles.affordabilityBanner}>
                 <MaterialIcon name="warning" size={18} color={colors.secondary} />
                 <Text style={styles.affordabilityBannerText}>
                   {S.affordabilityWarning(formatVND(totalRequiredMonthly), formatVND(savingsCap))}
                 </Text>
               </View>
+            )}
+            {savingsPlan && (
+              <SavingsPlanBanner
+                plan={savingsPlan}
+                isApplying={applyPlan.isPending}
+                onApply={handleApplyPlan}
+              />
             )}
             {activeGoals.map((goal) => (
               <GoalCard key={goal.id} goal={goal} onPress={() => handleGoalPress(goal)} />
@@ -482,6 +630,17 @@ function createStyles(colors: ThemeColors) {
     borderRadius: BORDER_RADIUS.lg, padding: SPACING[3],
   },
   affordabilityBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
+  planBannerBody: { flex: 1, gap: SPACING[2] },
+  planBannerNote: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
+  planApplyBtn: {
+    alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center',
+    paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],
+    borderRadius: BORDER_RADIUS.full, backgroundColor: colors.primary,
+  },
+  planApplyBtnDisabled: { opacity: 0.6 },
+  planApplyBtnText: {
+    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onPrimary,
+  },
   sectionDivider: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
     paddingVertical: SPACING[2], borderTopWidth: 1, borderTopColor: colors.surfaceVariant,
