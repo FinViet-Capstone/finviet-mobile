@@ -61,7 +61,12 @@ const S = {
   planApplyError: 'Không áp dụng được. Hãy thử lại.',
   planApplyStale: 'Mục tiêu vừa thay đổi nên đề xuất không còn phù hợp. Hãy kéo xuống để tải lại.',
   planInfeasible: (needed: string, max: string) =>
-    `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần. Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.`,
+    `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần.`,
+  planInfeasibleMonths: (months: number, when: string) =>
+    `Cần ít nhất ${months} tháng tích luỹ, tức giãn thời hạn tới ${when}.`,
+  planInfeasibleTarget: (amount: string) =>
+    `Hoặc hạ mục tiêu xuống ${amount} nếu giữ nguyên thời hạn.`,
+  planInfeasibleFallback: 'Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.',
   planNoIncome: 'Chưa có thu nhập hàng tháng nên không tính được mức chi tiêu phù hợp. Hãy đặt thu nhập trong phần Phân bổ ngân sách.',
   planNoDeadlineNote: (n: number) =>
     `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên.`,
@@ -83,6 +88,17 @@ const S = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * "tháng 8/2027" for a count of whole months from today. The backend returns a month count, but
+ * a user reading "cần ít nhất 12 tháng" still has to work out what date to type into the picker —
+ * so name the month for them.
+ */
+function monthsFromNowLabel(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return `tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+}
 
 /** Drops a trailing `.00` so a whole percentage reads "25%", not "25.00%". */
 function formatPct(pct: number): string {
@@ -361,6 +377,19 @@ function SavingsPlanBanner({
   }
 
   if (plan.status === 'infeasible') {
+    // The plan already knows how far the deadline would have to move, and — for a single goal —
+    // how far the target would have to drop. Showing only "hãy giãn thời hạn" would make the
+    // user guess at a number the system has already computed.
+    // `typeof === 'number'`, not `!== null`: against a backend that predates these fields they
+    // arrive as `undefined`, and `undefined !== null` is true — which would render
+    // "Cần ít nhất undefined tháng" instead of falling back.
+    const months = typeof plan.minimumMonthsToFund === 'number' ? plan.minimumMonthsToFund : null;
+    const maxTarget =
+      typeof plan.maximumFundableTargetAmount === 'number'
+        ? plan.maximumFundableTargetAmount
+        : null;
+    const hasConcreteFix = months !== null || maxTarget !== null;
+
     return (
       <View style={styles.affordabilityBanner}>
         <MaterialIcon name="warning" size={18} color={colors.secondary} />
@@ -371,6 +400,20 @@ function SavingsPlanBanner({
               formatVND(plan.maxFundableMonthlySavings ?? 0),
             )}
           </Text>
+          {months !== null && (
+            <Text style={styles.affordabilityBannerText}>
+              {S.planInfeasibleMonths(months, monthsFromNowLabel(months))}
+            </Text>
+          )}
+          {maxTarget !== null && (
+            <Text style={styles.affordabilityBannerText}>
+              {S.planInfeasibleTarget(formatVND(maxTarget))}
+            </Text>
+          )}
+          {/* No headroom at all (ceiling is 0) — there is genuinely no number to offer. */}
+          {!hasConcreteFix && (
+            <Text style={styles.affordabilityBannerText}>{S.planInfeasibleFallback}</Text>
+          )}
           {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
         </View>
       </View>
