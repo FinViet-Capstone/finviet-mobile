@@ -56,6 +56,9 @@ function invalidateGoalDependents(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
   qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
   qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+  // The savings-plan recommendation is derived from these goals, so a stale one
+  // would have the banner contradict the very list it sits above.
+  qc.invalidateQueries({ queryKey: queryKeys.incomeAllocation.recommendation() });
   // Goal money feeds the AI score's savingsScore (monthly view) — keep "Điểm chi
   // tiêu" from sitting on a pre-contribution value.
   invalidateAiDerived(qc);
@@ -85,7 +88,13 @@ export const useUpdateGoal = () => {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateGoalInput }) =>
       updateGoal(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goals.all() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.goals.all() });
+      // Editing a target or deadline changes what the goal needs per month, so
+      // the recommendation built from it is stale. No wallet/transaction
+      // invalidation here — an edit moves no money.
+      qc.invalidateQueries({ queryKey: queryKeys.incomeAllocation.recommendation() });
+    },
   });
 };
 

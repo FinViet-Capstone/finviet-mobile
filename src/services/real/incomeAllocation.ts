@@ -18,8 +18,14 @@
  * entirely rather than kept as a dead re-export.
  */
 
+import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
-import type { IncomeAllocationSetting, ScheduleIncomeAllocationInput } from '@/types';
+import type {
+  IncomeAllocationSetting,
+  SavingsPlanRecommendation,
+  SavingsPlanStatus,
+  ScheduleIncomeAllocationInput,
+} from '@/types';
 
 // ─── Backend DTO ──────────────────────────────────────────────────────────────
 
@@ -85,5 +91,83 @@ export async function scheduleIncomeAllocationChange(
     wantsPct: input.wantsPct,
     savingsPct: input.savingsPct,
   });
+  return toSetting(unwrap<IncomeAllocationEntryDto>(res), 'pending');
+}
+
+// ─── Savings-goal ↔ spending balance ────────────────────────────────────────
+
+interface SavingsPlanRecommendationDto {
+  month: string;
+  status: SavingsPlanStatus;
+  monthlyIncome: number;
+  requiredMonthlySavings: number;
+  currentSavingsCap: number;
+  shortfall: number;
+  goalsConsidered: number;
+  goalsWithoutDeadline: number;
+  proposed: IncomeAllocationEntryDto | null;
+  proposedNeedsCap: number | null;
+  proposedWantsCap: number | null;
+  proposedSavingsCap: number | null;
+  maxFundableMonthlySavings: number | null;
+}
+
+/**
+ * Flattens the backend's nested `proposed` entry into sibling `proposed*Pct`
+ * fields — the screen only ever needs the three percentages and the three caps,
+ * never the entry's own effectiveMonth (applying always targets next month, and
+ * the apply endpoint decides that server-side anyway).
+ */
+function toRecommendation(dto: SavingsPlanRecommendationDto): SavingsPlanRecommendation {
+  return {
+    month: dto.month,
+    status: dto.status,
+    monthlyIncome: dto.monthlyIncome,
+    requiredMonthlySavings: dto.requiredMonthlySavings,
+    currentSavingsCap: dto.currentSavingsCap,
+    shortfall: dto.shortfall,
+    goalsConsidered: dto.goalsConsidered,
+    goalsWithoutDeadline: dto.goalsWithoutDeadline,
+    proposedNeedsPct: dto.proposed?.needsPct ?? null,
+    proposedWantsPct: dto.proposed?.wantsPct ?? null,
+    proposedSavingsPct: dto.proposed?.savingsPct ?? null,
+    proposedNeedsCap: dto.proposedNeedsCap,
+    proposedWantsCap: dto.proposedWantsCap,
+    proposedSavingsCap: dto.proposedSavingsCap,
+    maxFundableMonthlySavings: dto.maxFundableMonthlySavings,
+  };
+}
+
+/**
+ * Returns `null` when the deployed backend doesn't have this endpoint yet (404).
+ *
+ * This ships ahead of the backend change reaching Render, and the goals screen
+ * keeps its own client-side affordability check as a fallback. Letting the 404
+ * surface as a query error instead would make the over-allocation warning vanish
+ * entirely against the current deployment — a silent regression of behaviour the
+ * thesis council has already seen. Any other failure still throws.
+ */
+export async function getSavingsPlanRecommendation(
+  month?: string,
+): Promise<SavingsPlanRecommendation | null> {
+  try {
+    const res = await api.get('/profile/income-allocation/recommendation', {
+      params: month ? { month } : undefined,
+    });
+    return toRecommendation(unwrap<SavingsPlanRecommendationDto>(res));
+  } catch (err) {
+    if (isAxiosError(err) && err.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Applies the proposed split. The backend recomputes it server-side rather than
+ * accepting one from here, so there is deliberately no payload — a proposal this
+ * screen is holding may already be stale from a goal edit or contribution.
+ * Returns the scheduled entry, which takes effect next calendar month.
+ */
+export async function applySavingsPlanRecommendation(): Promise<IncomeAllocationSetting> {
+  const res = await api.post('/profile/income-allocation/recommendation/apply');
   return toSetting(unwrap<IncomeAllocationEntryDto>(res), 'pending');
 }

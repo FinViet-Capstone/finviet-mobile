@@ -1,6 +1,67 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Automatic balance between saving goals and suggested spending (branch
+`feature/savings-goal-spending-balance`, cross-repo with `finviet-be`'s branch of the same
+name). Closes the thesis-council finding of 19-08-2026: *"Cần có sự cân đối tự động giữa việc
+mục tiêu tiết kiệm được đề ra và hệ thống tự scale và đề xuất mức chi tiêu phù hợp."* This
+screen has warned about over-allocation since 17-08 via its own client-side
+`computeGoalAffordability` — the council saw that warning and still raised the finding, because
+a warning that tells the user to go fix it by hand is not the system scaling anything. The
+backend now does the comparison and proposes a rebalanced split; this wires the screen to it
+and adds the one-tap apply that makes it actually automatic from the user's side.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all six changed
+files reports 0 problems (0 warnings — the `axios.isAxiosError` named-export warning that the
+first draft introduced was removed by importing `isAxiosError` directly); `npm test` 26/26
+suites, 131/131 tests (125 pre-existing + 6 new in
+`src/services/real/__tests__/incomeAllocation.test.ts`). **Not committed/pushed yet.**
+
+Not exercised against a running backend: the endpoints this calls are on a `finviet-be` branch
+that is itself uncommitted and not deployed to Render, and that repo's local Postgres can't
+start (pre-existing journal drift). So the wiring is verified by unit tests and types only —
+one manual pass on device is still needed once the backend ships.
+
+## Goals
+
+- `useSavingsPlanRecommendation()` / `useApplySavingsPlanRecommendation()` over
+  `GET /profile/income-allocation/recommendation` and
+  `POST .../recommendation/apply`.
+- `SavingsPlanBanner` on the goals screen renders only the three statuses the customer can act
+  on — `adjustable` (with the proposed Savings % and the new Wants cap, plus an "Áp dụng từ
+  tháng sau" button), `infeasible` (with the ceiling reachable without cutting Needs), and
+  `no_income`. `on_track` / `no_goals` / `invalid_allocation` render nothing: a banner saying
+  everything is fine, on a screen already showing every goal's progress, is just noise.
+- Apply sends **no payload**. The backend recomputes the split server-side, so a proposal this
+  screen is holding can't be written after a goal changed underneath it. A 422 back means
+  exactly that, and is surfaced as "đề xuất không còn phù hợp, hãy kéo xuống để tải lại".
+
+## Notes
+
+- **`computeGoalAffordability` is deliberately kept, not deleted.** `getSavingsPlanRecommendation`
+  resolves to `null` on 404 and the screen falls back to the local check then. This ships ahead
+  of the backend reaching Render; letting the 404 surface as a query error would make the
+  over-allocation warning vanish entirely on the live deployment — a silent regression of
+  behaviour the council has already seen. Once the backend is deployed everywhere, the local
+  path and its tests can be removed as a follow-up.
+- Both banners are mutually exclusive (`showLocalWarning = !savingsPlan && isOverAllocated`), so
+  there is never a moment where two versions of the same warning stack.
+- Goal mutations now invalidate `queryKeys.incomeAllocation.recommendation()`
+  (`invalidateGoalDependents` for create/contribute/withdraw/delete, and `useUpdateGoal`
+  separately since an edit moves no money and shouldn't invalidate wallets/transactions).
+  Without this the banner would contradict the very list it sits above after a goal edit —
+  the same "con số không khớp" class of defect the council flagged for the AI report.
+- Pull-to-refresh refetches the recommendation too, because the stale-plan error message tells
+  the user to do exactly that.
+- The backend never proposes cutting the Needs bucket (`WantsFloorPct = 5`), so `infeasible`
+  copy asks the user to extend a deadline, lower a target, or raise income rather than offering
+  a number to accept. That is a product decision on the backend side — see its
+  `context/current-feature.md`.
+
+---
+
 Feature: Three user-reported fixes (cross-repo with `finviet-be`; mobile branch
 `fix/score-no-data-and-budget-pct`, backend branch `fix/custom-category-id-and-score-no-data`).
 (1) Custom category creation always fails with the backend 500 fallback "An unexpected error

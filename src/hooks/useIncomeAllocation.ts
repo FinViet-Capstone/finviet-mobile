@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  applySavingsPlanRecommendation,
   getEffectiveIncomeAllocation,
+  getSavingsPlanRecommendation,
   getScheduledIncomeAllocation,
   scheduleIncomeAllocationChange,
   type ScheduleIncomeAllocationInput,
@@ -33,6 +35,37 @@ export const useScheduleIncomeAllocationChange = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: ScheduleIncomeAllocationInput) => scheduleIncomeAllocationChange(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.incomeAllocation.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
+    },
+  });
+};
+
+/**
+ * Whether the customer's goals fit their Savings bucket, and the rebalanced
+ * split that would fund them. Resolves to `null` against a backend that predates
+ * the endpoint, so callers must handle that rather than assume data.
+ *
+ * `STALE_TIME.short`: it's derived from goals and the allocation, both of which
+ * the customer edits right next to this — a 2-minute cache would leave the
+ * banner contradicting a goal they just created.
+ */
+export const useSavingsPlanRecommendation = () =>
+  useQuery({
+    queryKey: queryKeys.incomeAllocation.recommendation(),
+    queryFn: () => getSavingsPlanRecommendation(),
+    staleTime: STALE_TIME.short,
+  });
+
+/**
+ * Applies the proposed split for next month. Invalidates budgets too: the bucket
+ * caps the Budgets tab draws come from the same allocation.
+ */
+export const useApplySavingsPlanRecommendation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => applySavingsPlanRecommendation(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.incomeAllocation.all() });
       qc.invalidateQueries({ queryKey: queryKeys.budgets.all() });
