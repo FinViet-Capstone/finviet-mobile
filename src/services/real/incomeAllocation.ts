@@ -113,6 +113,7 @@ interface SavingsPlanRecommendationDto {
   totalRemainingAmount: number;
   minimumMonthsToFund: number | null;
   maximumFundableTargetAmount: number | null;
+  pendingBeforeApply: IncomeAllocationEntryDto | null;
 }
 
 /**
@@ -141,6 +142,9 @@ function toRecommendation(dto: SavingsPlanRecommendationDto): SavingsPlanRecomme
     totalRemainingAmount: dto.totalRemainingAmount,
     minimumMonthsToFund: dto.minimumMonthsToFund,
     maximumFundableTargetAmount: dto.maximumFundableTargetAmount,
+    pendingBeforeApply: dto.pendingBeforeApply
+      ? toSetting(dto.pendingBeforeApply, 'pending')
+      : null,
   };
 }
 

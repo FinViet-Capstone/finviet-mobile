@@ -29,7 +29,10 @@ import {
 } from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
-import type { SavingsPlanRecommendation } from '@/types/incomeAllocation';
+import type {
+  IncomeAllocationSetting,
+  SavingsPlanRecommendation,
+} from '@/types/incomeAllocation';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -60,10 +63,22 @@ const S = {
     `Từ đầu tháng sau, hũ Tiết kiệm sẽ là ${savingsPct}%. Tháng này giữ nguyên.`,
   planApplyError: 'Không áp dụng được. Hãy thử lại.',
   planApplyStale: 'Mục tiêu vừa thay đổi nên đề xuất không còn phù hợp. Hãy kéo xuống để tải lại.',
+  // Applying replaces next month's scheduled split. Warn first when that split isn't already
+  // what we're about to write — silently discarding one the customer set themselves is a
+  // surprise, not a convenience.
+  planOverwriteTitle: 'Thay thế phân bổ đã đặt cho tháng sau?',
+  planOverwriteMsg: (current: string, next: string) =>
+    `Tháng sau bạn đã đặt ${current}. Áp dụng đề xuất sẽ thay bằng ${next}.`,
+  planOverwriteConfirm: 'Thay thế',
+  planSplitLabel: (needs: string, wants: string, savings: string) =>
+    `Cần ${needs}% / Muốn ${wants}% / Tiết kiệm ${savings}%`,
   planInfeasible: (needed: string, max: string) =>
     `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần.`,
   planInfeasibleMonths: (months: number, when: string) =>
     `Cần ít nhất ${months} tháng tích luỹ, tức giãn thời hạn tới ${when}.`,
+  // The month count is whole months from today, so it drops by one the day the deadline's
+  // day-of-month falls behind today's. Without saying so, the number looks unstable.
+  planMonthRuleNote: 'Số tháng tính tròn từ hôm nay, nên có thể đổi khi sang ngày mới.',
   planInfeasibleTarget: (amount: string) =>
     `Hoặc hạ mục tiêu xuống ${amount} nếu giữ nguyên thời hạn.`,
   planInfeasibleFallback: 'Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.',
@@ -111,6 +126,17 @@ function formatVND(amount: number): string {
   return amount.toLocaleString('vi-VN');
 }
 
+/**
+ * Exact đồng, no compaction. The savings-plan banner uses this instead of `formatVND` because
+ * its figures are the ones a customer cross-checks against the Budget Allocation screen — and
+ * `formatVND` renders 1.176.471đ as "1.2M", which reads as a different number from the 23,53%
+ * shown there. Compact form is still right on the goal cards, where space is tight and nothing
+ * has to reconcile.
+ */
+function formatExactVND(amount: number): string {
+  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
+}
+
 function daysUntil(isoDate: string | null): number {
   if (!isoDate) return Number.POSITIVE_INFINITY;
   const diff = new Date(isoDate).getTime() - Date.now();
@@ -125,6 +151,27 @@ function isoDaysFromNow(days: number): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Would applying the recommendation discard a *different* split the customer already scheduled
+ * for next month?
+ *
+ * Exported so it's directly testable. Applying upserts next month's row, so an existing draft is
+ * replaced silently — that was a real data-loss surprise in testing (a hand-set 61/23,4/15,6 was
+ * overwritten with no prompt). Re-applying an identical split is still a no-op the user
+ * shouldn't have to confirm, hence the comparison rather than a bare null check.
+ */
+export function replacesDifferentPendingSplit(
+  pending: Pick<IncomeAllocationSetting, 'needsPct' | 'wantsPct' | 'savingsPct'> | null | undefined,
+  proposed: { needsPct: number | null; wantsPct: number | null; savingsPct: number | null },
+): boolean {
+  if (!pending) return false;
+  return (
+    pending.needsPct !== proposed.needsPct ||
+    pending.wantsPct !== proposed.wantsPct ||
+    pending.savingsPct !== proposed.savingsPct
+  );
 }
 
 /**
@@ -396,18 +443,21 @@ function SavingsPlanBanner({
         <View style={styles.planBannerBody}>
           <Text style={styles.affordabilityBannerText}>
             {S.planInfeasible(
-              formatVND(plan.requiredMonthlySavings),
-              formatVND(plan.maxFundableMonthlySavings ?? 0),
+              formatExactVND(plan.requiredMonthlySavings),
+              formatExactVND(plan.maxFundableMonthlySavings ?? 0),
             )}
           </Text>
           {months !== null && (
-            <Text style={styles.affordabilityBannerText}>
-              {S.planInfeasibleMonths(months, monthsFromNowLabel(months))}
-            </Text>
+            <>
+              <Text style={styles.affordabilityBannerText}>
+                {S.planInfeasibleMonths(months, monthsFromNowLabel(months))}
+              </Text>
+              <Text style={styles.planBannerNote}>{S.planMonthRuleNote}</Text>
+            </>
           )}
           {maxTarget !== null && (
             <Text style={styles.affordabilityBannerText}>
-              {S.planInfeasibleTarget(formatVND(maxTarget))}
+              {S.planInfeasibleTarget(formatExactVND(maxTarget))}
             </Text>
           )}
           {/* No headroom at all (ceiling is 0) — there is genuinely no number to offer. */}
@@ -426,14 +476,14 @@ function SavingsPlanBanner({
       <View style={styles.planBannerBody}>
         <Text style={styles.affordabilityBannerText}>
           {S.planAdjustable(
-            formatVND(plan.requiredMonthlySavings),
-            formatVND(plan.currentSavingsCap),
+            formatExactVND(plan.requiredMonthlySavings),
+            formatExactVND(plan.currentSavingsCap),
           )}
         </Text>
         <Text style={styles.affordabilityBannerText}>
           {S.planAdjustableFix(
             formatPct(plan.proposedSavingsPct ?? 0),
-            formatVND(plan.proposedWantsCap ?? 0),
+            formatExactVND(plan.proposedWantsCap ?? 0),
           )}
         </Text>
         {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
@@ -494,7 +544,7 @@ export default function GoalsScreen() {
   // warning never silently disappears mid-rollout.
   const showLocalWarning = !savingsPlan && isOverAllocated;
 
-  const handleApplyPlan = useCallback(() => {
+  const runApplyPlan = useCallback(() => {
     applyPlan.mutate(undefined, {
       onSuccess: (scheduled) => {
         Alert.alert(S.planAppliedTitle, S.planAppliedMsg(formatPct(scheduled.savingsPct)));
@@ -507,6 +557,41 @@ export default function GoalsScreen() {
       },
     });
   }, [applyPlan]);
+
+  const handleApplyPlan = useCallback(() => {
+    const pending = savingsPlan?.pendingBeforeApply ?? null;
+
+    const replacesDifferentSplit = replacesDifferentPendingSplit(pending, {
+      needsPct: savingsPlan?.proposedNeedsPct ?? null,
+      wantsPct: savingsPlan?.proposedWantsPct ?? null,
+      savingsPct: savingsPlan?.proposedSavingsPct ?? null,
+    });
+
+    if (!replacesDifferentSplit || pending === null) {
+      runApplyPlan();
+      return;
+    }
+
+    Alert.alert(
+      S.planOverwriteTitle,
+      S.planOverwriteMsg(
+        S.planSplitLabel(
+          formatPct(pending.needsPct),
+          formatPct(pending.wantsPct),
+          formatPct(pending.savingsPct),
+        ),
+        S.planSplitLabel(
+          formatPct(savingsPlan?.proposedNeedsPct ?? 0),
+          formatPct(savingsPlan?.proposedWantsPct ?? 0),
+          formatPct(savingsPlan?.proposedSavingsPct ?? 0),
+        ),
+      ),
+      [
+        { text: S.cancel, style: 'cancel' },
+        { text: S.planOverwriteConfirm, style: 'destructive', onPress: runApplyPlan },
+      ],
+    );
+  }, [savingsPlan, runApplyPlan]);
 
   const completedGoals = useMemo(() =>
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && g.isCompleted),
