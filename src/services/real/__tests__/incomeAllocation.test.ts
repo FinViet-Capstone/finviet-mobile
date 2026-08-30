@@ -52,6 +52,7 @@ const adjustableDto = {
   totalRemainingAmount: 30_000_000,
   minimumMonthsToFund: null,
   maximumFundableTargetAmount: null,
+  pendingBeforeApply: null,
 };
 
 beforeEach(() => {
@@ -90,6 +91,36 @@ describe('getSavingsPlanRecommendation', () => {
 
     expect(result!.proposedSavingsPct).toBeNull();
     expect(result!.maxFundableMonthlySavings).toBe(9_000_000);
+  });
+
+  it('maps the pending split that applying would replace', async () => {
+    // The screen needs this to warn before discarding a draft the customer set themselves.
+    mockedGet.mockResolvedValueOnce(
+      envelope({
+        ...adjustableDto,
+        pendingBeforeApply: {
+          effectiveMonth: '2026-09',
+          monthlyIncome: 5_000_000,
+          needsPct: 61,
+          wantsPct: 23.4,
+          savingsPct: 15.6,
+        },
+      }),
+    );
+
+    const result = await getSavingsPlanRecommendation();
+
+    expect(result!.pendingBeforeApply).not.toBeNull();
+    expect(result!.pendingBeforeApply!.savingsPct).toBe(15.6);
+    expect(result!.pendingBeforeApply!.effectiveMonth).toBe('2026-09');
+  });
+
+  it('leaves pendingBeforeApply null when nothing is scheduled', async () => {
+    mockedGet.mockResolvedValueOnce(envelope(adjustableDto));
+
+    const result = await getSavingsPlanRecommendation();
+
+    expect(result!.pendingBeforeApply).toBeNull();
   });
 
   it('carries the infeasible escape hatches through', async () => {

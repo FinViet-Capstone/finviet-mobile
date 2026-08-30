@@ -1,6 +1,47 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Close the savings-plan gaps found in device testing (branch `fix/savings-plan-limitations`,
+cross-repo with `finviet-be`'s branch of the same name). An external review ran the full four-step
+scenario on an Android emulator against production, confirmed the core auto-balance requirement
+works end-to-end, and found three rough edges worth fixing.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all five changed
+files reports 0 problems; `npx jest` **156/156 pass, 28/28 suites** (148 + 8 new).
+**Not committed/pushed yet.** Not re-tested on device.
+
+## Goals
+
+- **Overwrite warning.** Applying upserts next month's allocation row, so a draft already
+  scheduled there was replaced silently — in testing a hand-set 61/23,4/15,6 became
+  50/26,47/23,53 with no prompt. The banner now reads `pendingBeforeApply` from the backend and
+  confirms first, showing both splits. `replacesDifferentPendingSplit()` is exported and unit
+  tested: re-applying an identical split stays a no-op nobody has to confirm.
+- **Exact amounts in the banner.** `formatVND` renders 1.176.471đ as "1.2M", so the banner and
+  the Budget Allocation screen appeared to disagree — the same "con số không khớp" class of
+  defect the thesis council raised about the AI report. New `formatExactVND` is used for every
+  savings-plan figure. Goal cards keep the compact form: space is tight there and nothing has to
+  reconcile.
+- **Month-rule note.** The month count is whole months from today, so it drops by one the day
+  the deadline's day-of-month falls behind today's. Without saying so the number looks unstable;
+  a muted line under it now explains the rule.
+
+## Notes
+
+- The overwrite guard compares all three buckets, not just Savings — a Needs/Wants-only edit is
+  still the customer's own work and still worth confirming before discarding.
+- `pendingBeforeApply` arrives `undefined` from a backend that predates it, which
+  `replacesDifferentPendingSplit` treats as "nothing scheduled" — the old silent behaviour, not
+  a crash or a spurious prompt. Locked by a test.
+- **This needs `finviet-be` to reach `dev`, not `main`.** Render deploys from `dev`; the
+  infeasible escape-hatch fields have been sitting in `main` unreleased since 28-08, which is
+  why device testing saw only the generic fallback text. See the backend repo's
+  `context/current-feature.md`.
+
+---
+
 Feature: Edit a saving goal from the app (branch `automated-scale`). Goals could be created,
 contributed to, withdrawn from and archived — but never edited, so a wrong name, target or
 deadline meant archiving and starting over, losing the contribution history with it. This became

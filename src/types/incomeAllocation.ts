@@ -80,4 +80,10 @@ export interface SavingsPlanRecommendation {
    * exactly one goal was counted — with several there is no single target to lower.
    */
   maximumFundableTargetAmount: number | null;
+  /**
+   * The split already scheduled for next month, if any. Applying **replaces** it, so the screen
+   * must warn before discarding a split the customer set themselves. Null when nothing is
+   * scheduled, and `undefined` against a backend that predates this field.
+   */
+  pendingBeforeApply: IncomeAllocationSetting | null;
 }
