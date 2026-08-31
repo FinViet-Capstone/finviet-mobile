@@ -1,6 +1,48 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Confirm the on-track case and make the no-deadline note actionable (branch
+`fix/savings-plan-followups`). A second emulator review confirmed every earlier fix works on
+device and left five open items. Two were genuine gaps in what the screen communicates; this
+closes those. The other three are scope calls, recorded below rather than half-built.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` 0 problems on both
+changed files; `npx jest` **162/162 pass, 29/29 suites** (156 + 6 new).
+**Not committed/pushed yet.** Not re-tested on device.
+
+## Goals
+
+- **`on_track` now confirms instead of rendering nothing.** A quiet positive line — check icon,
+  tertiary tint, no border — reporting what the goals need against what the bucket allows.
+  Rendering nothing left the customer unable to tell "checked, you're fine" apart from "never
+  checked", which is the ambiguity the review flagged.
+- **The no-deadline note is actionable when it can be.** With exactly one such goal the note
+  names it and becomes a tappable link straight to its detail screen, where the edit sheet sets
+  a deadline. With several it stays text and says to open each goal.
+- `resolveSingleMissingDeadlineGoal()` exported and unit tested: the count comes from the
+  backend (so it can't contradict the figures it qualifies) while the tap needs a local goal
+  object, and the shortcut only appears when both sources agree on exactly one.
+
+## Notes
+
+- **Reversing an earlier call, deliberately.** The first version returned `null` for `on_track`
+  on the reasoning that "everything is fine" is noise above a list that already shows progress.
+  The review's counter is better: silence doesn't distinguish a passing check from no check at
+  all. The compromise is tone — confirm, but quietly, so it doesn't compete with the warning
+  states.
+- `invalid_allocation` and `no_goals` still render nothing. Neither is user-actionable from this
+  screen, and the empty state already covers having no goals.
+- **Not done, and why.** Per-goal priority ordering and folding actual spending / cash-flow
+  forecasting into the optimizer are both new features, not gaps in this one — the first needs a
+  DB column, an allocation algorithm and reordering UI; the second changes the model the whole
+  recommendation is built on. Neither belongs in a follow-up commit days before a defense.
+  "Doesn't write the allocation without confirmation" is the approved safety design, not a
+  defect: see the backend repo's note on why Needs is never auto-cut.
+
+---
+
 Feature: Close the savings-plan gaps found in device testing (branch `fix/savings-plan-limitations`,
 cross-repo with `finviet-be`'s branch of the same name). An external review ran the full four-step
 scenario on an Android emulator against production, confirmed the core auto-balance requirement

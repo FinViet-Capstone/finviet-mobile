@@ -83,8 +83,15 @@ const S = {
     `Hoặc hạ mục tiêu xuống ${amount} nếu giữ nguyên thời hạn.`,
   planInfeasibleFallback: 'Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.',
   planNoIncome: 'Chưa có thu nhập hàng tháng nên không tính được mức chi tiêu phù hợp. Hãy đặt thu nhập trong phần Phân bổ ngân sách.',
+  // Positive confirmation, not a warning: without it the customer can't tell "checked, you're
+  // fine" apart from "never checked".
+  planOnTrack: (needed: string, cap: string) =>
+    `Mục tiêu của bạn nằm trong phân bổ Tiết kiệm — cần ${needed}/tháng, hạn mức ${cap}/tháng.`,
   planNoDeadlineNote: (n: number) =>
-    `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên.`,
+    `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên. Mở từng mục tiêu để thêm thời hạn.`,
+  // Single goal: name it and make the note the action, so the fix is one tap instead of a hunt.
+  planNoDeadlineAction: (goalName: string) =>
+    `"${goalName}" chưa có thời hạn nên không được tính vào con số trên. Chạm để thêm thời hạn.`,
   ok: 'OK',
   newGoalTitle: 'Tạo mục tiêu mới',
   nameLabel: 'Tên mục tiêu',
@@ -151,6 +158,25 @@ function isoDaysFromNow(days: number): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * The one goal the "add a deadline" shortcut should open, or null when there isn't exactly one.
+ *
+ * Two sources have to agree: the backend's count (which is what the banner's other figures were
+ * computed against) and the local goal list (which is what a tap can actually navigate to). When
+ * they disagree — a goal completed or archived between the two reads — the note stays plain text
+ * rather than sending the customer to a goal that isn't the one being skipped.
+ *
+ * Exported for testing: silently opening the wrong goal is the kind of defect nothing else here
+ * would catch.
+ */
+export function resolveSingleMissingDeadlineGoal<T>(
+  backendCount: number,
+  localGoalsMissingDeadline: readonly T[],
+): T | null {
+  if (backendCount !== 1 || localGoalsMissingDeadline.length !== 1) return null;
+  return localGoalsMissingDeadline[0];
 }
 
 /**
@@ -397,22 +423,77 @@ function SavingsPlanBanner({
   plan,
   isApplying,
   onApply,
+  goalsMissingDeadline,
+  onOpenGoal,
 }: {
   plan: SavingsPlanRecommendation;
   isApplying: boolean;
   onApply: () => void;
+  /** Active goals with no deadline, from the list this banner sits above. */
+  goalsMissingDeadline: SavingsGoalWithProgress[];
+  onOpenGoal: (goal: SavingsGoalWithProgress) => void;
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  if (plan.status !== 'adjustable' && plan.status !== 'infeasible' && plan.status !== 'no_income') {
+  /**
+   * Goals with no deadline are excluded from the figures above — say so, and where possible let
+   * the user act on it instead of leaving them to work out that a deadline is what's missing.
+   *
+   * The count comes from the backend so it can't contradict the numbers it qualifies, but the
+   * tap needs a real goal object. Only offered when both sources agree there is exactly one;
+   * if they disagree the note stays plain text rather than sending the user to the wrong goal.
+   */
+  const missingDeadlineCount = plan.goalsWithoutDeadline;
+  const singleMissingGoal = resolveSingleMissingDeadlineGoal(
+    missingDeadlineCount,
+    goalsMissingDeadline,
+  );
+
+  const deadlineNote =
+    missingDeadlineCount > 0 ? (
+      singleMissingGoal ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => onOpenGoal(singleMissingGoal)}
+          accessibilityRole="button"
+          accessibilityLabel={S.planNoDeadlineAction(singleMissingGoal.name)}>
+          <Text style={styles.planBannerNoteLink}>
+            {S.planNoDeadlineAction(singleMissingGoal.name)}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.planBannerNote}>
+          {S.planNoDeadlineNote(missingDeadlineCount)}
+        </Text>
+      )
+    ) : null;
+
+  // Nothing to fund, or a split that can't produce a proposal — the empty state and the goal
+  // list already say everything there is to say.
+  if (plan.status === 'no_goals' || plan.status === 'invalid_allocation') {
     return null;
   }
 
-  // Only worth mentioning alongside a problem — on its own it would read as an
-  // error when nothing is actually wrong.
-  const deadlineNote =
-    plan.goalsWithoutDeadline > 0 ? S.planNoDeadlineNote(plan.goalsWithoutDeadline) : null;
+  // Confirm explicitly when the plan already covers the goals. Rendering nothing leaves the
+  // customer unable to tell "checked, you're fine" apart from "never checked" — the ambiguity
+  // an external review flagged. Kept visually quiet: a single positive line, not a warning card.
+  if (plan.status === 'on_track') {
+    return (
+      <View style={styles.planOkBanner}>
+        <MaterialIcon name="check_circle" size={18} color={colors.tertiary} />
+        <View style={styles.planBannerBody}>
+          <Text style={styles.planOkText}>
+            {S.planOnTrack(
+              formatExactVND(plan.requiredMonthlySavings),
+              formatExactVND(plan.currentSavingsCap),
+            )}
+          </Text>
+          {deadlineNote}
+        </View>
+      </View>
+    );
+  }
 
   if (plan.status === 'no_income') {
     return (
@@ -464,7 +545,7 @@ function SavingsPlanBanner({
           {!hasConcreteFix && (
             <Text style={styles.affordabilityBannerText}>{S.planInfeasibleFallback}</Text>
           )}
-          {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+          {deadlineNote}
         </View>
       </View>
     );
@@ -486,7 +567,7 @@ function SavingsPlanBanner({
             formatExactVND(plan.proposedWantsCap ?? 0),
           )}
         </Text>
-        {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+        {deadlineNote}
         <TouchableOpacity
           activeOpacity={0.7}
           style={[styles.planApplyBtn, isApplying && styles.planApplyBtnDisabled]}
@@ -529,6 +610,13 @@ export default function GoalsScreen() {
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && !g.isCompleted)
       .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline)),
     [goals]);
+
+  // The banner reports how many goals its figures had to skip; this is the same set locally, so
+  // it can offer to open the one that needs a deadline instead of only naming the problem.
+  const goalsMissingDeadline = useMemo(
+    () => activeGoals.filter((g) => !g.deadline),
+    [activeGoals],
+  );
 
   // `savingsCap` is already an absolute VND amount, correctly scaled (see
   // real/budgets.ts's toBucket normalization) — no further conversion needed.
@@ -669,6 +757,8 @@ export default function GoalsScreen() {
                 plan={savingsPlan}
                 isApplying={applyPlan.isPending}
                 onApply={handleApplyPlan}
+                goalsMissingDeadline={goalsMissingDeadline}
+                onOpenGoal={handleGoalPress}
               />
             )}
             {activeGoals.map((goal) => (
@@ -760,6 +850,18 @@ function createStyles(colors: ThemeColors) {
   affordabilityBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
   planBannerBody: { flex: 1, gap: SPACING[2] },
   planBannerNote: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
+  planBannerNoteLink: {
+    fontSize: FONT_SIZE.xs, color: colors.primary, lineHeight: 18,
+    fontWeight: FONT_WEIGHT.semibold, textDecorationLine: 'underline',
+  },
+  // Deliberately lighter than affordabilityBanner: this confirms rather than warns, so it uses
+  // the positive tone and no heavy border.
+  planOkBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING[2],
+    backgroundColor: withAlpha(colors.tertiary, 0.08),
+    borderRadius: BORDER_RADIUS.lg, padding: SPACING[3],
+  },
+  planOkText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
   planApplyBtn: {
     alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center',
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],
