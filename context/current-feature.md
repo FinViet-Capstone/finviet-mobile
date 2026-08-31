@@ -1,6 +1,173 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Confirm the on-track case and make the no-deadline note actionable (branch
+`fix/savings-plan-followups`). A second emulator review confirmed every earlier fix works on
+device and left five open items. Two were genuine gaps in what the screen communicates; this
+closes those. The other three are scope calls, recorded below rather than half-built.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` 0 problems on both
+changed files; `npx jest` **162/162 pass, 29/29 suites** (156 + 6 new).
+**Not committed/pushed yet.** Not re-tested on device.
+
+## Goals
+
+- **`on_track` now confirms instead of rendering nothing.** A quiet positive line — check icon,
+  tertiary tint, no border — reporting what the goals need against what the bucket allows.
+  Rendering nothing left the customer unable to tell "checked, you're fine" apart from "never
+  checked", which is the ambiguity the review flagged.
+- **The no-deadline note is actionable when it can be.** With exactly one such goal the note
+  names it and becomes a tappable link straight to its detail screen, where the edit sheet sets
+  a deadline. With several it stays text and says to open each goal.
+- `resolveSingleMissingDeadlineGoal()` exported and unit tested: the count comes from the
+  backend (so it can't contradict the figures it qualifies) while the tap needs a local goal
+  object, and the shortcut only appears when both sources agree on exactly one.
+
+## Notes
+
+- **Reversing an earlier call, deliberately.** The first version returned `null` for `on_track`
+  on the reasoning that "everything is fine" is noise above a list that already shows progress.
+  The review's counter is better: silence doesn't distinguish a passing check from no check at
+  all. The compromise is tone — confirm, but quietly, so it doesn't compete with the warning
+  states.
+- `invalid_allocation` and `no_goals` still render nothing. Neither is user-actionable from this
+  screen, and the empty state already covers having no goals.
+- **Not done, and why.** Per-goal priority ordering and folding actual spending / cash-flow
+  forecasting into the optimizer are both new features, not gaps in this one — the first needs a
+  DB column, an allocation algorithm and reordering UI; the second changes the model the whole
+  recommendation is built on. Neither belongs in a follow-up commit days before a defense.
+  "Doesn't write the allocation without confirmation" is the approved safety design, not a
+  defect: see the backend repo's note on why Needs is never auto-cut.
+
+---
+
+Feature: Close the savings-plan gaps found in device testing (branch `fix/savings-plan-limitations`,
+cross-repo with `finviet-be`'s branch of the same name). An external review ran the full four-step
+scenario on an Android emulator against production, confirmed the core auto-balance requirement
+works end-to-end, and found three rough edges worth fixing.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all five changed
+files reports 0 problems; `npx jest` **156/156 pass, 28/28 suites** (148 + 8 new).
+**Not committed/pushed yet.** Not re-tested on device.
+
+## Goals
+
+- **Overwrite warning.** Applying upserts next month's allocation row, so a draft already
+  scheduled there was replaced silently — in testing a hand-set 61/23,4/15,6 became
+  50/26,47/23,53 with no prompt. The banner now reads `pendingBeforeApply` from the backend and
+  confirms first, showing both splits. `replacesDifferentPendingSplit()` is exported and unit
+  tested: re-applying an identical split stays a no-op nobody has to confirm.
+- **Exact amounts in the banner.** `formatVND` renders 1.176.471đ as "1.2M", so the banner and
+  the Budget Allocation screen appeared to disagree — the same "con số không khớp" class of
+  defect the thesis council raised about the AI report. New `formatExactVND` is used for every
+  savings-plan figure. Goal cards keep the compact form: space is tight there and nothing has to
+  reconcile.
+- **Month-rule note.** The month count is whole months from today, so it drops by one the day
+  the deadline's day-of-month falls behind today's. Without saying so the number looks unstable;
+  a muted line under it now explains the rule.
+
+## Notes
+
+- The overwrite guard compares all three buckets, not just Savings — a Needs/Wants-only edit is
+  still the customer's own work and still worth confirming before discarding.
+- `pendingBeforeApply` arrives `undefined` from a backend that predates it, which
+  `replacesDifferentPendingSplit` treats as "nothing scheduled" — the old silent behaviour, not
+  a crash or a spurious prompt. Locked by a test.
+- **This needs `finviet-be` to reach `dev`, not `main`.** Render deploys from `dev`; the
+  infeasible escape-hatch fields have been sitting in `main` unreleased since 28-08, which is
+  why device testing saw only the generic fallback text. See the backend repo's
+  `context/current-feature.md`.
+
+---
+
+Feature: Edit a saving goal from the app (branch `automated-scale`). Goals could be created,
+contributed to, withdrawn from and archived — but never edited, so a wrong name, target or
+deadline meant archiving and starting over, losing the contribution history with it. This became
+acute alongside the savings-plan banner: its whole advice is "giãn thời hạn" or "hạ mục tiêu",
+and neither was possible without leaving the app.
+
+**Backend needed no change.** `PUT/PATCH /api/saving-goals/{id}` already existed, taking
+`{ goalName?, targetAmount?, deadline? }`, and `updateGoal` / `useUpdateGoal` were already wired
+on this side. Only the UI was missing.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both changed files
+0 errors and 4 warnings — the same 4 the file had before this change (pre-existing
+`set-state-in-effect` in ContributionSheet/WithdrawSheet, verified against the file at HEAD);
+`npx jest` **148/148 pass, 27/27 suites** (142 + 6 new). **Not committed/pushed yet.**
+Not yet exercised on device.
+
+## Goals
+
+- Pencil button in the goal detail header, next to archive; hidden for archived goals.
+- Sheet edits name / target / deadline, pre-filled from the goal, mirroring NewGoalSheet's
+  layout so both read the same.
+- `buildGoalPatch()` exported and unit-tested: sends **only the fields that changed**. The
+  backend treats an omitted field as "leave alone" and re-validates every field it *is* given,
+  so resending an untouched value can fail on a rule the user never triggered — most obviously
+  a deadline that was valid at creation and has since passed.
+- Client-side guard mirroring the backend rule that a target can't drop below what's already
+  saved, shown inline under the amount rather than as a server error after submit.
+- Save button reads "Chưa có thay đổi nào" and stays disabled until something actually differs.
+
+## Notes
+
+- **State is reset by remounting on open, not by an effect.** The parent bumps an `editSession`
+  counter used as the sheet's `key`, so each open starts fresh from the current goal — and
+  crucially the counter is *not* touched on close, so the component stays mounted long enough
+  for DraggableSheet to finish its slide-down. Conditional rendering (`{visible && <Sheet/>}`)
+  would have cut that animation short, which the sheet's own source calls out; a re-seeding
+  `useEffect` would have tripped `react-hooks/set-state-in-effect`, which is exactly the warning
+  the four pre-existing ones in this file are.
+- The icon/emoji is not editable, matching create — `UpdateSavingGoalRequest` has no
+  `IconEmoji` field and the create sheet has no picker either, so adding one here would need a
+  backend change and would be scope creep.
+- Editing a target or deadline already invalidates the savings-plan recommendation (added with
+  that feature), so the banner follows an edit immediately — including the intended flow of
+  stretching a deadline until an `infeasible` plan turns `adjustable`.
+
+---
+
+Feature: Make the `infeasible` savings-plan banner actionable (branch `automated-scale`,
+cross-repo with `finviet-be`'s branch of the same name). Follow-up to the entry below, from
+testing on a real device. `infeasible` showed the monthly ceiling and then three vague options
+with no number attached, so the user had to guess what deadline would actually work — it was hit
+four times in a row during testing and each answer needed the algorithm run by hand. The backend
+now returns the minimum deadline and (for a single goal) the maximum target; this shows them.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the four changed
+files reports 0 problems; `npx jest` on the changed suite 7/7. **Not committed/pushed yet.**
+Requires the matching backend change to be deployed — before that the new fields arrive as
+`undefined` and the banner falls back to the generic sentence, so it degrades quietly rather
+than breaking.
+
+## Goals
+
+- `infeasible` banner now reads: the ceiling, then "Cần ít nhất N tháng tích luỹ, tức giãn thời
+  hạn tới tháng M/YYYY", then (single goal only) "Hoặc hạ mục tiêu xuống X nếu giữ nguyên thời
+  hạn."
+- `monthsFromNowLabel()` converts the backend's month count into a named month. The backend
+  returns "12 months" because a month count is what the arithmetic produces, but a user reading
+  that still has to work out what date to type into the picker — so the screen names it.
+- The generic three-option sentence is kept as a fallback for the one case with no number to
+  give (ceiling is 0: Savings at 0% and Wants already at the floor).
+
+## Notes
+
+- The two new fields are optional in practice: against a backend that predates them they arrive
+  `undefined`, `!== null` is false, and the banner shows the fallback. No version check needed.
+- `monthsFromNowLabel` uses `setMonth` overflow on purpose — `setMonth(month + 14)` rolls the
+  year correctly, which is the whole reason not to hand-roll the arithmetic.
+
+---
+
 Feature: Automatic balance between saving goals and suggested spending (branch
 `feature/savings-goal-spending-balance`, cross-repo with `finviet-be`'s branch of the same
 name). Closes the thesis-council finding of 19-08-2026: *"Cần có sự cân đối tự động giữa việc

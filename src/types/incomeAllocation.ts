@@ -67,4 +67,23 @@ export interface SavingsPlanRecommendation {
   proposedSavingsCap: number | null;
   /** Only set when status is 'infeasible' — the ceiling without cutting Needs. */
   maxFundableMonthlySavings: number | null;
+  /** Total still to be saved across the goals counted above. */
+  totalRemainingAmount: number;
+  /**
+   * Shortest deadline that could ever work, in whole months. Only set when status is
+   * 'infeasible' and the ceiling is above zero — i.e. exactly when the user needs to know how
+   * far to push the deadline out.
+   */
+  minimumMonthsToFund: number | null;
+  /**
+   * Largest target that fits the existing deadline. Only set when status is 'infeasible' AND
+   * exactly one goal was counted — with several there is no single target to lower.
+   */
+  maximumFundableTargetAmount: number | null;
+  /**
+   * The split already scheduled for next month, if any. Applying **replaces** it, so the screen
+   * must warn before discarding a split the customer set themselves. Null when nothing is
+   * scheduled, and `undefined` against a backend that predates this field.
+   */
+  pendingBeforeApply: IncomeAllocationSetting | null;
 }

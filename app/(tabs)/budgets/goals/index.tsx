@@ -29,7 +29,10 @@ import {
 } from '@/hooks/useIncomeAllocation';
 import { getApiErrorMessage } from '@/utils/errors';
 import type { SavingsGoalWithProgress } from '@/types/goal';
-import type { SavingsPlanRecommendation } from '@/types/incomeAllocation';
+import type {
+  IncomeAllocationSetting,
+  SavingsPlanRecommendation,
+} from '@/types/incomeAllocation';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -60,11 +63,35 @@ const S = {
     `Từ đầu tháng sau, hũ Tiết kiệm sẽ là ${savingsPct}%. Tháng này giữ nguyên.`,
   planApplyError: 'Không áp dụng được. Hãy thử lại.',
   planApplyStale: 'Mục tiêu vừa thay đổi nên đề xuất không còn phù hợp. Hãy kéo xuống để tải lại.',
+  // Applying replaces next month's scheduled split. Warn first when that split isn't already
+  // what we're about to write — silently discarding one the customer set themselves is a
+  // surprise, not a convenience.
+  planOverwriteTitle: 'Thay thế phân bổ đã đặt cho tháng sau?',
+  planOverwriteMsg: (current: string, next: string) =>
+    `Tháng sau bạn đã đặt ${current}. Áp dụng đề xuất sẽ thay bằng ${next}.`,
+  planOverwriteConfirm: 'Thay thế',
+  planSplitLabel: (needs: string, wants: string, savings: string) =>
+    `Cần ${needs}% / Muốn ${wants}% / Tiết kiệm ${savings}%`,
   planInfeasible: (needed: string, max: string) =>
-    `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần. Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.`,
+    `Các mục tiêu cần ${needed}/tháng nhưng kế hoạch hiện tại nhiều nhất chỉ dành ra được ${max}/tháng mà không cắt hũ Cần.`,
+  planInfeasibleMonths: (months: number, when: string) =>
+    `Cần ít nhất ${months} tháng tích luỹ, tức giãn thời hạn tới ${when}.`,
+  // The month count is whole months from today, so it drops by one the day the deadline's
+  // day-of-month falls behind today's. Without saying so, the number looks unstable.
+  planMonthRuleNote: 'Số tháng tính tròn từ hôm nay, nên có thể đổi khi sang ngày mới.',
+  planInfeasibleTarget: (amount: string) =>
+    `Hoặc hạ mục tiêu xuống ${amount} nếu giữ nguyên thời hạn.`,
+  planInfeasibleFallback: 'Hãy giãn thời hạn, hạ mục tiêu, hoặc tăng thu nhập.',
   planNoIncome: 'Chưa có thu nhập hàng tháng nên không tính được mức chi tiêu phù hợp. Hãy đặt thu nhập trong phần Phân bổ ngân sách.',
+  // Positive confirmation, not a warning: without it the customer can't tell "checked, you're
+  // fine" apart from "never checked".
+  planOnTrack: (needed: string, cap: string) =>
+    `Mục tiêu của bạn nằm trong phân bổ Tiết kiệm — cần ${needed}/tháng, hạn mức ${cap}/tháng.`,
   planNoDeadlineNote: (n: number) =>
-    `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên.`,
+    `${n} mục tiêu chưa có thời hạn nên không được tính vào con số trên. Mở từng mục tiêu để thêm thời hạn.`,
+  // Single goal: name it and make the note the action, so the fix is one tap instead of a hunt.
+  planNoDeadlineAction: (goalName: string) =>
+    `"${goalName}" chưa có thời hạn nên không được tính vào con số trên. Chạm để thêm thời hạn.`,
   ok: 'OK',
   newGoalTitle: 'Tạo mục tiêu mới',
   nameLabel: 'Tên mục tiêu',
@@ -84,6 +111,17 @@ const S = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * "tháng 8/2027" for a count of whole months from today. The backend returns a month count, but
+ * a user reading "cần ít nhất 12 tháng" still has to work out what date to type into the picker —
+ * so name the month for them.
+ */
+function monthsFromNowLabel(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return `tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
 /** Drops a trailing `.00` so a whole percentage reads "25%", not "25.00%". */
 function formatPct(pct: number): string {
   return String(Number(pct.toFixed(2)));
@@ -93,6 +131,17 @@ function formatVND(amount: number): string {
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}M`;
   if (amount >= 1_000) return `${Math.round(amount / 1_000)}K`;
   return amount.toLocaleString('vi-VN');
+}
+
+/**
+ * Exact đồng, no compaction. The savings-plan banner uses this instead of `formatVND` because
+ * its figures are the ones a customer cross-checks against the Budget Allocation screen — and
+ * `formatVND` renders 1.176.471đ as "1.2M", which reads as a different number from the 23,53%
+ * shown there. Compact form is still right on the goal cards, where space is tight and nothing
+ * has to reconcile.
+ */
+function formatExactVND(amount: number): string {
+  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
 
 function daysUntil(isoDate: string | null): number {
@@ -109,6 +158,46 @@ function isoDaysFromNow(days: number): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * The one goal the "add a deadline" shortcut should open, or null when there isn't exactly one.
+ *
+ * Two sources have to agree: the backend's count (which is what the banner's other figures were
+ * computed against) and the local goal list (which is what a tap can actually navigate to). When
+ * they disagree — a goal completed or archived between the two reads — the note stays plain text
+ * rather than sending the customer to a goal that isn't the one being skipped.
+ *
+ * Exported for testing: silently opening the wrong goal is the kind of defect nothing else here
+ * would catch.
+ */
+export function resolveSingleMissingDeadlineGoal<T>(
+  backendCount: number,
+  localGoalsMissingDeadline: readonly T[],
+): T | null {
+  if (backendCount !== 1 || localGoalsMissingDeadline.length !== 1) return null;
+  return localGoalsMissingDeadline[0];
+}
+
+/**
+ * Would applying the recommendation discard a *different* split the customer already scheduled
+ * for next month?
+ *
+ * Exported so it's directly testable. Applying upserts next month's row, so an existing draft is
+ * replaced silently — that was a real data-loss surprise in testing (a hand-set 61/23,4/15,6 was
+ * overwritten with no prompt). Re-applying an identical split is still a no-op the user
+ * shouldn't have to confirm, hence the comparison rather than a bare null check.
+ */
+export function replacesDifferentPendingSplit(
+  pending: Pick<IncomeAllocationSetting, 'needsPct' | 'wantsPct' | 'savingsPct'> | null | undefined,
+  proposed: { needsPct: number | null; wantsPct: number | null; savingsPct: number | null },
+): boolean {
+  if (!pending) return false;
+  return (
+    pending.needsPct !== proposed.needsPct ||
+    pending.wantsPct !== proposed.wantsPct ||
+    pending.savingsPct !== proposed.savingsPct
+  );
 }
 
 /**
@@ -334,22 +423,77 @@ function SavingsPlanBanner({
   plan,
   isApplying,
   onApply,
+  goalsMissingDeadline,
+  onOpenGoal,
 }: {
   plan: SavingsPlanRecommendation;
   isApplying: boolean;
   onApply: () => void;
+  /** Active goals with no deadline, from the list this banner sits above. */
+  goalsMissingDeadline: SavingsGoalWithProgress[];
+  onOpenGoal: (goal: SavingsGoalWithProgress) => void;
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  if (plan.status !== 'adjustable' && plan.status !== 'infeasible' && plan.status !== 'no_income') {
+  /**
+   * Goals with no deadline are excluded from the figures above — say so, and where possible let
+   * the user act on it instead of leaving them to work out that a deadline is what's missing.
+   *
+   * The count comes from the backend so it can't contradict the numbers it qualifies, but the
+   * tap needs a real goal object. Only offered when both sources agree there is exactly one;
+   * if they disagree the note stays plain text rather than sending the user to the wrong goal.
+   */
+  const missingDeadlineCount = plan.goalsWithoutDeadline;
+  const singleMissingGoal = resolveSingleMissingDeadlineGoal(
+    missingDeadlineCount,
+    goalsMissingDeadline,
+  );
+
+  const deadlineNote =
+    missingDeadlineCount > 0 ? (
+      singleMissingGoal ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => onOpenGoal(singleMissingGoal)}
+          accessibilityRole="button"
+          accessibilityLabel={S.planNoDeadlineAction(singleMissingGoal.name)}>
+          <Text style={styles.planBannerNoteLink}>
+            {S.planNoDeadlineAction(singleMissingGoal.name)}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.planBannerNote}>
+          {S.planNoDeadlineNote(missingDeadlineCount)}
+        </Text>
+      )
+    ) : null;
+
+  // Nothing to fund, or a split that can't produce a proposal — the empty state and the goal
+  // list already say everything there is to say.
+  if (plan.status === 'no_goals' || plan.status === 'invalid_allocation') {
     return null;
   }
 
-  // Only worth mentioning alongside a problem — on its own it would read as an
-  // error when nothing is actually wrong.
-  const deadlineNote =
-    plan.goalsWithoutDeadline > 0 ? S.planNoDeadlineNote(plan.goalsWithoutDeadline) : null;
+  // Confirm explicitly when the plan already covers the goals. Rendering nothing leaves the
+  // customer unable to tell "checked, you're fine" apart from "never checked" — the ambiguity
+  // an external review flagged. Kept visually quiet: a single positive line, not a warning card.
+  if (plan.status === 'on_track') {
+    return (
+      <View style={styles.planOkBanner}>
+        <MaterialIcon name="check_circle" size={18} color={colors.tertiary} />
+        <View style={styles.planBannerBody}>
+          <Text style={styles.planOkText}>
+            {S.planOnTrack(
+              formatExactVND(plan.requiredMonthlySavings),
+              formatExactVND(plan.currentSavingsCap),
+            )}
+          </Text>
+          {deadlineNote}
+        </View>
+      </View>
+    );
+  }
 
   if (plan.status === 'no_income') {
     return (
@@ -361,17 +505,47 @@ function SavingsPlanBanner({
   }
 
   if (plan.status === 'infeasible') {
+    // The plan already knows how far the deadline would have to move, and — for a single goal —
+    // how far the target would have to drop. Showing only "hãy giãn thời hạn" would make the
+    // user guess at a number the system has already computed.
+    // `typeof === 'number'`, not `!== null`: against a backend that predates these fields they
+    // arrive as `undefined`, and `undefined !== null` is true — which would render
+    // "Cần ít nhất undefined tháng" instead of falling back.
+    const months = typeof plan.minimumMonthsToFund === 'number' ? plan.minimumMonthsToFund : null;
+    const maxTarget =
+      typeof plan.maximumFundableTargetAmount === 'number'
+        ? plan.maximumFundableTargetAmount
+        : null;
+    const hasConcreteFix = months !== null || maxTarget !== null;
+
     return (
       <View style={styles.affordabilityBanner}>
         <MaterialIcon name="warning" size={18} color={colors.secondary} />
         <View style={styles.planBannerBody}>
           <Text style={styles.affordabilityBannerText}>
             {S.planInfeasible(
-              formatVND(plan.requiredMonthlySavings),
-              formatVND(plan.maxFundableMonthlySavings ?? 0),
+              formatExactVND(plan.requiredMonthlySavings),
+              formatExactVND(plan.maxFundableMonthlySavings ?? 0),
             )}
           </Text>
-          {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+          {months !== null && (
+            <>
+              <Text style={styles.affordabilityBannerText}>
+                {S.planInfeasibleMonths(months, monthsFromNowLabel(months))}
+              </Text>
+              <Text style={styles.planBannerNote}>{S.planMonthRuleNote}</Text>
+            </>
+          )}
+          {maxTarget !== null && (
+            <Text style={styles.affordabilityBannerText}>
+              {S.planInfeasibleTarget(formatExactVND(maxTarget))}
+            </Text>
+          )}
+          {/* No headroom at all (ceiling is 0) — there is genuinely no number to offer. */}
+          {!hasConcreteFix && (
+            <Text style={styles.affordabilityBannerText}>{S.planInfeasibleFallback}</Text>
+          )}
+          {deadlineNote}
         </View>
       </View>
     );
@@ -383,17 +557,17 @@ function SavingsPlanBanner({
       <View style={styles.planBannerBody}>
         <Text style={styles.affordabilityBannerText}>
           {S.planAdjustable(
-            formatVND(plan.requiredMonthlySavings),
-            formatVND(plan.currentSavingsCap),
+            formatExactVND(plan.requiredMonthlySavings),
+            formatExactVND(plan.currentSavingsCap),
           )}
         </Text>
         <Text style={styles.affordabilityBannerText}>
           {S.planAdjustableFix(
             formatPct(plan.proposedSavingsPct ?? 0),
-            formatVND(plan.proposedWantsCap ?? 0),
+            formatExactVND(plan.proposedWantsCap ?? 0),
           )}
         </Text>
-        {deadlineNote && <Text style={styles.planBannerNote}>{deadlineNote}</Text>}
+        {deadlineNote}
         <TouchableOpacity
           activeOpacity={0.7}
           style={[styles.planApplyBtn, isApplying && styles.planApplyBtnDisabled]}
@@ -437,6 +611,13 @@ export default function GoalsScreen() {
       .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline)),
     [goals]);
 
+  // The banner reports how many goals its figures had to skip; this is the same set locally, so
+  // it can offer to open the one that needs a deadline instead of only naming the problem.
+  const goalsMissingDeadline = useMemo(
+    () => activeGoals.filter((g) => !g.deadline),
+    [activeGoals],
+  );
+
   // `savingsCap` is already an absolute VND amount, correctly scaled (see
   // real/budgets.ts's toBucket normalization) — no further conversion needed.
   const savingsCap = bucketAllocation?.buckets.find((b) => b.bucket === 'savings')?.allocationCap ?? 0;
@@ -451,7 +632,7 @@ export default function GoalsScreen() {
   // warning never silently disappears mid-rollout.
   const showLocalWarning = !savingsPlan && isOverAllocated;
 
-  const handleApplyPlan = useCallback(() => {
+  const runApplyPlan = useCallback(() => {
     applyPlan.mutate(undefined, {
       onSuccess: (scheduled) => {
         Alert.alert(S.planAppliedTitle, S.planAppliedMsg(formatPct(scheduled.savingsPct)));
@@ -464,6 +645,41 @@ export default function GoalsScreen() {
       },
     });
   }, [applyPlan]);
+
+  const handleApplyPlan = useCallback(() => {
+    const pending = savingsPlan?.pendingBeforeApply ?? null;
+
+    const replacesDifferentSplit = replacesDifferentPendingSplit(pending, {
+      needsPct: savingsPlan?.proposedNeedsPct ?? null,
+      wantsPct: savingsPlan?.proposedWantsPct ?? null,
+      savingsPct: savingsPlan?.proposedSavingsPct ?? null,
+    });
+
+    if (!replacesDifferentSplit || pending === null) {
+      runApplyPlan();
+      return;
+    }
+
+    Alert.alert(
+      S.planOverwriteTitle,
+      S.planOverwriteMsg(
+        S.planSplitLabel(
+          formatPct(pending.needsPct),
+          formatPct(pending.wantsPct),
+          formatPct(pending.savingsPct),
+        ),
+        S.planSplitLabel(
+          formatPct(savingsPlan?.proposedNeedsPct ?? 0),
+          formatPct(savingsPlan?.proposedWantsPct ?? 0),
+          formatPct(savingsPlan?.proposedSavingsPct ?? 0),
+        ),
+      ),
+      [
+        { text: S.cancel, style: 'cancel' },
+        { text: S.planOverwriteConfirm, style: 'destructive', onPress: runApplyPlan },
+      ],
+    );
+  }, [savingsPlan, runApplyPlan]);
 
   const completedGoals = useMemo(() =>
     (goals as SavingsGoalWithProgress[]).filter((g) => !g.isDeleted && g.isCompleted),
@@ -541,6 +757,8 @@ export default function GoalsScreen() {
                 plan={savingsPlan}
                 isApplying={applyPlan.isPending}
                 onApply={handleApplyPlan}
+                goalsMissingDeadline={goalsMissingDeadline}
+                onOpenGoal={handleGoalPress}
               />
             )}
             {activeGoals.map((goal) => (
@@ -632,6 +850,18 @@ function createStyles(colors: ThemeColors) {
   affordabilityBannerText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
   planBannerBody: { flex: 1, gap: SPACING[2] },
   planBannerNote: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
+  planBannerNoteLink: {
+    fontSize: FONT_SIZE.xs, color: colors.primary, lineHeight: 18,
+    fontWeight: FONT_WEIGHT.semibold, textDecorationLine: 'underline',
+  },
+  // Deliberately lighter than affordabilityBanner: this confirms rather than warns, so it uses
+  // the positive tone and no heavy border.
+  planOkBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING[2],
+    backgroundColor: withAlpha(colors.tertiary, 0.08),
+    borderRadius: BORDER_RADIUS.lg, padding: SPACING[3],
+  },
+  planOkText: { flex: 1, fontSize: FONT_SIZE.xs, color: colors.onSurface, lineHeight: 18 },
   planApplyBtn: {
     alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center',
     paddingHorizontal: SPACING[4], paddingVertical: SPACING[2],

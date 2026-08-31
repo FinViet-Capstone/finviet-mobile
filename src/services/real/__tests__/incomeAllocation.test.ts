@@ -49,6 +49,10 @@ const adjustableDto = {
   proposedWantsCap: 5_000_000,
   proposedSavingsCap: 5_000_000,
   maxFundableMonthlySavings: null,
+  totalRemainingAmount: 30_000_000,
+  minimumMonthsToFund: null,
+  maximumFundableTargetAmount: null,
+  pendingBeforeApply: null,
 };
 
 beforeEach(() => {
@@ -87,6 +91,58 @@ describe('getSavingsPlanRecommendation', () => {
 
     expect(result!.proposedSavingsPct).toBeNull();
     expect(result!.maxFundableMonthlySavings).toBe(9_000_000);
+  });
+
+  it('maps the pending split that applying would replace', async () => {
+    // The screen needs this to warn before discarding a draft the customer set themselves.
+    mockedGet.mockResolvedValueOnce(
+      envelope({
+        ...adjustableDto,
+        pendingBeforeApply: {
+          effectiveMonth: '2026-09',
+          monthlyIncome: 5_000_000,
+          needsPct: 61,
+          wantsPct: 23.4,
+          savingsPct: 15.6,
+        },
+      }),
+    );
+
+    const result = await getSavingsPlanRecommendation();
+
+    expect(result!.pendingBeforeApply).not.toBeNull();
+    expect(result!.pendingBeforeApply!.savingsPct).toBe(15.6);
+    expect(result!.pendingBeforeApply!.effectiveMonth).toBe('2026-09');
+  });
+
+  it('leaves pendingBeforeApply null when nothing is scheduled', async () => {
+    mockedGet.mockResolvedValueOnce(envelope(adjustableDto));
+
+    const result = await getSavingsPlanRecommendation();
+
+    expect(result!.pendingBeforeApply).toBeNull();
+  });
+
+  it('carries the infeasible escape hatches through', async () => {
+    // Without these the banner can only say "giãn thời hạn" with no number, which is the gap
+    // this pass exists to close.
+    mockedGet.mockResolvedValueOnce(
+      envelope({
+        ...adjustableDto,
+        status: 'infeasible',
+        proposed: null,
+        maxFundableMonthlySavings: 2_250_000,
+        totalRemainingAmount: 27_000_000,
+        minimumMonthsToFund: 12,
+        maximumFundableTargetAmount: 9_500_000,
+      }),
+    );
+
+    const result = await getSavingsPlanRecommendation();
+
+    expect(result!.totalRemainingAmount).toBe(27_000_000);
+    expect(result!.minimumMonthsToFund).toBe(12);
+    expect(result!.maximumFundableTargetAmount).toBe(9_500_000);
   });
 
   it('resolves to null on 404 so the screen can fall back instead of erroring', async () => {
