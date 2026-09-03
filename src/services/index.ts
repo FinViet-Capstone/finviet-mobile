@@ -59,6 +59,7 @@ export const createTransaction = transactions.createTransaction;
 export const updateTransaction = transactions.updateTransaction;
 export const classifyTransaction = transactions.classifyTransaction;
 export const deleteTransaction = transactions.deleteTransaction;
+export const splitTransaction = transactions.splitTransaction;
 export const createTransfer = transactions.createTransfer;
 export type {
   TransactionFilters,

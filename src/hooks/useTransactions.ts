@@ -8,10 +8,12 @@ import {
   updateTransaction,
   classifyTransaction,
   deleteTransaction,
+  splitTransaction,
   type TransactionFilters,
   type CreateTransactionInput,
   type UpdateTransactionInput,
 } from '@/services';
+import type { SplitPartInput } from '@/types';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 import { invalidateAiDerived } from './useReports';
 
@@ -84,6 +86,21 @@ export const useDeleteTransaction = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteTransaction(id),
+    onSuccess: () => invalidateTransactionDependents(qc),
+  });
+};
+
+/**
+ * Split a transaction across categories. The original id stops existing on success — the
+ * backend replaces that row with the parts — so callers must navigate away rather than stay on
+ * its detail screen. Invalidates the same dependents as any other transaction write, since the
+ * parts change what every category-based aggregation sees.
+ */
+export const useSplitTransaction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, parts }: { id: string; parts: SplitPartInput[] }) =>
+      splitTransaction(id, parts),
     onSuccess: () => invalidateTransactionDependents(qc),
   });
 };
