@@ -38,13 +38,19 @@ import {
   useCreateRule,
   useCategorizeTransaction,
   useOverrideCategorization,
+  useSplitTransaction,
 } from '@/hooks';
-import { CATEGORIES, getCategoryTypeForTransaction } from '@/constants/categories';
+import {
+  CATEGORIES,
+  getCategoryTypeForTransaction,
+  type CategoryType,
+} from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVND } from '@/utils/formatters';
 import { getApiErrorMessage } from '@/utils/errors';
+import { computeSplitState } from '@/utils/transactionSplit';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
-import type { CategorizationOutcome } from '@/types';
+import type { CategorizationOutcome, SplitPartInput } from '@/types';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Route: /transactions/[id]?mode=full|category
@@ -93,6 +99,10 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const [amountError, setAmountError] = useState<string | undefined>();
   const [amountFocused, setAmountFocused] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<CategorizationOutcome | null>(null);
+
+  const splitMutation = useSplitTransaction();
+  const [showSplitSheet, setShowSplitSheet] = useState(false);
+  const [splitSession, setSplitSession] = useState(0);
 
   useEffect(() => {
     if (!tx) return;
@@ -285,6 +295,11 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         <View style={styles.banner}>
           <MaterialIcon name="link" size={18} color={colors.secondary} />
           <Text style={styles.bannerText}>{S.linkedBanner}</Text>
+        </View>
+      ) : tx.splitGroupId ? (
+        <View style={styles.banner}>
+          <MaterialIcon name="call_split" size={18} color={colors.secondary} />
+          <Text style={styles.bannerText}>{S.splitFromGroup}</Text>
         </View>
       ) : null}
 
@@ -483,6 +498,22 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
                 ? <ActivityIndicator size="small" color={colors.onPrimary} />
                 : <Text style={styles.saveBtnText}>{S.save}</Text>}
             </TouchableOpacity>
+            {/* Same rules the backend enforces: linked-wallet rows, transfer legs and saving-goal
+                ledger rows cannot be split. Hiding the action avoids a predictable 422. */}
+            {selectedWallet?.type !== 'linked' &&
+              !tx.transferPairId &&
+              tx.categoryId !== 'cat_savings_goal' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.splitBtn}
+                onPress={() => { setSplitSession((n) => n + 1); setShowSplitSheet(true); }}
+                accessibilityRole="button"
+                accessibilityLabel={S.split}
+              >
+                <MaterialIcon name="call_split" size={18} color={colors.primary} />
+                <Text style={styles.splitBtnText}>{S.split}</Text>
+              </TouchableOpacity>
+            )}
             {/* Bank-synced (linked-wallet) transactions are read-only and cannot be deleted. */}
             {selectedWallet?.type !== 'linked' && (
               <TouchableOpacity
@@ -499,6 +530,34 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* entryType is null only for transfer legs, which can't be split — the button that
+          opens this is hidden for those, so the 'expense' fallback never reaches the user. */}
+      <SplitSheet
+        key={splitSession}
+        visible={showSplitSheet}
+        transaction={{ amount: tx.amount, categoryId: tx.categoryId }}
+        entryType={getCategoryTypeForTransaction(tx.type) ?? 'expense'}
+        isSubmitting={splitMutation.isPending}
+        onClose={() => setShowSplitSheet(false)}
+        onSubmit={(parts) => {
+          splitMutation.mutate(
+            { id: txId, parts },
+            {
+              onSuccess: (created) => {
+                setShowSplitSheet(false);
+                Alert.alert(S.splitDoneTitle, S.splitDoneMsg(created.length));
+                // This transaction no longer exists — the backend replaced it with the
+                // parts — so staying on its detail screen would show a 404.
+                router.dismissTo('/(tabs)/transactions');
+              },
+              onError: (err) => {
+                Alert.alert(S.splitError, getApiErrorMessage(err, S.splitError));
+              },
+            },
+          );
+        }}
+      />
 
       {/* Category picker */}
       <CategoryPickerSheet
@@ -551,6 +610,219 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         onDone={() => setAmountFocused(false)}
       />
     </SafeAreaView>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Split sheet
+// ───────────────────────────────────────────────────────────────────────────
+
+interface SplitDraftPart {
+  key: string;
+  categoryId: string | null;
+  amountRaw: string;
+}
+
+let splitPartKeySeq = 0;
+const newSplitPart = (): SplitDraftPart => ({
+  key: `part-${splitPartKeySeq++}`,
+  categoryId: null,
+  amountRaw: '',
+});
+
+/**
+ * Splits one transaction across categories.
+ *
+ * Seeded once per mount; the parent bumps this component's `key` each time the sheet opens, so
+ * a cancelled draft never lingers — same reason as the goal edit sheet, and it avoids a
+ * re-seeding effect that would trip react-hooks/set-state-in-effect.
+ */
+function SplitSheet({
+  visible,
+  transaction,
+  entryType,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  transaction: { amount: number; categoryId: string | null };
+  /** Income parts belong to income categories — the picker must not offer expense ones. */
+  entryType: CategoryType;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (parts: SplitPartInput[]) => void;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // Two rows to begin with: a split is at least two parts, so starting with one would only
+  // ever be a step the user has to take before anything can happen.
+  const [parts, setParts] = useState<SplitDraftPart[]>(() => [
+    { ...newSplitPart(), categoryId: transaction.categoryId },
+    newSplitPart(),
+  ]);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const parsed = useMemo(
+    () => parts.map((p) => ({ ...p, amount: parseInt(p.amountRaw || '0', 10) || 0 })),
+    [parts],
+  );
+  const { remaining, canSubmit } = computeSplitState(transaction.amount, parsed);
+  const hasPositiveParts = parsed.every((part) => part.amount > 0);
+
+  const setAmount = useCallback((key: string, raw: string) => {
+    const digits = raw.replace(/[^0-9]/g, '');
+    setParts((prev) => prev.map((p) => (p.key === key ? { ...p, amountRaw: digits } : p)));
+  }, []);
+
+  const setCategory = useCallback((key: string, categoryId: string | null) => {
+    setParts((prev) => prev.map((p) => (p.key === key ? { ...p, categoryId } : p)));
+  }, []);
+
+  const addPart = useCallback(() => setParts((prev) => [...prev, newSplitPart()]), []);
+
+  const removePart = useCallback((key: string) => {
+    setParts((prev) => (prev.length <= 2 ? prev : prev.filter((p) => p.key !== key)));
+  }, []);
+
+  /** Puts whatever is unallocated into this row, so the last part is one tap, not arithmetic. */
+  const fillRemainder = useCallback((key: string) => {
+    setParts((prev) => {
+      const others = prev.filter((p) => p.key !== key);
+      const allocated = others.reduce((s, p) => s + (parseInt(p.amountRaw || '0', 10) || 0), 0);
+      const left = transaction.amount - allocated;
+      if (left <= 0) return prev;
+      return prev.map((p) => (p.key === key ? { ...p, amountRaw: String(left) } : p));
+    });
+  }, [transaction.amount]);
+
+  const handleConfirm = useCallback(() => {
+    if (!canSubmit) return;
+    onSubmit(parsed.map((p) => ({ categoryId: p.categoryId, amount: p.amount })));
+  }, [canSubmit, parsed, onSubmit]);
+
+  const editingPart = parts.find((p) => p.key === editingKey) ?? null;
+
+  return (
+    <>
+      {/* Android does not reliably stack two React Native Modal-backed sheets. Temporarily hide
+          this one while the category picker is open; the component stays mounted so its draft
+          values are preserved when the picker closes. */}
+      <DraggableSheet visible={visible && editingPart === null} onClose={onClose}>
+        <ScrollView
+          contentContainerStyle={styles.splitSheet}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.splitTitle}>{S.splitTitle}</Text>
+          <Text style={styles.splitIntro}>{S.splitIntro(formatVND(transaction.amount))}</Text>
+
+          {parts.map((part, index) => {
+            const cat = part.categoryId
+              ? CATEGORIES.find((c) => c.id === part.categoryId) ?? null
+              : null;
+            return (
+              <View key={part.key} style={styles.splitRow}>
+                <View style={styles.splitRowHead}>
+                  <Text style={styles.splitRowLabel}>{S.splitPartLabel(index + 1)}</Text>
+                  {parts.length > 2 && (
+                    <TouchableOpacity
+                      onPress={() => removePart(part.key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={S.splitRemovePart}
+                    >
+                      <MaterialIcon name="close" size={16} color={colors.onSurfaceVariant} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.splitCategoryBtn}
+                  onPress={() => setEditingKey(part.key)}
+                >
+                  {cat ? (
+                    <>
+                      <View style={[styles.splitCatDot, { backgroundColor: cat.color }]} />
+                      <Text style={styles.splitCategoryText}>{cat.nameVi}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.splitCategoryPlaceholder}>{S.splitPickCategory}</Text>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.splitAmountRow}>
+                  <TextInput
+                    containerStyle={styles.splitAmountInput}
+                    value={part.amountRaw ? Number(part.amountRaw).toLocaleString('vi-VN') : ''}
+                    onChangeText={(t) => setAmount(part.key, t)}
+                    placeholder={S.splitAmountPlaceholder}
+                    keyboardType="number-pad"
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.splitFillBtn}
+                    onPress={() => fillRemainder(part.key)}
+                    accessibilityRole="button"
+                    accessibilityLabel={S.splitFillRemainder}
+                  >
+                    <MaterialIcon name="download" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+
+          <TouchableOpacity activeOpacity={0.7} style={styles.splitAddBtn} onPress={addPart}>
+            <MaterialIcon name="add" size={16} color={colors.primary} />
+            <Text style={styles.splitAddText}>{S.splitAddPart}</Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.splitStatus, canSubmit ? styles.splitOk : styles.splitBad]}>
+            {remaining === 0
+              ? hasPositiveParts
+                ? S.splitBalanced
+                : S.splitPositiveParts
+              : remaining > 0
+                ? S.splitRemaining(formatVND(remaining))
+                : S.splitOver(formatVND(-remaining))}
+          </Text>
+
+          <View style={styles.splitActions}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.splitCancelBtn} onPress={onClose}>
+              <Text style={styles.splitCancelText}>{S.cancel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.splitConfirmBtn, (!canSubmit || isSubmitting) && styles.btnDisabled]}
+              onPress={handleConfirm}
+              disabled={!canSubmit || isSubmitting}
+              accessibilityRole="button"
+              accessibilityLabel={S.splitConfirm}
+              accessibilityState={{ disabled: !canSubmit || isSubmitting }}
+            >
+              {isSubmitting
+                ? <ActivityIndicator size="small" color={colors.onPrimary} />
+                : <Text style={styles.splitConfirmText}>{S.splitConfirm}</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </DraggableSheet>
+
+      <CategoryPickerSheet
+        visible={visible && editingPart !== null}
+        title={S.splitPickCategory}
+        entryType={entryType}
+        selectedCategoryId={editingPart?.categoryId ?? null}
+        onSelect={(id) => {
+          if (editingPart) setCategory(editingPart.key, id);
+          setEditingKey(null);
+        }}
+        onClose={() => setEditingKey(null)}
+      />
+    </>
   );
 }
 
@@ -664,6 +936,58 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center', justifyContent: 'center',
   },
   deleteBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.error },
+  // ── Chia giao dịch ────────────────────────────────────────────────────────
+  splitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],
+    minHeight: 48, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: colors.primary,
+  },
+  splitBtnText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
+  splitSheet: { padding: SPACING[4], gap: SPACING[3], paddingBottom: SPACING[8] },
+  splitTitle: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface },
+  splitIntro: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
+  splitRow: {
+    gap: SPACING[2], padding: SPACING[3],
+    borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.surfaceVariant,
+  },
+  splitRowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  splitRowLabel: {
+    fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant,
+  },
+  splitCategoryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING[2],
+    minHeight: 44, paddingHorizontal: SPACING[3],
+    borderRadius: BORDER_RADIUS.md, backgroundColor: colors.surface,
+  },
+  splitCatDot: { width: 10, height: 10, borderRadius: 5 },
+  splitCategoryText: { fontSize: FONT_SIZE.sm, color: colors.onSurface },
+  splitCategoryPlaceholder: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
+  splitAmountRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
+  splitAmountInput: { flex: 1, marginBottom: 0 },
+  splitFillBtn: {
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.md, backgroundColor: colors.surface,
+  },
+  splitAddBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[1],
+    minHeight: 44, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary,
+  },
+  splitAddText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.primary },
+  splitStatus: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, textAlign: 'center' },
+  splitOk: { color: colors.tertiary },
+  splitBad: { color: colors.error },
+  splitActions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[2] },
+  splitCancelBtn: {
+    flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.surfaceVariant,
+  },
+  splitCancelText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+  splitConfirmBtn: {
+    flex: 2, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.lg, backgroundColor: colors.primary,
+  },
+  splitConfirmText: { fontSize: FONT_SIZE.base, fontWeight: FONT_WEIGHT.semibold, color: colors.onPrimary },
   btnDisabled: { opacity: 0.5 },
 
   // Sheet

@@ -1,6 +1,6 @@
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { api } from '@/lib/api';
-import { getTransactions } from '@/services/real/transactions';
+import { getTransactions, splitTransaction } from '@/services/real/transactions';
 
 function transactionDto(id: string, createdAt: string) {
   return {
@@ -75,5 +75,56 @@ describe('real transactions service', () => {
       'contribution',
     ]);
     expect(mock.history.get).toHaveLength(2);
+  });
+
+  it('splits a transaction and accepts the backend direct-list response', async () => {
+    const first = {
+      ...transactionDto('part-a', '2026-08-14T03:00:00Z'),
+      categoryId: 'cat_food',
+      amount: 3_000_000,
+      splitGroupId: 'group-1',
+    };
+    const second = {
+      ...transactionDto('part-b', '2026-08-14T03:00:00Z'),
+      categoryId: 'cat_shopping',
+      amount: 2_000_000,
+      splitGroupId: 'group-1',
+    };
+    mock.onPost('/transactions/original/split').reply(200, [first, second]);
+
+    const rows = await splitTransaction('original', [
+      { categoryId: 'cat_food', amount: 3_000_000 },
+      { categoryId: 'cat_shopping', amount: 2_000_000 },
+    ]);
+
+    expect(rows.map((row) => [row.id, row.amount, row.splitGroupId])).toEqual([
+      ['part-a', 3_000_000, 'group-1'],
+      ['part-b', 2_000_000, 'group-1'],
+    ]);
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({
+      parts: [
+        { categoryId: 'cat_food', amount: 3_000_000, note: null },
+        { categoryId: 'cat_shopping', amount: 2_000_000, note: null },
+      ],
+    });
+    expect(mock.history.post[0].headers?.['Idempotency-Key']).toBeTruthy();
+  });
+
+  it('also accepts an enveloped split response during a rolling deploy', async () => {
+    const part = {
+      ...transactionDto('part-a', '2026-08-14T03:00:00Z'),
+      splitGroupId: 'group-1',
+    };
+    mock.onPost('/transactions/original/split').reply(200, {
+      success: true,
+      data: [part],
+    });
+
+    await expect(
+      splitTransaction('original', [
+        { categoryId: 'cat_food', amount: 2_500_000 },
+        { categoryId: 'cat_shopping', amount: 2_500_000 },
+      ]),
+    ).resolves.toMatchObject([{ id: 'part-a', splitGroupId: 'group-1' }]);
   });
 });

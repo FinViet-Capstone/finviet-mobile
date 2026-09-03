@@ -35,6 +35,27 @@ export const TX_DETAIL_STRINGS = {
 
   save: "Lưu thay đổi",
   delete: "Xóa giao dịch",
+  // ── Chia giao dịch (F09) ───────────────────────────────────────────────────
+  split: "Chia giao dịch",
+  splitTitle: "Chia giao dịch",
+  splitIntro: (amount: string) =>
+    `Chia ${amount} thành nhiều phần theo danh mục. Tổng các phần phải đúng bằng số tiền gốc.`,
+  splitPartLabel: (n: number) => `Phần ${n}`,
+  splitPickCategory: "Chọn danh mục",
+  splitAmountPlaceholder: "Số tiền",
+  splitFillRemainder: "Điền số tiền còn lại",
+  splitAddPart: "Thêm phần",
+  splitRemovePart: "Bớt phần",
+  splitBalanced: "Vừa đủ — có thể chia",
+  splitPositiveParts: "Mỗi phần phải lớn hơn 0 ₫",
+  splitRemaining: (amount: string) => `Còn thiếu ${amount}`,
+  splitOver: (amount: string) => `Thừa ${amount}`,
+  splitConfirm: "Chia giao dịch",
+  splitDoneTitle: "Đã chia",
+  splitDoneMsg: (n: number) => `Giao dịch đã được tách thành ${n} phần.`,
+  splitError: "Không chia được giao dịch.",
+  // The original row is replaced, so there is nothing to come back to.
+  splitFromGroup: "Được tách từ một giao dịch",
 
   amountPositiveError: "Số tiền phải lớn hơn 0",
   noWalletTitle: "Chưa chọn ví",
