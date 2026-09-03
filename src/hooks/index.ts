@@ -23,6 +23,7 @@ export {
   useUpdateTransaction,
   useClassifyTransaction,
   useDeleteTransaction,
+  useSplitTransaction,
 } from './useTransactions';
 export {
   useBudgets,

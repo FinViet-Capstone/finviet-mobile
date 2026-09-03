@@ -29,6 +29,7 @@ import type {
   CreateTransferInput,
   CreateTransferResult,
   TransactionSummary,
+  SplitPartInput,
 } from '@/types';
 
 // Maximum page size accepted by the backend. Calendar queries may span multiple
@@ -52,6 +53,7 @@ interface TransactionDto {
   merchant?: string | null;
   transferPairId?: string | null;
   externalId?: string | null;
+  splitGroupId?: string | null;
   createdAt?: string;
   updatedAt?: string | null;
 }
@@ -104,6 +106,7 @@ function toTransaction(dto: TransactionDto): Transaction {
     entryMethod: toEntryMethod(dto.entryMethod),
     transferPairId: dto.transferPairId ?? null,
     externalId: dto.externalId ?? null,
+    splitGroupId: dto.splitGroupId ?? null,
     createdAt: dto.createdAt ?? '',
     updatedAt: dto.updatedAt ?? dto.createdAt ?? '',
   };
@@ -286,6 +289,36 @@ export async function classifyTransaction(
 
 export async function deleteTransaction(id: string): Promise<void> {
   await api.delete(`/transactions/${id}`);
+}
+
+/**
+ * POST /transactions/{id}/split — replace one transaction with several parts across
+ * categories.
+ *
+ * The backend deletes the original row and writes the parts as siblings sharing a
+ * `splitGroupId`, so this returns a list rather than a single transaction and the caller must
+ * refetch: the id passed in no longer exists afterwards. Parts must sum to the original amount
+ * exactly, or the backend rejects with `split_total_mismatch` — it will not adjust anything to
+ * make them fit, because that would move the wallet balance.
+ */
+export async function splitTransaction(
+  id: string,
+  parts: SplitPartInput[],
+): Promise<Transaction[]> {
+  const res = await api.post(`/transactions/${id}/split`, {
+    parts: parts.map((p) => ({
+      categoryId: p.categoryId ?? null,
+      amount: p.amount,
+      note: p.note ?? null,
+    })),
+  }, idempotentConfig());
+
+  // The split endpoint was introduced returning the list directly, while older/mobile-facing
+  // controllers use ApiResponse<T>. Accept both shapes so the app works during a rolling deploy
+  // and does not try to call `.map` on undefined after a successful split.
+  const body = res.data as TransactionDto[] | { data?: TransactionDto[] };
+  const rows = Array.isArray(body) ? body : body.data ?? [];
+  return rows.map(toTransaction);
 }
 
 // ─── Transfer (api/wallets/transfer) ──────────────────────────────────────────

@@ -39,10 +39,26 @@ export interface Transaction {
   transferPairId: string | null;
   /** External transaction ID from linked wallet provider (SePay, etc.) */
   externalId: string | null;
+  /**
+   * Shared by every transaction produced from one split, so the UI can show that they came
+   * from a single payment. null = never part of a split.
+   *
+   * Optional rather than required: a backend that predates the field omits it, and the
+   * transfer legs this client synthesizes locally have no split group either. Read it as
+   * `?? null` rather than assuming presence.
+   */
+  splitGroupId?: string | null;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */
   updatedAt: string;
+}
+
+/** One part of a split: which category it belongs to and how much of the original it takes. */
+export interface SplitPartInput {
+  categoryId: string | null;
+  amount: number;
+  note?: string | null;
 }
 
 // -------------------------------------------------------------------------
