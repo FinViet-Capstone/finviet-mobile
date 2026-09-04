@@ -8,17 +8,11 @@
  *
  * The SMS/photo screens each consume a SINGLE PhotoExtractionResult (one
  * candidate transaction), while the backend returns an array of parsed rows —
- * we map the first recognised row onto that shape. Amount/date/merchant are
- * parsed deterministically server-side, so they carry high confidence when
- * present; the category is the only AI guess, so its confidence comes from
- * the row's model score. CSV extraction surfaces the full row array instead
+ * we map the first recognised row onto that shape. SMS fields are parsed
+ * deterministically; receipt fields are AI-read and may
+ * carry field-level confidence from the backend. The category keeps its own
+ * rule/model confidence. CSV extraction surfaces the full row array instead
  * (the review-list UX needs every row, not just the first).
- *
- * extractFromPhoto's endpoint exists but `IReceiptOcrService` is an
- * intentional placeholder server-side (no OCR provider configured yet) — it
- * always throws a 503 with code `ocr_not_configured`. Callers must surface
- * that honestly (see BUSINESS_RULE_MESSAGES_VI) rather than treat it as
- * "zero rows found."
  */
 
 import { api, unwrap } from '@/lib/api';
@@ -32,6 +26,9 @@ interface ExtractedRowDto {
   merchant: string | null;
   description: string | null;
   transactionDate: string; // ISO timestamp
+  amountConfidence?: number | null;
+  merchantConfidence?: number | null;
+  transactionDateConfidence?: number | null;
   categoryId: string | null;
   categoryName: string | null;
   confidence: number | null;
@@ -54,6 +51,11 @@ const EMPTY_RESULT: PhotoExtractionResult = {
   confidence: { amount: 0, merchant: 0, transactionDate: 0, categoryId: 0 },
 };
 
+function confidenceOrFallback(value: number | null | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(1, value));
+}
+
 function toExtractionResult(row: ExtractedRowDto): PhotoExtractionResult {
   return {
     amount: row.amount ?? null,
@@ -62,10 +64,14 @@ function toExtractionResult(row: ExtractedRowDto): PhotoExtractionResult {
     transactionDate: (row.transactionDate ?? '').slice(0, 10),
     categoryId: row.categoryId ?? null,
     confidence: {
-      // Amount/date are regex-parsed server-side — trust them when present.
-      amount: row.amount != null ? 0.95 : 0,
-      merchant: row.merchant ? 0.85 : 0,
-      transactionDate: row.transactionDate ? 0.95 : 0,
+      // New OCR responses supply real field confidence. Fallbacks keep SMS and
+      // pre-deploy backend responses backward compatible.
+      amount: confidenceOrFallback(row.amountConfidence, row.amount != null ? 0.95 : 0),
+      merchant: confidenceOrFallback(row.merchantConfidence, row.merchant ? 0.85 : 0),
+      transactionDate: confidenceOrFallback(
+        row.transactionDateConfidence,
+        row.transactionDate ? 0.95 : 0,
+      ),
       // The category is the model's suggestion; use its score (0 when unresolved).
       categoryId: row.categoryId ? (row.confidence ?? 0) : 0,
     },
@@ -82,9 +88,8 @@ export async function extractFromSMS(text: string): Promise<PhotoExtractionResul
 }
 
 /**
- * POST /extract/photo — multipart upload of a receipt photo. Throws (via the
- * axios interceptor → getApiErrorMessage) when the backend's OCR provider
- * isn't configured — see the file header comment above.
+ * POST /extract/photo — multipart upload of a receipt photo. Gemini/Render can
+ * take longer than the shared 20s Axios default, especially after a cold start.
  */
 export async function extractFromPhoto(uri: string): Promise<PhotoExtractionResult> {
   const name = uri.split('/').pop() || 'receipt.jpg';
@@ -96,6 +101,7 @@ export async function extractFromPhoto(uri: string): Promise<PhotoExtractionResu
 
   const res = await api.post('/extract/photo', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
   });
   const data = unwrap<ExtractResponseDto>(res);
   const first = data.rows?.[0];
