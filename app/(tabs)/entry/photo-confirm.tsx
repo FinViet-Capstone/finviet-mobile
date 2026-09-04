@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Image,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import {
   BORDER_RADIUS,
   FONT_SIZE,
@@ -26,11 +25,14 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { CATEGORIES } from "@/constants/categories";
 import { CategoryPickerSheet } from "@/components/categories";
+import { DatePickerField } from "@/components/common/DatePickerField";
+import { TextInput } from "@/components/common/TextInput";
 import { formatVND } from "@/utils/formatters";
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { getApiErrorMessage } from "@/utils/errors";
+import { isValidReceiptDate, parseReceiptAmount } from "@/utils/receiptReview";
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -45,10 +47,12 @@ const S = {
   stay: "Ở lại",
   goManual: "Nhập thủ công",
   uncertainNotice: "Các trường màu cam cần kiểm tra lại.",
+  reviewHint:
+    "Đây là kết quả AI đề xuất. Hãy chạm vào từng trường để kiểm tra và chỉnh sửa trước khi lưu.",
   selectAll: "Chọn tất cả",
   deselectAll: "Bỏ chọn tất cả",
   selectedCount: (selected: number, total: number) => `${selected}/${total} đã chọn`,
-  confirmAll: "Chấp nhận tất cả",
+  confirmAll: "Lưu sau khi kiểm tra",
   needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
   needCategory: "Chọn danh mục →",
   retake: "Chụp lại",
@@ -61,7 +65,12 @@ const S = {
   duplicate: "Có thể trùng",
   noWallet: "Chưa có ví",
   noWalletMsg: "Hãy tạo ít nhất một ví trước khi lưu.",
-  savedMsg: (n: number) => `Đã lưu ${n} giao dịch`,
+  savedTitle: "Đã lưu thành công",
+  savedMsg: (n: number, dateIso?: string) =>
+    n === 1 && dateIso
+      ? `Giao dịch đã được lưu vào ngày ${formatDate(dateIso)}. Mở chi tiết để kiểm tra ngay.`
+      : `Đã lưu ${n} giao dịch.`,
+  viewSaved: "Xem giao dịch",
   saveError: "Không lưu được. Hãy thử lại.",
   imageOf: (i: number, n: number) => `Ảnh ${i}/${n}`,
   fieldWallet: "Ví",
@@ -83,6 +92,7 @@ interface ExtractedRow {
   amountUncertain: boolean;
   merchantUncertain: boolean;
   categoryUncertain: boolean;
+  dateUncertain: boolean;
   selected: boolean;
   isDuplicate: boolean;
   failedMessage?: string;
@@ -103,11 +113,16 @@ function formatDate(iso: string): string {
  * configured server-side yet (finviet-be's IReceiptOcrService placeholder),
  * as opposed to a transient/per-image failure. */
 function isOcrNotConfigured(err: unknown): boolean {
-  return axios.isAxiosError(err) && err.response?.data?.code === "ocr_not_configured";
+  return isAxiosError(err) && err.response?.data?.code === "ocr_not_configured";
 }
 
 function isUncertain(row: ExtractedRow): boolean {
-  return row.amountUncertain || row.merchantUncertain || row.categoryUncertain;
+  return (
+    row.amountUncertain ||
+    row.merchantUncertain ||
+    row.categoryUncertain ||
+    row.dateUncertain
+  );
 }
 
 // ─── Review Row ───────────────────────────────────────────────────────────────
@@ -118,6 +133,9 @@ function ReviewRow({
   total,
   blocking,
   onToggle,
+  onEditAmount,
+  onEditMerchant,
+  onEditDate,
   onEditCategory,
 }: {
   row: ExtractedRow;
@@ -126,6 +144,9 @@ function ReviewRow({
   /** Selected + extracted but has no category → blocks the batch submit. */
   blocking: boolean;
   onToggle: () => void;
+  onEditAmount: (amount: number) => void;
+  onEditMerchant: (merchant: string) => void;
+  onEditDate: (dateIso: string) => void;
   onEditCategory: () => void;
 }) {
   const colors = useThemeColors();
@@ -137,8 +158,7 @@ function ReviewRow({
   const isFailed = row.status === "failed";
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <View
       style={[
         styles.reviewRow,
         !row.selected && styles.reviewRowDeselected,
@@ -147,7 +167,6 @@ function ReviewRow({
         isFailed && styles.reviewRowFailed,
         blocking && styles.reviewRowBlocking,
       ]}
-      onPress={onToggle}
     >
       {/* Thumbnail + checkbox */}
       <View style={styles.reviewThumbWrap}>
@@ -156,13 +175,19 @@ function ReviewRow({
           style={styles.reviewThumb}
           resizeMode="cover"
         />
-        <View style={styles.reviewCheckOverlay}>
+        <TouchableOpacity
+          style={styles.reviewCheckOverlay}
+          onPress={onToggle}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: row.selected }}
+          accessibilityLabel={`${row.selected ? "Bỏ chọn" : "Chọn"} ảnh ${index + 1}`}
+        >
           <MaterialIcon
             name={row.selected ? "check_circle" : "radio_button_unchecked"}
             size={20}
             color={row.selected ? colors.primary : colors.onSurfaceVariant}
           />
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -204,14 +229,22 @@ function ReviewRow({
               >
                 {S.amountLabel}
               </Text>
-              <Text
-                style={[
-                  styles.reviewFieldValue,
-                  row.amountUncertain && styles.uncertainValue,
-                ]}
-              >
-                {row.amount > 0 ? formatVND(row.amount) : "—"}
-              </Text>
+              <View style={styles.reviewEditableValue}>
+                <TextInput
+                  variant="bare"
+                  value={row.amount > 0 ? String(row.amount) : ""}
+                  onChangeText={(value) => onEditAmount(parseReceiptAmount(value))}
+                  keyboardType="number-pad"
+                  placeholder="Nhập số tiền"
+                  accessibilityLabel={`Số tiền ảnh ${index + 1}`}
+                  inputStyle={[
+                    styles.reviewEditableInput,
+                    row.amountUncertain && styles.uncertainValue,
+                  ]}
+                />
+                <Text style={styles.currencySuffix}>đ</Text>
+                <MaterialIcon name="edit" size={14} color={colors.primary} />
+              </View>
             </View>
 
             {/* Merchant */}
@@ -224,15 +257,20 @@ function ReviewRow({
               >
                 {S.merchantLabel}
               </Text>
-              <Text
-                style={[
-                  styles.reviewFieldValue,
-                  row.merchantUncertain && styles.uncertainValue,
-                ]}
-                numberOfLines={1}
-              >
-                {row.merchant || "—"}
-              </Text>
+              <View style={styles.reviewEditableValue}>
+                <TextInput
+                  variant="bare"
+                  value={row.merchant}
+                  onChangeText={onEditMerchant}
+                  placeholder="Nhập người nhận"
+                  accessibilityLabel={`Người nhận ảnh ${index + 1}`}
+                  inputStyle={[
+                    styles.reviewEditableInput,
+                    row.merchantUncertain && styles.uncertainValue,
+                  ]}
+                />
+                <MaterialIcon name="edit" size={14} color={colors.primary} />
+              </View>
             </View>
 
             {/* Category — tappable */}
@@ -283,16 +321,39 @@ function ReviewRow({
             </TouchableOpacity>
 
             {/* Date */}
-            <View style={styles.reviewField}>
-              <Text style={styles.reviewFieldLabel}>{S.dateLabel}</Text>
-              <Text style={styles.reviewFieldValue}>
-                {formatDate(row.dateIso)}
-              </Text>
-            </View>
+            <DatePickerField
+              value={row.dateIso}
+              onChange={onEditDate}
+              maxDate={todayISO()}
+              uncertain={row.dateUncertain}
+              customTrigger={(openPicker) => (
+                <TouchableOpacity style={styles.reviewField} onPress={openPicker}>
+                  <Text
+                    style={[
+                      styles.reviewFieldLabel,
+                      row.dateUncertain && styles.uncertainLabel,
+                    ]}
+                  >
+                    {S.dateLabel}
+                  </Text>
+                  <View style={styles.reviewEditableValue}>
+                    <Text
+                      style={[
+                        styles.reviewFieldValue,
+                        row.dateUncertain && styles.uncertainValue,
+                      ]}
+                    >
+                      {formatDate(row.dateIso)}
+                    </Text>
+                    <MaterialIcon name="edit_calendar" size={14} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
           </>
         )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -329,6 +390,7 @@ export default function PhotoConfirmScreen() {
       amountUncertain: false,
       merchantUncertain: false,
       categoryUncertain: false,
+      dateUncertain: false,
       selected: true,
       isDuplicate: false,
     })),
@@ -342,16 +404,9 @@ export default function PhotoConfirmScreen() {
   // Photo entries can only target basic wallets — bank-linked wallets are
   // read-only (their transactions come from provider sync).
   const basicWallets = (walletsData?.wallets ?? []).filter((w) => w.type !== "linked");
+  const effectiveSelectedWalletId = selectedWalletId ?? basicWallets[0]?.id ?? null;
   const selectedWallet =
-    basicWallets.find((w) => w.id === selectedWalletId) ?? basicWallets[0];
-
-  // Pre-select the first basic wallet so the confirm button isn't stuck disabled.
-  useEffect(() => {
-    if (!selectedWalletId && basicWallets.length > 0) {
-      setSelectedWalletId(basicWallets[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basicWallets.length]);
+    basicWallets.find((w) => w.id === effectiveSelectedWalletId) ?? basicWallets[0];
 
   // Extract each image
   useEffect(() => {
@@ -377,6 +432,9 @@ export default function PhotoConfirmScreen() {
                       PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
                     categoryUncertain:
                       result.confidence.categoryId <
+                      PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
+                    dateUncertain:
+                      result.confidence.transactionDate <
                       PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
                   },
             );
@@ -452,6 +510,31 @@ export default function PhotoConfirmScreen() {
     [editingIdx],
   );
 
+  const handleAmountEdit = useCallback((idx: number, amount: number) => {
+    setRows((prev) =>
+      prev.map((row, i) =>
+        i === idx ? { ...row, amount, amountUncertain: false } : row,
+      ),
+    );
+  }, []);
+
+  const handleMerchantEdit = useCallback((idx: number, merchant: string) => {
+    setRows((prev) =>
+      prev.map((row, i) =>
+        i === idx ? { ...row, merchant, merchantUncertain: false } : row,
+      ),
+    );
+  }, []);
+
+  const handleDateEdit = useCallback((idx: number, dateIso: string) => {
+    if (!isValidReceiptDate(dateIso, todayISO())) return;
+    setRows((prev) =>
+      prev.map((row, i) =>
+        i === idx ? { ...row, dateIso, dateUncertain: false } : row,
+      ),
+    );
+  }, []);
+
   const handleConfirmAll = useCallback(async () => {
     if (!selectedWallet) {
       Alert.alert(S.noWallet, S.noWalletMsg);
@@ -477,8 +560,9 @@ export default function PhotoConfirmScreen() {
 
     setIsImporting(true);
     try {
+      const createdTransactions = [];
       for (const row of toSave) {
-        await createMutation.mutateAsync({
+        const created = await createMutation.mutateAsync({
           walletId: selectedWallet.id,
           categoryId: row.categoryId,
           amount: row.amount,
@@ -488,9 +572,20 @@ export default function PhotoConfirmScreen() {
           transactionDate: row.dateIso,
           entryMethod: "photo",
         });
+        createdTransactions.push(created);
       }
-      Alert.alert("", S.savedMsg(toSave.length), [
-        { text: "OK", onPress: () => router.back() },
+      const firstCreated = createdTransactions[0];
+      Alert.alert(S.savedTitle, S.savedMsg(toSave.length, toSave[0]?.dateIso), [
+        {
+          text: S.viewSaved,
+          onPress: () =>
+            firstCreated && createdTransactions.length === 1
+              ? router.replace({
+                  pathname: "/(tabs)/transactions/[id]",
+                  params: { id: firstCreated.id },
+                })
+              : router.replace("/(tabs)/transactions"),
+        },
       ]);
     } catch (err) {
       Alert.alert("", getApiErrorMessage(err, S.saveError));
@@ -576,6 +671,11 @@ export default function PhotoConfirmScreen() {
         />
       </TouchableOpacity>
 
+      <View style={styles.reviewNotice}>
+        <MaterialIcon name="fact_check" size={18} color={colors.primary} />
+        <Text style={styles.reviewNoticeText}>{S.reviewHint}</Text>
+      </View>
+
       {rows.length > 1 && (
         <View style={styles.selectAllRow}>
           <TouchableOpacity
@@ -609,6 +709,8 @@ export default function PhotoConfirmScreen() {
         keyExtractor={(_, i) => String(i)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         renderItem={({ item, index }) => (
           <ReviewRow
             row={item}
@@ -621,6 +723,9 @@ export default function PhotoConfirmScreen() {
               item.categoryId === null
             }
             onToggle={() => handleToggle(index)}
+            onEditAmount={(amount) => handleAmountEdit(index, amount)}
+            onEditMerchant={(merchant) => handleMerchantEdit(index, merchant)}
+            onEditDate={(dateIso) => handleDateEdit(index, dateIso)}
             onEditCategory={() => setEditingIdx(index)}
           />
         )}
@@ -685,7 +790,7 @@ export default function PhotoConfirmScreen() {
               <TouchableOpacity
                 style={[
                   styles.sheetRow,
-                  selectedWalletId === item.id && styles.sheetRowSelected,
+                  effectiveSelectedWalletId === item.id && styles.sheetRowSelected,
                 ]}
                 onPress={() => {
                   setSelectedWalletId(item.id);
@@ -701,7 +806,7 @@ export default function PhotoConfirmScreen() {
                 <Text style={styles.sheetRowText}>
                   {item.name} · {formatVND(item.balance)}
                 </Text>
-                {selectedWalletId === item.id && (
+                {effectiveSelectedWalletId === item.id && (
                   <MaterialIcon name="check" size={18} color={colors.primary} />
                 )}
               </TouchableOpacity>
@@ -779,6 +884,23 @@ function createStyles(colors: ThemeColors) {
     fontSize: FONT_SIZE.sm,
     color: colors.onSurface,
     fontWeight: FONT_WEIGHT.semibold,
+  },
+
+  reviewNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACING[2],
+    marginHorizontal: SPACING[4],
+    marginTop: SPACING[3],
+    padding: SPACING[3],
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: withAlpha(colors.primary, 0.08),
+  },
+  reviewNoticeText: {
+    flex: 1,
+    fontSize: FONT_SIZE.xs,
+    lineHeight: 18,
+    color: colors.onSurfaceVariant,
   },
 
   sheet: {
@@ -922,7 +1044,7 @@ function createStyles(colors: ThemeColors) {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    minHeight: 20,
+    minHeight: 30,
   },
   reviewFieldLabel: {
     fontSize: FONT_SIZE.xs,
@@ -938,6 +1060,27 @@ function createStyles(colors: ThemeColors) {
   },
   uncertainLabel: { color: colors.secondary },
   uncertainValue: { color: colors.secondary },
+  reviewEditableValue: {
+    flex: 2,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+  },
+  reviewEditableInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    textAlign: "right",
+    color: colors.onSurface,
+  },
+  currencySuffix: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: colors.onSurface,
+  },
   reviewCategoryRow: {
     flexDirection: "row",
     alignItems: "center",

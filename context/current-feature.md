@@ -1,6 +1,44 @@
 # Current Feature
 
 <!-- Feature name and short description -->
+Feature: Make receipt OCR reliable and surface honest confidence (branch
+`fix/receipt-ocr-reliability`, cross-repo with `finviet-be`). A live Render test on 2026-09-04
+correctly extracted a Vietnamese MINIMART receipt, but took 15.5s — too close to the shared 20s
+Axios timeout to survive provider latency or a Render cold start. The mapper also hard-coded 0.95
+confidence for amount/date and 0.85 for merchant even though all three are AI-read values.
+
+## Status
+
+Implemented and verified locally and on Android Emulator: `npm run type-check` clean; changed-file
+ESLint reports 0 problems; focused extraction/review tests pass 5/5; the full Jest suite passes
+174/174 across 32 suites. The rotated MINIMART receipt produced 87,000 VND, MINIMART,
+2018-03-12 and `cat_shopping`; the review UI then successfully edited every suggested field and
+persisted the corrected 88,000 VND / `MINIMART DA KIEM TRA` / 2026-09-04 / `cat_food`
+transaction. Not committed or pushed.
+
+## Goals
+
+- Give `POST /extract/photo` the same 120s timeout already used by other slow AI calls.
+- Consume optional field-level OCR confidences returned by the updated backend; retain the old
+  heuristic only as backward compatibility with a backend that has not deployed yet.
+- Remove stale comments that still describe Gemini OCR as an unconfigured 503 placeholder.
+- Turn the photo confirmation card into an explicit AI-review form: amount and merchant are text
+  inputs, date opens the native date picker, category opens the category picker, wallet remains
+  selectable, and edit icons plus guidance make the correction path discoverable.
+- After save, report the actual transaction date and open the newly created transaction detail.
+  This fixes the misleading old behavior where an OCR receipt dated 2018 was saved correctly but
+  `router.back()` returned the user to the current-month calendar, making it look missing.
+
+## Notes
+
+- No transaction is auto-saved; the user can inspect and correct all AI-proposed transaction
+  fields before the explicit "Lưu sau khi kiểm tra" action.
+- API verification found the user's earlier 87,000 VND transaction was created successfully at
+  2026-09-04 21:52, with transaction date 2018-03-12. The apparent loss was navigation/date
+  visibility, not a failed POST.
+
+---
+
 Feature: Confirm the on-track case and make the no-deadline note actionable (branch
 `fix/savings-plan-followups`). A second emulator review confirmed every earlier fix works on
 device and left five open items. Two were genuine gaps in what the screen communicates; this
