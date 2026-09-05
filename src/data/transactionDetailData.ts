@@ -32,6 +32,9 @@ export const TX_DETAIL_STRINGS = {
   walletLabel: "Ví",
   walletUnknown: "Ví đã xóa",
   dateLabel: "Ngày",
+  receiptImageLabel: "Ảnh hóa đơn",
+  receiptImageHint:
+    "Chạm vào ảnh để phóng to và đối chiếu với thông tin giao dịch.",
 
   save: "Lưu thay đổi",
   delete: "Xóa giao dịch",

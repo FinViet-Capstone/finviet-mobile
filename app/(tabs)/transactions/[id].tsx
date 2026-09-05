@@ -10,9 +10,12 @@ import {
   Alert,
   FlatList,
   ActivityIndicator,
+  Image,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 import {
   SPACING,
@@ -29,6 +32,7 @@ import { NumericKeypad, NUMPAD_HEIGHT } from '@/components/common/NumericKeypad'
 import { DraggableSheet } from '@/components/common/DraggableSheet';
 import { DatePickerField } from '@/components/common/DatePickerField';
 import { TextInput } from '@/components/common/TextInput';
+import { ImagePreviewModal } from '@/components/common/ImagePreviewModal';
 import { CategoryPickerSheet } from '@/components/categories';
 import {
   useTransactionById,
@@ -49,11 +53,12 @@ import { getCategoryIcon } from '@/constants/categoryIcons';
 import { formatVND } from '@/utils/formatters';
 import { getApiErrorMessage } from '@/utils/errors';
 import { computeSplitState } from '@/utils/transactionSplit';
+import { deleteReceiptImage, getReceiptImageUri } from '@/lib/receiptImageStorage';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
 import type { CategorizationOutcome, SplitPartInput } from '@/types';
 
 // ───────────────────────────────────────────────────────────────────────────
-// Route: /transactions/[id]?mode=full|category
+// Route: /transactions/[id]?mode=full|category&returnTo=history
 //   mode=full     → basic wallet, all fields editable
 //   mode=category → linked wallet, category only (per SePay edit rule)
 // ───────────────────────────────────────────────────────────────────────────
@@ -62,7 +67,11 @@ export default function TransactionDetailScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>();
+  const { id, mode, returnTo } = useLocalSearchParams<{
+    id: string;
+    mode?: string;
+    returnTo?: string;
+  }>();
 
   if (!id) {
     return (
@@ -73,10 +82,18 @@ export default function TransactionDetailScreen() {
     );
   }
 
-  return <DetailBody txId={id} modeParam={mode} />;
+  return <DetailBody txId={id} modeParam={mode} returnTo={returnTo} />;
 }
 
-function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
+function DetailBody({
+  txId,
+  modeParam,
+  returnTo,
+}: {
+  txId: string;
+  modeParam?: string;
+  returnTo?: string;
+}) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
@@ -99,6 +116,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const [amountError, setAmountError] = useState<string | undefined>();
   const [amountFocused, setAmountFocused] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<CategorizationOutcome | null>(null);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
 
   const splitMutation = useSplitTransaction();
   const [showSplitSheet, setShowSplitSheet] = useState(false);
@@ -128,13 +146,31 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
   const handleAmountBackspace = useCallback(() => setAmountRaw((prev) => prev.slice(0, -1)), []);
   const handleAmountClear = useCallback(() => setAmountRaw(''), []);
+  const handleLeave = useCallback(() => {
+    if (returnTo === 'history') {
+      router.replace('/(tabs)/transactions');
+      return;
+    }
+    router.back();
+  }, [returnTo, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (returnTo !== 'history') return undefined;
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/(tabs)/transactions');
+        return true;
+      });
+      return () => subscription.remove();
+    }, [returnTo, router]),
+  );
 
   if (isLoading) return <LoadingSpinner />;
 
   if (isError || !tx) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <Header onBack={() => router.back()} title={S.titleNotFound} />
+        <Header onBack={handleLeave} title={S.titleNotFound} />
         <EmptyState
           icon="receipt_long"
           title={isError ? S.loadErrorTitle : S.notFoundTitle}
@@ -151,6 +187,8 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
   const categoryOnly = modeParam === 'category' || selectedWallet?.type === 'linked';
   const fieldsLocked = isTransfer || categoryOnly;
+  const receiptImageUri =
+    tx.entryMethod === 'photo' ? getReceiptImageUri(txId) : undefined;
 
   const amountNum = parseInt(amountRaw, 10) || 0;
   const isIncome = tx.type === 'income';
@@ -159,7 +197,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
     const catName = CATEGORIES.find((c) => c.id === catId)?.nameVi ?? S.categoryLabel;
     Alert.alert(S.ruleTitle, S.ruleMessage(merchantName, catName), [
-      { text: S.ruleSkip, style: 'cancel', onPress: () => router.back() },
+      { text: S.ruleSkip, style: 'cancel', onPress: handleLeave },
       {
         text: S.ruleConfirm,
         onPress: () =>
@@ -168,9 +206,9 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
             {
               onSuccess: (res) =>
                 Alert.alert(S.ruleAppliedTitle, S.ruleAppliedMessage(res.appliedCount), [
-                  { text: S.ok, onPress: () => router.back() },
+                  { text: S.ok, onPress: handleLeave },
                 ]),
-              onError: () => router.back(),
+              onError: handleLeave,
             },
           ),
       },
@@ -207,7 +245,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           if (categoryChanged && merchantName) {
             offerRuleThenLeave(merchantName, categoryId);
           } else {
-            Alert.alert(S.savedTitle, S.savedMsg, [{ text: S.ok, onPress: () => router.back() }]);
+            Alert.alert(S.savedTitle, S.savedMsg, [{ text: S.ok, onPress: handleLeave }]);
           }
         },
         onError: (error) =>
@@ -224,8 +262,10 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         style: 'destructive',
         onPress: () =>
           deleteMutation.mutate(txId, {
-            onSuccess: () =>
-              Alert.alert(S.deletedTitle, S.deletedMsg, [{ text: S.ok, onPress: () => router.back() }]),
+            onSuccess: () => {
+              deleteReceiptImage(txId);
+              Alert.alert(S.deletedTitle, S.deletedMsg, [{ text: S.ok, onPress: handleLeave }]);
+            },
             onError: () => Alert.alert(S.saveErrorTitle, S.deleteErrorMsg),
           }),
       },
@@ -283,7 +323,7 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Header onBack={() => router.back()} title={S.titleEdit} />
+      <Header onBack={handleLeave} title={S.titleEdit} />
 
       {/* Transfer / linked banner */}
       {isTransfer ? (
@@ -328,6 +368,27 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
+          {receiptImageUri ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.receiptImageCard}
+              onPress={() => setShowReceiptPreview(true)}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={S.receiptImageHint}
+            >
+              <Image
+                source={{ uri: receiptImageUri }}
+                style={styles.receiptThumbnail}
+                resizeMode="cover"
+              />
+              <View style={styles.receiptImageText}>
+                <Text style={styles.receiptImageTitle}>{S.receiptImageLabel}</Text>
+                <Text style={styles.receiptImageHint}>{S.receiptImageHint}</Text>
+              </View>
+              <MaterialIcon name="zoom_in" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
+
           {/* Category */}
           {!isTransfer ? (
             <TouchableOpacity activeOpacity={0.7} style={styles.fieldRow} onPress={() => setShowCategoryModal(true)}>
@@ -609,6 +670,15 @@ function DetailBody({ txId, modeParam }: { txId: string; modeParam?: string }) {
         onClear={handleAmountClear}
         onDone={() => setAmountFocused(false)}
       />
+
+      {showReceiptPreview && receiptImageUri ? (
+        <ImagePreviewModal
+          visible
+          uri={receiptImageUri}
+          title={S.receiptImageLabel}
+          onClose={() => setShowReceiptPreview(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -890,6 +960,35 @@ function createStyles(colors: ThemeColors) {
 
   // Field rows (matches manual.tsx)
   fieldsContent: { paddingHorizontal: SPACING[4], paddingBottom: SPACING[12], paddingTop: SPACING[3], gap: SPACING[2] },
+  receiptImageCard: {
+    minHeight: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    padding: SPACING[3],
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.primary, 0.25),
+    backgroundColor: withAlpha(colors.primary, 0.06),
+  },
+  receiptThumbnail: {
+    width: 60,
+    height: 76,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: colors.surfaceVariant,
+  },
+  receiptImageText: { flex: 1 },
+  receiptImageTitle: {
+    color: colors.onSurface,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    marginBottom: SPACING[1],
+  },
+  receiptImageHint: {
+    color: colors.onSurfaceVariant,
+    fontSize: FONT_SIZE.xs,
+    lineHeight: 18,
+  },
   fieldRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surfaceContainer,
