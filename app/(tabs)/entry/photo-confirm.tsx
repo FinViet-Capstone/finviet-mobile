@@ -27,12 +27,14 @@ import { CATEGORIES } from "@/constants/categories";
 import { CategoryPickerSheet } from "@/components/categories";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { TextInput } from "@/components/common/TextInput";
+import { ImagePreviewModal } from "@/components/common/ImagePreviewModal";
 import { formatVND } from "@/utils/formatters";
 import { useExtractFromPhoto, useCreateTransaction, useWallets } from "@/hooks";
 import type { Wallet } from "@/types/wallet";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { getApiErrorMessage } from "@/utils/errors";
 import { isValidReceiptDate, parseReceiptAmount } from "@/utils/receiptReview";
+import { saveReceiptImage } from "@/lib/receiptImageStorage";
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,9 @@ const S = {
   viewSaved: "Xem giao dịch",
   saveError: "Không lưu được. Hãy thử lại.",
   imageOf: (i: number, n: number) => `Ảnh ${i}/${n}`,
+  previewImage: "Mở ảnh hóa đơn toàn màn hình",
+  imageSaveWarning:
+    "\n\nẢnh hóa đơn chưa được lưu trên thiết bị, nhưng giao dịch đã được tạo.",
   fieldWallet: "Ví",
   pickWallet: "Chọn ví",
   sheetWallet: "Chọn ví",
@@ -133,6 +138,7 @@ function ReviewRow({
   total,
   blocking,
   onToggle,
+  onPreviewImage,
   onEditAmount,
   onEditMerchant,
   onEditDate,
@@ -144,6 +150,7 @@ function ReviewRow({
   /** Selected + extracted but has no category → blocks the batch submit. */
   blocking: boolean;
   onToggle: () => void;
+  onPreviewImage: () => void;
   onEditAmount: (amount: number) => void;
   onEditMerchant: (merchant: string) => void;
   onEditDate: (dateIso: string) => void;
@@ -170,11 +177,21 @@ function ReviewRow({
     >
       {/* Thumbnail + checkbox */}
       <View style={styles.reviewThumbWrap}>
-        <Image
-          source={{ uri: row.uri }}
-          style={styles.reviewThumb}
-          resizeMode="cover"
-        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onPreviewImage}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={S.previewImage}
+        >
+          <Image
+            source={{ uri: row.uri }}
+            style={styles.reviewThumb}
+            resizeMode="cover"
+          />
+          <View style={styles.reviewZoomOverlay} pointerEvents="none">
+            <MaterialIcon name="zoom_in" size={16} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.reviewCheckOverlay}
           onPress={onToggle}
@@ -399,6 +416,7 @@ export default function PhotoConfirmScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
   const ocrUnavailableAlertShown = useRef(false);
 
   // Photo entries can only target basic wallets — bank-linked wallets are
@@ -561,6 +579,7 @@ export default function PhotoConfirmScreen() {
     setIsImporting(true);
     try {
       const createdTransactions = [];
+      let imageSaveFailed = false;
       for (const row of toSave) {
         const created = await createMutation.mutateAsync({
           walletId: selectedWallet.id,
@@ -572,17 +591,27 @@ export default function PhotoConfirmScreen() {
           transactionDate: row.dateIso,
           entryMethod: "photo",
         });
+        try {
+          saveReceiptImage(created.id, row.uri);
+        } catch {
+          // The transaction is already committed server-side. Keep it and tell
+          // the user only that its local image copy could not be preserved.
+          imageSaveFailed = true;
+        }
         createdTransactions.push(created);
       }
       const firstCreated = createdTransactions[0];
-      Alert.alert(S.savedTitle, S.savedMsg(toSave.length, toSave[0]?.dateIso), [
+      const savedMessage =
+        S.savedMsg(toSave.length, toSave[0]?.dateIso) +
+        (imageSaveFailed ? S.imageSaveWarning : "");
+      Alert.alert(S.savedTitle, savedMessage, [
         {
           text: S.viewSaved,
           onPress: () =>
             firstCreated && createdTransactions.length === 1
               ? router.replace({
                   pathname: "/(tabs)/transactions/[id]",
-                  params: { id: firstCreated.id },
+                  params: { id: firstCreated.id, returnTo: "history" },
                 })
               : router.replace("/(tabs)/transactions"),
         },
@@ -723,6 +752,7 @@ export default function PhotoConfirmScreen() {
               item.categoryId === null
             }
             onToggle={() => handleToggle(index)}
+            onPreviewImage={() => setPreviewUri(item.uri)}
             onEditAmount={(amount) => handleAmountEdit(index, amount)}
             onEditMerchant={(merchant) => handleMerchantEdit(index, merchant)}
             onEditDate={(dateIso) => handleDateEdit(index, dateIso)}
@@ -814,6 +844,15 @@ export default function PhotoConfirmScreen() {
           />
         </View>
       </DraggableSheet>
+
+      {previewUri ? (
+        <ImagePreviewModal
+          visible
+          uri={previewUri}
+          title="Ảnh hóa đơn gốc"
+          onClose={() => setPreviewUri(null)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -992,6 +1031,17 @@ function createStyles(colors: ThemeColors) {
     height: 80,
     borderRadius: BORDER_RADIUS.lg,
     backgroundColor: colors.surfaceVariant,
+  },
+  reviewZoomOverlay: {
+    position: "absolute",
+    left: 4,
+    bottom: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: withAlpha("#000000", 0.58),
   },
   reviewCheckOverlay: {
     position: "absolute",

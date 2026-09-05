@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { getProfile } from '@/services';
 import { getAccessToken, hydrateTokenCache } from '@/lib/mmkv';
 import { hydrateCategoryIconCache } from '@/lib/categoryIconStorage';
+import { hydrateReceiptImageCache } from '@/lib/receiptImageStorage';
 import { hydrateThemeCache } from '@/lib/themeCache';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -46,6 +47,7 @@ export function useBootstrapSession() {
     // Sync, local-disk only — unrelated to auth, so it doesn't need to block
     // the timeout/gate logic below.
     hydrateCategoryIconCache();
+    hydrateReceiptImageCache();
 
     (async () => {
       // themeCache must finish before the gate opens: ThemeProvider reads it
