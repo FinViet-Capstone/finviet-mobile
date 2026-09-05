@@ -25,15 +25,16 @@ client-side rather than wired against nothing:
 **Correction (2026-08-18):** Photo/receipt OCR extraction was previously documented here as
 permanently 503ing (`IReceiptOcrService` as an intentional placeholder). That's stale —
 `finviet-be` commit `aff76cc` wired it to a real Gemini-backed OCR provider, and
-`real/extraction.ts`'s `extractFromPhoto` now gets genuine extracted fields back. The current,
-narrower gap: the photo extraction path never calls the shared categorization service
-(`AiCategorizationService`/`PreviewAsync`) the way SMS/CSV extraction does
-(`TransactionExtractService.BuildResponseAsync`), so every photo-extracted row comes back
-`categoryId: null` by construction — not fixed yet, tracked as a backend follow-up. Separately,
+`real/extraction.ts`'s `extractFromPhoto` now gets genuine extracted fields back. At the time
+this correction was first written, the photo path also didn't yet call the shared
+categorization service the way SMS/CSV did — that gap has since been closed (see the
+`fix/ai-categorization-suggestions` work below, `ExtractController.ExtractPhoto` now calls
+`CategorizeItemAsync`) and confirmed live on-device 2026-09-05 (a photo-extracted transaction
+came back with a real, non-null `categoryId`, no client-side fallback involved). Separately,
 note that `AiCategorizationService.CategorizeTransactionAsync` (used by SMS, CSV, and SePay
 sync) silently falls back to `categoryId: null` on any Gemini provider failure, logged only as
-a warning — if AI categorization stops working across all of SMS/CSV/SePay at once, check that
-backend log path and the configured Gemini model/API key before assuming a code bug.
+a warning — if AI categorization stops working across all of SMS/CSV/SePay/photo at once, check
+that backend log path and the configured Gemini model/API key before assuming a code bug.
 
 There is no category-request feature (never had an admin-approval UI, removed
 as a concept months ago) — don't reintroduce it.
