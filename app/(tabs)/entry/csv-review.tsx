@@ -42,6 +42,7 @@ const S = {
   deselectAll: 'Bỏ chọn tất cả',
   duplicate: 'Có thể trùng',
   uncategorized: 'Chưa phân loại',
+  aiCategorizeFailed: 'AI không phân loại được — chạm để chọn',
   pickCategory: 'Chọn danh mục',
   amountLabel: 'Số tiền',
   categoryLabel: 'Danh mục',
@@ -122,6 +123,9 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
   const cat = row.suggestedCategoryId ? getCategoryById(row.suggestedCategoryId) : null;
   const isIncome = row.type === 'income';
   const needsCategoryEdit = !row.suggestedCategoryId;
+  // Income rows are never sent for AI categorization by design (only expenses are), so a
+  // missing category there is expected, not a failure — only flag it for expense rows.
+  const aiFailedToCategorize = needsCategoryEdit && !isIncome;
 
   return (
     <TouchableOpacity activeOpacity={0.7} style={[styles.previewRow, !row.selected && styles.previewRowDeselected, row.isDuplicate && styles.previewRowDuplicate]} onPress={onToggle}>
@@ -160,10 +164,15 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
               <View style={[styles.catDot, { backgroundColor: cat.color }]} />
               <Text style={styles.rowFieldValue}>{cat.nameVi}</Text>
             </>
+          ) : aiFailedToCategorize ? (
+            <>
+              <MaterialIcon name="error_outline" size={12} color={colors.error} />
+              <Text style={styles.aiFailedText}>{S.aiCategorizeFailed}</Text>
+            </>
           ) : (
             <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
           )}
-          <MaterialIcon name="chevron_right" size={16} color={needsCategoryEdit ? colors.secondary : colors.onSurfaceVariant} />
+          <MaterialIcon name="chevron_right" size={16} color={aiFailedToCategorize ? colors.error : needsCategoryEdit ? colors.secondary : colors.onSurfaceVariant} />
         </View>
       </TouchableOpacity>
 
@@ -561,6 +570,7 @@ function createStyles(colors: ThemeColors) {
     rowCategoryRight: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 2, justifyContent: 'flex-end' },
     catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
     uncategorizedText: { fontSize: FONT_SIZE.xs, color: colors.secondary, fontStyle: 'italic' },
+    aiFailedText: { fontSize: FONT_SIZE.xs, color: colors.error, fontWeight: FONT_WEIGHT.semibold },
 
     // Bottom bar
     bottomBar: {

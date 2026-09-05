@@ -56,14 +56,14 @@ const S = {
   selectedCount: (selected: number, total: number) => `${selected}/${total} đã chọn`,
   confirmAll: "Lưu sau khi kiểm tra",
   needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
-  needCategory: "Chọn danh mục →",
+  analyzingRow: "Đang phân tích ảnh này...",
+  aiCategorizeFailed: "AI không phân loại được — chạm để chọn",
   retake: "Chụp lại",
   amountLabel: "Số tiền",
   merchantLabel: "Người nhận",
   categoryLabel: "Danh mục",
   dateLabel: "Ngày",
   pickCategory: "Chọn danh mục",
-  uncategorized: "Chưa phân loại",
   duplicate: "Có thể trùng",
   noWallet: "Chưa có ví",
   noWalletMsg: "Hãy tạo ít nhất một ví trước khi lưu.",
@@ -232,7 +232,12 @@ function ReviewRow({
           </View>
         </View>
 
-        {isFailed ? (
+        {row.status === "processing" ? (
+          <View style={styles.reviewProcessingRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.reviewProcessingText}>{S.analyzingRow}</Text>
+          </View>
+        ) : isFailed ? (
           <Text style={styles.failedText}>{row.failedMessage ?? S.failedExtraction}</Text>
         ) : (
           <>
@@ -320,14 +325,16 @@ function ReviewRow({
                     </Text>
                   </>
                 ) : (
-                  <Text
-                    style={[
-                      styles.uncategorizedText,
-                      blocking && styles.needCategoryText,
-                    ]}
-                  >
-                    {blocking ? S.needCategory : S.uncategorized}
-                  </Text>
+                  <>
+                    <MaterialIcon
+                      name="error_outline"
+                      size={12}
+                      color={colors.error}
+                    />
+                    <Text style={[styles.uncategorizedText, styles.needCategoryText]}>
+                      {S.aiCategorizeFailed}
+                    </Text>
+                  </>
                 )}
                 <MaterialIcon
                   name="chevron_right"
@@ -426,9 +433,16 @@ export default function PhotoConfirmScreen() {
   const selectedWallet =
     basicWallets.find((w) => w.id === effectiveSelectedWalletId) ?? basicWallets[0];
 
-  // Extract each image
+  // Extract each image. Capped concurrency (rather than firing all N at once):
+  // the backend's per-request AI categorization call has no cross-request
+  // throttle of its own, so a full-speed batch mostly returned uncategorized
+  // rows except whichever request's Gemini call happened to win the race.
   useEffect(() => {
-    uris.forEach((uri, idx) => {
+    const EXTRACTION_CONCURRENCY = 2;
+
+    const processIndex = (idx: number) => {
+      if (idx >= uris.length) return;
+      const uri = uris[idx];
       extract.mutate(uri, {
         onSuccess: (result) => {
           setRows((prev) => {
@@ -470,6 +484,7 @@ export default function PhotoConfirmScreen() {
               return { ...r, isDuplicate };
             });
           });
+          processIndex(idx + EXTRACTION_CONCURRENCY);
         },
         onError: (err) => {
           const failedMessage = getApiErrorMessage(err, S.failedExtraction);
@@ -494,9 +509,14 @@ export default function PhotoConfirmScreen() {
               },
             ]);
           }
+          processIndex(idx + EXTRACTION_CONCURRENCY);
         },
       });
-    });
+    };
+
+    for (let i = 0; i < Math.min(EXTRACTION_CONCURRENCY, uris.length); i++) {
+      processIndex(i);
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1150,6 +1170,16 @@ function createStyles(colors: ThemeColors) {
     fontWeight: FONT_WEIGHT.semibold,
   },
   failedText: { fontSize: FONT_SIZE.xs, color: colors.error, lineHeight: 18 },
+  reviewProcessingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[2],
+    paddingVertical: SPACING[2],
+  },
+  reviewProcessingText: {
+    fontSize: FONT_SIZE.xs,
+    color: colors.onSurfaceVariant,
+  },
 
   // Bottom bar
   bottomBar: {
