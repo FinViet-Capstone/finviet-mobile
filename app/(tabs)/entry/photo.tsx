@@ -19,6 +19,39 @@ import {
 } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import type { PhotoUploadInput } from '@/types';
+import { createPhotoUploadSession } from '@/lib/photoUploadSession';
+
+function photoExtension(asset: ImagePicker.ImagePickerAsset): string {
+  const fromName = asset.fileName?.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  if (fromName && /^(jpe?g|png|webp|heic|heif)$/.test(fromName)) return fromName;
+  if (asset.mimeType === 'image/png') return 'png';
+  if (asset.mimeType === 'image/webp') return 'webp';
+  if (asset.mimeType === 'image/heic' || asset.mimeType === 'image/heif') return 'heic';
+  return 'jpg';
+}
+
+function mimeFromExtension(extension: string): string {
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  if (extension === 'heic' || extension === 'heif') return 'image/heic';
+  return 'image/jpeg';
+}
+
+function preparePhotoAssets(
+  assets: ImagePicker.ImagePickerAsset[],
+): PhotoUploadInput[] {
+  return assets.map((asset, index) => {
+    if (!asset.base64) throw new Error(`Image ${index + 1} has no readable payload`);
+    const extension = photoExtension(asset);
+    return {
+      uri: asset.uri,
+      fileName: asset.fileName ?? `receipt-${Date.now()}-${index}.${extension}`,
+      mimeType: asset.mimeType ?? mimeFromExtension(extension),
+      base64: asset.base64,
+    };
+  });
+}
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +62,7 @@ const S = {
   galleryIcon: 'image',
   cameraPermErr: 'Camera chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.',
   galleryPermErr: 'Thư viện ảnh chưa được cấp quyền. Vui lòng cấp quyền trong Cài đặt.',
+  photoReadErr: 'Không thể đọc tệp ảnh đã chọn. Vui lòng chọn lại ảnh khác.',
   openSettings: 'Mở Cài Đặt',
   recentScans: 'Ảnh gần đây',
   addPhoto: 'add',
@@ -46,9 +80,12 @@ export default function PhotoEntryScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
 
-  const buildConfirmHref = (uris: string[]) => ({
+  const buildConfirmHref = (photos: PhotoUploadInput[]) => ({
     pathname: '/(tabs)/entry/photo-confirm' as const,
-    params: dateParam ? { uris: JSON.stringify(uris), date: dateParam } : { uris: JSON.stringify(uris) },
+    params: {
+      sessionId: createPhotoUploadSession(photos),
+      ...(dateParam ? { date: dateParam } : {}),
+    },
   });
 
   const handleCamera = async () => {
@@ -60,9 +97,12 @@ export default function PhotoEntryScreen() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         quality: 0.85,
+        base64: true,
       });
       if (result.canceled) return;
-      router.push(buildConfirmHref([result.assets[0].uri]));
+      router.push(buildConfirmHref(preparePhotoAssets([result.assets[0]])));
+    } catch {
+      setPermError(S.photoReadErr);
     } finally {
       setIsLoading(false);
     }
@@ -77,11 +117,14 @@ export default function PhotoEntryScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.85,
+        base64: true,
         allowsMultipleSelection: true,
         selectionLimit: 5,
       });
       if (result.canceled) return;
-      router.push(buildConfirmHref(result.assets.map((a) => a.uri)));
+      router.push(buildConfirmHref(preparePhotoAssets(result.assets)));
+    } catch {
+      setPermError(S.photoReadErr);
     } finally {
       setIsLoading(false);
     }
@@ -224,11 +267,11 @@ function createStyles(colors: ThemeColors) {
     overflow: 'hidden',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15,13,21,0.6)',
   },
   frameWrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 64,

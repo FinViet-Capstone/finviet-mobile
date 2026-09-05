@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { extractFromPhoto } from '@/services';
+import type { PhotoUploadInput } from '@/types';
 
 export const useExtractFromPhoto = () =>
   useMutation({
-    mutationFn: (uri: string) => extractFromPhoto(uri),
+    mutationFn: (input: string | PhotoUploadInput) => extractFromPhoto(input),
   });

@@ -161,7 +161,7 @@ function createStyles(colors: ThemeColors) {
     // Transparent — the keypad must NOT dim/obscure the form above it. (Tap here
     // still dismisses via onClose; it blocks touch, not the view.)
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'transparent',
     },
     panel: {
