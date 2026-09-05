@@ -101,6 +101,13 @@ function lookupCode(code: string): string | undefined {
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (
+    error instanceof Error
+    && error.name === 'PhotoUploadError'
+    && error.message.trim()
+  ) {
+    return error.message;
+  }
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiErrorBody | undefined;
     const mapped = data?.code ? lookupCode(data.code) : undefined;

@@ -63,17 +63,28 @@ jest.mock('expo-file-system', () => {
   };
 });
 
+const mockWriteAsStringAsync = jest.fn(async (uri: string) => {
+  mockFsState.files.add(uri);
+});
+
+jest.mock('expo-file-system/legacy', () => ({
+  EncodingType: { Base64: 'base64' },
+  writeAsStringAsync: (...args: unknown[]) => mockWriteAsStringAsync(...(args as [string])),
+}));
+
 import {
   deleteReceiptImage,
   getReceiptImageUri,
   hydrateReceiptImageCache,
   saveReceiptImage,
+  saveReceiptImageBase64,
 } from '../receiptImageStorage';
 
 describe('receipt image storage', () => {
   beforeEach(() => {
     mockFsState.directories.clear();
     mockFsState.files.clear();
+    mockWriteAsStringAsync.mockClear();
     hydrateReceiptImageCache();
   });
 
@@ -94,5 +105,21 @@ describe('receipt image storage', () => {
     deleteReceiptImage('tx-2');
     hydrateReceiptImageCache();
     expect(getReceiptImageUri('tx-2')).toBeUndefined();
+  });
+
+  it('writes picker base64 directly without reopening an Android content URI', async () => {
+    const storedUri = await saveReceiptImageBase64(
+      'tx-3',
+      'data:image/png;base64,AQID',
+      'image/png',
+    );
+
+    expect(storedUri).toBe('file:///document/receipt-images/tx-3.png');
+    expect(mockWriteAsStringAsync).toHaveBeenCalledWith(
+      storedUri,
+      'AQID',
+      { encoding: 'base64' },
+    );
+    expect(getReceiptImageUri('tx-3')).toBe(storedUri);
   });
 });

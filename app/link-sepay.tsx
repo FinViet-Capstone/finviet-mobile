@@ -213,7 +213,7 @@ function createStyles(colors: ThemeColors) {
     },
     webview: { flex: 1 },
     loadingOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',

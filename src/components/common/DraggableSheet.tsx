@@ -123,11 +123,11 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       justifyContent: 'flex-end',
     },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: `${colors.black}80`,
     },
     sheet: {
