@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import type { DevicePushToken, NotificationResponse } from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { InAppNotificationBanner } from '@/components/common/InAppNotificationBanner';
@@ -19,6 +19,7 @@ import {
 import { getNotificationInstallationId } from '@/lib/notificationStorage';
 import {
   getExpoNotificationToken,
+  loadNativeNotifications,
   notificationPlatform,
   setupNotifications,
 } from '@/lib/notifications';
@@ -48,8 +49,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     isSeeded: false,
     seenIds: new Set<string>(),
   });
-  const pendingResponseRef = useRef<Notifications.NotificationResponse | null>(null);
-  const responseListenerReadyRef = useRef(false);
+  const pendingResponseRef = useRef<NotificationResponse | null>(null);
   const previousCustomerIdRef = useRef<string | null>(null);
   const isForeground = appState === 'active';
   const {
@@ -85,7 +85,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, [dismissCurrent, markReadBestEffort, router]);
 
   const handleNotificationResponse = useCallback((
-    response: Notifications.NotificationResponse,
+    response: NotificationResponse,
   ) => {
     if (!isAuthenticated) {
       pendingResponseRef.current = response;
@@ -93,7 +93,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
 
     const csvRoute = csvImportReadyRoute(
-      response.notification.request.content.data as Record<string, unknown>,
+      response.notification.request.content.data ?? {},
     );
     if (csvRoute) {
       router.push(csvRoute);
@@ -101,7 +101,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
 
     const pushData = parseNotificationPushData(
-      response.notification.request.content.data,
+      response.notification.request.content.data ?? {},
     );
     if (!pushData) {
       router.push('/notifications');
@@ -151,11 +151,22 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, [isAuthenticated, queryClient, refetchUnread]);
 
   useEffect(() => {
-    if (!hydrated || !isAuthenticated || !customerId) return;
+    // Expo Go can still display local notifications, but Android remote-push
+    // registration was removed in SDK 53. In SDK 57, merely subscribing to
+    // push-token changes throws and prevents the whole app from rendering.
+    // Keep server polling and FinViet's in-app banner active while skipping
+    // the native notification module that requires a development build.
+    if (
+      !hydrated
+      || !isAuthenticated
+      || !customerId
+      || !notificationPlatform()
+    ) return;
 
     let isCancelled = false;
+    let tokenSubscription: { remove: () => void } | null = null;
 
-    const register = async (devicePushToken?: Notifications.DevicePushToken) => {
+    const register = async (devicePushToken?: DevicePushToken) => {
       try {
         const platform = notificationPlatform();
         if (!platform || !(await setupNotifications())) return;
@@ -171,71 +182,86 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       }
     };
 
-    register();
-    const tokenSubscription = Notifications.addPushTokenListener((deviceToken) => {
-      register(deviceToken);
-    });
+    void (async () => {
+      const Notifications = await loadNativeNotifications();
+      if (!Notifications || isCancelled) return;
+
+      await register();
+      if (isCancelled) return;
+      tokenSubscription = Notifications.addPushTokenListener((deviceToken) => {
+        register(deviceToken);
+      });
+    })();
 
     return () => {
       isCancelled = true;
-      tokenSubscription.remove();
+      tokenSubscription?.remove();
     };
   }, [customerId, hydrated, isAuthenticated]);
 
   useEffect(() => {
-    const receiveSubscription = Notifications.addNotificationReceivedListener((event) => {
+    let isCancelled = false;
+    let receiveSubscription: { remove: () => void } | null = null;
+    let responseSubscription: { remove: () => void } | null = null;
+
+    void (async () => {
+      const Notifications = await loadNativeNotifications();
+      if (!Notifications || isCancelled) return;
+
+      receiveSubscription = Notifications.addNotificationReceivedListener((event) => {
+        const session = useAuthStore.getState();
+        const activeCustomerId = session.customer?.id ?? null;
+        if (!session.isAuthenticated || !activeCustomerId) return;
+
+        const content = event.request.content;
+        if (csvImportReadyRoute(content.data ?? {})) return;
+
+        const pushData = parseNotificationPushData(content.data ?? {});
+        if (!pushData) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() });
+          return;
+        }
+
+        const notification: AppNotification = {
+          id: pushData.notificationId,
+          customerId: activeCustomerId,
+          type: pushData.type,
+          title: content.title,
+          body: content.body,
+          entityType: pushData.entityType,
+          entityId: pushData.entityId,
+          isRead: false,
+          sentAt: new Date().toISOString(),
+        };
+        insertNotificationInCache(queryClient, activeCustomerId, notification);
+        if (AppState.currentState === 'active') enqueue(notification);
+      });
+      responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        pendingResponseRef.current = response;
+        const session = useAuthStore.getState();
+        if (!session.hydrated || !session.isAuthenticated) return;
+        handleNotificationResponse(response);
+        pendingResponseRef.current = null;
+      });
+
+      const initialResponse = Notifications.getLastNotificationResponse();
+      if (!initialResponse) return;
+
+      pendingResponseRef.current = initialResponse;
+      Notifications.clearLastNotificationResponse();
       const session = useAuthStore.getState();
-      const activeCustomerId = session.customer?.id ?? null;
-      if (!session.isAuthenticated || !activeCustomerId) return;
-
-      const content = event.request.content;
-      if (csvImportReadyRoute(content.data as Record<string, unknown>)) return;
-
-      const pushData = parseNotificationPushData(content.data);
-      if (!pushData) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() });
-        return;
+      if (session.hydrated && session.isAuthenticated) {
+        handleNotificationResponse(initialResponse);
+        pendingResponseRef.current = null;
       }
-
-      const notification: AppNotification = {
-        id: pushData.notificationId,
-        customerId: activeCustomerId,
-        type: pushData.type,
-        title: content.title,
-        body: content.body,
-        entityType: pushData.entityType,
-        entityId: pushData.entityId,
-        isRead: false,
-        sentAt: new Date().toISOString(),
-      };
-      insertNotificationInCache(queryClient, activeCustomerId, notification);
-      if (AppState.currentState === 'active') enqueue(notification);
-    });
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      pendingResponseRef.current = response;
-      const session = useAuthStore.getState();
-      if (!session.hydrated || !session.isAuthenticated) return;
-      handleNotificationResponse(response);
-      pendingResponseRef.current = null;
-    });
-    responseListenerReadyRef.current = true;
+    })();
 
     return () => {
-      responseListenerReadyRef.current = false;
-      receiveSubscription.remove();
-      responseSubscription.remove();
+      isCancelled = true;
+      receiveSubscription?.remove();
+      responseSubscription?.remove();
     };
   }, [enqueue, handleNotificationResponse, queryClient]);
-
-  useEffect(() => {
-    if (!hydrated || !responseListenerReadyRef.current) return;
-
-    const initialResponse = Notifications.getLastNotificationResponse();
-    if (!initialResponse) return;
-
-    pendingResponseRef.current = initialResponse;
-    Notifications.clearLastNotificationResponse();
-  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated || !isAuthenticated || !pendingResponseRef.current) return;

@@ -502,7 +502,7 @@ export function AIChatbotSheet({ visible, onClose }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: withAlpha(colors.black, 0.5),
   },
   container: {

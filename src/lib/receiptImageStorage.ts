@@ -6,6 +6,7 @@
  */
 
 import { Directory, File, Paths } from 'expo-file-system';
+import { EncodingType, writeAsStringAsync } from 'expo-file-system/legacy';
 
 const RECEIPT_DIR = new Directory(Paths.document, 'receipt-images');
 const RECEIPT_FILE_PATTERN = /^(.+)\.(jpe?g|png|webp|heic|heif)$/i;
@@ -52,6 +53,30 @@ export function saveReceiptImage(transactionId: string, pickedUri: string): stri
   const source = new File(pickedUri);
   const destination = new File(RECEIPT_DIR, `${transactionId}.${extension}`);
   source.copy(destination);
+  cache.set(transactionId, destination.uri);
+  return destination.uri;
+}
+
+/** Persist the bytes already returned by ImagePicker without re-opening its
+ * short-lived Android URI. */
+export async function saveReceiptImageBase64(
+  transactionId: string,
+  base64: string,
+  mimeType?: string | null,
+): Promise<string> {
+  ensureDir();
+  deleteReceiptImage(transactionId);
+
+  const extension = mimeType === 'image/png'
+    ? 'png'
+    : mimeType === 'image/webp'
+      ? 'webp'
+      : mimeType === 'image/heic' || mimeType === 'image/heif'
+        ? 'heic'
+        : 'jpg';
+  const destination = new File(RECEIPT_DIR, `${transactionId}.${extension}`);
+  const payload = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
+  await writeAsStringAsync(destination.uri, payload, { encoding: EncodingType.Base64 });
   cache.set(transactionId, destination.uri);
   return destination.uri;
 }

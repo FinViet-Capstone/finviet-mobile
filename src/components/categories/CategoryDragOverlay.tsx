@@ -103,7 +103,7 @@ export function CategoryDragOverlay({ active, dragX, dragY, chipLabel, chipCateg
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 999,
     elevation: 999,
   },

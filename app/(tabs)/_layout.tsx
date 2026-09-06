@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarButtonProps } from 'expo-router/js-tabs';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import TabBarIcon from '@/components/common/TabBarIcon';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';

@@ -34,7 +34,15 @@ import type { Wallet } from "@/types/wallet";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { getApiErrorMessage } from "@/utils/errors";
 import { isValidReceiptDate, parseReceiptAmount } from "@/utils/receiptReview";
-import { saveReceiptImage } from "@/lib/receiptImageStorage";
+import {
+  saveReceiptImage,
+  saveReceiptImageBase64,
+} from "@/lib/receiptImageStorage";
+import {
+  deletePhotoUploadSession,
+  getPhotoUploadSession,
+} from "@/lib/photoUploadSession";
+import type { PhotoUploadInput } from "@/types";
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -56,14 +64,14 @@ const S = {
   selectedCount: (selected: number, total: number) => `${selected}/${total} đã chọn`,
   confirmAll: "Lưu sau khi kiểm tra",
   needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
-  needCategory: "Chọn danh mục →",
+  analyzingRow: "Đang phân tích ảnh này...",
+  aiCategorizeFailed: "AI không phân loại được — chạm để chọn",
   retake: "Chụp lại",
   amountLabel: "Số tiền",
   merchantLabel: "Người nhận",
   categoryLabel: "Danh mục",
   dateLabel: "Ngày",
   pickCategory: "Chọn danh mục",
-  uncategorized: "Chưa phân loại",
   duplicate: "Có thể trùng",
   noWallet: "Chưa có ví",
   noWalletMsg: "Hãy tạo ít nhất một ví trước khi lưu.",
@@ -89,6 +97,9 @@ const S = {
 
 interface ExtractedRow {
   uri: string;
+  previewUri: string;
+  base64?: string | null;
+  mimeType?: string | null;
   status: "processing" | "done" | "failed";
   amount: number;
   merchant: string;
@@ -118,7 +129,14 @@ function formatDate(iso: string): string {
  * configured server-side yet (finviet-be's IReceiptOcrService placeholder),
  * as opposed to a transient/per-image failure. */
 function isOcrNotConfigured(err: unknown): boolean {
-  return isAxiosError(err) && err.response?.data?.code === "ocr_not_configured";
+  return (
+    (isAxiosError(err) && err.response?.data?.code === "ocr_not_configured")
+    || (
+      err instanceof Error
+      && "apiCode" in err
+      && (err as Error & { apiCode?: string }).apiCode === "ocr_not_configured"
+    )
+  );
 }
 
 function isUncertain(row: ExtractedRow): boolean {
@@ -128,6 +146,41 @@ function isUncertain(row: ExtractedRow): boolean {
     row.categoryUncertain ||
     row.dateUncertain
   );
+}
+
+function parsePhotoInputs(
+  rawPhotos: string | string[] | undefined,
+  rawUris: string | string[] | undefined,
+): PhotoUploadInput[] {
+  const parse = (raw: string | string[] | undefined): unknown => {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (!value) return [];
+    try {
+      return JSON.parse(value);
+    } catch {
+      return [];
+    }
+  };
+
+  const photos = parse(rawPhotos);
+  if (Array.isArray(photos)) {
+    const valid = photos.filter(
+      (item): item is PhotoUploadInput =>
+        typeof item === "object"
+        && item !== null
+        && typeof (item as PhotoUploadInput).uri === "string"
+        && (item as PhotoUploadInput).uri.length > 0,
+    );
+    if (valid.length > 0) return valid;
+  }
+
+  // Backward compatibility for old links that only carried a JSON URI array.
+  const uris = parse(rawUris);
+  return Array.isArray(uris)
+    ? uris
+        .filter((uri): uri is string => typeof uri === "string" && uri.length > 0)
+        .map((uri) => ({ uri }))
+    : [];
 }
 
 // ─── Review Row ───────────────────────────────────────────────────────────────
@@ -184,7 +237,7 @@ function ReviewRow({
           accessibilityLabel={S.previewImage}
         >
           <Image
-            source={{ uri: row.uri }}
+            source={{ uri: row.previewUri }}
             style={styles.reviewThumb}
             resizeMode="cover"
           />
@@ -232,7 +285,12 @@ function ReviewRow({
           </View>
         </View>
 
-        {isFailed ? (
+        {row.status === "processing" ? (
+          <View style={styles.reviewProcessingRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.reviewProcessingText}>{S.analyzingRow}</Text>
+          </View>
+        ) : isFailed ? (
           <Text style={styles.failedText}>{row.failedMessage ?? S.failedExtraction}</Text>
         ) : (
           <>
@@ -320,14 +378,16 @@ function ReviewRow({
                     </Text>
                   </>
                 ) : (
-                  <Text
-                    style={[
-                      styles.uncategorizedText,
-                      blocking && styles.needCategoryText,
-                    ]}
-                  >
-                    {blocking ? S.needCategory : S.uncategorized}
-                  </Text>
+                  <>
+                    <MaterialIcon
+                      name="error_outline"
+                      size={12}
+                      color={colors.error}
+                    />
+                    <Text style={[styles.uncategorizedText, styles.needCategoryText]}>
+                      {S.aiCategorizeFailed}
+                    </Text>
+                  </>
                 )}
                 <MaterialIcon
                   name="chevron_right"
@@ -378,8 +438,15 @@ function ReviewRow({
 
 export default function PhotoConfirmScreen() {
   const router = useRouter();
-  const { uris: rawUris, date: dateParam } = useLocalSearchParams<{
-    uris?: string;
+  const {
+    sessionId: rawSessionId,
+    photos: rawPhotos,
+    uris: rawUris,
+    date: dateParam,
+  } = useLocalSearchParams<{
+    sessionId?: string | string[];
+    photos?: string | string[];
+    uris?: string | string[];
     date?: string;
   }>();
   const extract = useExtractFromPhoto();
@@ -388,17 +455,22 @@ export default function PhotoConfirmScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const uris: string[] = (() => {
-    try {
-      return JSON.parse(rawUris ?? "[]");
-    } catch {
-      return [];
-    }
-  })();
+  const sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
+  const photoInputs = useMemo(() => {
+    const sessionPhotos = getPhotoUploadSession(sessionId);
+    return sessionPhotos.length > 0
+      ? sessionPhotos
+      : parsePhotoInputs(rawPhotos, rawUris);
+  }, [sessionId, rawPhotos, rawUris]);
 
   const [rows, setRows] = useState<ExtractedRow[]>(
-    uris.map((uri) => ({
-      uri,
+    photoInputs.map((photo) => ({
+      uri: photo.uri,
+      previewUri: photo.base64
+        ? `data:${photo.mimeType ?? "image/jpeg"};base64,${photo.base64}`
+        : photo.uri,
+      base64: photo.base64,
+      mimeType: photo.mimeType,
       status: "processing",
       amount: 0,
       merchant: "",
@@ -426,10 +498,17 @@ export default function PhotoConfirmScreen() {
   const selectedWallet =
     basicWallets.find((w) => w.id === effectiveSelectedWalletId) ?? basicWallets[0];
 
-  // Extract each image
+  // Extract each image. Capped concurrency (rather than firing all N at once):
+  // the backend's per-request AI categorization call has no cross-request
+  // throttle of its own, so a full-speed batch mostly returned uncategorized
+  // rows except whichever request's Gemini call happened to win the race.
   useEffect(() => {
-    uris.forEach((uri, idx) => {
-      extract.mutate(uri, {
+    const EXTRACTION_CONCURRENCY = 2;
+
+    const processIndex = (idx: number) => {
+      if (idx >= photoInputs.length) return;
+      const photoInput = photoInputs[idx];
+      extract.mutate(photoInput, {
         onSuccess: (result) => {
           setRows((prev) => {
             const updated = prev.map((r, i) =>
@@ -470,6 +549,7 @@ export default function PhotoConfirmScreen() {
               return { ...r, isDuplicate };
             });
           });
+          processIndex(idx + EXTRACTION_CONCURRENCY);
         },
         onError: (err) => {
           const failedMessage = getApiErrorMessage(err, S.failedExtraction);
@@ -494,9 +574,14 @@ export default function PhotoConfirmScreen() {
               },
             ]);
           }
+          processIndex(idx + EXTRACTION_CONCURRENCY);
         },
       });
-    });
+    };
+
+    for (let i = 0; i < Math.min(EXTRACTION_CONCURRENCY, photoInputs.length); i++) {
+      processIndex(i);
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -592,7 +677,11 @@ export default function PhotoConfirmScreen() {
           entryMethod: "photo",
         });
         try {
-          saveReceiptImage(created.id, row.uri);
+          if (row.base64) {
+            await saveReceiptImageBase64(created.id, row.base64, row.mimeType);
+          } else {
+            saveReceiptImage(created.id, row.uri);
+          }
         } catch {
           // The transaction is already committed server-side. Keep it and tell
           // the user only that its local image copy could not be preserved.
@@ -604,6 +693,7 @@ export default function PhotoConfirmScreen() {
       const savedMessage =
         S.savedMsg(toSave.length, toSave[0]?.dateIso) +
         (imageSaveFailed ? S.imageSaveWarning : "");
+      deletePhotoUploadSession(sessionId);
       Alert.alert(S.savedTitle, savedMessage, [
         {
           text: S.viewSaved,
@@ -621,7 +711,12 @@ export default function PhotoConfirmScreen() {
     } finally {
       setIsImporting(false);
     }
-  }, [rows, selectedWallet, createMutation, router]);
+  }, [rows, selectedWallet, createMutation, router, sessionId]);
+
+  const handleBack = useCallback(() => {
+    deletePhotoUploadSession(sessionId);
+    router.back();
+  }, [router, sessionId]);
 
   // Strict gate (Path A): the batch can only be submitted when every selected,
   // successfully-extracted row has a category. Uncategorized selected rows block it.
@@ -643,7 +738,7 @@ export default function PhotoConfirmScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             style={styles.headerBtn}
-            onPress={() => router.back()}
+            onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Quay lại"
           >
@@ -664,7 +759,7 @@ export default function PhotoConfirmScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.headerBtn}
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
         >
@@ -752,7 +847,7 @@ export default function PhotoConfirmScreen() {
               item.categoryId === null
             }
             onToggle={() => handleToggle(index)}
-            onPreviewImage={() => setPreviewUri(item.uri)}
+            onPreviewImage={() => setPreviewUri(item.previewUri)}
             onEditAmount={(amount) => handleAmountEdit(index, amount)}
             onEditMerchant={(merchant) => handleMerchantEdit(index, merchant)}
             onEditDate={(dateIso) => handleDateEdit(index, dateIso)}
@@ -766,7 +861,7 @@ export default function PhotoConfirmScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.retakeBtn}
-          onPress={() => router.back()}
+          onPress={handleBack}
         >
           <Text style={styles.retakeText}>{S.retake}</Text>
         </TouchableOpacity>
@@ -1150,6 +1245,16 @@ function createStyles(colors: ThemeColors) {
     fontWeight: FONT_WEIGHT.semibold,
   },
   failedText: { fontSize: FONT_SIZE.xs, color: colors.error, lineHeight: 18 },
+  reviewProcessingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING[2],
+    paddingVertical: SPACING[2],
+  },
+  reviewProcessingText: {
+    fontSize: FONT_SIZE.xs,
+    color: colors.onSurfaceVariant,
+  },
 
   // Bottom bar
   bottomBar: {

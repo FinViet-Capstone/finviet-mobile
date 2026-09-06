@@ -89,7 +89,7 @@ type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 let refreshPromise: Promise<string> | null = null;
 
 /** Refresh via a bare axios call so it never re-enters this interceptor. */
-async function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<string> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) throw new Error('No refresh token');
 

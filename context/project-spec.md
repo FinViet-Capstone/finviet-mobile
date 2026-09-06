@@ -51,12 +51,15 @@ A. Wallets & Multi-Method Transaction Entry
   return genuine extracted fields. **Correction (2026-08-18):** photo/receipt OCR is no longer
   the 503 placeholder previously documented here — `IReceiptOcrService` is now wired to a real
   Gemini-backed provider (`finviet-be` commit `aff76cc`) and the endpoint returns real
-  extracted amount/merchant/date data. However, unlike SMS and CSV extraction, the photo path
-  never calls the shared categorization service at all
-  (`AiCategorizationService`/`PreviewAsync`, only wired into `TransactionExtractService` for
-  SMS/CSV) — so every photo-extracted row currently comes back with `categoryId: null` by
-  construction, regardless of AI provider health. Not yet fixed; tracked as a backend follow-up.
-  Separately, SMS/CSV/SePay-sync categorization can silently degrade to `categoryId: null` for
+  extracted amount/merchant/date data. This section previously also said the photo path never
+  calls the shared categorization service, leaving every row `categoryId: null` by
+  construction — that gap was closed by the `fix/ai-categorization-suggestions` work
+  (`ExtractController.ExtractPhoto` now calls `CategorizeItemAsync`) and reconfirmed live
+  on-device 2026-09-05 (a photo-extracted row came back with a real AI-assigned category).
+  **Newly found the same day:** across a multi-photo batch, only one image's row comes back
+  categorized — the rest land `categoryId: null` regardless of content. Not yet root-caused;
+  see Features §A follow-up note below. Separately, SMS/CSV/SePay-sync categorization can
+  silently degrade to `categoryId: null` for
   every transaction if the backend's Gemini call fails (rule match first, then Gemini; any
   provider failure is caught and swallowed to "uncategorized" with only a warning log, never
   surfaced to the app) — worth checking backend logs/config directly if AI categorization stops

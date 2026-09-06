@@ -1,11 +1,11 @@
 import React from 'react';
-import { Text, TextStyle, StyleSheet } from 'react-native';
+import { Text, TextStyle, StyleSheet, type ColorValue } from 'react-native';
 import { useThemeColors } from '@/providers/ThemeProvider';
 
 export interface MaterialIconProps {
   readonly name: string;
   readonly size?: number;
-  readonly color?: string;
+  readonly color?: ColorValue;
   readonly filled?: boolean;
   readonly style?: TextStyle;
 }

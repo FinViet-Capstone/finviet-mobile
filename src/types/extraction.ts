@@ -13,6 +13,16 @@ export interface PhotoExtractionResult {
   };
 }
 
+/** ImagePicker data required by the OCR upload and receipt preview. */
+export interface PhotoUploadInput {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  /** Raw payload returned by ImagePicker. It deliberately avoids re-reading an
+   * Android content/cache URI after its temporary permission has expired. */
+  base64?: string | null;
+}
+
 /**
  * One parsed row from a CSV/XLSX bank-statement import. Unlike photo/SMS
  * extraction (single candidate), CSV extraction returns many rows at once.
