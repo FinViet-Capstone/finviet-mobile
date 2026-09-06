@@ -1,8 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useNavigation, usePreventRemove } from 'expo-router/react-navigation';
+import { useNavigation, useRouter } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
@@ -157,27 +156,31 @@ export default function CategoriesRoute() {
 
   // Block leaving (header back, hardware back, swipe-back) while a bucket move
   // is staged but not yet saved — otherwise it's silently discarded.
-  usePreventRemove(pendingMoves.size > 0, ({ data }) => {
-    Alert.alert(
-      'Chưa lưu thay đổi',
-      'Bạn có thay đổi danh mục chưa được lưu. Bạn muốn làm gì?',
-      [
-        { text: 'Ở lại', style: 'cancel' },
-        {
-          text: 'Không lưu',
-          style: 'destructive',
-          onPress: () => navigation.dispatch(data.action),
-        },
-        {
-          text: 'Lưu',
-          onPress: async () => {
-            const saved = await handleSaveChanges();
-            if (saved) navigation.dispatch(data.action);
+  useEffect(() => {
+    if (pendingMoves.size === 0) return undefined;
+    return navigation.addListener('beforeRemove', (event) => {
+      event.preventDefault();
+      Alert.alert(
+        'Chưa lưu thay đổi',
+        'Bạn có thay đổi danh mục chưa được lưu. Bạn muốn làm gì?',
+        [
+          { text: 'Ở lại', style: 'cancel' },
+          {
+            text: 'Không lưu',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(event.data.action),
           },
-        },
-      ],
-    );
-  });
+          {
+            text: 'Lưu',
+            onPress: async () => {
+              const saved = await handleSaveChanges();
+              if (saved) navigation.dispatch(event.data.action);
+            },
+          },
+        ],
+      );
+    });
+  }, [handleSaveChanges, navigation, pendingMoves.size]);
 
   const pctOf = useCallback(
     (b: BucketId) => {
