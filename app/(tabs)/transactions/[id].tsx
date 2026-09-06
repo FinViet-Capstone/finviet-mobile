@@ -14,8 +14,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router/react-navigation';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   SPACING,
