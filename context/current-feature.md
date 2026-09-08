@@ -1,5 +1,47 @@
 # Current Feature
 
+Feature: Budget category progress as a donut + long-press progress detail (branch
+`feature/budget-category-donut`, mobile only). The Budgets tab showed each category's
+progress as a 64×4pt linear bar with a percentage above it — readable only as "roughly how
+full", with nowhere to see pacing or how far past a limit the spend actually is.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the three changed/new
+source files reports 0 errors (2 pre-existing warnings on untouched lines of `budgets/index.tsx` —
+unused `wallets`, the `bucketPct` memo dep); `npx jest` **183/183 pass, 35/35 suites** (179 + 4 new).
+**Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- New `BudgetDonut` (`src/components/budget/BudgetDonut.tsx`) — an SVG ring built the same way
+  `SpendingScoreCard`'s score ring already is (`react-native-svg` `Circle` + `strokeDashoffset`),
+  with the percentage in the middle. Replaces the linear bar on every category row.
+- The arc caps at 100% while the printed percentage stays truthful — a 340% ring would otherwise
+  wrap and read as 40%. Same split the bucket cards already use.
+- Long-press the donut (or the row) → `app/(tabs)/budgets/category/[id].tsx`, a zoom-in detail
+  screen: a 208pt donut, the status pill, exact spent/limit/remaining-or-over figures, a
+  day-pace card comparing actual spend against the straight-line expectation for the day of the
+  month, and one line of advice. Medium haptic on the long-press; a one-line hint above the
+  category groups makes the gesture discoverable.
+- `computePace()` exported and unit tested: a *past* month is fully elapsed, so it must report
+  the whole limit as expected and 0 days left rather than a slice of the current date.
+
+## Notes
+- The detail screen re-reads the month the Budgets tab is viewing (`startDate`/`endDate` passed as
+  route params into the same `useBudgets(range)` query), so opening it from a past month shows that
+  month, not "now".
+- Figures use `@/utils/formatters`' exact `formatVND`, not the Budgets tab's local compact
+  formatter — a detail screen that rounds 1.176.471đ to "1.2M" is the same "con số không khớp"
+  class of defect the thesis council raised.
+- Savings keeps its documented asymmetry here too: over target is green, below is neutral gray,
+  never red.
+- A tap on the donut still opens the limit sheet, exactly like a tap anywhere else on the row —
+  the long-press is additive, nothing was taken away.
+
+---
+
+
 <!-- Feature name and short description -->
 Feature: Make receipt OCR reliable and surface honest confidence (branch
 `fix/receipt-ocr-reliability`, cross-repo with `finviet-be`). A live Render test on 2026-09-04
