@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
@@ -21,6 +22,7 @@ import { useCustomerCategories } from '@/hooks/useCustomerCategories';
 import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
+import { BudgetDonut } from '@/components/budget/BudgetDonut';
 import { getBudgetStatus } from '@/utils/budgetStatus';
 import type { BucketType } from '@/constants/categories';
 import type { BudgetWithSpend } from '@/types/budget';
@@ -42,6 +44,9 @@ const S = {
   of: '/',
   left: 'Còn lại',
   noLimit: 'Chưa có hạn mức',
+  donutHint: 'Nhấn giữ biểu đồ tiến độ để xem chi tiết',
+  donutA11yLabel: (name: string, pct: string) => `Tiến độ ${name}: ${pct}`,
+  donutA11yHint: 'Nhấn giữ để mở màn hình chi tiết tiến độ',
   months: [
     'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
     'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
@@ -200,9 +205,10 @@ interface CategoryRowProps {
   allocationCap: number;
   remainingCap: number;
   onSetLimit: (target: SetLimitTarget) => void;
+  onOpenDetail: (categoryId: string) => void;
 }
 
-function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, remainingCap, onSetLimit }: CategoryRowProps) {
+function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, remainingCap, onSetLimit, onOpenDetail }: CategoryRowProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const msIcon = getCategoryIcon(icon);
@@ -225,11 +231,23 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
     ? colors.warning
     : colors.primary;
 
+  const openSetLimit = () =>
+    onSetLimit({ categoryId, categoryName: nameVi, bucket, existingLimit: budget?.monthlyLimit, allocationCap, remainingCap });
+
+  // Long-press anywhere on the row works too, but the donut is what the hint
+  // points at — a tap there still opens the limit sheet, same as the row.
+  const handleOpenDetail = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onOpenDetail(categoryId);
+  };
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       style={[styles.categoryRow, isBadOver && styles.categoryRowOver]}
-      onPress={() => onSetLimit({ categoryId, categoryName: nameVi, bucket, existingLimit: budget?.monthlyLimit, allocationCap, remainingCap })}
+      onPress={openSetLimit}
+      onLongPress={hasLimit ? handleOpenDetail : undefined}
+      delayLongPress={280}
     >
       <View style={styles.categoryLeft}>
         <View style={[styles.categoryIconWrap, { backgroundColor: withAlpha(colors.primary, 0.13) }]}>
@@ -248,19 +266,23 @@ function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, 
       </View>
 
       {hasLimit ? (
-        <View style={styles.categoryRight}>
-          <Text style={[styles.categoryPct, { color: barColor }]} numberOfLines={1}>
-            {`${budget.percentage.toFixed(0)}%`}
-          </Text>
-          <View style={styles.categoryBarTrack}>
-            <View
-              style={[
-                styles.categoryBarFill,
-                { width: `${Math.min(budget.percentage, 100)}%` as any, backgroundColor: barColor },
-              ]}
-            />
-          </View>
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.categoryRight}
+          onPress={openSetLimit}
+          onLongPress={handleOpenDetail}
+          delayLongPress={280}
+          accessibilityRole="button"
+          accessibilityLabel={S.donutA11yLabel(nameVi, `${budget.percentage.toFixed(0)}%`)}
+          accessibilityHint={S.donutA11yHint}
+        >
+          <BudgetDonut
+            percentage={budget.percentage}
+            color={barColor}
+            trackColor={colors.surfaceVariant}
+            labelColor={isBadOver ? colors.error : colors.onSurface}
+          />
+        </TouchableOpacity>
       ) : (
         <View style={styles.setLimitBtn}>
           <MaterialIcon name="add" size={14} color={colors.primary} />
@@ -377,6 +399,16 @@ export default function BudgetsScreen() {
     setLimitTarget(target);
   }, []);
 
+  const handleOpenCategoryDetail = useCallback(
+    (categoryId: string) => {
+      router.push({
+        pathname: '/(tabs)/budgets/category/[id]',
+        params: { id: categoryId, ...selectedRange },
+      });
+    },
+    [router, selectedRange],
+  );
+
   if (isLoading) return <LoadingSpinner />;
   if (isError) return <ErrorState message={(error as Error)?.message} onRetry={refetch} />;
 
@@ -463,6 +495,12 @@ export default function BudgetsScreen() {
           ))}
         </View>
 
+        {/* Long-press affordance is invisible on its own — say it once. */}
+        <View style={styles.donutHintRow}>
+          <MaterialIcon name="touch_app" size={14} color={colors.onSurfaceVariant} />
+          <Text style={styles.donutHint}>{S.donutHint}</Text>
+        </View>
+
         {/* Category groups — Reddit thread style */}
         {buckets.map((bucket) => {
           const cats = categoriesByBucket[bucket];
@@ -512,6 +550,7 @@ export default function BudgetsScreen() {
                               allocationCap={cap}
                               remainingCap={remaining}
                               onSetLimit={handleSetLimit}
+                              onOpenDetail={handleOpenCategoryDetail}
                             />
                           </View>
                         </View>
@@ -806,25 +845,20 @@ function createStyles(colors: ThemeColors) {
     color: colors.onSurfaceVariant,
     marginTop: 2,
   },
-  categoryRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-    width: 84,
+  donutHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
+    marginBottom: SPACING[3],
   },
-  categoryPct: {
+  donutHint: {
     fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.semibold,
+    color: colors.onSurfaceVariant,
   },
-  categoryBarTrack: {
-    width: 64,
-    height: 4,
-    backgroundColor: colors.surfaceVariant,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-  },
-  categoryBarFill: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
+  categoryRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: SPACING[2],
   },
   setLimitBtn: {
     flexDirection: 'row',
