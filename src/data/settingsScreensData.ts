@@ -43,6 +43,11 @@ export const AI_PREFERENCES_STRINGS = {
     },
   },
   dataScopeHint: 'Bạn có thể tắt riêng từng nhóm dữ liệu mà trợ lý AI được phép sử dụng.',
+  dependencies: {
+    requiresTransactions: 'Cần bật quyền dùng dữ liệu Giao dịch trước.',
+    disablingTransactions:
+      'Tắt quyền này sẽ tự tắt Báo cáo chi tiêu hằng tuần và RAG cá nhân hóa.',
+  },
   dataScope: {
     shareBalances: 'Số dư ví',
     shareTransactions: 'Giao dịch',
