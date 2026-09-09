@@ -48,13 +48,26 @@ export async function getNotificationPrefs(customerId: string): Promise<Notifica
   }
 }
 
+/**
+ * Serializes the read-modify-write below. Two toggles flipped in quick
+ * succession would otherwise both read the same stored value and the second
+ * write would clobber the first one's key.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
 /** Merge a patch into the saved prefs for a customer and persist the result. */
-export async function setNotificationPrefs(
+export function setNotificationPrefs(
   customerId: string,
   patch: Partial<NotificationPrefs>,
 ): Promise<NotificationPrefs> {
-  const current = await getNotificationPrefs(customerId);
-  const next = { ...current, ...patch };
-  if (customerId) await SecureStore.setItemAsync(keyFor(customerId), JSON.stringify(next));
-  return next;
+  const run = writeQueue.then(async () => {
+    const current = await getNotificationPrefs(customerId);
+    const next = { ...current, ...patch };
+    if (customerId) await SecureStore.setItemAsync(keyFor(customerId), JSON.stringify(next));
+    return next;
+  });
+  // Keep the chain alive even if this write rejects, so a single failure
+  // doesn't wedge every later write.
+  writeQueue = run.catch(() => undefined);
+  return run;
 }
