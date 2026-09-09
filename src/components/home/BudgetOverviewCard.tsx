@@ -1,14 +1,31 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BudgetDonut } from '@/components/budget/BudgetDonut';
+import * as Haptics from 'expo-haptics';
+import { MaterialIcon } from '@/components/common/MaterialIcon';
+import {
+  BudgetAllocationPie,
+  computePieSegments,
+  segmentFillColor,
+  type PieBucket,
+} from '@/components/budget/BudgetAllocationPie';
+import { BucketDetailPopup } from '@/components/budget/BucketDetailPopup';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
 import { getBudgetStatus } from '@/utils/budgetStatus';
 
-const DONUT_SIZE = 76;
-const DONUT_STROKE = 7;
+const S = {
+  title: 'Ngân sách tháng này',
+  detail: 'Chi tiết →',
+  hint: 'Nhấn giữ một phần của biểu đồ để xem chi tiết',
+  needs: 'Thiết yếu',
+  wants: 'Mong muốn',
+  savings: 'Tiết kiệm',
+  a11yHint: 'Nhấn giữ để xem chi tiết bucket này',
+  a11yLabel: (label: string, pct: number, spent: string, limit: string) =>
+    `${label}: đã dùng ${pct}%, ${spent} trên ${limit}`,
+};
 
 export function getDisplayedPercentage(spent: number, limit: number): number {
   if (limit <= 0) return 0;
@@ -23,14 +40,6 @@ function getPctColor(spent: number, limit: number, colors: ThemeColors, goalMode
   return colors.budget[getBudgetStatus(pct)];
 }
 
-interface BucketRow {
-  label: string;
-  spent: number;
-  limit: number;
-  activeColor: string;
-  goalMode?: boolean;
-}
-
 export interface BudgetOverviewCardProps {
   readonly needsSpent: number;
   readonly needsLimit: number;
@@ -38,36 +47,6 @@ export interface BudgetOverviewCardProps {
   readonly wantsLimit: number;
   readonly savingsSpent: number;
   readonly savingsLimit: number;
-}
-
-function BucketItem({ label, spent, limit, activeColor, goalMode }: BucketRow) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const pct = getDisplayedPercentage(spent, limit);
-  const pctColor = getPctColor(spent, limit, colors, goalMode);
-
-  return (
-    <View
-      style={styles.bucketItem}
-      accessibilityRole="text"
-      accessibilityLabel={`${label}: đã dùng ${pct}%, ${formatVND(spent)} trên ${formatVND(limit)}`}
-    >
-      <BudgetDonut
-        percentage={pct}
-        color={activeColor}
-        trackColor={colors.surfaceContainerHighest}
-        size={DONUT_SIZE}
-        strokeWidth={DONUT_STROKE}
-        labelColor={pctColor}
-        labelSize={FONT_SIZE.base}
-      />
-      <Text style={styles.bucketLabel} numberOfLines={1}>{label}</Text>
-      <View style={styles.amounts}>
-        <Text style={styles.bucketSpent} numberOfLines={1}>{formatVND(spent)}</Text>
-        <Text style={styles.bucketLimit} numberOfLines={1}>/ {formatVND(limit)}</Text>
-      </View>
-    </View>
-  );
 }
 
 export function BudgetOverviewCard({
@@ -81,37 +60,120 @@ export function BudgetOverviewCard({
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [openedKey, setOpenedKey] = useState<string | null>(null);
+
+  const buckets = useMemo<PieBucket[]>(
+    () => [
+      { key: 'needs', label: S.needs, spent: needsSpent, limit: needsLimit, color: colors.primary },
+      { key: 'wants', label: S.wants, spent: wantsSpent, limit: wantsLimit, color: colors.secondary },
+      {
+        key: 'savings',
+        label: S.savings,
+        spent: savingsSpent,
+        limit: savingsLimit,
+        color: colors.tertiary,
+        goalMode: true,
+      },
+    ],
+    [needsSpent, needsLimit, wantsSpent, wantsLimit, savingsSpent, savingsLimit, colors],
+  );
+
+  // The legend dot has to track the sector's colour, including the switch to
+  // danger once a bucket goes over — otherwise the legend stops identifying
+  // the very sector that just turned red.
+  const segments = useMemo(() => computePieSegments(buckets), [buckets]);
+
+  const openDetail = (key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setOpenedKey(key);
+  };
+
+  const opened = buckets.find((b) => b.key === openedKey) ?? null;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>Ngân sách tháng này</Text>
+        <Text style={styles.title}>{S.title}</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/budgets')} activeOpacity={0.7}>
-          <Text style={styles.detailLink}>Chi tiết →</Text>
+          <Text style={styles.detailLink}>{S.detail}</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.bucketList}>
-        <BucketItem
-          label="Thiết yếu"
-          spent={needsSpent}
-          limit={needsLimit}
-          activeColor={colors.primary}
-        />
-        <BucketItem
-          label="Mong muốn"
-          spent={wantsSpent}
-          limit={wantsLimit}
-          activeColor={colors.secondary}
-        />
-        <BucketItem
-          label="Tiết kiệm"
-          spent={savingsSpent}
-          limit={savingsLimit}
-          activeColor={colors.tertiary}
-          goalMode
-        />
+      <View style={styles.chartWrap}>
+        <BudgetAllocationPie buckets={buckets} onSegmentLongPress={openDetail} />
       </View>
+
+      <View style={styles.hintRow}>
+        <MaterialIcon name="touch_app" size={13} color={colors.onSurfaceVariant} />
+        <Text style={styles.hintText}>{S.hint}</Text>
+      </View>
+
+      <View style={styles.legend}>
+        {buckets.map((bucket) => {
+          const segment = segments.find((s) => s.bucket.key === bucket.key);
+          const dotColor = segment ? segmentFillColor(segment, colors) : bucket.color;
+          const pct = getDisplayedPercentage(bucket.spent, bucket.limit);
+          const isBadOver = !!segment?.isOver && !bucket.goalMode;
+          return (
+            <TouchableOpacity
+              key={bucket.key}
+              style={styles.legendRow}
+              activeOpacity={0.7}
+              onLongPress={() => openDetail(bucket.key)}
+              delayLongPress={280}
+              accessibilityRole="button"
+              accessibilityLabel={S.a11yLabel(
+                bucket.label,
+                pct,
+                formatVND(bucket.spent),
+                formatVND(bucket.limit),
+              )}
+              accessibilityHint={S.a11yHint}
+            >
+              <View style={[styles.legendDot, { backgroundColor: dotColor }]} />
+              <Text style={styles.legendLabel} numberOfLines={1}>{bucket.label}</Text>
+              {isBadOver && (
+                <MaterialIcon name="warning" size={14} color={colors.budget.danger} />
+              )}
+              <Text style={styles.legendAmount} numberOfLines={1}>
+                <Text style={[styles.legendSpent, isBadOver && { color: colors.budget.danger }]}>
+                  {formatVND(bucket.spent)}
+                </Text>
+                <Text style={styles.legendLimit}> / {formatVND(bucket.limit)}</Text>
+              </Text>
+              <View
+                style={[
+                  styles.pctBadge,
+                  {
+                    backgroundColor: withAlpha(
+                      getPctColor(bucket.spent, bucket.limit, colors, bucket.goalMode),
+                      0.15,
+                    ),
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pctText,
+                    { color: getPctColor(bucket.spent, bucket.limit, colors, bucket.goalMode) },
+                  ]}
+                >
+                  {pct}%
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <BucketDetailPopup
+        bucket={opened}
+        onClose={() => setOpenedKey(null)}
+        onOpenBudgets={() => {
+          setOpenedKey(null);
+          router.push('/(tabs)/budgets');
+        }}
+      />
     </View>
   );
 }
@@ -129,7 +191,7 @@ function createStyles(colors: ThemeColors) {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING[5],
+    marginBottom: SPACING[4],
   },
   title: {
     fontSize: FONT_SIZE.xl,
@@ -141,33 +203,60 @@ function createStyles(colors: ThemeColors) {
     color: colors.primary,
     fontWeight: FONT_WEIGHT.medium,
   },
-  bucketList: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING[2],
+  chartWrap: {
+    alignItems: 'center',
   },
-  bucketItem: {
-    flex: 1,
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: SPACING[3],
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.onSurfaceVariant,
+  },
+  legend: {
+    marginTop: SPACING[4],
+    gap: SPACING[3],
+  },
+  legendRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
   },
-  bucketLabel: {
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
     fontSize: FONT_SIZE.sm,
     color: colors.onSurface,
-    fontWeight: FONT_WEIGHT.medium,
-    textAlign: 'center',
   },
-  amounts: {
-    alignItems: 'center',
-  },
-  bucketSpent: {
+  legendAmount: {
+    flex: 1,
     fontSize: FONT_SIZE.xs,
+    textAlign: 'right',
+  },
+  legendSpent: {
     fontWeight: FONT_WEIGHT.semibold,
     color: colors.onSurface,
   },
-  bucketLimit: {
-    fontSize: FONT_SIZE.xs,
+  legendLimit: {
     color: colors.onSurfaceVariant,
+  },
+  pctBadge: {
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 2,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  pctText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.bold,
   },
   });
 }
