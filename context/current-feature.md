@@ -1,5 +1,124 @@
 # Current Feature
 
+Feature: Merge the three bucket donuts into ONE allocation pie, with a capped overspend sector
+and a long-press detail popup (branch `feature/home-budget-donut`, continuing after commit
+`7239d3b`). The 3-donut layout shipped in the previous entry answered "how full is each bucket"
+but showed the three buckets as three unrelated circles. User asked to merge them into a single
+pie, and specified the overspend behaviour directly: an over-budget sector **stops at its own
+boundary** ("cho nó đứng yên đó"), turns red with a warning, and long-pressing it opens a popup
+with the exact overage.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all four
+changed/new files 0 problems; `npx jest` **194/194 pass, 37/37 suites** (186 + 8 new geometry
+tests). **Not committed/pushed.**
+
+**Verified on the Android emulator** (Medium_Phone_API_36.0, Expo Go, live backend): the ring renders
+with correct proportions (Thiết yếu 180°/Mong muốn 108°/Tiết kiệm 72° from 10M/6M/4M), the hole
+reads 2.300.000 ₫ / 20.000.000 ₫, the legend and both new icon glyphs render, and **long-pressing
+the SVG sector itself fires** — the popup opened with 23% / 2.300.000 ₫ / 10.000.000 ₫ / còn lại
+7.700.000 ₫. The **overspend visuals are still unseen**: no bucket on the test account is over, so
+the red sector, the warning marker and the popup's red line have unit-test coverage only.
+
+## Goals
+
+- New `src/components/budget/BudgetAllocationPie.tsx` — one ring where each sector's **angle is
+  the bucket's share of the total allocation**, and the fill inside a sector is that bucket's own
+  `spent / limit`. The hole shows total đã dùng / tổng hạn mức.
+- New `src/components/budget/BucketDetailPopup.tsx` — the long-press detail: raw uncapped %, đã
+  chi, hạn mức, and either còn lại or **vượt hạn mức** with the exact figure, plus a link into the
+  Budgets tab.
+- `BudgetOverviewCard` composes pie + hint line + a 3-row legend, and owns the popup state.
+  Its props are unchanged, so `app/(tabs)/home/index.tsx` needed no edit.
+- `computePieSegments()` exported and unit tested (8 cases): proportional sweeps, the ring closing
+  exactly at 360°, the overspend cap, the truthful `overAmount`, and the zero-limit edge cases.
+
+## Notes
+
+- **Why angle = hạn mức, not angle = đã chi.** The three limits are `income × needsPct/wantsPct/
+  savingsPct` ([home/index.tsx:115-117](app/(tabs)/home/index.tsx#L115-L117)), so they sum to
+  exactly the month's income — they are genuine parts of one whole, which is what makes a single
+  pie legitimate here at all. A pie sized by *spending* would have had nowhere to put a limit.
+- **The overspend cap is the load-bearing decision.** A sector that grew past its share would
+  have to eat its neighbours' angle, making the ring lie about the other two buckets — and a pie
+  has no geometry for ">100% of a slice" regardless. So the sector fills to its boundary and
+  stops, exactly as asked, and the magnitude moves into `overAmount` → the popup. This follows the
+  house rule already set on the Budgets tab: **geometry capped, number truthful.**
+- **The card's badge keeps Home's documented 100% clamp.** `getDisplayedPercentage` is unchanged
+  and still drives the legend badge (its existing test still locks it in), matching
+  `project-spec.md` §C. The raw 124%-style figure appears only in the popup — which is precisely
+  the split the user asked for ("muốn xem chi tiết vượt bao nhiêu thì nhấn giữ").
+- **Savings stays inverted.** `segmentFillColor` turns an over sector `budget.danger` — except
+  when `goalMode`, where over target is *good* and goes `budget.safe` green. The warning marker is
+  suppressed for that case and the popup swaps its red overspend line for a green confirmation.
+  Applying one red treatment to all three sectors would have broken the asymmetry
+  `real/budgets.ts` and `getPctColor` have maintained since the savings-netting work.
+- **Sectors are filled `Path` wedges, not stroked arcs.** Stroke hit-testing is unreliable; a
+  filled annulus sector gives `onLongPress` a real area to hit. The unfilled remainder of each
+  sector is drawn as its own full-width wedge at 16% alpha so the bucket's share stays visible
+  and the whole sector — not just the spent part — is pressable.
+- **The legend rows are long-pressable too.** Partly discoverability and accessibility (a % inside
+  an SVG wedge has no accessible name, so each legend row carries the Vietnamese
+  `accessibilityLabel`/`accessibilityHint`), and partly a deliberate fallback if `react-native-svg`
+  touch handling misbehaves on a given device.
+- **Both on-device risks are now closed.** `react-native-svg` 15.15.4 does fire `onLongPress` on a
+  filled `<G>`/`<Path>` inside a ScrollView, and the new `touch_app`/`warning` ligatures render.
+- **One defect the device caught that no test would have.** The popup's header dot was wired to
+  `accentColor`, which is `onSurface` while a bucket is under its limit — so it rendered black and
+  identified nothing. It now takes the sector's own colour (and follows the sector to danger/safe
+  once over, so it still points at whatever just changed colour behind the scrim).
+- The previous entry's three-donut layout for `BudgetOverviewCard` is superseded by this.
+  `SavingsGoalCard`'s donut from that same entry is untouched and still ships, as does
+  `BudgetDonut`, still used by the Budgets tab and the category detail screen.
+
+---
+
+Feature: Home budget + savings goal progress as donut charts (branch
+`feature/home-budget-donut`, mobile only). The Home tab's "Ngân sách tháng này" card showed
+each bucket as a 10-tick energy bar with a % badge beside it, and "Mục tiêu tiết kiệm" showed a
+10pt linear track — user asked for both to be circular charts instead.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both changed files
+0 problems; `npx jest` **186/186 pass, 36/36 suites** (no new tests — the existing
+`getDisplayedPercentage` suite still covers the only pure logic, unchanged).
+**Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- `BudgetOverviewCard` now lays the three buckets out as a row of three `BudgetDonut` rings
+  (76pt, stroke 7) instead of stacked rows: donut with the % inside, bucket label under it, then
+  the exact spent / limit figures stacked below.
+- `SavingsGoalCard` replaces its linear track with a 92pt `BudgetDonut` on the left (% plus a
+  "hoàn thành" caption inside the ring), with the goal emoji, name and exact amounts to its
+  right.
+- Reuses the existing `src/components/budget/BudgetDonut.tsx` from the Budgets-tab donut work
+  rather than adding a chart library — Home and the Budgets tab now read as one visual language.
+
+## Notes
+
+- **Chosen over a single composition pie.** A pie splitting spend across Needs/Wants/Savings
+  would have dropped the spent-vs-limit comparison (23% of the Thiết yếu cap) that is the whole
+  point of the card. Three progress rings keep it.
+- Amounts stay **exact** (`formatVND`), not compacted to "2.3m", even in the narrower three-column
+  layout — a Home card that rounds while the Budgets tab doesn't is the same "con số không khớp"
+  class of defect the thesis council raised. At `FONT_SIZE.xs` an 11-character figure fits the
+  ~100pt column.
+- The card's documented clamping is unchanged: `getDisplayedPercentage` still caps the displayed
+  percentage at 100 (both the ring and the number it prints), while the amounts underneath stay
+  truthful. That differs from the Budgets tab's category donuts, which cap only the arc — Home's
+  clamp predates this change and its test locks it in.
+- Savings keeps its asymmetry: `getPctColor`'s `goalMode` still colors the number green at/over
+  target and neutral gray below, never red. Only the ring's own track/arc color comes from the
+  bucket palette.
+- The removed `EnergyBar`/`PctBadge`/`TICK_COUNT` had no consumers outside this file.
+- Both cards gained a Vietnamese `accessibilityLabel` on the progress group, since the % is now
+  a glyph inside an SVG rather than a standalone badge.
+
+---
+
 Feature: Budget category progress as a donut + long-press progress detail (branch
 `feature/budget-category-donut`, mobile only). The Budgets tab showed each category's
 progress as a 64×4pt linear bar with a percentage above it — readable only as "roughly how
