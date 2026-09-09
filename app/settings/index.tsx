@@ -23,6 +23,7 @@ import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { useCustomer, useUpdatePreferences } from '@/hooks/useCustomer';
 import { useLogout, useEffectiveIncomeAllocation, useUploadAvatar } from '@/hooks';
 import { getApiErrorMessage } from '@/utils/errors';
+import type { NotificationPrefs } from '@/lib/notificationPrefsCache';
 import { AI_PREFERENCES_STRINGS } from '@/data/settingsScreensData';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
@@ -191,9 +192,14 @@ export default function SettingsScreen() {
   const notifReport = user?.notifications?.report ?? true;
   const notifGoals = user?.notifications?.goals ?? true;
 
-  const handleToggleNotif = useCallback((key: 'budget' | 'report' | 'goals', val: boolean) => {
+  /**
+   * Always sends one mutation, however many toggles it covers — firing one per
+   * key made the concurrent writes overwrite each other, so the master switch
+   * only ever moved the last of the three.
+   */
+  const handleToggleNotif = useCallback((patch: Partial<NotificationPrefs>) => {
     updatePrefs.mutate(
-      { notifications: { [key]: val } },
+      { notifications: patch },
       { onError: (err) => Alert.alert('', getApiErrorMessage(err, 'Không thể lưu tùy chọn thông báo.')) },
     );
   }, [updatePrefs]);
@@ -343,11 +349,7 @@ export default function SettingsScreen() {
           <SectionCard>
             <ToggleRow icon="notifications" label={S.rows.pushNotif}
               value={notifBudget || notifReport || notifGoals}
-              onToggle={(v) => {
-                handleToggleNotif('budget', v);
-                handleToggleNotif('report', v);
-                handleToggleNotif('goals', v);
-              }} />
+              onToggle={(v) => handleToggleNotif({ budget: v, report: v, goals: v })} />
             <Divider />
             <SettingsRow icon="warning" iconColor={colors.secondaryContainer}
               label={S.rows.budgetAlert} value={budgetAlertValue}
@@ -355,7 +357,7 @@ export default function SettingsScreen() {
               rightElement={
                 <Switch
                   value={notifBudget}
-                  onValueChange={(v) => handleToggleNotif('budget', v)}
+                  onValueChange={(v) => handleToggleNotif({ budget: v })}
                   trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
                   thumbColor={notifBudget ? colors.onPrimary : colors.onSurfaceVariant}
                   ios_backgroundColor={colors.surfaceVariant}
@@ -364,11 +366,11 @@ export default function SettingsScreen() {
             <Divider />
             <ToggleRow icon="calendar_today" iconColor={colors.info}
               label={S.rows.weeklyReport} value={notifReport}
-              onToggle={(v) => handleToggleNotif('report', v)} />
+              onToggle={(v) => handleToggleNotif({ report: v })} />
             <Divider />
             <ToggleRow icon="flag" iconColor={colors.tertiary}
               label={S.rows.goalMilestone} value={notifGoals}
-              onToggle={(v) => handleToggleNotif('goals', v)} />
+              onToggle={(v) => handleToggleNotif({ goals: v })} />
           </SectionCard>
         </View>
 

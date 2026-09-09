@@ -119,6 +119,61 @@ Implemented and locally verified: `npm run type-check` clean; `npx eslint` on bo
 
 ---
 
+Fix: the Settings notification switches forgot toggles when turned off and back on
+(branch `claude/notification-switch-settings-bug-7f7491`, mobile only). Reported from a
+screen recording: flipping the master "Thông báo" switch off and on left the three
+per-category toggles in an arbitrary mix, and the master switch appeared to flip itself
+back on.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all five
+changed/new files reports 0 problems; `npm test` **193/193 pass, 38/38 suites** (186 + 7
+new). Committed on the branch above, not pushed/PR'd. Not exercised on device.
+
+## Root cause
+
+Two independent races, both triggered by the master switch firing three separate mutations
+in the same tick (one per key):
+
+- `useUpdatePreferences` read `currentCustomer` from a render-time `useAuthStore(...)`
+  selector rather than `useAuthStore.getState()` inside `mutationFn` (which is what
+  `useUpdateProfile` already did). All three concurrent mutations merged onto the same
+  pre-toggle snapshot, and `updateCustomer` replaces `notifications` wholesale — so the
+  last one to settle won and the other two keys reverted.
+- `setNotificationPrefs` is a read-modify-write over SecureStore with no sequencing, so
+  the three concurrent calls all read the same stored value and the last write clobbered
+  the other two keys on disk as well.
+
+Because the master switch's value is `budget || report || goals`, a half-applied "off"
+immediately read back as on.
+
+## Goals
+
+- `handleToggleNotif` takes a `Partial<NotificationPrefs>` patch, so the master switch
+  sends **one** mutation covering all three keys. Individual rows unchanged in behaviour.
+- `useUpdatePreferences` reads the session fresh inside `mutationFn`, so sequential
+  preference saves can't revert each other either.
+- `setNotificationPrefs` serializes through a module-level promise chain; a rejected write
+  doesn't wedge later ones.
+- Dropped the artificial 350ms `delay()` for notifications-only patches — that path makes
+  no network call, so the delay only made the switch lag behind the tap.
+
+## Notes
+
+- These three toggles still have no backend field (`UpdateProfileSettingsRequest` carries
+  only `Theme` and `NotifBudgetThresholds`), so they remain device-local in
+  `notificationPrefsCache` — unchanged by this fix.
+- Out of scope: the master switch's OR semantics (partial-on still displays as on), the
+  budget-alert row's double role (tap = thresholds, switch = on/off), and moving the
+  toggles to a real backend field.
+- `src/hooks/__tests__/useUpdatePreferences.test.tsx` makes Jest print its "did not exit"
+  notice. Reproduced with a bare `useMutation` under `renderHook` and no project code, and
+  `--detectOpenHandles` finds nothing — it's a jest-expo/TanStack interaction, not
+  something the suite can tear down. Noted in the file.
+
+---
+
 Feature: Budget category progress as a donut + long-press progress detail (branch
 `feature/budget-category-donut`, mobile only). The Budgets tab showed each category's
 progress as a 64×4pt linear bar with a percentage above it — readable only as "roughly how
