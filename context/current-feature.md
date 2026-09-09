@@ -1,5 +1,44 @@
 # Current Feature
 
+Fix: “Hủy” on the manual-entry screen returned to Home instead of the entry-method
+chooser (branch `fix/entry-cancel-back-to-chooser`, mobile only). Reported from the
+emulator: opening “+” → Nhập Thủ Công and then tapping Hủy dropped the customer on the
+Home tab, so getting back to the four entry methods meant tapping “+” again.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed
+file 0 errors (2 pre-existing tolerated `set-state-in-effect` warnings on untouched lines);
+`npx jest` 201/201 pass, 39/39 suites. **Not committed/pushed.** Not re-checked on device.
+
+## Root cause
+
+The cancel button called `router.back()`
+([manual.tsx:224](app/(tabs)/entry/manual.tsx#L224)), which is history-based: it returns to
+whatever sits below this screen rather than to a known destination. Reaching the screen via
+the “+” tab leaves the Home tab as that predecessor, so Hủy exits the entry flow entirely.
+The Calendar day double-tap ([transactions/index.tsx:154](app/(tabs)/transactions/index.tsx#L154))
+is a second entrance with the same shape.
+
+## Goals
+
+- `handleCancel` uses `router.dismissTo("/(tabs)/entry")` instead of `router.back()`. React
+  Navigation’s `POP_TO` pops back to the chooser when it is already below this screen, and
+  replaces this screen with it when it is not — so both entrances land on the four-method
+  chooser and neither leaves the manual screen stranded in the stack.
+
+## Notes
+
+- Scoped to the Hủy button only. The success alert still uses `router.back()`: after a save
+  the customer is done with the entry flow, and returning them to the chooser would invite a
+  second entry rather than showing the transaction they just made.
+- The SMS and photo review screens hand off to this screen with `router.replace`
+  ([sms.tsx:175](app/(tabs)/entry/sms.tsx#L175), [photo-confirm.tsx:570](app/(tabs)/entry/photo-confirm.tsx#L570)),
+  so their own frames are already gone by then — Hủy pops straight to the chooser for those
+  paths too, which is the same destination they started from.
+
+---
+
 Fix: duplicate React keys logged on every render of `Quản lý danh mục` (branch
 `claude/categorybucketcard-render-error-2cca47`, mobile only). Opening Settings → Quản lý danh
 mục logged a repeated React error pointing at `CategoryBucketCard.tsx:206` — the `<View

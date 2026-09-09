@@ -138,6 +138,15 @@ export default function ManualEntryScreen() {
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
+  /**
+   * Cancel returns to the entry-method chooser rather than to whatever sits
+   * below on the stack — `router.back()` lands on Home when this screen was
+   * opened through the "+" tab, and on the Calendar when it was opened by a
+   * day double-tap. `dismissTo` pops back to the chooser when it is already
+   * below this screen, and replaces this screen with it when it is not.
+   */
+  const handleCancel = () => router.dismissTo("/(tabs)/entry");
+
   const handleAmountKey = (key: string) => {
     if (key === "del") {
       setAmountRaw((prev) => prev.slice(0, -1));
@@ -212,7 +221,7 @@ export default function ManualEntryScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.topBarBtn}
-          onPress={() => router.back()}
+          onPress={handleCancel}
         >
           <Text style={styles.topBarCancel}>{S.cancel}</Text>
         </TouchableOpacity>
