@@ -31,6 +31,14 @@ import { getApiErrorMessage } from '@/utils/errors';
 
 const BUCKET_ORDER: BucketId[] = ['needs', 'wants', 'savings'];
 
+/**
+ * Customer-created categories live in the same global expense catalog as system
+ * ones (id prefixed `custom_`), so `useCustomerCategories()` returns them too —
+ * they must be skipped there, or every custom category would be listed twice:
+ * once from that list and once from `useCustomCategories()`, with the same id.
+ */
+const isCustomCategoryId = (id: string) => id.startsWith('custom_');
+
 /** A drag-and-drop move staged locally until "Lưu thay đổi" persists it. */
 interface PendingMove {
   subId: string;
@@ -89,6 +97,7 @@ export default function CategoriesRoute() {
           if (target !== currentBucket && currentBucket) {
              let itemsInCurrent = 0;
              for (const c of (cats ?? [])) {
+               if (isCustomCategoryId(c.id)) continue; // counted from customCats below
                const b = prev.get(c.id)?.targetBucket ?? c.bucketId;
                if (b === currentBucket) itemsInCurrent++;
              }
@@ -205,7 +214,7 @@ export default function CategoriesRoute() {
       pct: pctOf(b),
       subCategories: [
         ...list
-          .filter((c) => bucketFor(c.id, c.bucketId) === b)
+          .filter((c) => !isCustomCategoryId(c.id) && bucketFor(c.id, c.bucketId) === b)
           .map((c) => ({
             id: c.id, // customer_category row id — needed by useBulkMoveBucket
             categoryId: c.categoryId,

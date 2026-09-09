@@ -1,5 +1,54 @@
 # Current Feature
 
+Fix: duplicate React keys logged on every render of `Quản lý danh mục` (branch
+`claude/categorybucketcard-render-error-2cca47`, mobile only). Opening Settings → Quản lý danh
+mục logged a repeated React error pointing at `CategoryBucketCard.tsx:206` — the `<View
+key={sub.id}>` inside `bucket.subCategories.map`.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed file 0
+problems; `npx jest` 200/201 pass, 38/39 suites — the one failure
+(`useUpdatePreferences.test.tsx:62`, a `waitFor` timeout under full-run load) is unrelated to this
+change and passes 2/2 when the suite is run on its own. **Not committed/pushed.** Not re-checked
+on device.
+
+## Root cause
+
+Both queries feeding the screen hit the *same* endpoint. `real/categories.ts`'s
+`getCustomerCategories()` maps every row of `GET /categories?type=expense`, and
+`real/customCategories.ts`'s `getCustomCategories()` filters that same response down to the
+`custom_`-prefixed ids — so each customer-created category is present in both lists, carrying the
+identical `dto.categoryId` as its `id`. `app/settings/categories.tsx`'s `buckets` memo
+concatenates the two lists, so every custom category produced two children with the same React
+`key`, once per render.
+
+Two visible symptoms besides the console error: the duplicate row rendered its raw id as its name
+(the system-list branch names rows via `getCategoryById(c.categoryId)?.nameVi ?? c.categoryId`,
+which finds nothing for a `custom_` id), and the "mỗi hũ phải có ít nhất 1 danh mục" drag guard
+double-counted custom categories.
+
+## Goals
+
+- New `isCustomCategoryId()` helper in `app/settings/categories.tsx`; the system-list filter in the
+  `buckets` memo skips those ids, so a custom category is rendered once — from `customCats`, the
+  list that has its real `nameVi` and sets `isCustom: true`.
+- The same skip in `handleDragEnd`'s per-bucket count, so the last-category guard counts each
+  category once.
+
+## Notes
+
+- **Fixed on the screen, not in the service.** Filtering `custom_` ids out of
+  `getCustomerCategories()` itself would have been the smaller diff but would break its other
+  consumers — `useBucketSpend`, the Budgets tab, and `CategoryPickerSheet` all need custom
+  categories in that list to resolve a transaction's bucket. The overlap is only wrong where the
+  two lists are concatenated, which is this screen alone.
+- The `custom_` prefix is the backend's own documented convention (`types/customCategory.ts`,
+  `real/customCategories.ts:59` already filters on it), not a new assumption. Deriving the skip
+  set from `customCats` instead would flash the duplicate whenever that query resolves a tick
+  after `cats`.
+
+---
 Feature: Merge the three bucket donuts into ONE allocation pie, with a capped overspend sector
 and a long-press detail popup (branch `feature/home-budget-donut`, continuing after commit
 `7239d3b`). The 3-donut layout shipped in the previous entry answered "how full is each bucket"
