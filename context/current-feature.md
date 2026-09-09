@@ -1,5 +1,50 @@
 # Current Feature
 
+Feature: Home budget + savings goal progress as donut charts (branch
+`feature/home-budget-donut`, mobile only). The Home tab's "Ngân sách tháng này" card showed
+each bucket as a 10-tick energy bar with a % badge beside it, and "Mục tiêu tiết kiệm" showed a
+10pt linear track — user asked for both to be circular charts instead.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both changed files
+0 problems; `npx jest` **186/186 pass, 36/36 suites** (no new tests — the existing
+`getDisplayedPercentage` suite still covers the only pure logic, unchanged).
+**Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- `BudgetOverviewCard` now lays the three buckets out as a row of three `BudgetDonut` rings
+  (76pt, stroke 7) instead of stacked rows: donut with the % inside, bucket label under it, then
+  the exact spent / limit figures stacked below.
+- `SavingsGoalCard` replaces its linear track with a 92pt `BudgetDonut` on the left (% plus a
+  "hoàn thành" caption inside the ring), with the goal emoji, name and exact amounts to its
+  right.
+- Reuses the existing `src/components/budget/BudgetDonut.tsx` from the Budgets-tab donut work
+  rather than adding a chart library — Home and the Budgets tab now read as one visual language.
+
+## Notes
+
+- **Chosen over a single composition pie.** A pie splitting spend across Needs/Wants/Savings
+  would have dropped the spent-vs-limit comparison (23% of the Thiết yếu cap) that is the whole
+  point of the card. Three progress rings keep it.
+- Amounts stay **exact** (`formatVND`), not compacted to "2.3m", even in the narrower three-column
+  layout — a Home card that rounds while the Budgets tab doesn't is the same "con số không khớp"
+  class of defect the thesis council raised. At `FONT_SIZE.xs` an 11-character figure fits the
+  ~100pt column.
+- The card's documented clamping is unchanged: `getDisplayedPercentage` still caps the displayed
+  percentage at 100 (both the ring and the number it prints), while the amounts underneath stay
+  truthful. That differs from the Budgets tab's category donuts, which cap only the arc — Home's
+  clamp predates this change and its test locks it in.
+- Savings keeps its asymmetry: `getPctColor`'s `goalMode` still colors the number green at/over
+  target and neutral gray below, never red. Only the ring's own track/arc color comes from the
+  bucket palette.
+- The removed `EnergyBar`/`PctBadge`/`TICK_COUNT` had no consumers outside this file.
+- Both cards gained a Vietnamese `accessibilityLabel` on the progress group, since the % is now
+  a glyph inside an SVG rather than a standalone badge.
+
+---
+
 Feature: Budget category progress as a donut + long-press progress detail (branch
 `feature/budget-category-donut`, mobile only). The Budgets tab showed each category's
 progress as a 64×4pt linear bar with a percentage above it — readable only as "roughly how

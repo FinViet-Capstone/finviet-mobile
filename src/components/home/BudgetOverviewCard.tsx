@@ -1,12 +1,14 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { BudgetDonut } from '@/components/budget/BudgetDonut';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
 import { getBudgetStatus } from '@/utils/budgetStatus';
 
-const TICK_COUNT = 10;
+const DONUT_SIZE = 76;
+const DONUT_STROKE = 7;
 
 export function getDisplayedPercentage(spent: number, limit: number): number {
   if (limit <= 0) return 0;
@@ -38,55 +40,32 @@ export interface BudgetOverviewCardProps {
   readonly savingsLimit: number;
 }
 
-function EnergyBar({ spent, limit, activeColor }: { spent: number; limit: number; activeColor: string }) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const activeTicks = Math.round(
-    (getDisplayedPercentage(spent, limit) / 100) * TICK_COUNT,
-  );
-  return (
-    <View style={styles.tickRow}>
-      {Array.from({ length: TICK_COUNT }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.tick,
-            { backgroundColor: i < activeTicks ? activeColor : colors.surfaceContainerHighest },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-function PctBadge({ spent, limit, goalMode }: { spent: number; limit: number; goalMode?: boolean }) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const pct = getDisplayedPercentage(spent, limit);
-  const color = getPctColor(spent, limit, colors, goalMode);
-  return (
-    <View style={[styles.pctBadge, { backgroundColor: withAlpha(color, 0.15) }]}>
-      <Text style={[styles.pctText, { color }]}>{pct}%</Text>
-    </View>
-  );
-}
-
 function BucketItem({ label, spent, limit, activeColor, goalMode }: BucketRow) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const pct = getDisplayedPercentage(spent, limit);
+  const pctColor = getPctColor(spent, limit, colors, goalMode);
+
   return (
-    <View style={styles.bucketItem}>
-      <View style={styles.bucketHeader}>
-        <Text style={styles.bucketLabel}>{label}</Text>
-        <View style={styles.bucketRight}>
-          <Text style={styles.bucketAmount}>
-            <Text style={styles.bucketSpent}>{formatVND(spent)}</Text>
-            <Text style={styles.bucketLimit}> / {formatVND(limit)}</Text>
-          </Text>
-          <PctBadge spent={spent} limit={limit} goalMode={goalMode} />
-        </View>
+    <View
+      style={styles.bucketItem}
+      accessibilityRole="text"
+      accessibilityLabel={`${label}: đã dùng ${pct}%, ${formatVND(spent)} trên ${formatVND(limit)}`}
+    >
+      <BudgetDonut
+        percentage={pct}
+        color={activeColor}
+        trackColor={colors.surfaceContainerHighest}
+        size={DONUT_SIZE}
+        strokeWidth={DONUT_STROKE}
+        labelColor={pctColor}
+        labelSize={FONT_SIZE.base}
+      />
+      <Text style={styles.bucketLabel} numberOfLines={1}>{label}</Text>
+      <View style={styles.amounts}>
+        <Text style={styles.bucketSpent} numberOfLines={1}>{formatVND(spent)}</Text>
+        <Text style={styles.bucketLimit} numberOfLines={1}>/ {formatVND(limit)}</Text>
       </View>
-      <EnergyBar spent={spent} limit={limit} activeColor={activeColor} />
     </View>
   );
 }
@@ -163,55 +142,32 @@ function createStyles(colors: ThemeColors) {
     fontWeight: FONT_WEIGHT.medium,
   },
   bucketList: {
-    gap: SPACING[4],
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING[2],
   },
   bucketItem: {
-    gap: SPACING[2],
-  },
-  bucketHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bucketRight: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
     gap: SPACING[2],
-  },
-  pctBadge: {
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    minWidth: 44,
-    alignItems: 'center',
-  },
-  pctText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.bold,
   },
   bucketLabel: {
     fontSize: FONT_SIZE.sm,
     color: colors.onSurface,
+    fontWeight: FONT_WEIGHT.medium,
+    textAlign: 'center',
   },
-  bucketAmount: {
-    fontSize: FONT_SIZE.sm,
+  amounts: {
+    alignItems: 'center',
   },
   bucketSpent: {
+    fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: colors.onSurface,
   },
   bucketLimit: {
+    fontSize: FONT_SIZE.xs,
     color: colors.onSurfaceVariant,
-  },
-  tickRow: {
-    flexDirection: 'row',
-    height: 10,
-    gap: 2,
-  },
-  tick: {
-    flex: 1,
-    height: '100%',
-    borderRadius: 2,
   },
   });
 }
