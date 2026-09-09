@@ -87,9 +87,13 @@ export interface UpdatePreferencesInput {
 export const useUpdatePreferences = () => {
   const qc = useQueryClient();
   const updateCustomer = useAuthStore((s) => s.updateCustomer);
-  const currentCustomer = useAuthStore((s) => s.customer);
   return useMutation({
     mutationFn: async (patch: UpdatePreferencesInput) => {
+      // Read the session fresh instead of closing over a render-time value:
+      // two preference mutations fired close together would otherwise both
+      // merge onto the same pre-toggle snapshot, and whichever settled last
+      // would silently revert the other's change.
+      const currentCustomer = useAuthStore.getState().customer;
       const merged = {
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
         ...(patch.notifications !== undefined && currentCustomer
@@ -117,7 +121,7 @@ export const useUpdatePreferences = () => {
           theme: patch.theme,
           notifBudgetThresholds: patch.notifBudgetThresholds,
         });
-      } else {
+      } else if (patch.notifications === undefined) {
         await delay();
       }
       if (patch.notifications !== undefined && currentCustomer) {

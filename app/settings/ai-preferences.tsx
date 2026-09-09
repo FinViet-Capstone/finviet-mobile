@@ -29,6 +29,11 @@ import type {
   UpdateAiPreferencesInput,
 } from '@/services';
 import { getApiErrorMessage } from '@/utils/errors';
+import {
+  buildAiPreferencePatch,
+  requiresTransactionSharing,
+  type BooleanAiPreference,
+} from '@/utils/aiPreferenceDependencies';
 
 interface CategorizationOption {
   value: CategorizationMode;
@@ -76,9 +81,15 @@ const DATA_SCOPE_ROWS: Array<{
   key: 'shareBalances' | 'shareTransactions' | 'shareBudgets' | 'shareGoals' | 'shareReports';
   icon: string;
   label: string;
+  description?: string;
 }> = [
   { key: 'shareBalances', icon: 'account_balance_wallet', label: S.dataScope.shareBalances },
-  { key: 'shareTransactions', icon: 'receipt_long', label: S.dataScope.shareTransactions },
+  {
+    key: 'shareTransactions',
+    icon: 'receipt_long',
+    label: S.dataScope.shareTransactions,
+    description: S.dependencies.disablingTransactions,
+  },
   { key: 'shareBudgets', icon: 'pie_chart', label: S.dataScope.shareBudgets },
   { key: 'shareGoals', icon: 'flag', label: S.dataScope.shareGoals },
   { key: 'shareReports', icon: 'description', label: S.dataScope.shareReports },
@@ -120,20 +131,10 @@ export default function AiPreferencesScreen() {
   }, [preferences, savePatch]);
 
   const handleSwitchChange = useCallback((
-    field: keyof Pick<
-      AiPreferences,
-      | 'defaultHistoryEnabled'
-      | 'weeklyReportEnabled'
-      | 'ragEnabled'
-      | 'shareBalances'
-      | 'shareTransactions'
-      | 'shareBudgets'
-      | 'shareGoals'
-      | 'shareReports'
-    >,
+    field: BooleanAiPreference,
     value: boolean,
   ) => {
-    savePatch(field, { [field]: value });
+    savePatch(field, buildAiPreferencePatch(field, value));
   }, [savePatch]);
 
   const commitThreshold = useCallback(async (value: number) => {
@@ -267,20 +268,24 @@ export default function AiPreferencesScreen() {
         ) : null}
 
         <Section title={S.sections.experience}>
-          {EXPERIENCE_ROWS.map((row, index) => (
-            <React.Fragment key={row.key}>
-              {index > 0 ? <Divider /> : null}
-              <PreferenceSwitchRow
-                icon={row.icon}
-                label={row.label}
-                description={row.description}
-                value={preferences[row.key]}
-                isDisabled={hasPendingMutation}
-                isPending={pendingField === row.key}
-                onValueChange={(value) => handleSwitchChange(row.key, value)}
-              />
-            </React.Fragment>
-          ))}
+          {EXPERIENCE_ROWS.map((row, index) => {
+            const dependencyDisabled =
+              requiresTransactionSharing(row.key) && !preferences.shareTransactions;
+            return (
+              <React.Fragment key={row.key}>
+                {index > 0 ? <Divider /> : null}
+                <PreferenceSwitchRow
+                  icon={row.icon}
+                  label={row.label}
+                  description={dependencyDisabled ? S.dependencies.requiresTransactions : row.description}
+                  value={dependencyDisabled ? false : preferences[row.key]}
+                  isDisabled={hasPendingMutation || dependencyDisabled}
+                  isPending={pendingField === row.key}
+                  onValueChange={(value) => handleSwitchChange(row.key, value)}
+                />
+              </React.Fragment>
+            );
+          })}
         </Section>
 
         <Section title={S.sections.dataScope} hint={S.dataScopeHint}>
@@ -290,6 +295,7 @@ export default function AiPreferencesScreen() {
               <PreferenceSwitchRow
                 icon={row.icon}
                 label={row.label}
+                description={row.description}
                 value={preferences[row.key]}
                 isDisabled={hasPendingMutation}
                 isPending={pendingField === row.key}

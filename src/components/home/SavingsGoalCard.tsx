@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
+import { BudgetDonut } from '@/components/budget/BudgetDonut';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
@@ -45,27 +46,36 @@ export function SavingsGoalCard({ goal }: SavingsGoalCardProps) {
         </View>
       </View>
 
-      <View style={styles.goalRow}>
-        <View style={styles.iconWrapper}>
-          <Text style={styles.iconEmoji}>
-            {goal.iconEmoji ?? '🎯'}
-          </Text>
-        </View>
+      <View
+        style={styles.goalRow}
+        accessibilityRole="text"
+        accessibilityLabel={`${goal.name}: ${pct.toFixed(0)}% hoàn thành, ${formatVND(goal.currentAmount)} trên ${formatVND(goal.targetAmount)}`}
+      >
+        <BudgetDonut
+          percentage={pct}
+          color={colors.primary}
+          trackColor={colors.surfaceContainerHighest}
+          size={92}
+          strokeWidth={9}
+          labelColor={colors.primary}
+          labelSize={FONT_SIZE.lg}
+          caption="hoàn thành"
+          captionColor={colors.onSurfaceVariant}
+          captionSize={FONT_SIZE.xs - 2}
+        />
         <View style={styles.goalInfo}>
-          <Text style={styles.goalName} numberOfLines={1}>{goal.name}</Text>
-        </View>
-      </View>
-
-      <View style={styles.progressSection}>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${pct}%` as unknown as number }]} />
-        </View>
-        <View style={styles.progressLabels}>
+          <View style={styles.goalNameRow}>
+            <View style={styles.iconWrapper}>
+              <Text style={styles.iconEmoji}>
+                {goal.iconEmoji ?? '🎯'}
+              </Text>
+            </View>
+            <Text style={styles.goalName} numberOfLines={2}>{goal.name}</Text>
+          </View>
           <Text style={styles.progressCurrent}>
             <Text style={styles.progressCurrentBold}>{formatVND(goal.currentAmount)}</Text>
             {' / '}{formatVND(goal.targetAmount)}
           </Text>
-          <Text style={styles.progressPct}>{pct.toFixed(0)}% hoàn thành</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -114,13 +124,12 @@ function createStyles(colors: ThemeColors) {
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[3],
-    marginBottom: SPACING[4],
+    gap: SPACING[4],
   },
   iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: withAlpha(colors.primary, 0.1),
     borderWidth: 1,
     borderColor: withAlpha(colors.primary, 0.2),
@@ -128,34 +137,22 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
   },
   iconEmoji: {
-    fontSize: 22,
+    fontSize: 18,
   },
   goalInfo: {
     flex: 1,
+    gap: SPACING[2],
+  },
+  goalNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
   },
   goalName: {
+    flex: 1,
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
     color: colors.onSurface,
-  },
-  progressSection: {
-    gap: SPACING[2],
-  },
-  progressTrack: {
-    height: 10,
-    backgroundColor: colors.surfaceContainerHighest,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   progressCurrent: {
     fontSize: FONT_SIZE.sm,
@@ -165,11 +162,6 @@ function createStyles(colors: ThemeColors) {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.bold,
     color: colors.onSurface,
-  },
-  progressPct: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.semibold,
-    color: colors.primary,
   },
   });
 }
