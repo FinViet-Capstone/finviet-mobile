@@ -27,8 +27,8 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NumericKeypad, NUMPAD_HEIGHT } from "@/components/common/NumericKeypad";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { TextInput } from "@/components/common/TextInput";
-import { CATEGORIES } from "@/constants/categories";
-import type { Category } from "@/constants/categories";
+import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
+import type { CatalogCategory } from "@/lib/categoryCatalog";
 import { CategoryPickerSheet } from "@/components/categories";
 import { useExtractFromSMS, useWallets, useCreateTransaction } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
@@ -92,6 +92,7 @@ export default function SMSEntryScreen() {
   const extract = useExtractFromSMS();
   const createMutation = useCreateTransaction();
   const { data: walletData, isLoading: walletsLoading } = useWallets();
+  const categoryCatalog = useCategoryCatalog();
 
   const [phase, setPhase] = useState<Phase>("paste");
   const [smsText, setSmsText] = useState("");
@@ -131,8 +132,8 @@ export default function SMSEntryScreen() {
   if (walletsLoading || !walletData) return <LoadingSpinner />;
 
   const wallets: Wallet[] = basicWallets;
-  const selectedCategory: Category | null = categoryId
-    ? (CATEGORIES.find((c) => c.id === categoryId) ?? null)
+  const selectedCategory: CatalogCategory | null = categoryId
+    ? (categoryCatalog.get(categoryId) ?? null)
     : null;
   const selectedWallet = wallets.find((w) => w.id === walletId) ?? wallets[0];
   const amountNum = parseInt(amountRaw.replace(/\D/g, "") || "0", 10);

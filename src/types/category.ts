@@ -26,6 +26,17 @@ export interface CustomerCategory {
   bucketId: BucketType;
   /** How this entry was created */
   source: CategorySource;
+  /**
+   * Vietnamese name as the backend itself reports it. Present on every row the
+   * real API returns; the FE static catalog (constants/categories.ts) is only a
+   * visual default for the ids it happens to know, so this is the only name
+   * available for a customer-created (`custom_`) or admin-added category.
+   */
+  nameVi?: string;
+  /** Hex color from the backend catalog. Same reasoning as nameVi. */
+  color?: string;
+  /** Icon from the backend catalog — already a Material Symbol name. */
+  icon?: string;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */

@@ -1,5 +1,95 @@
 # Current Feature
 
+Fix: a customer's own category never appeared when creating a transaction (branch
+`fix/custom-categories-visible`, mobile only). Reported from the emulator with
+screenshots: “Thú cưng” is created successfully and shows in Settings → Quản lý danh
+mục, but the “Chọn danh mục” sheet on every entry flow lists only the built-in
+categories. The same screenshots show a second symptom — a row rendering its raw id,
+`cat_vehicle`, in the bucket editor.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all 24
+changed/new files 0 errors / 9 warnings — the exact same 9 that same file set produces at
+HEAD (verified by stashing and re-linting): the project-tolerated `react-hooks` v6 class
+plus the two long-standing `budgets/index.tsx` ones; `npx jest` **219/219 pass, 42/42
+suites** (201 + 18 new). **Not committed/pushed.**
+
+**Partly verified on the emulator.** Existing custom categories now appear in the picker
+and on the Budgets tab (confirmed with `Xe`). That pass also found a follow-up defect,
+fixed below: a *newly* created category still didn't show until the app was restarted.
+
+## Root cause
+
+[CategoryPickerSheet.tsx:66](src/components/categories/CategoryPickerSheet.tsx#L66) built
+its list from `getCategories(entryType)` — the hardcoded 19-item array in
+[constants/categories.ts:56](src/constants/categories.ts#L56). Custom categories exist only
+on the backend, so no compile-time array can contain them. Creation, ownership and the
+bucket editor were all working; the picker was simply reading a different list.
+
+Privacy is already correct **server-side** and needed no change: `CategoryService.IsVisibleTo`
+(finviet-be) makes a `custom_*` category visible only to a customer holding an active
+`customer_categories` row for it, so `GET /categories?type=expense` returns the system
+catalog plus *only that customer's own* custom rows — with real `nameVi`/`color`/`icon`.
+[real/categories.ts:38-49](src/services/real/categories.ts#L38-L49) was discarding all three.
+
+`cat_vehicle` is the same cause from the other direction: it is in the deployed database but
+in neither the FE constant nor the backend's own seed migration
+(`V0002__baseline_reference_data.sql` lists 18 `cat_*` ids), so an admin added it later.
+Anything an admin adds from now on would have rendered the same way.
+
+## Goals
+
+- New `src/lib/categoryCatalog.ts`: `GET /categories` is the catalog; the compiled constant
+  supplies *visuals* for the ids it recognises. A known id keeps its existing FE
+  name/colour/icon (so nothing shifts appearance); an unknown one — custom or admin-added —
+  falls back to what the backend sent. `useCategoryCatalog()` wraps the existing
+  `useCustomerCategories()` query, so this adds no request.
+- `CustomerCategory` carries `nameVi`/`color`/`icon` through from the DTO instead of dropping
+  them.
+- Every screen that resolved a category through the constant now goes through the catalog:
+  the picker, `CategoryBadge`, `TransactionCard`, Home's recent list, the Budgets tab and its
+  category detail, transaction detail (including the split editor), all four entry flows, the
+  CSV review rows, and CSV data export.
+- `app/settings/categories.tsx` falls back to the backend's name before the raw id, which is
+  what fixes `cat_vehicle`.
+- **Follow-up from the emulator pass:** every custom-category write now invalidates *both*
+  category caches. `GET /categories?type=expense` backs two query keys —
+  `queryKeys.customCategories` (the `custom_`-filtered view the bucket editor reads) and
+  `queryKeys.customerCategories` (the whole catalog the new resolver reads) — and
+  create/delete/bucket-move only ever invalidated the first. Before this change the catalog
+  kept its `STALE_TIME.medium` copy, so a category created seconds ago appeared in the bucket
+  editor and nowhere else. A shared `useInvalidateCategoryQueries()` in
+  `src/hooks/useCustomCategories.ts` now covers all four mutations, with three tests in
+  `src/hooks/__tests__/useCustomCategories.test.tsx` asserting both keys are hit.
+
+## Notes
+
+- **`get()` deliberately resolves more than `list` contains.** The catalog query is
+  expense-only, so a badge on an *income* transaction would have started rendering “Khác” had
+  `get()` been limited to the pickable list. It falls back to the system constant for income,
+  `cat_savings_goal`, `cat_uncategorized`, and for every id before the query resolves —
+  otherwise already-rendered rows flash the unknown-id fallback on a cold start. Locked by two
+  tests.
+- **The constant wins over the backend for a known id.** The two disagree on colour (the seed
+  has `cat_food` at `#4EDEA3`, the FE at `#F97316`). Taking the backend's values would have
+  recoloured the whole app as a side effect of a bug fix.
+- **The catalog is memoized on the query array's identity** (a `WeakMap`), not per component,
+  because `TransactionCard` resolves a category per row and a month's list is long.
+- `getTransactionCardVisuals` takes the resolved category as a parameter instead of looking it
+  up, so it stays pure and directly unit-testable — the same reason its branching was pulled
+  out of the component in the first place.
+- **`CategoryRow`'s `icon` prop changed meaning** (Lucide slug → resolved Material Symbol
+  name), so its second mapping through `getCategoryIcon` had to go with it. A custom category
+  has no Lucide slug to map from.
+- **Left alone on purpose:** `lib/categoryVisual.ts` / `useCategoryVisual` / `CategoryIcon`,
+  which already handle custom categories and are used only by the bucket editor; and
+  `real/budgets.ts`'s `toBudget`, which already falls back to the backend's `categoryName`.
+- Income is unaffected end to end — custom categories are expense-only on both sides
+  (`createCustomCategory` hardcodes `type: 'expense'`, and the backend stores them that way).
+
+---
+
 Fix: “Hủy” on the manual-entry screen returned to Home instead of the entry-method
 chooser (branch `fix/entry-cancel-back-to-chooser`, mobile only). Reported from the
 emulator: opening “+” → Nhập Thủ Công and then tapping Hủy dropped the customer on the

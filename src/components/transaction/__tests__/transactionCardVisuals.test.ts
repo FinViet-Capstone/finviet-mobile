@@ -88,6 +88,35 @@ describe('getTransactionCardVisuals', () => {
     expect(v.amountColor).toBe(COLORS.tertiary);
   });
 
+  it('renders a customer-created category like any other, not the unknown-id fallback', () => {
+    // The category is resolved by the caller (useCategoryCatalog) precisely so
+    // a `custom_` id — which exists only on the backend — reaches this function.
+    const v = getTransactionCardVisuals(
+      tx({ categoryId: 'custom_pet', merchant: 'PetMart' }),
+      COLORS,
+      'Ví tiền mặt',
+      {
+        id: 'custom_pet',
+        nameVi: 'Thú cưng',
+        color: '#FF00AA',
+        bucket: 'wants',
+        iconName: 'pets',
+        isCustom: true,
+      },
+    );
+
+    expect(v.subtitle).toBe('Thú cưng');
+    expect(v.iconName).toBe('pets');
+    expect(v.iconColor).toBe('#FF00AA');
+    expect(v.isUncategorized).toBe(false);
+  });
+
+  it('falls back to the wallet name while the catalog has not resolved the category yet', () => {
+    const v = getTransactionCardVisuals(tx({ merchant: 'Highlands' }), COLORS, 'Ví tiền mặt');
+    expect(v.subtitle).toBe('Ví tiền mặt');
+    expect(v.iconName).toBe('more_horiz');
+  });
+
   it('expense prefers merchant, then description, for its title', () => {
     expect(getTransactionCardVisuals(tx({ merchant: 'Highlands' }), COLORS).title).toBe(
       'Highlands',

@@ -11,8 +11,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
 import { BudgetDonut } from '@/components/budget/BudgetDonut';
 import { useBudgets } from '@/hooks/useBudgets';
-import { useCustomerCategories } from '@/hooks/useCustomerCategories';
-import { getCategoryById, getBucketColor, getBucketLabel } from '@/constants/categories';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
+import { getBucketColor, getBucketLabel } from '@/constants/categories';
 import { getCategoryIcon } from '@/constants/categoryIcons';
 import { getBudgetStatus } from '@/utils/budgetStatus';
 import { formatVND } from '@/utils/formatters';
@@ -118,17 +118,15 @@ export default function BudgetCategoryDetailScreen() {
   );
 
   const { data: budgets = [], isLoading, isError, error, refetch, isRefetching } = useBudgets(range);
-  const { data: customerCats = [] } = useCustomerCategories();
+  const categoryCatalog = useCategoryCatalog();
 
   const budget = useMemo(
     () => (budgets as BudgetWithSpend[]).find((b) => b.categoryId === id),
     [budgets, id],
   );
 
-  const category = id ? getCategoryById(id) : undefined;
-  const bucket = (customerCats.find((c) => c.categoryId === id)?.bucketId ??
-    category?.defaultBucket ??
-    'needs') as BucketType;
+  const category = categoryCatalog.get(id);
+  const bucket = (category?.bucket ?? 'needs') as BucketType;
 
   const handleBack = useCallback(() => router.back(), [router]);
 
@@ -254,7 +252,7 @@ export default function BudgetCategoryDetailScreen() {
           <View style={styles.heroTop}>
             <View style={[styles.heroIcon, { backgroundColor: withAlpha(bucketColor, 0.16) }]}>
               <MaterialIcon
-                name={getCategoryIcon(category?.icon ?? budget.categoryIcon)}
+                name={category?.iconName ?? getCategoryIcon(budget.categoryIcon)}
                 size={20}
                 color={bucketColor}
               />

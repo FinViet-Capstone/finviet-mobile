@@ -29,7 +29,7 @@ import {
   withAlpha,
 } from "@/theme";
 import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
-import { CATEGORIES } from "@/constants/categories";
+import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -87,6 +87,7 @@ export default function ManualEntryScreen() {
   const router = useRouter();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const { data: walletData, isLoading } = useWallets();
+  const categoryCatalog = useCategoryCatalog();
   const createMutation = useCreateTransaction();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -129,7 +130,7 @@ export default function ManualEntryScreen() {
   const wallets: Wallet[] = basicWallets;
   const effectiveWalletId = selectedWalletId ?? wallets[0]?.id;
   const selectedCategory = selectedCategoryId
-    ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
+    ? (categoryCatalog.get(selectedCategoryId) ?? null)
     : null;
   const selectedWallet =
     wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];

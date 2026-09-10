@@ -23,7 +23,7 @@ import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
-import { CATEGORIES } from "@/constants/categories";
+import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
 import { CategoryPickerSheet } from "@/components/categories";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { TextInput } from "@/components/common/TextInput";
@@ -211,8 +211,9 @@ function ReviewRow({
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const categoryCatalog = useCategoryCatalog();
   const cat = row.categoryId
-    ? (CATEGORIES.find((c) => c.id === row.categoryId) ?? null)
+    ? (categoryCatalog.get(row.categoryId) ?? null)
     : null;
   const uncertain = isUncertain(row);
   const isFailed = row.status === "failed";

@@ -43,12 +43,8 @@ import {
   useOverrideCategorization,
   useSplitTransaction,
 } from '@/hooks';
-import {
-  CATEGORIES,
-  getCategoryTypeForTransaction,
-  type CategoryType,
-} from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
+import { getCategoryTypeForTransaction, type CategoryType } from '@/constants/categories';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 import { formatVND } from '@/utils/formatters';
 import { getApiErrorMessage } from '@/utils/errors';
 import { computeSplitState } from '@/utils/transactionSplit';
@@ -97,6 +93,7 @@ function DetailBody({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { data: tx, isLoading, isError } = useTransactionById(txId);
+  const categoryCatalog = useCategoryCatalog();
   const { data: walletData } = useWallets();
   const updateMutation = useUpdateTransaction();
   const deleteMutation = useDeleteTransaction();
@@ -180,7 +177,7 @@ function DetailBody({
   }
 
   const wallets = walletData?.wallets ?? [];
-  const selectedCategory = categoryId ? CATEGORIES.find((c) => c.id === categoryId) ?? null : null;
+  const selectedCategory = categoryCatalog.get(categoryId) ?? null;
   const selectedWallet = wallets.find((w) => w.id === walletId) ?? null;
 
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
@@ -194,7 +191,7 @@ function DetailBody({
   const categoryType = getCategoryTypeForTransaction(tx.type);
 
   const offerRuleThenLeave = (merchantName: string, catId: string) => {
-    const catName = CATEGORIES.find((c) => c.id === catId)?.nameVi ?? S.categoryLabel;
+    const catName = categoryCatalog.get(catId)?.nameVi ?? S.categoryLabel;
     Alert.alert(S.ruleTitle, S.ruleMessage(merchantName, catName), [
       { text: S.ruleSkip, style: 'cancel', onPress: handleLeave },
       {
@@ -277,7 +274,7 @@ function DetailBody({
       onSuccess: (outcome) => {
         if (outcome.applied && outcome.categoryId) {
           setCategoryId(outcome.categoryId);
-          const catName = CATEGORIES.find((c) => c.id === outcome.categoryId)?.nameVi ?? outcome.categoryName ?? '';
+          const catName = categoryCatalog.get(outcome.categoryId)?.nameVi ?? outcome.categoryName ?? '';
           Alert.alert(S.aiSuggestAppliedTitle, S.aiSuggestAppliedMsg(catName));
           return;
         }
@@ -393,7 +390,7 @@ function DetailBody({
             <TouchableOpacity activeOpacity={0.7} style={styles.fieldRow} onPress={() => setShowCategoryModal(true)}>
               <View style={[styles.fieldIconWrap, { backgroundColor: selectedCategory ? `${selectedCategory.color}25` : withAlpha(colors.secondary, 0.13) }]}>
                 <MaterialIcon
-                  name={selectedCategory ? getCategoryIcon(selectedCategory.icon) : 'category'}
+                  name={selectedCategory?.iconName ?? 'category'}
                   size={20}
                   color={selectedCategory?.color ?? colors.secondary}
                 />
@@ -724,6 +721,7 @@ function SplitSheet({
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const categoryCatalog = useCategoryCatalog();
 
   // Two rows to begin with: a split is at least two parts, so starting with one would only
   // ever be a step the user has to take before anything can happen.
@@ -789,9 +787,7 @@ function SplitSheet({
           <Text style={styles.splitIntro}>{S.splitIntro(formatVND(transaction.amount))}</Text>
 
           {parts.map((part, index) => {
-            const cat = part.categoryId
-              ? CATEGORIES.find((c) => c.id === part.categoryId) ?? null
-              : null;
+            const cat = categoryCatalog.get(part.categoryId) ?? null;
             return (
               <View key={part.key} style={styles.splitRow}>
                 <View style={styles.splitRowHead}>

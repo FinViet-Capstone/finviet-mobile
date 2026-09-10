@@ -5,6 +5,7 @@ import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SPACING } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVNDCompact } from '@/utils/formatters';
 import type { Transaction } from '@/types/transaction';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 import { getTransactionCardVisuals } from './transactionCardVisuals';
 
 export interface TransactionCardProps {
@@ -33,6 +34,9 @@ export const TransactionCard = React.memo(function TransactionCard({
 }: TransactionCardProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Shared across every row (memoized on the query result), so this stays cheap
+  // in a long list — see lib/categoryCatalog.ts.
+  const category = useCategoryCatalog().get(tx.categoryId);
   const {
     iconName,
     iconColor,
@@ -42,7 +46,7 @@ export const TransactionCard = React.memo(function TransactionCard({
     title,
     subtitle,
     isUncategorized,
-  } = getTransactionCardVisuals(tx, colors, walletName);
+  } = getTransactionCardVisuals(tx, colors, walletName, category);
 
   return (
     <TouchableOpacity

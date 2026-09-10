@@ -218,7 +218,9 @@ export default function CategoriesRoute() {
           .map((c) => ({
             id: c.id, // customer_category row id — needed by useBulkMoveBucket
             categoryId: c.categoryId,
-            name: getCategoryById(c.categoryId)?.nameVi ?? c.categoryId,
+            // The backend's own name is the fallback, not the raw id: a category
+            // an admin added after this build isn't in the FE constant.
+            name: getCategoryById(c.categoryId)?.nameVi ?? c.nameVi ?? c.categoryId,
           })),
         ...customList
           .filter((c) => bucketFor(c.id, c.bucketId) === b)

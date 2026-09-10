@@ -9,11 +9,15 @@
  */
 import { withAlpha } from '@/theme';
 import type { ThemeColors } from '@/providers/ThemeProvider';
-import { getCategoryById } from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
+import type { CatalogCategory } from '@/lib/categoryCatalog';
 import type { Transaction } from '@/types/transaction';
 
-type Category = ReturnType<typeof getCategoryById>;
+/**
+ * Resolved by the caller (useCategoryCatalog) rather than looked up here, so
+ * this stays a pure function and so customer-created categories — which only
+ * exist on the backend — render like any other.
+ */
+type Category = CatalogCategory | undefined;
 
 export interface TransactionCardVisuals {
   iconName: string;
@@ -41,7 +45,7 @@ function resolveIcon(
     ? 'savings'
     : isUncategorized
     ? 'help_outline'
-    : getCategoryIcon(category?.icon);
+    : category?.iconName || 'more_horiz';
   const iconColor = isTransfer
     ? colors.onSurfaceVariant
     : isGoalContrib
@@ -111,11 +115,12 @@ export function getTransactionCardVisuals(
   tx: Transaction,
   colors: ThemeColors,
   walletName = '',
+  resolvedCategory?: CatalogCategory,
 ): TransactionCardVisuals {
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out';
   const isIncome = tx.type === 'income';
   const isGoalContrib = tx.categoryId === 'cat_savings_goal';
-  const category = !isTransfer && tx.categoryId ? getCategoryById(tx.categoryId) : undefined;
+  const category = isTransfer ? undefined : resolvedCategory;
   // Transfer legs carry categoryId === null but are NOT uncategorized spend —
   // they get their own swap styling, never the amber "classify now" treatment.
   const isUncategorized = !isTransfer && !tx.categoryId;

@@ -44,6 +44,12 @@ function toCustomerCategory(dto: CategoryDto): CustomerCategory {
     categoryId: dto.categoryId,
     bucketId,
     source: 'system',
+    // Kept, not discarded: the FE's static catalog only knows the ids it was
+    // compiled with, so a customer-created (`custom_`) or admin-added category
+    // has no other source for its name/color/icon.
+    nameVi: dto.nameVi ?? dto.categoryName,
+    color: dto.color ?? undefined,
+    icon: dto.icon ?? undefined,
     createdAt: '',
     updatedAt: '',
   };

@@ -100,3 +100,4 @@ export {
   useBulkUpdateCustomCategoryBucket,
 } from './useCustomCategories';
 export { useCategoryVisual } from './useCategoryVisual';
+export { useCategoryCatalog } from './useCategoryCatalog';
