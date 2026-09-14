@@ -43,13 +43,18 @@ export async function googleOAuth(_mode: 'login' | 'register'): Promise<Customer
   try {
     const res = await api.post('/auth/google-login', { idToken });
     const payload = unwrap<AuthResponsePayload>(res);
+    if (!payload?.accessToken || !payload.refreshToken || !payload.profile?.customerId) {
+      throw new AuthError('oauth_failed');
+    }
+    const customer = await toCustomer(payload.profile);
     setAuthTokens({
       accessToken: payload.accessToken,
       refreshToken: payload.refreshToken,
       accessTokenExpiry: payload.accessTokenExpiry,
     });
-    return await toCustomer(payload.profile);
+    return customer;
   } catch (err) {
+    if (err instanceof AuthError) throw err;
     // The banner collapses every backend rejection into one sentence, so log the
     // status here — it is what separates "Firebase Admin rejected the token" from
     // "the exchange before this never produced one".
