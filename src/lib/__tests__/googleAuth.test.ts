@@ -25,6 +25,12 @@ const SIGN_IN_WITH_IDP_URL =
 
 const signIn = GoogleSignin.signIn as jest.Mock;
 const hasPlayServices = GoogleSignin.hasPlayServices as jest.Mock;
+const originalIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+beforeAll(() => { process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = 'ios-client.apps.googleusercontent.com'; });
+afterAll(() => {
+  if (originalIosClientId === undefined) delete process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  else process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = originalIosClientId;
+});
 
 /** The native module rejects with a plain Error carrying a `code` string. */
 function nativeError(code: string): Error & { code: string } {
@@ -98,8 +104,19 @@ describe('googleAuth — Google ID token → Firebase ID token', () => {
     expect(GoogleSignin.configure).toHaveBeenCalledWith(
       expect.objectContaining({
         webClientId: 'web-client-id.apps.googleusercontent.com',
+        iosClientId: 'ios-client.apps.googleusercontent.com',
       }),
     );
+  });
+
+  it.each([
+    { needConfirmation: true, idToken: 'unconfirmed-token' },
+    { idToken: 123 },
+    {},
+  ])('rejects invalid or unconfirmed Firebase response %j', async (data) => {
+    googleSignInSucceeds();
+    mock.onPost(SIGN_IN_WITH_IDP_URL).reply(200, data);
+    await expect(getFirebaseIdTokenFromGoogle()).rejects.toMatchObject({ code: 'oauth_failed' });
   });
 
   it('reports a dismissed account picker as oauth_cancelled, not a failure', async () => {

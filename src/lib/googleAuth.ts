@@ -19,6 +19,7 @@
  */
 
 import axios, { isAxiosError } from 'axios';
+import { Platform } from 'react-native';
 import { FIREBASE_API_KEY, GOOGLE_WEB_CLIENT_ID } from '@/lib/env';
 import { isGoogleSignInAvailable } from '@/lib/nativeModuleAvailability';
 import { AuthError } from '@/types/auth';
@@ -72,6 +73,10 @@ let isConfigured = false;
 /** `configure` is synchronous and idempotent, but there's no reason to repeat it. */
 function ensureConfigured(): void {
   if (isConfigured) return;
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
+  if (Platform.OS === 'ios' && !iosClientId) {
+    throw new AuthError('unknown', 'Ứng dụng thiếu cấu hình Google iOS client ID. Vui lòng kiểm tra cấu hình bản build.');
+  }
   if (!GOOGLE_WEB_CLIENT_ID || !FIREBASE_API_KEY) {
     throw new AuthError(
       'unknown',
@@ -81,6 +86,7 @@ function ensureConfigured(): void {
   const { GoogleSignin } = loadNativeModule();
   GoogleSignin.configure({
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    ...(iosClientId ? { iosClientId } : {}),
     scopes: ['email', 'profile'],
     // No server-side Google API access is needed — the backend only verifies
     // the identity token, it never calls Google on the customer's behalf.
@@ -141,6 +147,7 @@ async function getGoogleIdToken(): Promise<string> {
 /** Firebase's response; only the minted Firebase ID token matters here. */
 interface SignInWithIdpResponse {
   idToken?: string;
+  needConfirmation?: boolean;
 }
 
 /** Trades Google's ID token for the Firebase one the backend can verify. */
@@ -154,11 +161,12 @@ async function exchangeForFirebaseIdToken(googleIdToken: string): Promise<string
         // browser redirect in this flow.
         requestUri: 'http://localhost',
         returnSecureToken: true,
+        returnIdpCredential: false,
       },
       { params: { key: FIREBASE_API_KEY }, timeout: 20_000 },
     );
     const idToken = res.data?.idToken;
-    if (!idToken) {
+    if (res.data.needConfirmation || typeof idToken !== 'string' || !idToken) {
       throw new AuthError('oauth_failed', 'Firebase không cấp được phiên đăng nhập.');
     }
     return idToken;
