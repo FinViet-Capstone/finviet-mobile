@@ -1,15 +1,35 @@
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { api } from '@/lib/api';
-import { getProfile, updateProfileSettings } from '@/services/real/auth';
+import { getFirebaseIdTokenFromGoogle } from '@/lib/googleAuth';
+import { setAuthTokens } from '@/lib/mmkv';
+import { googleOAuth, getProfile, updateProfileSettings } from '@/services/real/auth';
+import { AuthError } from '@/types/auth';
+
+// Token storage is SecureStore-backed; stubbed so the session write is
+// observable and nothing touches the device keychain under test.
+jest.mock('@/lib/mmkv', () => ({
+  setAuthTokens: jest.fn(),
+  clearAuthTokens: jest.fn(),
+  getAccessToken: jest.fn(() => null),
+  getRefreshToken: jest.fn(() => null),
+}));
+
+// Google sign-in reaches the backend as an opaque Firebase ID token; the native
+// half that produces it is covered in src/lib/__tests__/googleAuth.test.ts.
+jest.mock('@/lib/googleAuth', () => ({
+  getFirebaseIdTokenFromGoogle: jest.fn(),
+  signOutFromGoogle: jest.fn().mockResolvedValue(undefined),
+}));
+
+// One adapter for the whole file: axios-mock-adapter patches the shared `api`
+// instance, so a second one created per describe would detach the first.
+const mock = new AxiosMockAdapter(api);
+afterEach(() => mock.reset());
+afterAll(() => mock.restore());
 
 // Backend AppTheme has no JsonStringEnumConverter registered, so it serializes
 // as a raw integer on the wire (0 Light, 1 Dark, 2 System) in both directions.
 describe('real auth service — theme enum mapping', () => {
-  const mock = new AxiosMockAdapter(api);
-
-  afterEach(() => mock.reset());
-  afterAll(() => mock.restore());
-
   it('sends theme as an integer, not a string, on save', async () => {
     mock.onPut('/profile/settings').reply(200, { success: true, data: {} });
 
@@ -53,5 +73,74 @@ describe('real auth service — theme enum mapping', () => {
 
     const customer = await getProfile();
     expect(customer.theme).toBe('system');
+  });
+});
+
+describe('real auth service — googleOAuth', () => {
+  const getToken = getFirebaseIdTokenFromGoogle as jest.Mock;
+
+  const profile = {
+    customerId: 'c1',
+    fullName: 'Google User',
+    email: 'gu@example.com',
+    isEmailVerified: true,
+    isActive: true,
+    monthlyIncomeExpected: 12_000_000,
+  };
+
+  beforeEach(() => getToken.mockResolvedValue('firebase-id-token'));
+  afterEach(() => getToken.mockReset());
+
+  it('posts the Firebase ID token and opens a session from the response', async () => {
+    mock.onPost('/auth/google-login').reply(200, {
+      success: true,
+      data: {
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        accessTokenExpiry: '2026-01-01T00:00:00Z',
+        profile,
+      },
+    });
+
+    const customer = await googleOAuth('login');
+
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ idToken: 'firebase-id-token' });
+    expect(customer.email).toBe('gu@example.com');
+    expect(setAuthTokens).toHaveBeenCalledWith({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      accessTokenExpiry: '2026-01-01T00:00:00Z',
+    });
+  });
+
+  it('sends the same request in register mode — the backend creates the account itself', async () => {
+    mock.onPost('/auth/google-login').reply(200, {
+      success: true,
+      data: { accessToken: 'a', refreshToken: 'r', accessTokenExpiry: 'e', profile },
+    });
+
+    await googleOAuth('register');
+
+    expect(mock.history.post).toHaveLength(1);
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ idToken: 'firebase-id-token' });
+  });
+
+  it('never calls the backend when the customer dismisses the picker', async () => {
+    getToken.mockRejectedValue(new AuthError('oauth_cancelled'));
+
+    await expect(googleOAuth('login')).rejects.toMatchObject({ code: 'oauth_cancelled' });
+    expect(mock.history.post).toHaveLength(0);
+  });
+
+  it.each([
+    // Firebase Admin rejected the token — including the case where the backend
+    // has no service-account credentials configured at all.
+    [401, 'oauth_failed'],
+    [400, 'oauth_failed'],
+    [403, 'account_locked'],
+  ])('maps a %d from the backend to %s', async (status, code) => {
+    mock.onPost('/auth/google-login').reply(status, { success: false, message: 'nope' });
+
+    await expect(googleOAuth('login')).rejects.toMatchObject({ code });
   });
 });

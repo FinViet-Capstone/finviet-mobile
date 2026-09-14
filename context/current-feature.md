@@ -1,5 +1,186 @@
 # Current Feature
 
+Feature: finish Google login (branch `feature/google-login`, mobile only). The button,
+the `useGoogleOAuth` hook and the `oauth_cancelled`/`oauth_failed` error copy have all
+existed since the mock era, but the service behind them
+([real/auth.ts:36](src/services/real/auth.ts#L36)) only threw "chưa khả dụng ở bản kết
+nối backend". The backend half was already complete.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all 8
+changed/new files 0 errors / 1 warning (the pre-existing `axios`-named-export one on an
+untouched line of `real/auth.ts`); `npx jest` **236/236 pass, 43/43 suites** (219 + 17
+new). **Not committed/pushed.**
+
+**Run on the Android emulator** (Medium_Phone_API_36.0, live backend), both ways:
+
+- **Expo Go**: the auth screen renders, the app boots to Home on an existing session, and
+  tapping "Đăng nhập với Google" surfaces the inline banner "Đăng nhập Google cần bản build
+  riêng của ứng dụng (không chạy được trong Expo Go)" — the graceful-degradation path. Two
+  defects this caught that no test would have are recorded under Notes.
+- **Native dev build** (`npx expo run:android`, `BUILD SUCCESSFUL`, installed as
+  `com.finviet.mobile`): the native module loads with no redbox, and tapping the button really
+  does hand off to Google Play Services (`com.google.android.gms/...MinuteMaidActivity` takes
+  focus — confirmed via `dumpsys window`). Backing out of it returns to the app with the
+  banner "Bạn đã huỷ đăng nhập với Google": the `oauth_cancelled` branch works on a real
+  device, the button leaves its loading state, and nothing hangs.
+
+**Google sign-in then completed end to end on the emulator** (user confirmed), against the
+live Render backend and a real Google account. Getting there took two more runs, each
+failing one step further down — both were config, neither was code:
+
+1. **DEVELOPER_ERROR**, rendered as "Cấu hình Google Sign-In chưa đúng (SHA-1 / package name)".
+   Confirmed the fingerprint gap, and the message pointed straight at it. Fixed by registering
+   the right SHA-1 (see item 1 below — the first one recorded here was wrong).
+2. **401 from `POST /auth/google-login`.** The mobile half was already correct by then: the
+   native picker returned a Google ID token, Firebase's `signInWithIdp` exchanged it for a
+   Firebase ID token (no exchange error logged), and the app posted it. The backend had no
+   Firebase Admin credentials. Fixed entirely in Render config — see item 2 below. **No
+   backend or mobile code change was needed for this**, which is worth remembering: the
+   instinct was to push and redeploy the mobile branch, and that would have changed nothing.
+
+`__DEV__`-only `console.warn` lines were added at the two failure points during this
+diagnosis and kept: the banner collapses five distinct causes into one sentence, so without
+them a backend rejection and a failed Firebase exchange are indistinguishable on a device.
+
+## Root cause / what was missing
+
+Nothing was broken; the token-acquisition layer simply didn't exist. `POST
+/api/auth/google-login` ([AuthController.cs:108](../../../newestbe/finviet-be/src/FinViet.Api/Controllers/AuthController.cs#L108))
+takes a **Firebase** ID token, verifies it with Firebase Admin, matches on `GoogleId`
+then falls back to email (so an existing password account is auto-linked on first Google
+sign-in, and an unknown one is created), and returns the same `AuthResponseDto` as
+`/auth/login`. The app had no way to produce that token.
+
+## Goals
+
+- New `src/lib/googleAuth.ts`: `@react-native-google-signin/google-signin` opens the
+  native picker, then Firebase's `accounts:signInWithIdp` REST endpoint trades Google's
+  ID token for the Firebase one. Every native outcome comes back as a typed `AuthError`.
+- `googleOAuth()` posts that token, stores the session through the same `setAuthTokens`
+  path as `login()`, and returns a `Customer` — so the screen's existing
+  `onSuccess → onboarding | home` routing needed no edit.
+- `logout()` also signs out of Google, so the next sign-in offers the account picker
+  instead of silently reusing the account that just left.
+- Two `EXPO_PUBLIC_*` vars (`GOOGLE_WEB_CLIENT_ID`, `FIREBASE_API_KEY`) in `env.ts`,
+  documented in `.env.example` and set in the (gitignored) `.env.local`.
+
+## Notes
+
+- **Why the REST exchange rather than `@react-native-firebase/auth`.** The native flow
+  returns a *Google* ID token; Firebase Admin only accepts a *Firebase* one. The full
+  Firebase SDK would convert it, but at the price of a committed/EAS-secret
+  `google-services.json`, the google-services gradle plugin and a heavier build — for
+  one HTTP call the SDK itself makes internally. `webClientId` is all Android needs.
+- **Two defects only the emulator could find.**
+  1. **A static import would have taken the whole app down in Expo Go.** The package
+     resolves its TurboModule with `getEnforcing` at *import* time, and the services
+     barrel pulls this file in transitively — so every screen, not just Google sign-in,
+     would have died on startup. Now loaded lazily, on first use.
+  2. **`try/catch` around that lazy `require` does not work, and looked like it did.**
+     Metro's dev-mode `guardedLoadModule` hands a throwing module factory to
+     `ErrorUtils.reportFatalError` — a full-screen redbox — and returns `undefined`, so
+     the `catch` never runs. The fix is to *not require it at all* unless
+     `TurboModuleRegistry.get('RNGoogleSignin')` says it is there; that probe lives in
+     its own `src/lib/nativeModuleAvailability.ts`, the one piece Jest cannot run
+     honestly, so every suite mocks a single boolean instead of React Native's core.
+     Locked by the first test in `googleAuth.test.ts`, which must stay first (the module
+     caches the package handle after one successful load).
+- **The actionable failures use code `unknown`, not `oauth_failed`.** `AuthErrorBanner`
+  renders the curated copy for a known code and only shows a custom message under
+  `unknown` — so as `oauth_failed` the Expo Go / Play Services / SHA-1 messages rendered
+  as the generic "Đăng nhập với Google không thành công. Hãy thử lại." (seen on device).
+  This is the same convention the previous stub used. Widening the banner instead would
+  have leaked raw backend English into the other auth flows, which pass the server's
+  message into `AuthError` through `toAuthError`.
+- **The auto-added Expo config plugin was removed from `app.json` on purpose.** Its
+  bare form (no options) takes the Firebase branch — `AndroidConfig.GoogleServices.*` —
+  which fails prebuild without `android.googleServicesFile`. The Android native module
+  autolinks and needs nothing from it. iOS will need the plugin's
+  `{ iosUrlScheme }` form once an iOS OAuth client exists; there is no iOS app in the
+  Firebase project today, so iOS Google sign-in cannot work yet either way.
+- **`mode` is now cosmetic.** "Đăng nhập" and "Đăng ký" send the identical request —
+  the backend decides between linking and creating. Kept in the signature so the tab
+  label still reads naturally.
+- **Android's DEVELOPER_ERROR (code `10`) gets its own message** instead of the generic
+  one. It is the first failure any new machine or new keystore hits, and the message
+  names the actual cause (SHA-1 / package name) rather than "thử lại".
+- A cancelled picker is `oauth_cancelled` and never reaches the network. Both the
+  modern `{ type: 'cancelled' }` response and the older thrown `SIGN_IN_CANCELLED` are
+  handled; a test locks each.
+- The native module is mocked globally in `jest.setup.js` — it has no JS fallback, so
+  any suite that transitively imports the auth service would fail on import otherwise.
+- `real/__tests__/auth.test.ts` now shares **one** `AxiosMockAdapter` for the file. A
+  second one created per `describe` silently detaches the first (found the hard way:
+  the pre-existing theme block's `afterAll(restore)` killed interception for the new
+  block below it).
+
+## Còn phải làm ngoài code (blocking on-device testing)
+
+1. **SHA-1 fingerprint — confirmed live, still the open blocker.** Signing in with a real
+   Google account on the dev build produced exactly the DEVELOPER_ERROR branch
+   ("Cấu hình Google Sign-In chưa đúng (SHA-1 / package name)"), which is the proof that
+   the fingerprint is not registered. Firebase currently has only
+   `de:e3:08:c1:ce:ea:d2:0f:bd:41:71:8b:d8:90:a7:04:10:09:4f:71` on `com.finviet.mobile`.
+
+   The fingerprint to add is **`5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`**,
+   read out of the installed APK itself with
+   `apksigner verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk`.
+
+   **Do not read it from `~/.android/debug.keystore`** — that is the trap this hit first.
+   `android/app/build.gradle` pins `signingConfigs.debug` to `storeFile file('debug.keystore')`,
+   i.e. **`android/app/debug.keystore`**, the one Expo prebuild put in the project; the
+   machine-wide keystore is never used. Because `android/` is gitignored wholesale, that file
+   is per-checkout, so **every developer's build has its own SHA-1** and each has to be added
+   to the same Firebase app (it accepts many). Read yours with
+   `keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android`.
+
+   The console's "SHA-1 + package name already in use" banner is worth resolving at the same
+   time — `com.finviet.app` is a second app in the same project.
+2. **Backend Firebase credentials on Render — confirmed to be the remaining blocker.**
+   With the SHA-1 added, a real Google account now completes the native flow *and* the
+   Firebase exchange, and dies one step later. Dev-log evidence from the emulator:
+
+   ```
+   WARN [googleOAuth] /auth/google-login failed 401
+        {"success":false,"message":"Invalid or expired Google ID token.", ...}
+   ```
+
+   No `[googleAuth] signInWithIdp failed` line accompanies it, which is the load-bearing
+   detail: **Firebase did mint an ID token**, so everything on the mobile side worked. That
+   401 is `GoogleLoginCommandHandler`'s `firebaseUser is null` branch, i.e.
+   `FirebaseAuthService.VerifyIdTokenAsync` returned null — and with a token minted seconds
+   earlier by the same project, "not configured" is the only plausible reason left.
+
+   The backend repo's `Dockerfile` never copies a service-account JSON and never sets
+   `GOOGLE_APPLICATION_CREDENTIALS`; there is no `render.yaml`; and `appsettings.json` is
+   gitignored there, so the deployed container almost certainly has no credentials at all
+   and `FirebaseAuthService` disables itself at construction.
+
+   **Fixed, and this is what did it** (backend/infra, not this repo, no code change): upload
+   the service account JSON as a **Render Secret File**, set **both**
+   `Firebase__ServiceAccountJsonPath=/etc/secrets/<filename>` and
+   `Firebase__ProjectId=finviet-c900f`, then **restart/redeploy the service** — env vars and
+   secret files are only read into `IConfiguration` at process start, and `FirebaseApp.Create`
+   runs once and caches statically, so setting them on a live service changes nothing until it
+   restarts. That restart is what the last three 401s were waiting on.
+
+   The ProjectId is not optional in practice: `FirebaseApp.Create` falls back to the literal
+   `"finviet"` when it is missing, which is the wrong project and fails verification just as
+   silently.
+3. ~~**Rebuild the dev client**~~ — done for this machine's emulator: `npx expo run:android`
+   succeeded (3m41s incremental) and `com.finviet.mobile` is installed on
+   Medium_Phone_API_36.0. Anyone else on the team still needs their own build; Expo Go will
+   never run this. Gradle autolinking picks the package up with no prebuild — the log shows
+   `:react-native-google-signin_google-signin:compileDebugKotlin`.
+4. **EAS builds need the two new env vars** (`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`,
+   `EXPO_PUBLIC_FIREBASE_API_KEY`) as EAS environment variables. They were deliberately
+   kept out of `eas.json`, which is committed, to respect this repo's "Firebase config
+   stays out of git" rule.
+
+---
+
 Fix: a customer's own category never appeared when creating a transaction (branch
 `fix/custom-categories-visible`, mobile only). Reported from the emulator with
 screenshots: “Thú cưng” is created successfully and shows in Settings → Quản lý danh
