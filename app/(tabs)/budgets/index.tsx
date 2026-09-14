@@ -18,9 +18,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { useBudgets, useBudgetBuckets } from '@/hooks/useBudgets';
 import { useWallets } from '@/hooks/useWallets';
 import { useBucketSpend } from '@/hooks/useBucketSpend';
-import { useCustomerCategories } from '@/hooks/useCustomerCategories';
-import { getCategoryById, getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
+import { getBucketColor, getBucketIcon, getBucketLabel } from '@/constants/categories';
 import SetLimitSheet from '@/components/budget/SetLimitSheet';
 import { BudgetDonut } from '@/components/budget/BudgetDonut';
 import { getBudgetStatus } from '@/utils/budgetStatus';
@@ -211,7 +210,9 @@ interface CategoryRowProps {
 function CategoryRow({ categoryId, nameVi, icon, bucket, budget, allocationCap, remainingCap, onSetLimit, onOpenDetail }: CategoryRowProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const msIcon = getCategoryIcon(icon);
+  // Already a Material Symbol name — the catalog resolved it (a custom category
+  // has no Lucide slug to map from).
+  const msIcon = icon || 'more_horiz';
   const hasLimit = !!budget;
   const isOverLimit = hasLimit && budget.percentage > 100;
   const isSavings = bucket === 'savings';
@@ -312,7 +313,7 @@ export default function BudgetsScreen() {
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets(selectedRange);
   const bucketSpend = useBucketSpend(selectedRange);
   const { data: wallets = [] } = useWallets();
-  const { data: customerCats = [] } = useCustomerCategories();
+  const categoryCatalog = useCategoryCatalog();
   // Sourced from the same server-side per-month bucket resolution the pacing
   // numbers already use (not Customer.needsPct/etc, and not the income-
   // allocation "effective" lookup, which only resolves the *current* month
@@ -326,14 +327,15 @@ export default function BudgetsScreen() {
     const result: Record<BucketType, { id: string; nameVi: string; icon: string }[]> = {
       needs: [], wants: [], savings: [],
     };
-    for (const cc of customerCats) {
-      const cat = getCategoryById(cc.categoryId);
-      if (!cat) continue;
-      const b = cc.bucketId as BucketType;
-      if (result[b]) result[b].push({ id: cat.id, nameVi: cat.nameVi, icon: cat.icon });
+    for (const cat of categoryCatalog.list) {
+      const b = cat.bucket;
+      // A category the FE constant doesn't know (customer-created, or added by
+      // an admin after this build) used to be dropped here, so it could never
+      // be given a monthly limit.
+      if (b && result[b]) result[b].push({ id: cat.id, nameVi: cat.nameVi, icon: cat.iconName });
     }
     return result;
-  }, [customerCats]);
+  }, [categoryCatalog]);
 
   const income = bucketAllocation?.monthlyIncome ?? 0;
   const bucketPct: Record<BucketType, number> = {

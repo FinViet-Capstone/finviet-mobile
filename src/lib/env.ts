@@ -24,3 +24,18 @@ const DEFAULT_SENTRY_DSN =
 
 /** Sentry DSN. Empty disables crash reporting. */
 export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? DEFAULT_SENTRY_DSN;
+
+// ─── Google Sign-In (see src/lib/googleAuth.ts) ───────────────────────────────
+// Neither value is a secret — both ship inside any app binary that uses them,
+// and Firebase treats the browser key as public. They live in env rather than
+// in source so a different Firebase project can be pointed at per build, and
+// so this repo keeps honouring its "no Firebase config in git" .gitignore rule.
+// Empty = Google sign-in reports itself as unconfigured; email/password is
+// unaffected.
+
+/** OAuth **web** client ID of the Firebase project (`client_type: 3`). */
+export const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+
+/** Firebase Web API key, used only for the identitytoolkit token exchange. */
+export const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '';

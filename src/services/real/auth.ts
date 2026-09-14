@@ -5,12 +5,14 @@
  * string (see ApiResponse / ExceptionHandlingMiddleware). We map those onto the
  * FE AuthErrorCode union so AuthErrorBanner renders consistent Vietnamese copy.
  *
- * googleOAuth has no usable backend equivalent yet (needs a Firebase ID token
- * + custom dev build) so it still fails loudly below.
+ * googleOAuth runs the native Google flow (see lib/googleAuth.ts) and posts the
+ * resulting Firebase ID token to the backend, which verifies it through Firebase
+ * Admin. It needs a dev/production build — the native module is absent in Expo Go.
  */
 
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { api, unwrap, type AuthResponsePayload } from '@/lib/api';
+import { getFirebaseIdTokenFromGoogle, signOutFromGoogle } from '@/lib/googleAuth';
 import { setAuthTokens } from '@/lib/mmkv';
 import { AuthError, type AuthErrorCode } from '@/types/auth';
 import { getNotificationPrefs } from '@/lib/notificationPrefsCache';
@@ -25,19 +27,48 @@ import type {
 } from '@/types';
 
 /**
- * Google sign-in is NOT mocked in real mode. The backend (`POST /auth/google-login`)
- * verifies a **Firebase ID token** via Firebase Admin — obtaining one needs Firebase +
- * Google OAuth client config and a custom dev build (it cannot run inside Expo Go).
+ * POST /api/auth/google-login — exchanges a Firebase ID token for a FinViet
+ * session. The backend matches on `GoogleId` first and falls back to email, so an
+ * existing password account is auto-linked on first Google sign-in and an unknown
+ * account is created on the spot. That makes `mode` purely cosmetic here — "đăng
+ * nhập" and "đăng ký" are the same request — but it stays in the signature so the
+ * screen's active tab still reads naturally.
  *
- * Until that's wired we fail loudly here instead of minting a tokenless "demo" session,
- * which is what caused every protected screen (wallets/budgets/entry) to 401. Use
- * email/password against the real backend instead (e.g. the seeded demo@finviet.local).
+ * The token itself comes from the native flow, which throws its own typed
+ * AuthError (`oauth_cancelled` when the customer dismisses the picker) before any
+ * request is made.
  */
-export async function googleOAuth(_mode: 'login' | 'register'): Promise<never> {
-  throw new AuthError(
-    'unknown',
-    'Đăng nhập Google chưa khả dụng ở bản kết nối backend. Vui lòng dùng email và mật khẩu.',
-  );
+export async function googleOAuth(_mode: 'login' | 'register'): Promise<Customer> {
+  const idToken = await getFirebaseIdTokenFromGoogle();
+  try {
+    const res = await api.post('/auth/google-login', { idToken });
+    const payload = unwrap<AuthResponsePayload>(res);
+    setAuthTokens({
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken,
+      accessTokenExpiry: payload.accessTokenExpiry,
+    });
+    return await toCustomer(payload.profile);
+  } catch (err) {
+    // The banner collapses every backend rejection into one sentence, so log the
+    // status here — it is what separates "Firebase Admin rejected the token" from
+    // "the exchange before this never produced one".
+    if (__DEV__ && isAxiosError(err)) {
+      console.warn(
+        '[googleOAuth] /auth/google-login failed',
+        err.response?.status,
+        JSON.stringify(err.response?.data),
+      );
+    }
+    throw toAuthError(err, (status) => {
+      // 401 — Firebase Admin rejected the token: expired, minted for another
+      // project, or the backend has no service-account credentials at all.
+      // 400 — the Google account carries no verified email.
+      if (status === 401 || status === 400) return 'oauth_failed';
+      if (status === 403) return 'account_locked';
+      return undefined;
+    });
+  }
 }
 
 // ─── error mapping ────────────────────────────────────────────────────────────
@@ -392,10 +423,15 @@ export async function resendVerification(email: string): Promise<void> {
 
 /** Best-effort server-side refresh-token revoke. Caller clears local session. */
 export async function logout(refreshToken: string): Promise<void> {
-  if (!refreshToken) return;
-  try {
-    await api.post('/auth/logout', { refreshToken });
-  } catch {
-    // Logout is best-effort — never block the user from leaving.
+  if (refreshToken) {
+    try {
+      await api.post('/auth/logout', { refreshToken });
+    } catch {
+      // Logout is best-effort — never block the user from leaving.
+    }
   }
+  // Drop the cached Google account as well, so the next Google sign-in offers
+  // the account picker instead of silently reusing whoever just signed out.
+  // Runs even with no refresh token — the Google session is independent of it.
+  await signOutFromGoogle();
 }

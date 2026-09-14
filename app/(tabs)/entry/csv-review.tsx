@@ -18,7 +18,7 @@ import { CategoryPickerSheet } from '@/components/categories';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
 import { useRules, useExtractFromCsv } from '@/hooks';
-import { getCategoryById } from '@/constants/categories';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 import type { Wallet, Transaction, Rule } from '@/types';
 import { getApiErrorMessage } from '@/utils/errors';
 import { scheduleCsvImportReadyNotification } from '@/lib/notifications';
@@ -119,7 +119,7 @@ function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: b
 function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggle: () => void; onEditCategory: () => void }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const cat = row.suggestedCategoryId ? getCategoryById(row.suggestedCategoryId) : null;
+  const cat = useCategoryCatalog().get(row.suggestedCategoryId) ?? null;
   const isIncome = row.type === 'income';
   const needsCategoryEdit = !row.suggestedCategoryId;
   // Income rows are never sent for AI categorization by design (only expenses are), so a

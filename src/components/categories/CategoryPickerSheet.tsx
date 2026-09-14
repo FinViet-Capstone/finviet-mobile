@@ -2,10 +2,12 @@
  * CategoryPickerSheet — shared "Chọn danh mục" bottom sheet.
  *
  * Used by every manual-entry flow (manual add, CSV import, SMS extraction,
- * photo/receipt confirm). For expense categories it exposes a bucket filter
- * (Tất cả / Thiết yếu / Mong muốn / Tiết kiệm) so a category shows up under
- * whichever bucket the customer has actually placed it in — via
- * useCustomerCategories() — not the system's static defaultBucket.
+ * photo/receipt confirm). For expense categories the list comes from the
+ * customer's real catalog (useCategoryCatalog) — their own custom labels
+ * included — and a bucket filter (Tất cả / Thiết yếu / Mong muốn / Tiết kiệm)
+ * shows each one under whichever bucket they actually placed it in, not the
+ * system's static defaultBucket. Income has no per-customer set, so it still
+ * comes from the global constant.
  */
 
 import React, { useMemo, useState } from "react";
@@ -20,9 +22,10 @@ import {
 import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
-import { useCustomerCategories } from "@/hooks/useCustomerCategories";
+import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
 import { getCategories, getBucketLabel } from "@/constants/categories";
 import type { BucketType, CategoryType } from "@/constants/categories";
+import { fromSystemCategory, type CatalogCategory } from "@/lib/categoryCatalog";
 
 type BucketFilter = "all" | BucketType;
 
@@ -51,24 +54,23 @@ export function CategoryPickerSheet({
 }: CategoryPickerSheetProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data: customerCats } = useCustomerCategories();
+  const catalog = useCategoryCatalog();
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>("all");
 
-  // Per-customer bucket placement, falling back to the system default for any
-  // category not yet in the customer's set (e.g. not seeded/loaded yet).
-  const bucketByCategoryId = useMemo(() => {
-    const map = new Map<string, BucketType>();
-    customerCats?.forEach((c) => map.set(c.categoryId, c.bucketId));
-    return map;
-  }, [customerCats]);
-
-  const categories = useMemo(() => {
-    const all = getCategories(entryType);
-    if (entryType === "income" || bucketFilter === "all") return all;
-    return all.filter(
-      (c) => (bucketByCategoryId.get(c.id) ?? c.defaultBucket) === bucketFilter,
-    );
-  }, [entryType, bucketFilter, bucketByCategoryId]);
+  const categories = useMemo<CatalogCategory[]>(() => {
+    // Income categories are global — there is no per-customer income set, and
+    // custom categories are expense-only on both sides.
+    if (entryType === "income") {
+      return getCategories("income").map(fromSystemCategory);
+    }
+    // Until the catalog query resolves, fall back to the compiled system list so
+    // the sheet is never briefly empty; custom labels appear once it loads.
+    const all = catalog.list.length
+      ? catalog.list
+      : getCategories("expense").map(fromSystemCategory);
+    if (bucketFilter === "all") return all;
+    return all.filter((c) => c.bucket === bucketFilter);
+  }, [entryType, bucketFilter, catalog]);
 
   return (
     <DraggableSheet visible={visible} onClose={onClose}>

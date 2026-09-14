@@ -11,6 +11,23 @@ import {
 import type { BucketType } from '@/constants/categories';
 import type { CustomCategory } from '@/types/customCategory';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
+import { useAuthStore } from '@/stores/authStore';
+
+/**
+ * Both category lists come from the same endpoint (GET /categories?type=expense):
+ * this key holds the `custom_`-filtered view, and queryKeys.customerCategories
+ * holds the whole catalog that useCategoryCatalog (pickers, transaction rows,
+ * the Budgets tab) reads. A write to one has to refresh both, or a newly created
+ * category shows in the bucket editor and nowhere else until the other goes stale.
+ */
+function useInvalidateCategoryQueries() {
+  const qc = useQueryClient();
+  const customerId = useAuthStore((s) => s.customer?.id ?? null);
+  return () => {
+    qc.invalidateQueries({ queryKey: queryKeys.customCategories() });
+    qc.invalidateQueries({ queryKey: queryKeys.customerCategories(customerId) });
+  };
+}
 
 export const useCustomCategories = () =>
   useQuery({
@@ -20,24 +37,25 @@ export const useCustomCategories = () =>
   });
 
 export const useCreateCustomCategory = () => {
-  const qc = useQueryClient();
+  const invalidateCategories = useInvalidateCategoryQueries();
   return useMutation({
     mutationFn: (input: CreateCustomCategoryInput) => createCustomCategory(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.customCategories() }),
+    onSuccess: invalidateCategories,
   });
 };
 
 export const useDeleteCustomCategory = () => {
-  const qc = useQueryClient();
+  const invalidateCategories = useInvalidateCategoryQueries();
   return useMutation({
     mutationFn: (id: string) => deleteCustomCategory(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.customCategories() }),
+    onSuccess: invalidateCategories,
   });
 };
 
 /** Reassign a customer-created category to a different bucket (drag-and-drop). */
 export const useUpdateCustomCategoryBucket = () => {
   const qc = useQueryClient();
+  const invalidateCategories = useInvalidateCategoryQueries();
   const key = queryKeys.customCategories();
   return useMutation({
     mutationFn: ({ id, bucketId }: { id: string; bucketId: BucketType }) =>
@@ -55,15 +73,15 @@ export const useUpdateCustomCategoryBucket = () => {
     onError: (_err, _vars, context) => {
       if (context?.previous) qc.setQueryData(key, context.previous);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+    onSettled: invalidateCategories,
   });
 };
 
 /** Persist every staged drag-and-drop move for custom categories in one round trip. */
 export const useBulkUpdateCustomCategoryBucket = () => {
-  const qc = useQueryClient();
+  const invalidateCategories = useInvalidateCategoryQueries();
   return useMutation({
     mutationFn: (moves: BulkBucketMove[]) => bulkUpdateCustomCategoryBucket(moves),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.customCategories() }),
+    onSuccess: invalidateCategories,
   });
 };

@@ -17,7 +17,8 @@ import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { DATA_EXPORT_STRINGS } from '@/data/settingsScreensData';
 import { useTransactions } from '@/hooks';
 import { useWallets } from '@/hooks/useWallets';
-import { getCategoryById } from '@/constants/categories';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
+import type { CategoryCatalog } from '@/lib/categoryCatalog';
 import type { Transaction, TransactionType } from '@/types';
 
 const TYPE_VI: Record<TransactionType, string> = {
@@ -32,13 +33,17 @@ function csvField(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function buildCsv(transactions: Transaction[], walletNames: Map<string, string>): string {
+function buildCsv(
+  transactions: Transaction[],
+  walletNames: Map<string, string>,
+  categories: CategoryCatalog,
+): string {
   const header = ['Ngày', 'Loại', 'Ví', 'Danh mục', 'Mô tả', 'Số tiền (VND)'];
   const rows = transactions.map((t) => [
     t.transactionDate,
     TYPE_VI[t.type],
     walletNames.get(t.walletId) ?? 'Ví đã xóa',
-    t.categoryId ? (getCategoryById(t.categoryId)?.nameVi ?? t.categoryId) : 'Chưa phân loại',
+    t.categoryId ? (categories.get(t.categoryId)?.nameVi ?? t.categoryId) : 'Chưa phân loại',
     t.merchant ?? t.description ?? '',
     String(t.amount),
   ]);
@@ -126,6 +131,7 @@ export function DataExportScreen() {
   const transactions = (txData ?? []) as Transaction[];
   const { data: walletsData } = useWallets();
   const wallets = (walletsData as any)?.wallets ?? [];
+  const categoryCatalog = useCategoryCatalog();
 
   const handleExport = async () => {
     if (isExporting) return;
@@ -145,7 +151,7 @@ export function DataExportScreen() {
       const walletNames = new Map<string, string>(
         wallets.map((w: { id: string; name: string }) => [w.id, w.name]),
       );
-      const csv = buildCsv(transactions, walletNames);
+      const csv = buildCsv(transactions, walletNames, categoryCatalog);
 
       if (!EXPORT_DIR.exists) EXPORT_DIR.create({ intermediates: true });
       const file = new File(EXPORT_DIR, `finviet_${startDate}_${endDate}.csv`);
