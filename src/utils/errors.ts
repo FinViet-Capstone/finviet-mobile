@@ -29,6 +29,10 @@ const SEPAY_GENERIC_ERROR_VI = 'SePay đang gặp sự cố. Vui lòng thử l�
  * which was missing several of these). Verified 2026-08-10.
  */
 export const BUSINESS_RULE_MESSAGES_VI: Record<string, string> = {
+  vnpay_not_configured: 'Thanh toán VNPay chưa được cấu hình. Vui lòng thử lại sau.',
+  vnpay_request_failed: 'Không thể kết nối VNPay. Vui lòng kiểm tra lại giao dịch.',
+  already_subscribed: 'Bạn đã có gói đăng ký đang hoạt động.',
+  plan_discontinued: 'Gói này đã ngừng cung cấp. Vui lòng chọn gói khác.',
   // ─── Profile ────────────────────────────────────────────────────────────────
   allocation_locked_use_schedule_endpoint:
     'Không thể chỉnh sửa thu nhập và phân bổ ngân sách ở đây sau khi đã hoàn tất thiết lập ban đầu — hãy dùng chức năng lên lịch thay đổi thu nhập.',
