@@ -1808,3 +1808,145 @@ this entry was written. Not merged/deployed yet.
   client was already sending correctly.
 - No physical-device verification in this environment; confirming the on-device
   suggest-button/settings-link flow and a real CSV re-import is the user's to do.
+
+---
+
+Feature: CSV import Parsed ↔ Categorized preview toggle (branch
+`feature/csv-review-parsed-categorized-toggle`, mobile only, ticket #1 of 2 —
+`finviet-mobile` [#84](https://github.com/FinViet-Capstone/finviet-mobile/issues/84)).
+User asked for a way to see & compare a CSV row's raw parsed result against its
+AI-categorized result on the review screen. A `/grilling` session first established what
+"raw vs categorized" could actually mean given the real data: there is no separately
+retained original/pre-cleanup text anywhere in the pipeline — `merchant`/`description`
+are set once at extraction and never touched again — so the only field with a genuine
+before/after is `categoryId` (null right after extraction → AI/rule-assigned after
+categorization runs). Scoped down to exactly that, broken into two GitHub issues; this is
+the first (per-row toggle only — the global sticky "flip all rows" toggle is issue #85,
+blocked by this one).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed
+file reports 0 errors (2 pre-existing tolerated `set-state-in-effect` warnings on
+untouched lines, unchanged from HEAD); `npx jest` **255/255 pass, 46/46 suites** (no
+regressions; no new test file, matching this file's existing untested-screen precedent —
+the added logic is a single-key state map with no branching worth its own pure-function
+extraction). **Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- `PreviewRow` in `app/(tabs)/entry/csv-review.tsx` gained a two-way segmented control
+  ("Đã phân loại" / "Trước phân loại") that flips one card between its Categorized view
+  (today's behavior, unchanged: real category, tap-to-edit, plus a new AI/Quy tắc source
+  badge when `categorySource` is `'ai'`/`'client_rule'`) and a new Parsed view (plain
+  `Chưa phân loại`, no badge, **not tappable** — a fixed read-only snapshot).
+- Screen-level `rowViews: Record<string, RowView>` state (absent entry = default
+  `'categorized'`), with a `handleSetRowView(id, view)` setter designed be reused
+  as-is by #85's global toggle — selecting a view is idempotent (`onSelect(view)`, not a
+  blind flip), so a future "set every row to X" action can call the same setter per row
+  without needing per-row toggle state semantics of its own.
+- No backend change; no new editing surface (Parsed view has no chevron/tap target at
+  all, distinct from Categorized's existing tap-to-edit).
+
+## Notes
+
+- Merchant/description/amount/date are identical in both views by construction — only
+  the category line's rendering branches on `view`. This was confirmed by research before
+  implementing (grep across `types/extraction.ts`, `real/extraction.ts`,
+  `csv-review.tsx`): no `rawLine`/original-note field exists anywhere the FE can reach.
+- The AI/rule source badge is net-new UI — `categorySource` already existed on `ParsedRow`
+  and was already sent to the backend on import (`aiSource`/`aiConfidence`), but was never
+  rendered anywhere before this change.
+- Global toggle, its sticky-header placement, and its "always overrides individual
+  per-row state" behavior are explicitly out of scope here — see #85.
+
+---
+
+Fix: csv-review.tsx's back/cancel buttons didn't return to the entry-method chooser
+(same branch, continuing on `feature/csv-review-parsed-categorized-toggle`). User tested
+the CSV background-extraction notify-when-done flow (letting extraction run while
+exploring elsewhere in the app, then tapping the resulting notification) and reported:
+after tapping the notification, the screen was still loading, then went to its error
+state ("Không đọc được file CSV") — and from there, neither the "+" tab nor the header
+back icon returned to the 4-method entry chooser.
+
+## Root cause
+
+Diagnosed with `/diagnosing-bugs`, using a throwaway `expo-router/testing-library`
+harness (real `app/(tabs)/_layout.tsx` + `entry/_layout.tsx`, stubbed leaf screens) to
+get a deterministic, sub-second feedback loop before touching any code — this refuted
+the first, more exotic theory (that the notification's `router.navigate` call creates a
+duplicate/stale csv-review instance) and instead pinned down two separate, real
+navigation defects:
+
+1. **`router.back()` only pops one level.** csv-review.tsx's header back arrow, its
+   error-state "Quay lại" button, and its bottom-bar "Huỷ" button all called plain
+   `router.back()`. When reached the normal way (push chain `index → csv-import →
+   csv-review` still intact — confirmed via the harness this is the actual case for the
+   in-app ephemeral-banner notify path; `router.navigate` correctly reuses the existing
+   mounted screen, no duplicate, no remount), one `back()` only reaches `csv-import` (the
+   file picker), not the chooser.
+2. **`router.back()` exits the entry tab entirely when the stack is shorter.** If
+   csv-review is reached via a cold-start deep link (app suspended/killed while extraction
+   ran in the background, so the OS notification tap relaunches straight into csv-review
+   with no `index`/`csv-import` beneath it in its own stack — plausible after enough
+   background time), `router.back()` doesn't error; it falls through to the tabs
+   navigator's own back-history and **lands on Home**.
+
+Separately confirmed (via the same harness, reading `@react-navigation/bottom-tabs`
+source): pressing the "+" tab while already viewing any entry sub-screen is a **no-op**
+by design — `BottomTabBar.tsx`'s `onPress` only dispatches a navigate action
+`if (!focused && ...)`. This is general, pre-existing behavior across the whole entry
+flow (manual/sms/photo/csv alike), not something introduced by or specific to this CSV
+work — left unfixed here per explicit scope discussion with the user.
+
+This is the exact same defect class `fix/entry-cancel-back-to-chooser` (2026-08-xx,
+documented above) already fixed once for `manual.tsx`'s Hủy button, just never
+propagated to csv-review.tsx (which didn't exist yet at the time) — or, it turns out, to
+`csv-import.tsx`, `photo.tsx`, or `sms.tsx`'s own header back buttons, all of which still
+call plain `router.back()` too (grepped, not fixed — flagged as a latent follow-up, out
+of the scope the user asked for).
+
+## Fix
+
+All three "leave this flow" buttons in csv-review.tsx (header back arrow, error-state
+"Quay lại", bottom-bar "Huỷ") now share one `handleExitFlow = () =>
+router.dismissTo('/(tabs)/entry')` — same primitive `manual.tsx` already uses. `dismissTo`
+pops back to the chooser when it's already below this screen, and replaces this screen
+with it when it isn't, so it self-heals for both stack shapes above with no branching.
+The success/partial-success `router.back()` calls are unchanged, matching the existing
+`manual.tsx` precedent (finishing the flow should show what was just imported, not
+short-circuit to the chooser).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines of `csv-review.tsx`); `npx jest`
+**258/258 pass, 47/47 suites** (255 + 3 new). **Not committed/pushed.** Not exercised on
+device (no device access in this environment) — the notify-when-done round trip itself
+(extraction succeeding/failing while backgrounded) still needs a real on-device pass;
+this fix only addresses the navigation dead-end once the screen is in an error/idle
+state, which is reproducible and now regression-tested independent of a real backend.
+
+## Notes
+
+- Regression tests (`app/(tabs)/entry/__tests__/csv-review.test.tsx`) render the **real**
+  `csv-review.tsx` (hooks mocked: `useWallets`, `useTransactions`,
+  `useCreateTransaction`, `useRules`, `useExtractFromCsv`, `useCategoryCatalog`,
+  `CategoryPickerSheet`, notification/banner stores) via `expo-router/testing-library`'s
+  `renderRouter` with `{ appDir: 'app', overrides }`, using the real `(tabs)/_layout.tsx`
+  and `entry/_layout.tsx` — not a hand-rolled stub of the navigation shape — so the tests
+  exercise the actual bug pattern at its real call site. Confirmed red-then-green: ran the
+  three tests against the pre-fix code (`git stash` on just this file) and watched all
+  three fail with the exact reported symptoms (`/entry/csv-import` and `/home` instead of
+  `/entry`) before restoring the fix.
+- `useExtractFromCsv` is mocked to reject, driving the screen into its real error state —
+  the same state the user's screenshot showed — rather than asserting against a
+  hand-wired "already in error" prop, since csv-review.tsx has no such prop; status is
+  derived entirely from the extraction call's own outcome.
+- Did not investigate *why* the user's real extraction attempt failed in the first place
+  (the "Không thể phân tích file" message) — no loop was available for that without a real
+  device/network trace of a backgrounded request; could be a genuine transient failure
+  (network deprioritized while backgrounded) rather than a bug. Flagged to the user as a
+  separate, unconfirmed question.

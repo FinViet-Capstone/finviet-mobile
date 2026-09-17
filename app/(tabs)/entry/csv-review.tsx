@@ -59,6 +59,10 @@ const S = {
   notifyReadyTitle: 'Phân loại xong',
   notifyReadyBody: (n: number) => `AI đã phân loại xong ${n} giao dịch. Chạm để xem kết quả.`,
   contentLabel: 'Nội dung',
+  viewCategorized: 'Đã phân loại',
+  viewParsed: 'Trước phân loại',
+  sourceAi: 'AI',
+  sourceRule: 'Quy tắc',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -81,6 +85,12 @@ interface ParsedRow {
   isDuplicate: boolean;
   selected: boolean;
 }
+
+/** Which snapshot of a row's category is currently displayed — 'categorized' is the row's real,
+ * current, editable state; 'parsed' is a fixed read-only snapshot of how it looked right after
+ * CSV extraction, before AI/rule categorization ran. Defaults to 'categorized' when a row has no
+ * entry in the screen's per-row view map. */
+type RowView = 'categorized' | 'parsed';
 
 /** Longest-keyword-wins substring match against the customer's saved merchant rules. */
 function suggestCategoryFromMerchant(merchant: string, rules: Rule[]): string | null {
@@ -113,10 +123,44 @@ function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: b
   );
 }
 
+/** Two-way segmented control flipping one card between its Categorized and Parsed views.
+ * Selecting the already-active side is a no-op rather than a blind flip, since a global "set
+ * all rows to X" toggle (separate ticket) needs to land on an exact state, not toggle it. */
+function ViewToggle({ view, onSelect }: { view: RowView; onSelect: (view: RowView) => void }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.viewToggle}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.viewToggleOption, view === 'categorized' && styles.viewToggleOptionActive]}
+        onPress={() => onSelect('categorized')}
+        accessibilityRole="button"
+        accessibilityLabel={S.viewCategorized}
+      >
+        <Text style={[styles.viewToggleText, view === 'categorized' && styles.viewToggleTextActive]}>{S.viewCategorized}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.viewToggleOption, view === 'parsed' && styles.viewToggleOptionActive]}
+        onPress={() => onSelect('parsed')}
+        accessibilityRole="button"
+        accessibilityLabel={S.viewParsed}
+      >
+        <Text style={[styles.viewToggleText, view === 'parsed' && styles.viewToggleTextActive]}>{S.viewParsed}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 /** Labeled-field card, matching photo-confirm's ReviewRow layout (Số tiền / Danh mục / Ngày as
  * label-left value-right rows) so both entry methods read the same way — just without a photo
  * thumbnail, since CSV rows don't have one; the merchant serves as the row's title instead. */
-function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggle: () => void; onEditCategory: () => void }) {
+function PreviewRow({
+  row, view, onToggle, onEditCategory, onSetView,
+}: {
+  row: ParsedRow; view: RowView; onToggle: () => void; onEditCategory: () => void; onSetView: (view: RowView) => void;
+}) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const cat = useCategoryCatalog().get(row.suggestedCategoryId) ?? null;
@@ -137,6 +181,8 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
         {row.isDuplicate && <View style={styles.dupBadge}><Text style={styles.dupBadgeText}>{S.duplicate}</Text></View>}
       </View>
 
+      <ViewToggle view={view} onSelect={onSetView} />
+
       {/* Số tiền */}
       <View style={styles.rowField}>
         <Text style={styles.rowFieldLabel}>{S.amountLabel}</Text>
@@ -154,26 +200,40 @@ function PreviewRow({ row, onToggle, onEditCategory }: { row: ParsedRow; onToggl
         </View>
       )}
 
-      {/* Danh mục — tappable */}
-      <TouchableOpacity activeOpacity={0.7} style={styles.rowField} onPress={onEditCategory}>
-        <Text style={styles.rowFieldLabel}>{S.categoryLabel}</Text>
-        <View style={styles.rowCategoryRight}>
-          {cat ? (
-            <>
-              <View style={[styles.catDot, { backgroundColor: cat.color }]} />
-              <Text style={styles.rowFieldValue}>{cat.nameVi}</Text>
-            </>
-          ) : aiFailedToCategorize ? (
-            <>
-              <MaterialIcon name="error_outline" size={12} color={colors.error} />
-              <Text style={styles.aiFailedText}>{S.aiCategorizeFailed}</Text>
-            </>
-          ) : (
-            <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
-          )}
-          <MaterialIcon name="chevron_right" size={16} color={aiFailedToCategorize ? colors.error : needsCategoryEdit ? colors.secondary : colors.onSurfaceVariant} />
+      {/* Danh mục — Parsed view is a fixed, read-only snapshot of the row before categorization
+          ran, so it's plain text with no edit affordance; Categorized view keeps today's
+          tap-to-edit behavior unchanged, plus a source badge when AI/a rule actually decided it. */}
+      {view === 'parsed' ? (
+        <View style={styles.rowField}>
+          <Text style={styles.rowFieldLabel}>{S.categoryLabel}</Text>
+          <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
         </View>
-      </TouchableOpacity>
+      ) : (
+        <TouchableOpacity activeOpacity={0.7} style={styles.rowField} onPress={onEditCategory}>
+          <Text style={styles.rowFieldLabel}>{S.categoryLabel}</Text>
+          <View style={styles.rowCategoryRight}>
+            {cat ? (
+              <>
+                {row.categorySource && (
+                  <View style={styles.sourceBadge}>
+                    <Text style={styles.sourceBadgeText}>{row.categorySource === 'ai' ? S.sourceAi : S.sourceRule}</Text>
+                  </View>
+                )}
+                <View style={[styles.catDot, { backgroundColor: cat.color }]} />
+                <Text style={styles.rowFieldValue}>{cat.nameVi}</Text>
+              </>
+            ) : aiFailedToCategorize ? (
+              <>
+                <MaterialIcon name="error_outline" size={12} color={colors.error} />
+                <Text style={styles.aiFailedText}>{S.aiCategorizeFailed}</Text>
+              </>
+            ) : (
+              <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
+            )}
+            <MaterialIcon name="chevron_right" size={16} color={aiFailedToCategorize ? colors.error : needsCategoryEdit ? colors.secondary : colors.onSurfaceVariant} />
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Ngày */}
       <View style={styles.rowField}>
@@ -205,6 +265,9 @@ export default function CsvReviewScreen() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  // Absent entry = 'categorized' (the default view) — only rows a user has actually flipped get
+  // a key here, so a fresh extraction never needs to seed this map.
+  const [rowViews, setRowViews] = useState<Record<string, RowView>>({});
 
   // Switching tabs doesn't unmount this screen (no unmountOnBlur), so the extraction call
   // below keeps running and updating state even when the user isn't looking at it — this ref
@@ -313,6 +376,21 @@ export default function CsvReviewScreen() {
     setEditingRowId(id);
   }, []);
 
+  /**
+   * Leaving the flow returns to the entry-method chooser rather than wherever sits below on
+   * the stack. Plain `router.back()` only pops one level (landing on csv-import, the file
+   * picker) when this screen's own history is intact, and jumps out of the entry tab entirely
+   * — to Home — when it isn't (e.g. reached via a notification tap after the app was
+   * suspended/killed in the background, so csv-review is the only entry in its stack).
+   * `dismissTo` pops back to the chooser when it is already below this screen, and replaces
+   * this screen with it when it is not — same fix as manual.tsx's `handleCancel`.
+   */
+  const handleExitFlow = useCallback(() => router.dismissTo('/(tabs)/entry'), [router]);
+
+  const handleSetRowView = useCallback((id: string, view: RowView) => {
+    setRowViews((prev) => (prev[id] === view ? prev : { ...prev, [id]: view }));
+  }, []);
+
   const handleCategorySelect = useCallback((categoryId: string) => {
     // Manual pick overrides whatever suggested it — clear categorySource/confidence so the
     // import doesn't log a stale AI/rule decision for a category the user chose themselves.
@@ -377,7 +455,7 @@ export default function CsvReviewScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.headerBtn}
-          onPress={status === 'loading' ? undefined : () => router.back()}
+          onPress={status === 'loading' ? undefined : handleExitFlow}
           disabled={status === 'loading'}
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
@@ -402,7 +480,7 @@ export default function CsvReviewScreen() {
           <MaterialIcon name="error_outline" size={40} color={colors.error} />
           <Text style={styles.errorTitle}>{S.errorTitle}</Text>
           <Text style={styles.loadingSubtitle}>{errorMsg}</Text>
-          <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={handleExitFlow}>
             <Text style={styles.backBtnText}>{S.goBack}</Text>
           </TouchableOpacity>
         </View>
@@ -440,7 +518,14 @@ export default function CsvReviewScreen() {
                 <Text style={styles.selectAllText}>{allSelected ? S.deselectAll : S.selectAll}</Text>
               </TouchableOpacity>
               {rows.map((row) => (
-                <PreviewRow key={row.id} row={row} onToggle={() => handleToggleRow(row.id)} onEditCategory={() => handleEditCategory(row.id)} />
+                <PreviewRow
+                  key={row.id}
+                  row={row}
+                  view={rowViews[row.id] ?? 'categorized'}
+                  onToggle={() => handleToggleRow(row.id)}
+                  onEditCategory={() => handleEditCategory(row.id)}
+                  onSetView={(view) => handleSetRowView(row.id, view)}
+                />
               ))}
             </View>
 
@@ -449,7 +534,7 @@ export default function CsvReviewScreen() {
 
           {/* Bottom action */}
           <View style={styles.bottomBar}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={() => router.back()}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.cancelBtn} onPress={handleExitFlow}>
               <Text style={styles.cancelText}>{S.cancelBtn}</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -562,6 +647,23 @@ function createStyles(colors: ThemeColors) {
     rowMerchant: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface, lineHeight: 18 },
     dupBadge: { backgroundColor: withAlpha(colors.secondary, 0.13), paddingHorizontal: SPACING[2], paddingVertical: 2, borderRadius: BORDER_RADIUS.full, flexShrink: 0 },
     dupBadgeText: { fontSize: 10, color: colors.secondary, fontWeight: FONT_WEIGHT.semibold },
+
+    // Per-row Categorized/Parsed segmented toggle
+    viewToggle: {
+      flexDirection: 'row',
+      alignSelf: 'flex-start',
+      backgroundColor: colors.surfaceContainerHigh,
+      borderRadius: BORDER_RADIUS.full,
+      padding: 2,
+    },
+    viewToggleOption: { paddingHorizontal: SPACING[2], paddingVertical: 3, borderRadius: BORDER_RADIUS.full },
+    viewToggleOptionActive: { backgroundColor: colors.surface },
+    viewToggleText: { fontSize: 10, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant },
+    viewToggleTextActive: { color: colors.primary },
+
+    // AI/rule source attribution badge, shown next to a resolved category in Categorized view
+    sourceBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: BORDER_RADIUS.full, backgroundColor: withAlpha(colors.primary, 0.12) },
+    sourceBadgeText: { fontSize: 9, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
 
     rowField: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 20 },
     rowFieldLabel: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, flex: 1 },
