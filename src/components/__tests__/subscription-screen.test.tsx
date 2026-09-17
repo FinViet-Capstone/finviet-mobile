@@ -6,8 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import SubscriptionScreen from '../../../app/settings/subscription';
 import { getCurrentSubscription, getSubscriptionPayment, getSubscriptionPlans, subscribeToPlan } from '@/services/real/subscriptions';
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }), Redirect: () => null }));
-jest.mock('@react-navigation/native', () => ({ useIsFocused: () => true }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }), Redirect: () => null, useIsFocused: () => true }));
 jest.mock('@/stores/authStore', () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ customer: { id: 'customer-1' } }) }));
 jest.mock('@/providers/ThemeProvider', () => ({ useThemeColors: () => jest.requireActual<typeof import('@/theme')>('@/theme').COLORS }));
 jest.mock('@/components/common/MaterialIcon', () => ({ MaterialIcon: () => null }));
