@@ -329,6 +329,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{S.sections.finance}</Text>
           <SectionCard>
+            <SettingsRow icon="workspace_premium" iconColor={colors.primary}
+              label="Gói đăng ký" value="VNPay QR"
+              onPress={() => router.push('/settings/subscription')} />
+            <Divider />
             <SettingsRow icon="payments" iconColor={colors.secondary}
               label={S.rows.income} value={formatIncome(effectiveAllocation?.monthlyIncome)}
               onPress={() => router.push({ pathname: '/settings/budget-allocation' })} />
