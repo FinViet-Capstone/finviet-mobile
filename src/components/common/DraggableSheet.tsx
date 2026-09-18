@@ -40,19 +40,11 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
 
   useEffect(() => {
     if (!visible) return;
-    // Start fully offscreen so the entrance springs up instead of the sheet
-    // appearing at its final position in the same frame it mounts (which
-    // read as a pop/freeze when opened right as a native Alert dismisses).
-    translateY.value = windowHeight;
-    backdropOpacity.value = 0;
+    // Entrance is instant — appears at its final position with no slide-up.
+    translateY.value = 0;
+    backdropOpacity.value = 1;
     setMounted(true);
-  }, [visible, windowHeight]);
-
-  useEffect(() => {
-    if (!visible || !mounted) return;
-    translateY.value = withSpring(0, DISMISS_SPRING_CONFIG);
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-  }, [visible, mounted]);
+  }, [visible]);
 
   useEffect(() => {
     if (visible || !mounted) return;
