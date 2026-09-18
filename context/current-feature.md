@@ -1808,3 +1808,316 @@ this entry was written. Not merged/deployed yet.
   client was already sending correctly.
 - No physical-device verification in this environment; confirming the on-device
   suggest-button/settings-link flow and a real CSV re-import is the user's to do.
+
+---
+
+Feature: CSV import Parsed ↔ Categorized preview toggle (branch
+`feature/csv-review-parsed-categorized-toggle`, mobile only, ticket #1 of 2 —
+`finviet-mobile` [#84](https://github.com/FinViet-Capstone/finviet-mobile/issues/84)).
+User asked for a way to see & compare a CSV row's raw parsed result against its
+AI-categorized result on the review screen. A `/grilling` session first established what
+"raw vs categorized" could actually mean given the real data: there is no separately
+retained original/pre-cleanup text anywhere in the pipeline — `merchant`/`description`
+are set once at extraction and never touched again — so the only field with a genuine
+before/after is `categoryId` (null right after extraction → AI/rule-assigned after
+categorization runs). Scoped down to exactly that, broken into two GitHub issues; this is
+the first (per-row toggle only — the global sticky "flip all rows" toggle is issue #85,
+blocked by this one).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed
+file reports 0 errors (2 pre-existing tolerated `set-state-in-effect` warnings on
+untouched lines, unchanged from HEAD); `npx jest` **255/255 pass, 46/46 suites** (no
+regressions; no new test file, matching this file's existing untested-screen precedent —
+the added logic is a single-key state map with no branching worth its own pure-function
+extraction). **Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- `PreviewRow` in `app/(tabs)/entry/csv-review.tsx` gained a two-way segmented control
+  ("Đã phân loại" / "Trước phân loại") that flips one card between its Categorized view
+  (today's behavior, unchanged: real category, tap-to-edit, plus a new AI/Quy tắc source
+  badge when `categorySource` is `'ai'`/`'client_rule'`) and a new Parsed view (plain
+  `Chưa phân loại`, no badge, **not tappable** — a fixed read-only snapshot).
+- Screen-level `rowViews: Record<string, RowView>` state (absent entry = default
+  `'categorized'`), with a `handleSetRowView(id, view)` setter designed be reused
+  as-is by #85's global toggle — selecting a view is idempotent (`onSelect(view)`, not a
+  blind flip), so a future "set every row to X" action can call the same setter per row
+  without needing per-row toggle state semantics of its own.
+- No backend change; no new editing surface (Parsed view has no chevron/tap target at
+  all, distinct from Categorized's existing tap-to-edit).
+
+## Notes
+
+- Merchant/description/amount/date are identical in both views by construction — only
+  the category line's rendering branches on `view`. This was confirmed by research before
+  implementing (grep across `types/extraction.ts`, `real/extraction.ts`,
+  `csv-review.tsx`): no `rawLine`/original-note field exists anywhere the FE can reach.
+- The AI/rule source badge is net-new UI — `categorySource` already existed on `ParsedRow`
+  and was already sent to the backend on import (`aiSource`/`aiConfidence`), but was never
+  rendered anywhere before this change.
+- Global toggle, its sticky-header placement, and its "always overrides individual
+  per-row state" behavior are explicitly out of scope here — see #85.
+
+---
+
+Fix: csv-review.tsx's back/cancel buttons didn't return to the entry-method chooser
+(same branch, continuing on `feature/csv-review-parsed-categorized-toggle`). User tested
+the CSV background-extraction notify-when-done flow (letting extraction run while
+exploring elsewhere in the app, then tapping the resulting notification) and reported:
+after tapping the notification, the screen was still loading, then went to its error
+state ("Không đọc được file CSV") — and from there, neither the "+" tab nor the header
+back icon returned to the 4-method entry chooser.
+
+## Root cause
+
+Diagnosed with `/diagnosing-bugs`, using a throwaway `expo-router/testing-library`
+harness (real `app/(tabs)/_layout.tsx` + `entry/_layout.tsx`, stubbed leaf screens) to
+get a deterministic, sub-second feedback loop before touching any code — this refuted
+the first, more exotic theory (that the notification's `router.navigate` call creates a
+duplicate/stale csv-review instance) and instead pinned down two separate, real
+navigation defects:
+
+1. **`router.back()` only pops one level.** csv-review.tsx's header back arrow, its
+   error-state "Quay lại" button, and its bottom-bar "Huỷ" button all called plain
+   `router.back()`. When reached the normal way (push chain `index → csv-import →
+   csv-review` still intact — confirmed via the harness this is the actual case for the
+   in-app ephemeral-banner notify path; `router.navigate` correctly reuses the existing
+   mounted screen, no duplicate, no remount), one `back()` only reaches `csv-import` (the
+   file picker), not the chooser.
+2. **`router.back()` exits the entry tab entirely when the stack is shorter.** If
+   csv-review is reached via a cold-start deep link (app suspended/killed while extraction
+   ran in the background, so the OS notification tap relaunches straight into csv-review
+   with no `index`/`csv-import` beneath it in its own stack — plausible after enough
+   background time), `router.back()` doesn't error; it falls through to the tabs
+   navigator's own back-history and **lands on Home**.
+
+Separately confirmed (via the same harness, reading `@react-navigation/bottom-tabs`
+source): pressing the "+" tab while already viewing any entry sub-screen is a **no-op**
+by design — `BottomTabBar.tsx`'s `onPress` only dispatches a navigate action
+`if (!focused && ...)`. This is general, pre-existing behavior across the whole entry
+flow (manual/sms/photo/csv alike), not something introduced by or specific to this CSV
+work — left unfixed here per explicit scope discussion with the user.
+
+This is the exact same defect class `fix/entry-cancel-back-to-chooser` (2026-08-xx,
+documented above) already fixed once for `manual.tsx`'s Hủy button, just never
+propagated to csv-review.tsx (which didn't exist yet at the time) — or, it turns out, to
+`csv-import.tsx`, `photo.tsx`, or `sms.tsx`'s own header back buttons, all of which still
+call plain `router.back()` too (grepped, not fixed — flagged as a latent follow-up, out
+of the scope the user asked for).
+
+## Fix
+
+All three "leave this flow" buttons in csv-review.tsx (header back arrow, error-state
+"Quay lại", bottom-bar "Huỷ") now share one `handleExitFlow = () =>
+router.dismissTo('/(tabs)/entry')` — same primitive `manual.tsx` already uses. `dismissTo`
+pops back to the chooser when it's already below this screen, and replaces this screen
+with it when it isn't, so it self-heals for both stack shapes above with no branching.
+The success/partial-success `router.back()` calls are unchanged, matching the existing
+`manual.tsx` precedent (finishing the flow should show what was just imported, not
+short-circuit to the chooser).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines of `csv-review.tsx`); `npx jest`
+**258/258 pass, 47/47 suites** (255 + 3 new). **Not committed/pushed.** Not exercised on
+device (no device access in this environment) — the notify-when-done round trip itself
+(extraction succeeding/failing while backgrounded) still needs a real on-device pass;
+this fix only addresses the navigation dead-end once the screen is in an error/idle
+state, which is reproducible and now regression-tested independent of a real backend.
+
+## Notes
+
+- Regression tests (`app/(tabs)/entry/__tests__/csv-review.test.tsx`) render the **real**
+  `csv-review.tsx` (hooks mocked: `useWallets`, `useTransactions`,
+  `useCreateTransaction`, `useRules`, `useExtractFromCsv`, `useCategoryCatalog`,
+  `CategoryPickerSheet`, notification/banner stores) via `expo-router/testing-library`'s
+  `renderRouter` with `{ appDir: 'app', overrides }`, using the real `(tabs)/_layout.tsx`
+  and `entry/_layout.tsx` — not a hand-rolled stub of the navigation shape — so the tests
+  exercise the actual bug pattern at its real call site. Confirmed red-then-green: ran the
+  three tests against the pre-fix code (`git stash` on just this file) and watched all
+  three fail with the exact reported symptoms (`/entry/csv-import` and `/home` instead of
+  `/entry`) before restoring the fix.
+- `useExtractFromCsv` is mocked to reject, driving the screen into its real error state —
+  the same state the user's screenshot showed — rather than asserting against a
+  hand-wired "already in error" prop, since csv-review.tsx has no such prop; status is
+  derived entirely from the extraction call's own outcome.
+- Did not investigate *why* the user's real extraction attempt failed in the first place
+  (the "Không thể phân tích file" message) — no loop was available for that without a real
+  device/network trace of a backgrounded request; could be a genuine transient failure
+  (network deprioritized while backgrounded) rather than a bug. Flagged to the user as a
+  separate, unconfirmed question.
+
+---
+
+Feature: CSV import global sticky Parsed ↔ Categorized toggle (same branch, ticket #2 of
+2 — `finviet-mobile`
+[#85](https://github.com/FinViet-Capstone/finviet-mobile/issues/85), blocked by #84
+above and now implemented on top of it).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (same 2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines); `npx jest` **261/261 pass, 48/48
+suites** (258 + 3 new). **Not committed/pushed.** Not exercised on device — in
+particular, `stickyHeaderIndices` visual pinning itself isn't verifiable via RTL (no real
+layout/scroll engine under Jest); only the state-transition behavior is regression-tested.
+
+## Goals
+
+- The screen's `ScrollView` now passes `stickyHeaderIndices={[1]}`, with its direct
+  children split into: wallet section (0), a new `stickySummary` block (1 — selection
+  count, "Bỏ chọn tất cả", and the new global toggle, given its own opaque
+  `colors.background` so pinned content doesn't show the row list scrolling underneath
+  it), then the row list (2). No new dependency — built entirely on React Native's own
+  `ScrollView` sticky-header support.
+- The global toggle **reuses the exact `ViewToggle` component #84 built for per-row use**
+  (confirmed reusable exactly as designed at the time — see that entry's note on
+  `handleSetRowView`'s idempotent-`onSelect` shape), just wired to a new
+  `handleSetAllRowViews(view)` that overwrites every row's entry in `rowViews` at once.
+  A separate `globalView` state tracks only which segment the global control itself last
+  showed active — not whether every row still agrees, since a row flipped individually
+  afterward is expected to diverge from it (per #85's acceptance criteria).
+- `handleSetAllRowViews` always overwrites, including rows already flipped individually —
+  a plain "set all" master switch, per the ticket's explicit "global always wins" design
+  call (no per-row override protection).
+
+## Notes
+
+- `ViewToggle` gained an optional `testID` prop (defaulting to `undefined`, so it renders
+  no testID when omitted) purely so tests can address the global instance
+  (`global-view-toggle-*`) separately from each row's own
+  (`row-view-toggle-${row.id}-*`) — all instances otherwise share identical
+  accessibility labels ("Đã phân loại"/"Trước phân loại"), which is correct for screen
+  readers but made them ambiguous to `getByLabelText` once more than one exists on
+  screen.
+- New `app/(tabs)/entry/__tests__/csv-review.globalToggle.test.tsx` (3 tests): global
+  toggle sets every row's view at once; global toggle overwrites a row already flipped by
+  hand; a row can still be flipped individually again after the global toggle was used.
+  Same `renderRouter`/real-screen-with-mocked-hooks pattern as #84's fix — this time
+  `useExtractFromCsv` resolves with two real rows (one AI-categorized, one not) instead
+  of rejecting, since these tests need the `ready` state's row list, not the error state
+  `csv-review.test.tsx` exercises.
+- No change to default initial view, selection behavior, or the import flow — confirmed
+  by the existing 258 tests still passing unchanged.
+
+---
+
+Fix: receipt image preview modal (`src/components/common/ImagePreviewModal.tsx`, same
+branch as above per user's explicit instruction to implement on it rather than cutting a
+new `fix/` branch). Reported with a screenshot: the close (X) button rendered overlapping
+the real OS status bar/battery icon and didn't respond to taps; user also asked for
+swipe-to-dismiss.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all three
+changed/new files 0 errors / 0 new warnings (14 total, all the same pre-tolerated
+`react-hooks/immutability`/`set-state-in-effect` class this codebase already tolerates for
+reanimated shared-value writes — 12 pre-existing in `DraggableSheet.tsx`, unchanged count,
+plus 2 of the same class newly introduced in `ImagePreviewModal.tsx`); `npx jest`
+**261/261 pass, 48/48 suites** (no new tests — matches the pre-existing convention of not
+unit-testing this gesture/reanimated class of component; `DraggableSheet.tsx` has none
+either). **Committed** on `feature/csv-review-parsed-categorized-toggle`. Not exercised on
+device — confirming the fix and the swipe feel on a real emulator/device is the user's to
+do.
+
+## Root cause
+
+RN's `Modal` (`presentationStyle="fullScreen"`) opens a *separate native window* on
+Android. `app/_layout.tsx` has exactly one root-level `SafeAreaProvider`, and its measured
+insets don't propagate into that separate window — a documented
+`react-native-safe-area-context` caveat. So the modal's `SafeAreaView` resolved a top inset
+of 0, and the header rendered flush at y=0, physically under/behind the real status bar —
+exactly matching the screenshot where the X overlapped the battery icon.
+
+## Goals
+
+- Nest a second `<SafeAreaProvider>` inside the modal's own content (the standard fix for
+  this library's Modal-on-Android caveat), so insets are measured against the modal's own
+  window instead of wrongly inherited from the app-root one.
+- Swipe-**down**-only dismiss (confirmed with the user across several rounds — not
+  swipe-left, not swipe-up, and deliberately not turning this into a `DraggableSheet`-style
+  bottom sheet: kept full-screen so a receipt photo keeps maximum screen space to zoom
+  into). Extends the existing `pan` gesture rather than adding a competing one: unzoomed, a
+  downward drag translates + fades the whole screen (header/image/hint together) 1:1 with
+  the finger, matching `DraggableSheet`'s existing feel (no minimum distance before it
+  starts tracking). Zoomed pan behavior (`scale.value > MIN_SCALE`) is untouched.
+- New `expand_more` chevron button, centered at the bottom near the hint text, also closes
+  on tap — kept **in addition to** the existing header X (three ways to close: X, chevron,
+  swipe — confirmed with the user this is wanted redundancy, not clutter).
+- `DISMISS_THRESHOLD`/`DISMISS_SPRING_CONFIG` extracted to new
+  `src/constants/gestures.ts`, shared by both `ImagePreviewModal.tsx` and
+  `DraggableSheet.tsx` (previously two verbatim-duplicated copies of the same constants) —
+  a `/code-review` finding fixed before committing, so the app's one swipe-to-dismiss feel
+  can't silently drift between the two components.
+
+## Notes
+
+- **A second `/code-review` finding, also fixed before committing:** the first draft played
+  a 200ms "slide off to 600" exit tween before calling `onClose()`. Both real call sites
+  (`app/(tabs)/entry/photo-confirm.tsx:944`, `app/(tabs)/transactions/[id].tsx:670`)
+  conditionally render the *entire* `<ImagePreviewModal>` off the same prop `onClose()`
+  flips (`{previewUri ? <ImagePreviewModal .../> : null}` and
+  `{showReceiptPreview && receiptImageUri ? <ImagePreviewModal .../> : null}`), so the
+  component unmounts the instant `onClose()` fires — the exit tween could never actually
+  paint a frame; it was dead weight, unlike `DraggableSheet`'s own exit animation, which
+  works because that component keeps itself mounted via local `mounted` state until its
+  animation's `finished` callback fires. Reproducing that same decoupled-mounted-state
+  trick onto a true native `Modal` plus two differently-shaped parent unmount patterns
+  wasn't worth the complexity for this fix, so the tween was simply removed — the live
+  drag-follows-finger feedback during the gesture itself (before release) is what actually
+  delivers the "swipe to dismiss" feel, and release just commits the close immediately,
+  matching how the X button and double-tap-to-reset already behave.
+- `dismissY` (the new shared value driving the swipe) resets to 0 in a `useEffect` keyed on
+  `visible` becoming true — needed because both parents keep the same component instance
+  mounted/toggle `visible` rather than remounting fresh, so without the reset a screen
+  dismissed by swipe would still read as translated/faded the next time it's opened.
+- Scope stayed confined to `ImagePreviewModal.tsx`, `DraggableSheet.tsx` (constant-sharing
+  only — no behavior change there), and the new `src/constants/gestures.ts`.
+
+---
+
+Fix: `DraggableSheet`'s spring-up entrance animation (same branch, same session). User
+reported a "jumping" feel on open. Confirmed scope with the user across three options
+(entrance only / exit only / everything including swipe-release) before touching code —
+**entrance only**.
+
+## Status
+
+Implemented and verified: `npm run type-check` clean; `npx eslint` on the changed file 0
+errors / 9 warnings (down from 12 — one whole effect removed; the remaining 9 are the same
+pre-tolerated `react-hooks/immutability`/`exhaustive-deps`/`set-state-in-effect` classes
+this file already had); `npx jest` 261/261 pass, 48/48 suites (no test file for this
+component, matching its pre-existing convention). Committed on
+`feature/csv-review-parsed-categorized-toggle`.
+
+## Goals
+
+- On open, `translateY`/`backdropOpacity` are now set directly to their final values (0 /
+  1) instead of starting off-screen/transparent and springing in via `withSpring`/
+  `withTiming` — the sheet now appears at its final position immediately, no slide-up.
+  Collapsed the two open-related `useEffect`s into one, since the second one (which only
+  ever *animated* toward the final values) had nothing left to do.
+- **Left untouched, per explicit user confirmation:** the programmatic exit animation
+  (250ms slide-down when closed via a button/backdrop tap) and swipe-to-dismiss (live
+  finger-tracking during the drag, spring-back-or-fly-off on release) — both are the
+  gesture-driven kind of animation, not the automatic transition that was reported as
+  jumping.
+
+## Notes
+
+- All 10 `DraggableSheet` consumers get this for free (single shared component, no API
+  change) — `CategoryPickerSheet`, `CustomCategorySheet`, `WalletPickerSheet`,
+  `EditProfileSheet`, `SetLimitSheet`, and the sheet usages in `transactions/[id].tsx`,
+  `entry/photo-confirm.tsx`, `entry/manual.tsx`, `budgets/goals/index.tsx`,
+  `budgets/goals/[id].tsx`, `wallets/index.tsx`.
+- This reverses part of (not all of) the 2026-08-18 entry above titled "the withdraw-all
+  flow still lagged" / "give `DraggableSheet` a real spring slide-up entrance and timed
+  slide-down exit" — that work's *exit* animation and the underlying deferred-unmount
+  mechanism (the `mounted` state) are both still exactly as that entry left them; only the
+  entrance half is reverted.
