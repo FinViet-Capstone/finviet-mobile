@@ -1950,3 +1950,57 @@ state, which is reproducible and now regression-tested independent of a real bac
   device/network trace of a backgrounded request; could be a genuine transient failure
   (network deprioritized while backgrounded) rather than a bug. Flagged to the user as a
   separate, unconfirmed question.
+
+---
+
+Feature: CSV import global sticky Parsed ↔ Categorized toggle (same branch, ticket #2 of
+2 — `finviet-mobile`
+[#85](https://github.com/FinViet-Capstone/finviet-mobile/issues/85), blocked by #84
+above and now implemented on top of it).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (same 2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines); `npx jest` **261/261 pass, 48/48
+suites** (258 + 3 new). **Not committed/pushed.** Not exercised on device — in
+particular, `stickyHeaderIndices` visual pinning itself isn't verifiable via RTL (no real
+layout/scroll engine under Jest); only the state-transition behavior is regression-tested.
+
+## Goals
+
+- The screen's `ScrollView` now passes `stickyHeaderIndices={[1]}`, with its direct
+  children split into: wallet section (0), a new `stickySummary` block (1 — selection
+  count, "Bỏ chọn tất cả", and the new global toggle, given its own opaque
+  `colors.background` so pinned content doesn't show the row list scrolling underneath
+  it), then the row list (2). No new dependency — built entirely on React Native's own
+  `ScrollView` sticky-header support.
+- The global toggle **reuses the exact `ViewToggle` component #84 built for per-row use**
+  (confirmed reusable exactly as designed at the time — see that entry's note on
+  `handleSetRowView`'s idempotent-`onSelect` shape), just wired to a new
+  `handleSetAllRowViews(view)` that overwrites every row's entry in `rowViews` at once.
+  A separate `globalView` state tracks only which segment the global control itself last
+  showed active — not whether every row still agrees, since a row flipped individually
+  afterward is expected to diverge from it (per #85's acceptance criteria).
+- `handleSetAllRowViews` always overwrites, including rows already flipped individually —
+  a plain "set all" master switch, per the ticket's explicit "global always wins" design
+  call (no per-row override protection).
+
+## Notes
+
+- `ViewToggle` gained an optional `testID` prop (defaulting to `undefined`, so it renders
+  no testID when omitted) purely so tests can address the global instance
+  (`global-view-toggle-*`) separately from each row's own
+  (`row-view-toggle-${row.id}-*`) — all instances otherwise share identical
+  accessibility labels ("Đã phân loại"/"Trước phân loại"), which is correct for screen
+  readers but made them ambiguous to `getByLabelText` once more than one exists on
+  screen.
+- New `app/(tabs)/entry/__tests__/csv-review.globalToggle.test.tsx` (3 tests): global
+  toggle sets every row's view at once; global toggle overwrites a row already flipped by
+  hand; a row can still be flipped individually again after the global toggle was used.
+  Same `renderRouter`/real-screen-with-mocked-hooks pattern as #84's fix — this time
+  `useExtractFromCsv` resolves with two real rows (one AI-categorized, one not) instead
+  of rejecting, since these tests need the `ready` state's row list, not the error state
+  `csv-review.test.tsx` exercises.
+- No change to default initial view, selection behavior, or the import flow — confirmed
+  by the existing 258 tests still passing unchanged.

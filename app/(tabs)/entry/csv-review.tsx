@@ -126,17 +126,18 @@ function WalletCard({ wallet, selected, onPress }: { wallet: Wallet; selected: b
 /** Two-way segmented control flipping one card between its Categorized and Parsed views.
  * Selecting the already-active side is a no-op rather than a blind flip, since a global "set
  * all rows to X" toggle (separate ticket) needs to land on an exact state, not toggle it. */
-function ViewToggle({ view, onSelect }: { view: RowView; onSelect: (view: RowView) => void }) {
+function ViewToggle({ view, onSelect, testID }: { view: RowView; onSelect: (view: RowView) => void; testID?: string }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.viewToggle}>
+    <View style={styles.viewToggle} testID={testID}>
       <TouchableOpacity
         activeOpacity={0.7}
         style={[styles.viewToggleOption, view === 'categorized' && styles.viewToggleOptionActive]}
         onPress={() => onSelect('categorized')}
         accessibilityRole="button"
         accessibilityLabel={S.viewCategorized}
+        testID={testID && `${testID}-categorized`}
       >
         <Text style={[styles.viewToggleText, view === 'categorized' && styles.viewToggleTextActive]}>{S.viewCategorized}</Text>
       </TouchableOpacity>
@@ -146,6 +147,7 @@ function ViewToggle({ view, onSelect }: { view: RowView; onSelect: (view: RowVie
         onPress={() => onSelect('parsed')}
         accessibilityRole="button"
         accessibilityLabel={S.viewParsed}
+        testID={testID && `${testID}-parsed`}
       >
         <Text style={[styles.viewToggleText, view === 'parsed' && styles.viewToggleTextActive]}>{S.viewParsed}</Text>
       </TouchableOpacity>
@@ -181,7 +183,7 @@ function PreviewRow({
         {row.isDuplicate && <View style={styles.dupBadge}><Text style={styles.dupBadgeText}>{S.duplicate}</Text></View>}
       </View>
 
-      <ViewToggle view={view} onSelect={onSetView} />
+      <ViewToggle view={view} onSelect={onSetView} testID={`row-view-toggle-${row.id}`} />
 
       {/* Số tiền */}
       <View style={styles.rowField}>
@@ -268,6 +270,10 @@ export default function CsvReviewScreen() {
   // Absent entry = 'categorized' (the default view) — only rows a user has actually flipped get
   // a key here, so a fresh extraction never needs to seed this map.
   const [rowViews, setRowViews] = useState<Record<string, RowView>>({});
+  // Tracks only which segment the global toggle itself last showed as active — not whether
+  // every row actually agrees, since a row flipped individually after a global set is expected
+  // to diverge (see handleSetAllRowViews).
+  const [globalView, setGlobalView] = useState<RowView>('categorized');
 
   // Switching tabs doesn't unmount this screen (no unmountOnBlur), so the extraction call
   // below keeps running and updating state even when the user isn't looking at it — this ref
@@ -391,6 +397,14 @@ export default function CsvReviewScreen() {
     setRowViews((prev) => (prev[id] === view ? prev : { ...prev, [id]: view }));
   }, []);
 
+  // Force-applies to every row, overwriting any row already flipped individually — a simple
+  // "set all" master switch rather than a "set defaults for untouched rows only" one. A user
+  // who wants one row different from the rest can flip it again afterward.
+  const handleSetAllRowViews = useCallback((view: RowView) => {
+    setGlobalView(view);
+    setRowViews(() => Object.fromEntries(rows.map((r) => [r.id, view])));
+  }, [rows]);
+
   const handleCategorySelect = useCallback((categoryId: string) => {
     // Manual pick overrides whatever suggested it — clear categorySource/confidence so the
     // import doesn't log a stale AI/rule decision for a category the user chose themselves.
@@ -486,7 +500,12 @@ export default function CsvReviewScreen() {
         </View>
       ) : (
         <>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            stickyHeaderIndices={[1]}
+          >
             {/* Step: Wallet */}
             <View style={styles.section}>
               <Text style={styles.stepTitle}>{S.step2Title}</Text>
@@ -502,21 +521,28 @@ export default function CsvReviewScreen() {
                 )}
             </View>
 
-            {/* Step: Preview */}
-            <View style={styles.section}>
+            {/* Step: Preview — sticky summary (selection count, select-all, and the global
+                Categorized/Parsed toggle) stays pinned while the row list below it scrolls. */}
+            <View style={styles.stickySummary}>
               <View style={styles.stepTitleRow}>
                 <Text style={styles.stepTitle}>{S.step3Title}</Text>
                 <Text style={styles.selectedCount}>{selectedCount}/{rows.length} được chọn</Text>
               </View>
               <Text style={styles.stepHint}>{S.step3Hint}</Text>
-              <TouchableOpacity activeOpacity={0.7} style={styles.selectAllRow} onPress={handleToggleAll}>
-                <MaterialIcon
-                  name={allSelected ? 'check_box' : noneSelected ? 'check_box_outline_blank' : 'indeterminate_check_box'}
-                  size={20}
-                  color={noneSelected ? colors.onSurfaceVariant : colors.primary}
-                />
-                <Text style={styles.selectAllText}>{allSelected ? S.deselectAll : S.selectAll}</Text>
-              </TouchableOpacity>
+              <View style={styles.summaryControlsRow}>
+                <TouchableOpacity activeOpacity={0.7} style={styles.selectAllRow} onPress={handleToggleAll}>
+                  <MaterialIcon
+                    name={allSelected ? 'check_box' : noneSelected ? 'check_box_outline_blank' : 'indeterminate_check_box'}
+                    size={20}
+                    color={noneSelected ? colors.onSurfaceVariant : colors.primary}
+                  />
+                  <Text style={styles.selectAllText}>{allSelected ? S.deselectAll : S.selectAll}</Text>
+                </TouchableOpacity>
+                <ViewToggle view={globalView} onSelect={handleSetAllRowViews} testID="global-view-toggle" />
+              </View>
+            </View>
+
+            <View style={styles.section}>
               {rows.map((row) => (
                 <PreviewRow
                   key={row.id}
@@ -527,9 +553,8 @@ export default function CsvReviewScreen() {
                   onSetView={(view) => handleSetRowView(row.id, view)}
                 />
               ))}
+              <View style={{ height: 120 }} />
             </View>
-
-            <View style={{ height: 120 }} />
           </ScrollView>
 
           {/* Bottom action */}
@@ -610,6 +635,17 @@ function createStyles(colors: ThemeColors) {
     emptyText: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant },
     selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2], paddingVertical: SPACING[1] },
     selectAllText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+
+    // Sticky summary — pinned via ScrollView's stickyHeaderIndices, so it needs its own opaque
+    // background to cover rows scrolling underneath it once pinned.
+    stickySummary: {
+      gap: SPACING[3],
+      backgroundColor: colors.background,
+      paddingBottom: SPACING[3],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    summaryControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
     // Wallets
     walletList: { gap: SPACING[2] },
