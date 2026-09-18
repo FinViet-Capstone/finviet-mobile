@@ -72,9 +72,19 @@ export const api: AxiosInstance = axios.create({
   timeout: 20_000,
 });
 
+// Thêm metadata vào type config để lưu thời gian bắt đầu
+declare module 'axios' {
+  export interface InternalAxiosRequestConfig {
+    metadata?: { startTime: number };
+  }
+}
+
 // ─── Request: attach access token ─────────────────────────────────────────────
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Bắt đầu bấm giờ
+  config.metadata = { startTime: Date.now() };
+
   const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -110,8 +120,21 @@ export async function refreshAccessToken(): Promise<string> {
 }
 
 api.interceptors.response.use(
-  (res: AxiosResponse) => res,
+  (res: AxiosResponse) => {
+    // Kết thúc đếm giờ và log
+    if (res.config.metadata) {
+      const duration = Date.now() - res.config.metadata.startTime;
+      console.log(`⏱️ [API PERF] ${res.config.method?.toUpperCase()} ${res.config.url} => ${duration} ms`);
+    }
+    return res;
+  },
   async (error) => {
+    // Tính thời gian đối với request bị lỗi
+    if (error.config?.metadata) {
+      const duration = Date.now() - error.config.metadata.startTime;
+      console.log(`❌ [API PERF] ERROR ${error.config.method?.toUpperCase()} ${error.config.url} => ${duration} ms`);
+    }
+
     const original = error.config as RetryConfig | undefined;
     const status = error.response?.status;
     const url: string = original?.url ?? '';
