@@ -2079,3 +2079,45 @@ exactly matching the screenshot where the X overlapped the battery icon.
   dismissed by swipe would still read as translated/faded the next time it's opened.
 - Scope stayed confined to `ImagePreviewModal.tsx`, `DraggableSheet.tsx` (constant-sharing
   only — no behavior change there), and the new `src/constants/gestures.ts`.
+
+---
+
+Fix: `DraggableSheet`'s spring-up entrance animation (same branch, same session). User
+reported a "jumping" feel on open. Confirmed scope with the user across three options
+(entrance only / exit only / everything including swipe-release) before touching code —
+**entrance only**.
+
+## Status
+
+Implemented and verified: `npm run type-check` clean; `npx eslint` on the changed file 0
+errors / 9 warnings (down from 12 — one whole effect removed; the remaining 9 are the same
+pre-tolerated `react-hooks/immutability`/`exhaustive-deps`/`set-state-in-effect` classes
+this file already had); `npx jest` 261/261 pass, 48/48 suites (no test file for this
+component, matching its pre-existing convention). Committed on
+`feature/csv-review-parsed-categorized-toggle`.
+
+## Goals
+
+- On open, `translateY`/`backdropOpacity` are now set directly to their final values (0 /
+  1) instead of starting off-screen/transparent and springing in via `withSpring`/
+  `withTiming` — the sheet now appears at its final position immediately, no slide-up.
+  Collapsed the two open-related `useEffect`s into one, since the second one (which only
+  ever *animated* toward the final values) had nothing left to do.
+- **Left untouched, per explicit user confirmation:** the programmatic exit animation
+  (250ms slide-down when closed via a button/backdrop tap) and swipe-to-dismiss (live
+  finger-tracking during the drag, spring-back-or-fly-off on release) — both are the
+  gesture-driven kind of animation, not the automatic transition that was reported as
+  jumping.
+
+## Notes
+
+- All 10 `DraggableSheet` consumers get this for free (single shared component, no API
+  change) — `CategoryPickerSheet`, `CustomCategorySheet`, `WalletPickerSheet`,
+  `EditProfileSheet`, `SetLimitSheet`, and the sheet usages in `transactions/[id].tsx`,
+  `entry/photo-confirm.tsx`, `entry/manual.tsx`, `budgets/goals/index.tsx`,
+  `budgets/goals/[id].tsx`, `wallets/index.tsx`.
+- This reverses part of (not all of) the 2026-08-18 entry above titled "the withdraw-all
+  flow still lagged" / "give `DraggableSheet` a real spring slide-up entrance and timed
+  slide-down exit" — that work's *exit* animation and the underlying deferred-unmount
+  mechanism (the `mounted` state) are both still exactly as that entry left them; only the
+  entrance half is reverted.
