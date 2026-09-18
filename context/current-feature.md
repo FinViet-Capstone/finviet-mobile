@@ -2004,3 +2004,78 @@ layout/scroll engine under Jest); only the state-transition behavior is regressi
   `csv-review.test.tsx` exercises.
 - No change to default initial view, selection behavior, or the import flow — confirmed
   by the existing 258 tests still passing unchanged.
+
+---
+
+Fix: receipt image preview modal (`src/components/common/ImagePreviewModal.tsx`, same
+branch as above per user's explicit instruction to implement on it rather than cutting a
+new `fix/` branch). Reported with a screenshot: the close (X) button rendered overlapping
+the real OS status bar/battery icon and didn't respond to taps; user also asked for
+swipe-to-dismiss.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all three
+changed/new files 0 errors / 0 new warnings (14 total, all the same pre-tolerated
+`react-hooks/immutability`/`set-state-in-effect` class this codebase already tolerates for
+reanimated shared-value writes — 12 pre-existing in `DraggableSheet.tsx`, unchanged count,
+plus 2 of the same class newly introduced in `ImagePreviewModal.tsx`); `npx jest`
+**261/261 pass, 48/48 suites** (no new tests — matches the pre-existing convention of not
+unit-testing this gesture/reanimated class of component; `DraggableSheet.tsx` has none
+either). **Committed** on `feature/csv-review-parsed-categorized-toggle`. Not exercised on
+device — confirming the fix and the swipe feel on a real emulator/device is the user's to
+do.
+
+## Root cause
+
+RN's `Modal` (`presentationStyle="fullScreen"`) opens a *separate native window* on
+Android. `app/_layout.tsx` has exactly one root-level `SafeAreaProvider`, and its measured
+insets don't propagate into that separate window — a documented
+`react-native-safe-area-context` caveat. So the modal's `SafeAreaView` resolved a top inset
+of 0, and the header rendered flush at y=0, physically under/behind the real status bar —
+exactly matching the screenshot where the X overlapped the battery icon.
+
+## Goals
+
+- Nest a second `<SafeAreaProvider>` inside the modal's own content (the standard fix for
+  this library's Modal-on-Android caveat), so insets are measured against the modal's own
+  window instead of wrongly inherited from the app-root one.
+- Swipe-**down**-only dismiss (confirmed with the user across several rounds — not
+  swipe-left, not swipe-up, and deliberately not turning this into a `DraggableSheet`-style
+  bottom sheet: kept full-screen so a receipt photo keeps maximum screen space to zoom
+  into). Extends the existing `pan` gesture rather than adding a competing one: unzoomed, a
+  downward drag translates + fades the whole screen (header/image/hint together) 1:1 with
+  the finger, matching `DraggableSheet`'s existing feel (no minimum distance before it
+  starts tracking). Zoomed pan behavior (`scale.value > MIN_SCALE`) is untouched.
+- New `expand_more` chevron button, centered at the bottom near the hint text, also closes
+  on tap — kept **in addition to** the existing header X (three ways to close: X, chevron,
+  swipe — confirmed with the user this is wanted redundancy, not clutter).
+- `DISMISS_THRESHOLD`/`DISMISS_SPRING_CONFIG` extracted to new
+  `src/constants/gestures.ts`, shared by both `ImagePreviewModal.tsx` and
+  `DraggableSheet.tsx` (previously two verbatim-duplicated copies of the same constants) —
+  a `/code-review` finding fixed before committing, so the app's one swipe-to-dismiss feel
+  can't silently drift between the two components.
+
+## Notes
+
+- **A second `/code-review` finding, also fixed before committing:** the first draft played
+  a 200ms "slide off to 600" exit tween before calling `onClose()`. Both real call sites
+  (`app/(tabs)/entry/photo-confirm.tsx:944`, `app/(tabs)/transactions/[id].tsx:670`)
+  conditionally render the *entire* `<ImagePreviewModal>` off the same prop `onClose()`
+  flips (`{previewUri ? <ImagePreviewModal .../> : null}` and
+  `{showReceiptPreview && receiptImageUri ? <ImagePreviewModal .../> : null}`), so the
+  component unmounts the instant `onClose()` fires — the exit tween could never actually
+  paint a frame; it was dead weight, unlike `DraggableSheet`'s own exit animation, which
+  works because that component keeps itself mounted via local `mounted` state until its
+  animation's `finished` callback fires. Reproducing that same decoupled-mounted-state
+  trick onto a true native `Modal` plus two differently-shaped parent unmount patterns
+  wasn't worth the complexity for this fix, so the tween was simply removed — the live
+  drag-follows-finger feedback during the gesture itself (before release) is what actually
+  delivers the "swipe to dismiss" feel, and release just commits the close immediately,
+  matching how the X button and double-tap-to-reset already behave.
+- `dismissY` (the new shared value driving the swipe) resets to 0 in a `useEffect` keyed on
+  `visible` becoming true — needed because both parents keep the same component instance
+  mounted/toggle `visible` rather than remounting fresh, so without the reset a screen
+  dismissed by swipe would still read as translated/faded the next time it's opened.
+- Scope stayed confined to `ImagePreviewModal.tsx`, `DraggableSheet.tsx` (constant-sharing
+  only — no behavior change there), and the new `src/constants/gestures.ts`.
