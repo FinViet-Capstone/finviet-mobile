@@ -104,6 +104,10 @@ function lookupCode(code: string): string | undefined {
   return BUSINESS_RULE_MESSAGES_VI[code] ?? (code.startsWith('sepay_error_') ? SEPAY_GENERIC_ERROR_VI : undefined);
 }
 
+function formatSepayDiagnostic(code: string, message: string): string {
+  return `SePay Test Mode trả về lỗi.\nMã: ${code}\nChi tiết: ${message}`;
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (
     error instanceof Error
@@ -115,6 +119,16 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiErrorBody | undefined;
     const mapped = data?.code ? lookupCode(data.code) : undefined;
+    if (
+      mapped === SEPAY_GENERIC_ERROR_VI
+      && data?.code?.startsWith('sepay_')
+      && data.message?.trim()
+    ) {
+      // Generic SePay mappings used to hide the only actionable signal returned by the
+      // backend. Keep friendly wording while including the stable code and provider detail,
+      // which never contains the submitted API token.
+      return formatSepayDiagnostic(data.code, data.message.trim());
+    }
     if (mapped) return mapped;
     if (data?.message && data.message.trim()) return data.message;
     if (data?.errors) {

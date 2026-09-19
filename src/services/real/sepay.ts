@@ -21,6 +21,7 @@
  *  6. To re-sync later: POST /wallets/{id}/sepay-sync.
  */
 
+import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
 import type { Wallet, WalletType } from '@/types';
 
@@ -125,7 +126,7 @@ export interface SepayLinkStatus {
   walletId: string;
   walletName: string;
   balance: number;
-  /** "oauth" or "static". */
+  /** "oauth", "static", or "sandbox". */
   authMode: string;
   bankShortName?: string;
   accountMask?: string;
@@ -233,19 +234,31 @@ export async function linkSepayAccount(
   };
 }
 
-/**
- * Link a bank account using a personal SePay User API token (my.sepay.vn → API Access).
- * No OAuth flow — the backend validates the token, creates the wallet, and imports history.
- */
+export class SepaySandboxUnavailableError extends Error {
+  constructor() {
+    super('Máy chủ FinViet chưa được cập nhật để hỗ trợ SePay Test Mode. Vui lòng cập nhật backend rồi thử lại; không cần tạo lại token.');
+    this.name = 'SepaySandboxUnavailableError';
+  }
+}
+
+/** Link using a personal token, selecting an explicit Sandbox route for Test mode. */
 export async function linkSepayWithToken(
   apiToken: string,
   accountNumber?: string,
+  sandbox = false,
 ): Promise<SepayLinkResult> {
   const res = await api.post(
-    '/wallets/sepay/link-token',
-    { apiToken, accountNumber: accountNumber ?? null },
+    sandbox ? '/wallets/sepay/link-sandbox-token' : '/wallets/sepay/link-token',
+    { apiToken, accountNumber: accountNumber ?? null, sandbox },
     { timeout: 120_000 },
-  );
+  ).catch((error: unknown) => {
+    if (sandbox && isAxiosError(error)
+      && (error.response?.status === 404 || error.response?.status === 405)) {
+      // Never fall back to the production route: old servers ignore `sandbox`.
+      throw new SepaySandboxUnavailableError();
+    }
+    throw error;
+  });
   const dto = unwrap<SepayLinkResultDto>(res);
   return {
     wallets: dto.wallets.map(toWallet),

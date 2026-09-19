@@ -27,8 +27,15 @@ describe('getApiErrorMessage', () => {
     );
   });
 
-  it('maps the dynamic sepay_error_{status} catch-all to the generic SePay message', () => {
+  it('shows backend diagnostics for a dynamic SePay provider error', () => {
     const err = fakeAxiosError(502, { code: 'sepay_error_418', message: "SePay failed with HTTP 418." });
+    expect(getApiErrorMessage(err, 'fallback')).toBe(
+      'SePay Test Mode trả về lỗi.\nMã: sepay_error_418\nChi tiết: SePay failed with HTTP 418.',
+    );
+  });
+
+  it('keeps the generic SePay message when the backend has no diagnostic detail', () => {
+    const err = fakeAxiosError(502, { code: 'sepay_parse_error', message: '' });
     expect(getApiErrorMessage(err, 'fallback')).toBe('SePay đang gặp sự cố. Vui lòng thử lại sau.');
   });
 
