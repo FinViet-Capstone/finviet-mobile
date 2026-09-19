@@ -9,11 +9,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DISMISS_SPRING_CONFIG, DISMISS_THRESHOLD } from '@/constants/gestures';
 import { BORDER_RADIUS, SPACING } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
-
-const DISMISS_THRESHOLD = 120;
-const SPRING_CONFIG = { damping: 20, stiffness: 200 };
 
 interface Props {
   visible: boolean;
@@ -42,19 +40,11 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
 
   useEffect(() => {
     if (!visible) return;
-    // Start fully offscreen so the entrance springs up instead of the sheet
-    // appearing at its final position in the same frame it mounts (which
-    // read as a pop/freeze when opened right as a native Alert dismisses).
-    translateY.value = windowHeight;
-    backdropOpacity.value = 0;
+    // Entrance is instant — appears at its final position with no slide-up.
+    translateY.value = 0;
+    backdropOpacity.value = 1;
     setMounted(true);
-  }, [visible, windowHeight]);
-
-  useEffect(() => {
-    if (!visible || !mounted) return;
-    translateY.value = withSpring(0, SPRING_CONFIG);
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-  }, [visible, mounted]);
+  }, [visible]);
 
   useEffect(() => {
     if (visible || !mounted) return;
@@ -79,7 +69,7 @@ export function DraggableSheet({ visible, onClose, children }: Props) {
         backdropOpacity.value = withTiming(0, { duration: 200 });
         runOnJS(onClose)();
       } else {
-        translateY.value = withSpring(0, SPRING_CONFIG);
+        translateY.value = withSpring(0, DISMISS_SPRING_CONFIG);
         backdropOpacity.value = withTiming(1, { duration: 150 });
       }
     });

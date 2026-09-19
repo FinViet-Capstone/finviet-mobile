@@ -3,8 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
-import { getCategoryById } from '@/constants/categories';
-import { getCategoryIcon } from '@/constants/categoryIcons';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 
 export interface CategoryBadgeProps {
   /** Accepts string | null — null renders the same gray "Khác" fallback as an unknown ID */
@@ -14,7 +13,9 @@ export interface CategoryBadgeProps {
 export function CategoryBadge({ categoryId }: CategoryBadgeProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const category = categoryId ? getCategoryById(categoryId) : undefined;
+  // Resolved against the customer's real catalog, so a custom label shows its
+  // own name instead of the unknown-id "Khác" fallback.
+  const category = useCategoryCatalog().get(categoryId);
 
   if (!category) {
     return (
@@ -24,12 +25,11 @@ export function CategoryBadge({ categoryId }: CategoryBadgeProps) {
     );
   }
 
-  const iconName = getCategoryIcon(category.icon);
   const backgroundColor = withAlpha(category.color, 0.15); // ~15% opacity tint
 
   return (
     <View style={[styles.pill, { backgroundColor }]}>
-      <MaterialIcon name={iconName} size={12} color={category.color} />
+      <MaterialIcon name={category.iconName} size={12} color={category.color} />
       <Text style={[styles.label, { color: category.color }]} numberOfLines={1}>
         {category.nameVi}
       </Text>

@@ -29,7 +29,7 @@ import {
   withAlpha,
 } from "@/theme";
 import { useThemeColors, type ThemeColors } from "@/providers/ThemeProvider";
-import { CATEGORIES } from "@/constants/categories";
+import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
 import type { Category } from "@/constants/categories";
 import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -87,6 +87,7 @@ export default function ManualEntryScreen() {
   const router = useRouter();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const { data: walletData, isLoading } = useWallets();
+  const categoryCatalog = useCategoryCatalog();
   const createMutation = useCreateTransaction();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -129,7 +130,7 @@ export default function ManualEntryScreen() {
   const wallets: Wallet[] = basicWallets;
   const effectiveWalletId = selectedWalletId ?? wallets[0]?.id;
   const selectedCategory = selectedCategoryId
-    ? (CATEGORIES.find((c) => c.id === selectedCategoryId) ?? null)
+    ? (categoryCatalog.get(selectedCategoryId) ?? null)
     : null;
   const selectedWallet =
     wallets.find((w) => w.id === effectiveWalletId) ?? wallets[0];
@@ -137,6 +138,15 @@ export default function ManualEntryScreen() {
   const amountNum = parseInt(amountRaw.replace(/\D/g, "") || "0", 10);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
+
+  /**
+   * Cancel returns to the entry-method chooser rather than to whatever sits
+   * below on the stack — `router.back()` lands on Home when this screen was
+   * opened through the "+" tab, and on the Calendar when it was opened by a
+   * day double-tap. `dismissTo` pops back to the chooser when it is already
+   * below this screen, and replaces this screen with it when it is not.
+   */
+  const handleCancel = () => router.dismissTo("/(tabs)/entry");
 
   const handleAmountKey = (key: string) => {
     if (key === "del") {
@@ -212,7 +222,7 @@ export default function ManualEntryScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.topBarBtn}
-          onPress={() => router.back()}
+          onPress={handleCancel}
         >
           <Text style={styles.topBarCancel}>{S.cancel}</Text>
         </TouchableOpacity>

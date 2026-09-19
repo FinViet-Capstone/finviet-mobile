@@ -1,17 +1,17 @@
 /**
- * link-sepay-token.tsx — Link a bank account with a personal SePay User API token.
+ * link-sepay-token.tsx — Link SePay production or an isolated Sandbox demo account.
  *
- * For users who already have a SePay account connected to their bank and a personal
- * API token (my.sepay.vn → API Access / Cấu hình API). No OAuth flow needed:
+ * Accepts an API token from my.sepay.vn → API Access. Sandbox is enabled by default for
+ * project demonstrations and uses only SePay Test mode data. No OAuth flow is needed:
  *   1. User pastes their SePay API token.
- *   2. We send it to POST /wallets/sepay/link-token.
+ *   2. We send it to the dedicated Sandbox route or the production link-token route.
  *   3. Backend validates it, creates a sepay_linked wallet, and imports transactions.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,11 +23,15 @@ import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { API_BASE_URL } from '@/lib/env';
 import { getApiErrorMessage } from '@/utils/errors';
+import { SepaySandboxUnavailableError } from '@/services/real/sepay';
 
 const S = {
   title: 'Liên kết SePay',
   heading: 'Nhập API token SePay',
-  hint: 'Lấy token tại my.sepay.vn → Công ty → Cấu hình API (API Access). Token dùng để đồng bộ giao dịch từ tài khoản ngân hàng đã kết nối.',
+  sandboxLabel: 'Chế độ demo Sandbox',
+  sandboxDescription: 'Dùng tài khoản và giao dịch giả lập, không cần liên kết ngân hàng thật.',
+  sandboxHint: 'Tại my.sepay.vn, bật Test mode → API Access → sao chép đầy đủ token. Giữ chế độ demo Sandbox bên dưới bật khi liên kết.',
+  productionHint: 'Lấy token Production tại my.sepay.vn → Cấu hình Công ty → API Access. Token này truy cập dữ liệu ngân hàng thật đã liên kết.',
   noBackendError: 'Chưa cấu hình địa chỉ máy chủ (EXPO_PUBLIC_API_BASE_URL trống). Tính năng liên kết SePay cần một máy chủ .NET đang chạy.',
   tokenLabel: 'API Token',
   tokenPlaceholder: 'Dán token của bạn vào đây',
@@ -52,6 +56,7 @@ export default function LinkSepayTokenScreen() {
 
   const [token, setToken] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [sandbox, setSandbox] = useState(true);
   const [phase, setPhase] = useState<Phase>('input');
   const [errorMessage, setErrorMessage] = useState('');
   const [syncCount, setSyncCount] = useState(0);
@@ -71,7 +76,7 @@ export default function LinkSepayTokenScreen() {
     setPhase('linking');
 
     linkMutation.mutate(
-      { apiToken: trimmed, accountNumber: accountNumber.trim() || undefined },
+      { apiToken: trimmed, accountNumber: accountNumber.trim() || undefined, sandbox },
       {
         onSuccess: (result) => {
           setSyncCount(result.transactionsSynced);
@@ -80,12 +85,14 @@ export default function LinkSepayTokenScreen() {
         onError: (err: unknown) => {
           // The backend explains *why* in the error envelope's `message`; Axios's own
           // err.message is only "Request failed with status code 400".
-          setErrorMessage(getApiErrorMessage(err, S.linkError));
+          setErrorMessage(err instanceof SepaySandboxUnavailableError
+            ? err.message
+            : getApiErrorMessage(err, S.linkError));
           setPhase('error');
         },
       },
     );
-  }, [token, accountNumber, linkMutation]);
+  }, [token, accountNumber, sandbox, linkMutation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -114,7 +121,22 @@ export default function LinkSepayTokenScreen() {
                 <MaterialIcon name="account_balance" size={48} color={colors.primary} />
               </View>
               <Text style={styles.heading}>{S.heading}</Text>
-              <Text style={styles.hint}>{S.hint}</Text>
+              <Text style={styles.hint}>{sandbox ? S.sandboxHint : S.productionHint}</Text>
+
+              <View style={styles.sandboxRow}>
+                <View style={styles.sandboxCopy}>
+                  <Text style={styles.sandboxLabel}>{S.sandboxLabel}</Text>
+                  <Text style={styles.sandboxDescription}>{S.sandboxDescription}</Text>
+                </View>
+                <Switch
+                  value={sandbox}
+                  onValueChange={setSandbox}
+                  disabled={phase !== 'input'}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                  thumbColor={sandbox ? colors.primary : colors.outline}
+                  accessibilityLabel={S.sandboxLabel}
+                />
+              </View>
 
               <Text style={styles.fieldLabel}>{S.tokenLabel}</Text>
               <TextInput
@@ -160,7 +182,7 @@ export default function LinkSepayTokenScreen() {
               <MaterialIcon name="check_circle" size={64} color={colors.tertiary} />
               <Text style={styles.statusTitle}>{S.successTitle}</Text>
               <Text style={styles.statusSubtitle}>
-                Đã đồng bộ {syncCount} giao dịch từ ngân hàng của bạn.
+                Đã đồng bộ {syncCount} giao dịch {sandbox ? 'giả lập từ Sandbox' : 'từ ngân hàng của bạn'}.
               </Text>
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -207,6 +229,14 @@ function createStyles(colors: ThemeColors) {
     iconWrap: { alignItems: 'center', marginBottom: SPACING[2] },
     heading: { fontSize: FONT_SIZE.lg, fontWeight: FONT_WEIGHT.bold, color: colors.onSurface, textAlign: 'center' },
     hint: { fontSize: FONT_SIZE.sm, color: colors.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: SPACING[2] },
+    sandboxRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SPACING[3],
+      padding: SPACING[4], borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.surfaceContainer,
+    },
+    sandboxCopy: { flex: 1, gap: SPACING[1] },
+    sandboxLabel: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface },
+    sandboxDescription: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, lineHeight: 18 },
     fieldLabel: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SPACING[2] },
     primaryBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING[2],

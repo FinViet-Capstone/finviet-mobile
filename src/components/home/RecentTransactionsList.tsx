@@ -5,8 +5,7 @@ import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { formatVND } from '@/utils/formatters';
-import { getCategoryIcon } from '@/constants/categoryIcons';
-import { CATEGORIES } from '@/constants/categories';
+import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 import type { Transaction } from '@/types';
 
 export interface RecentTransactionsListProps {
@@ -28,6 +27,7 @@ function formatRelativeDate(dateStr: string): string {
 export function RecentTransactionsList({ transactions }: RecentTransactionsListProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const categoryCatalog = useCategoryCatalog();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
@@ -45,8 +45,8 @@ export function RecentTransactionsList({ transactions }: RecentTransactionsListP
 
       <View style={styles.list}>
         {transactions.slice(0, 5).map((tx) => {
-          const cat = CATEGORIES.find((c) => c.id === tx.categoryId);
-          const iconName = cat ? getCategoryIcon(cat.icon) : 'receipt';
+          const cat = categoryCatalog.get(tx.categoryId);
+          const iconName = cat?.iconName ?? 'receipt';
           const isIncome = tx.type === 'income';
           const amountColor = isIncome ? colors.tertiary : colors.onSurface;
           const iconBg = isIncome ? withAlpha(colors.tertiary, 0.1) : colors.surfaceContainerHigh;

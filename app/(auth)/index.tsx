@@ -369,10 +369,10 @@ export default function AuthScreen() {
             )}
 
             {/* ── Divider & Google Auth ───────────────────────────────── */}
-            {/* Google sign-in needs Firebase + a dev build, so it can't run
-                inside Expo Go — tapping it surfaces the backend's honest
-                "not available yet, use email/password" error instead of
-                pretending to work. */}
+            {/* Native module (see lib/googleAuth.ts): works in a dev/production
+                build, and reports itself as unconfigured inside Expo Go rather
+                than crashing. Both tabs hit the same endpoint — the backend
+                links or creates the account itself. */}
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>hoặc</Text>

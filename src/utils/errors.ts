@@ -29,6 +29,10 @@ const SEPAY_GENERIC_ERROR_VI = 'SePay đang gặp sự cố. Vui lòng thử l�
  * which was missing several of these). Verified 2026-08-10.
  */
 export const BUSINESS_RULE_MESSAGES_VI: Record<string, string> = {
+  vnpay_not_configured: 'Thanh toán VNPay chưa được cấu hình. Vui lòng thử lại sau.',
+  vnpay_request_failed: 'Không thể kết nối VNPay. Vui lòng kiểm tra lại giao dịch.',
+  already_subscribed: 'Bạn đã có gói đăng ký đang hoạt động.',
+  plan_discontinued: 'Gói này đã ngừng cung cấp. Vui lòng chọn gói khác.',
   // ─── Profile ────────────────────────────────────────────────────────────────
   allocation_locked_use_schedule_endpoint:
     'Không thể chỉnh sửa thu nhập và phân bổ ngân sách ở đây sau khi đã hoàn tất thiết lập ban đầu — hãy dùng chức năng lên lịch thay đổi thu nhập.',
@@ -100,6 +104,10 @@ function lookupCode(code: string): string | undefined {
   return BUSINESS_RULE_MESSAGES_VI[code] ?? (code.startsWith('sepay_error_') ? SEPAY_GENERIC_ERROR_VI : undefined);
 }
 
+function formatSepayDiagnostic(code: string, message: string): string {
+  return `SePay Test Mode trả về lỗi.\nMã: ${code}\nChi tiết: ${message}`;
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (
     error instanceof Error
@@ -111,6 +119,16 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiErrorBody | undefined;
     const mapped = data?.code ? lookupCode(data.code) : undefined;
+    if (
+      mapped === SEPAY_GENERIC_ERROR_VI
+      && data?.code?.startsWith('sepay_')
+      && data.message?.trim()
+    ) {
+      // Generic SePay mappings used to hide the only actionable signal returned by the
+      // backend. Keep friendly wording while including the stable code and provider detail,
+      // which never contains the submitted API token.
+      return formatSepayDiagnostic(data.code, data.message.trim());
+    }
     if (mapped) return mapped;
     if (data?.message && data.message.trim()) return data.message;
     if (data?.errors) {

@@ -1,5 +1,315 @@
 # Current Feature
 
+Feature: finish Google login (branch `feature/google-login`, mobile only). The button,
+the `useGoogleOAuth` hook and the `oauth_cancelled`/`oauth_failed` error copy have all
+existed since the mock era, but the service behind them
+([real/auth.ts:36](src/services/real/auth.ts#L36)) only threw "chưa khả dụng ở bản kết
+nối backend". The backend half was already complete.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all 8
+changed/new files 0 errors / 1 warning (the pre-existing `axios`-named-export one on an
+untouched line of `real/auth.ts`); `npx jest` **236/236 pass, 43/43 suites** (219 + 17
+new). **Not committed/pushed.**
+
+**Run on the Android emulator** (Medium_Phone_API_36.0, live backend), both ways:
+
+- **Expo Go**: the auth screen renders, the app boots to Home on an existing session, and
+  tapping "Đăng nhập với Google" surfaces the inline banner "Đăng nhập Google cần bản build
+  riêng của ứng dụng (không chạy được trong Expo Go)" — the graceful-degradation path. Two
+  defects this caught that no test would have are recorded under Notes.
+- **Native dev build** (`npx expo run:android`, `BUILD SUCCESSFUL`, installed as
+  `com.finviet.mobile`): the native module loads with no redbox, and tapping the button really
+  does hand off to Google Play Services (`com.google.android.gms/...MinuteMaidActivity` takes
+  focus — confirmed via `dumpsys window`). Backing out of it returns to the app with the
+  banner "Bạn đã huỷ đăng nhập với Google": the `oauth_cancelled` branch works on a real
+  device, the button leaves its loading state, and nothing hangs.
+
+**Google sign-in then completed end to end on the emulator** (user confirmed), against the
+live Render backend and a real Google account. Getting there took two more runs, each
+failing one step further down — both were config, neither was code:
+
+1. **DEVELOPER_ERROR**, rendered as "Cấu hình Google Sign-In chưa đúng (SHA-1 / package name)".
+   Confirmed the fingerprint gap, and the message pointed straight at it. Fixed by registering
+   the right SHA-1 (see item 1 below — the first one recorded here was wrong).
+2. **401 from `POST /auth/google-login`.** The mobile half was already correct by then: the
+   native picker returned a Google ID token, Firebase's `signInWithIdp` exchanged it for a
+   Firebase ID token (no exchange error logged), and the app posted it. The backend had no
+   Firebase Admin credentials. Fixed entirely in Render config — see item 2 below. **No
+   backend or mobile code change was needed for this**, which is worth remembering: the
+   instinct was to push and redeploy the mobile branch, and that would have changed nothing.
+
+`__DEV__`-only `console.warn` lines were added at the two failure points during this
+diagnosis and kept: the banner collapses five distinct causes into one sentence, so without
+them a backend rejection and a failed Firebase exchange are indistinguishable on a device.
+
+## Root cause / what was missing
+
+Nothing was broken; the token-acquisition layer simply didn't exist. `POST
+/api/auth/google-login` ([AuthController.cs:108](../../../newestbe/finviet-be/src/FinViet.Api/Controllers/AuthController.cs#L108))
+takes a **Firebase** ID token, verifies it with Firebase Admin, matches on `GoogleId`
+then falls back to email (so an existing password account is auto-linked on first Google
+sign-in, and an unknown one is created), and returns the same `AuthResponseDto` as
+`/auth/login`. The app had no way to produce that token.
+
+## Goals
+
+- New `src/lib/googleAuth.ts`: `@react-native-google-signin/google-signin` opens the
+  native picker, then Firebase's `accounts:signInWithIdp` REST endpoint trades Google's
+  ID token for the Firebase one. Every native outcome comes back as a typed `AuthError`.
+- `googleOAuth()` posts that token, stores the session through the same `setAuthTokens`
+  path as `login()`, and returns a `Customer` — so the screen's existing
+  `onSuccess → onboarding | home` routing needed no edit.
+- `logout()` also signs out of Google, so the next sign-in offers the account picker
+  instead of silently reusing the account that just left.
+- Two `EXPO_PUBLIC_*` vars (`GOOGLE_WEB_CLIENT_ID`, `FIREBASE_API_KEY`) in `env.ts`,
+  documented in `.env.example` and set in the (gitignored) `.env.local`.
+
+## Notes
+
+- **Why the REST exchange rather than `@react-native-firebase/auth`.** The native flow
+  returns a *Google* ID token; Firebase Admin only accepts a *Firebase* one. The full
+  Firebase SDK would convert it, but at the price of a committed/EAS-secret
+  `google-services.json`, the google-services gradle plugin and a heavier build — for
+  one HTTP call the SDK itself makes internally. `webClientId` is all Android needs.
+- **Two defects only the emulator could find.**
+  1. **A static import would have taken the whole app down in Expo Go.** The package
+     resolves its TurboModule with `getEnforcing` at *import* time, and the services
+     barrel pulls this file in transitively — so every screen, not just Google sign-in,
+     would have died on startup. Now loaded lazily, on first use.
+  2. **`try/catch` around that lazy `require` does not work, and looked like it did.**
+     Metro's dev-mode `guardedLoadModule` hands a throwing module factory to
+     `ErrorUtils.reportFatalError` — a full-screen redbox — and returns `undefined`, so
+     the `catch` never runs. The fix is to *not require it at all* unless
+     `TurboModuleRegistry.get('RNGoogleSignin')` says it is there; that probe lives in
+     its own `src/lib/nativeModuleAvailability.ts`, the one piece Jest cannot run
+     honestly, so every suite mocks a single boolean instead of React Native's core.
+     Locked by the first test in `googleAuth.test.ts`, which must stay first (the module
+     caches the package handle after one successful load).
+- **The actionable failures use code `unknown`, not `oauth_failed`.** `AuthErrorBanner`
+  renders the curated copy for a known code and only shows a custom message under
+  `unknown` — so as `oauth_failed` the Expo Go / Play Services / SHA-1 messages rendered
+  as the generic "Đăng nhập với Google không thành công. Hãy thử lại." (seen on device).
+  This is the same convention the previous stub used. Widening the banner instead would
+  have leaked raw backend English into the other auth flows, which pass the server's
+  message into `AuthError` through `toAuthError`.
+- **The auto-added Expo config plugin was removed from `app.json` on purpose.** Its
+  bare form (no options) takes the Firebase branch — `AndroidConfig.GoogleServices.*` —
+  which fails prebuild without `android.googleServicesFile`. The Android native module
+  autolinks and needs nothing from it. iOS will need the plugin's
+  `{ iosUrlScheme }` form once an iOS OAuth client exists; there is no iOS app in the
+  Firebase project today, so iOS Google sign-in cannot work yet either way.
+- **`mode` is now cosmetic.** "Đăng nhập" and "Đăng ký" send the identical request —
+  the backend decides between linking and creating. Kept in the signature so the tab
+  label still reads naturally.
+- **Android's DEVELOPER_ERROR (code `10`) gets its own message** instead of the generic
+  one. It is the first failure any new machine or new keystore hits, and the message
+  names the actual cause (SHA-1 / package name) rather than "thử lại".
+- A cancelled picker is `oauth_cancelled` and never reaches the network. Both the
+  modern `{ type: 'cancelled' }` response and the older thrown `SIGN_IN_CANCELLED` are
+  handled; a test locks each.
+- The native module is mocked globally in `jest.setup.js` — it has no JS fallback, so
+  any suite that transitively imports the auth service would fail on import otherwise.
+- `real/__tests__/auth.test.ts` now shares **one** `AxiosMockAdapter` for the file. A
+  second one created per `describe` silently detaches the first (found the hard way:
+  the pre-existing theme block's `afterAll(restore)` killed interception for the new
+  block below it).
+
+## Còn phải làm ngoài code (blocking on-device testing)
+
+1. **SHA-1 fingerprint — confirmed live, still the open blocker.** Signing in with a real
+   Google account on the dev build produced exactly the DEVELOPER_ERROR branch
+   ("Cấu hình Google Sign-In chưa đúng (SHA-1 / package name)"), which is the proof that
+   the fingerprint is not registered. Firebase currently has only
+   `de:e3:08:c1:ce:ea:d2:0f:bd:41:71:8b:d8:90:a7:04:10:09:4f:71` on `com.finviet.mobile`.
+
+   The fingerprint to add is **`5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`**,
+   read out of the installed APK itself with
+   `apksigner verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk`.
+
+   **Do not read it from `~/.android/debug.keystore`** — that is the trap this hit first.
+   `android/app/build.gradle` pins `signingConfigs.debug` to `storeFile file('debug.keystore')`,
+   i.e. **`android/app/debug.keystore`**, the one Expo prebuild put in the project; the
+   machine-wide keystore is never used. Because `android/` is gitignored wholesale, that file
+   is per-checkout, so **every developer's build has its own SHA-1** and each has to be added
+   to the same Firebase app (it accepts many). Read yours with
+   `keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android`.
+
+   The console's "SHA-1 + package name already in use" banner is worth resolving at the same
+   time — `com.finviet.app` is a second app in the same project.
+2. **Backend Firebase credentials on Render — confirmed to be the remaining blocker.**
+   With the SHA-1 added, a real Google account now completes the native flow *and* the
+   Firebase exchange, and dies one step later. Dev-log evidence from the emulator:
+
+   ```
+   WARN [googleOAuth] /auth/google-login failed 401
+        {"success":false,"message":"Invalid or expired Google ID token.", ...}
+   ```
+
+   No `[googleAuth] signInWithIdp failed` line accompanies it, which is the load-bearing
+   detail: **Firebase did mint an ID token**, so everything on the mobile side worked. That
+   401 is `GoogleLoginCommandHandler`'s `firebaseUser is null` branch, i.e.
+   `FirebaseAuthService.VerifyIdTokenAsync` returned null — and with a token minted seconds
+   earlier by the same project, "not configured" is the only plausible reason left.
+
+   The backend repo's `Dockerfile` never copies a service-account JSON and never sets
+   `GOOGLE_APPLICATION_CREDENTIALS`; there is no `render.yaml`; and `appsettings.json` is
+   gitignored there, so the deployed container almost certainly has no credentials at all
+   and `FirebaseAuthService` disables itself at construction.
+
+   **Fixed, and this is what did it** (backend/infra, not this repo, no code change): upload
+   the service account JSON as a **Render Secret File**, set **both**
+   `Firebase__ServiceAccountJsonPath=/etc/secrets/<filename>` and
+   `Firebase__ProjectId=finviet-c900f`, then **restart/redeploy the service** — env vars and
+   secret files are only read into `IConfiguration` at process start, and `FirebaseApp.Create`
+   runs once and caches statically, so setting them on a live service changes nothing until it
+   restarts. That restart is what the last three 401s were waiting on.
+
+   The ProjectId is not optional in practice: `FirebaseApp.Create` falls back to the literal
+   `"finviet"` when it is missing, which is the wrong project and fails verification just as
+   silently.
+3. ~~**Rebuild the dev client**~~ — done for this machine's emulator: `npx expo run:android`
+   succeeded (3m41s incremental) and `com.finviet.mobile` is installed on
+   Medium_Phone_API_36.0. Anyone else on the team still needs their own build; Expo Go will
+   never run this. Gradle autolinking picks the package up with no prebuild — the log shows
+   `:react-native-google-signin_google-signin:compileDebugKotlin`.
+4. **EAS builds need the two new env vars** (`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`,
+   `EXPO_PUBLIC_FIREBASE_API_KEY`) as EAS environment variables. They were deliberately
+   kept out of `eas.json`, which is committed, to respect this repo's "Firebase config
+   stays out of git" rule.
+
+---
+
+Fix: a customer's own category never appeared when creating a transaction (branch
+`fix/custom-categories-visible`, mobile only). Reported from the emulator with
+screenshots: “Thú cưng” is created successfully and shows in Settings → Quản lý danh
+mục, but the “Chọn danh mục” sheet on every entry flow lists only the built-in
+categories. The same screenshots show a second symptom — a row rendering its raw id,
+`cat_vehicle`, in the bucket editor.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all 24
+changed/new files 0 errors / 9 warnings — the exact same 9 that same file set produces at
+HEAD (verified by stashing and re-linting): the project-tolerated `react-hooks` v6 class
+plus the two long-standing `budgets/index.tsx` ones; `npx jest` **219/219 pass, 42/42
+suites** (201 + 18 new). **Not committed/pushed.**
+
+**Partly verified on the emulator.** Existing custom categories now appear in the picker
+and on the Budgets tab (confirmed with `Xe`). That pass also found a follow-up defect,
+fixed below: a *newly* created category still didn't show until the app was restarted.
+
+## Root cause
+
+[CategoryPickerSheet.tsx:66](src/components/categories/CategoryPickerSheet.tsx#L66) built
+its list from `getCategories(entryType)` — the hardcoded 19-item array in
+[constants/categories.ts:56](src/constants/categories.ts#L56). Custom categories exist only
+on the backend, so no compile-time array can contain them. Creation, ownership and the
+bucket editor were all working; the picker was simply reading a different list.
+
+Privacy is already correct **server-side** and needed no change: `CategoryService.IsVisibleTo`
+(finviet-be) makes a `custom_*` category visible only to a customer holding an active
+`customer_categories` row for it, so `GET /categories?type=expense` returns the system
+catalog plus *only that customer's own* custom rows — with real `nameVi`/`color`/`icon`.
+[real/categories.ts:38-49](src/services/real/categories.ts#L38-L49) was discarding all three.
+
+`cat_vehicle` is the same cause from the other direction: it is in the deployed database but
+in neither the FE constant nor the backend's own seed migration
+(`V0002__baseline_reference_data.sql` lists 18 `cat_*` ids), so an admin added it later.
+Anything an admin adds from now on would have rendered the same way.
+
+## Goals
+
+- New `src/lib/categoryCatalog.ts`: `GET /categories` is the catalog; the compiled constant
+  supplies *visuals* for the ids it recognises. A known id keeps its existing FE
+  name/colour/icon (so nothing shifts appearance); an unknown one — custom or admin-added —
+  falls back to what the backend sent. `useCategoryCatalog()` wraps the existing
+  `useCustomerCategories()` query, so this adds no request.
+- `CustomerCategory` carries `nameVi`/`color`/`icon` through from the DTO instead of dropping
+  them.
+- Every screen that resolved a category through the constant now goes through the catalog:
+  the picker, `CategoryBadge`, `TransactionCard`, Home's recent list, the Budgets tab and its
+  category detail, transaction detail (including the split editor), all four entry flows, the
+  CSV review rows, and CSV data export.
+- `app/settings/categories.tsx` falls back to the backend's name before the raw id, which is
+  what fixes `cat_vehicle`.
+- **Follow-up from the emulator pass:** every custom-category write now invalidates *both*
+  category caches. `GET /categories?type=expense` backs two query keys —
+  `queryKeys.customCategories` (the `custom_`-filtered view the bucket editor reads) and
+  `queryKeys.customerCategories` (the whole catalog the new resolver reads) — and
+  create/delete/bucket-move only ever invalidated the first. Before this change the catalog
+  kept its `STALE_TIME.medium` copy, so a category created seconds ago appeared in the bucket
+  editor and nowhere else. A shared `useInvalidateCategoryQueries()` in
+  `src/hooks/useCustomCategories.ts` now covers all four mutations, with three tests in
+  `src/hooks/__tests__/useCustomCategories.test.tsx` asserting both keys are hit.
+
+## Notes
+
+- **`get()` deliberately resolves more than `list` contains.** The catalog query is
+  expense-only, so a badge on an *income* transaction would have started rendering “Khác” had
+  `get()` been limited to the pickable list. It falls back to the system constant for income,
+  `cat_savings_goal`, `cat_uncategorized`, and for every id before the query resolves —
+  otherwise already-rendered rows flash the unknown-id fallback on a cold start. Locked by two
+  tests.
+- **The constant wins over the backend for a known id.** The two disagree on colour (the seed
+  has `cat_food` at `#4EDEA3`, the FE at `#F97316`). Taking the backend's values would have
+  recoloured the whole app as a side effect of a bug fix.
+- **The catalog is memoized on the query array's identity** (a `WeakMap`), not per component,
+  because `TransactionCard` resolves a category per row and a month's list is long.
+- `getTransactionCardVisuals` takes the resolved category as a parameter instead of looking it
+  up, so it stays pure and directly unit-testable — the same reason its branching was pulled
+  out of the component in the first place.
+- **`CategoryRow`'s `icon` prop changed meaning** (Lucide slug → resolved Material Symbol
+  name), so its second mapping through `getCategoryIcon` had to go with it. A custom category
+  has no Lucide slug to map from.
+- **Left alone on purpose:** `lib/categoryVisual.ts` / `useCategoryVisual` / `CategoryIcon`,
+  which already handle custom categories and are used only by the bucket editor; and
+  `real/budgets.ts`'s `toBudget`, which already falls back to the backend's `categoryName`.
+- Income is unaffected end to end — custom categories are expense-only on both sides
+  (`createCustomCategory` hardcodes `type: 'expense'`, and the backend stores them that way).
+
+---
+
+Fix: “Hủy” on the manual-entry screen returned to Home instead of the entry-method
+chooser (branch `fix/entry-cancel-back-to-chooser`, mobile only). Reported from the
+emulator: opening “+” → Nhập Thủ Công and then tapping Hủy dropped the customer on the
+Home tab, so getting back to the four entry methods meant tapping “+” again.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed
+file 0 errors (2 pre-existing tolerated `set-state-in-effect` warnings on untouched lines);
+`npx jest` 201/201 pass, 39/39 suites. **Not committed/pushed.** Not re-checked on device.
+
+## Root cause
+
+The cancel button called `router.back()`
+([manual.tsx:224](app/(tabs)/entry/manual.tsx#L224)), which is history-based: it returns to
+whatever sits below this screen rather than to a known destination. Reaching the screen via
+the “+” tab leaves the Home tab as that predecessor, so Hủy exits the entry flow entirely.
+The Calendar day double-tap ([transactions/index.tsx:154](app/(tabs)/transactions/index.tsx#L154))
+is a second entrance with the same shape.
+
+## Goals
+
+- `handleCancel` uses `router.dismissTo("/(tabs)/entry")` instead of `router.back()`. React
+  Navigation’s `POP_TO` pops back to the chooser when it is already below this screen, and
+  replaces this screen with it when it is not — so both entrances land on the four-method
+  chooser and neither leaves the manual screen stranded in the stack.
+
+## Notes
+
+- Scoped to the Hủy button only. The success alert still uses `router.back()`: after a save
+  the customer is done with the entry flow, and returning them to the chooser would invite a
+  second entry rather than showing the transaction they just made.
+- The SMS and photo review screens hand off to this screen with `router.replace`
+  ([sms.tsx:175](app/(tabs)/entry/sms.tsx#L175), [photo-confirm.tsx:570](app/(tabs)/entry/photo-confirm.tsx#L570)),
+  so their own frames are already gone by then — Hủy pops straight to the chooser for those
+  paths too, which is the same destination they started from.
+
+---
+
 Fix: duplicate React keys logged on every render of `Quản lý danh mục` (branch
 `claude/categorybucketcard-render-error-2cca47`, mobile only). Opening Settings → Quản lý danh
 mục logged a repeated React error pointing at `CategoryBucketCard.tsx:206` — the `<View
@@ -1498,3 +1808,316 @@ this entry was written. Not merged/deployed yet.
   client was already sending correctly.
 - No physical-device verification in this environment; confirming the on-device
   suggest-button/settings-link flow and a real CSV re-import is the user's to do.
+
+---
+
+Feature: CSV import Parsed ↔ Categorized preview toggle (branch
+`feature/csv-review-parsed-categorized-toggle`, mobile only, ticket #1 of 2 —
+`finviet-mobile` [#84](https://github.com/FinViet-Capstone/finviet-mobile/issues/84)).
+User asked for a way to see & compare a CSV row's raw parsed result against its
+AI-categorized result on the review screen. A `/grilling` session first established what
+"raw vs categorized" could actually mean given the real data: there is no separately
+retained original/pre-cleanup text anywhere in the pipeline — `merchant`/`description`
+are set once at extraction and never touched again — so the only field with a genuine
+before/after is `categoryId` (null right after extraction → AI/rule-assigned after
+categorization runs). Scoped down to exactly that, broken into two GitHub issues; this is
+the first (per-row toggle only — the global sticky "flip all rows" toggle is issue #85,
+blocked by this one).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on the changed
+file reports 0 errors (2 pre-existing tolerated `set-state-in-effect` warnings on
+untouched lines, unchanged from HEAD); `npx jest` **255/255 pass, 46/46 suites** (no
+regressions; no new test file, matching this file's existing untested-screen precedent —
+the added logic is a single-key state map with no branching worth its own pure-function
+extraction). **Not committed/pushed.** Not exercised on device.
+
+## Goals
+
+- `PreviewRow` in `app/(tabs)/entry/csv-review.tsx` gained a two-way segmented control
+  ("Đã phân loại" / "Trước phân loại") that flips one card between its Categorized view
+  (today's behavior, unchanged: real category, tap-to-edit, plus a new AI/Quy tắc source
+  badge when `categorySource` is `'ai'`/`'client_rule'`) and a new Parsed view (plain
+  `Chưa phân loại`, no badge, **not tappable** — a fixed read-only snapshot).
+- Screen-level `rowViews: Record<string, RowView>` state (absent entry = default
+  `'categorized'`), with a `handleSetRowView(id, view)` setter designed be reused
+  as-is by #85's global toggle — selecting a view is idempotent (`onSelect(view)`, not a
+  blind flip), so a future "set every row to X" action can call the same setter per row
+  without needing per-row toggle state semantics of its own.
+- No backend change; no new editing surface (Parsed view has no chevron/tap target at
+  all, distinct from Categorized's existing tap-to-edit).
+
+## Notes
+
+- Merchant/description/amount/date are identical in both views by construction — only
+  the category line's rendering branches on `view`. This was confirmed by research before
+  implementing (grep across `types/extraction.ts`, `real/extraction.ts`,
+  `csv-review.tsx`): no `rawLine`/original-note field exists anywhere the FE can reach.
+- The AI/rule source badge is net-new UI — `categorySource` already existed on `ParsedRow`
+  and was already sent to the backend on import (`aiSource`/`aiConfidence`), but was never
+  rendered anywhere before this change.
+- Global toggle, its sticky-header placement, and its "always overrides individual
+  per-row state" behavior are explicitly out of scope here — see #85.
+
+---
+
+Fix: csv-review.tsx's back/cancel buttons didn't return to the entry-method chooser
+(same branch, continuing on `feature/csv-review-parsed-categorized-toggle`). User tested
+the CSV background-extraction notify-when-done flow (letting extraction run while
+exploring elsewhere in the app, then tapping the resulting notification) and reported:
+after tapping the notification, the screen was still loading, then went to its error
+state ("Không đọc được file CSV") — and from there, neither the "+" tab nor the header
+back icon returned to the 4-method entry chooser.
+
+## Root cause
+
+Diagnosed with `/diagnosing-bugs`, using a throwaway `expo-router/testing-library`
+harness (real `app/(tabs)/_layout.tsx` + `entry/_layout.tsx`, stubbed leaf screens) to
+get a deterministic, sub-second feedback loop before touching any code — this refuted
+the first, more exotic theory (that the notification's `router.navigate` call creates a
+duplicate/stale csv-review instance) and instead pinned down two separate, real
+navigation defects:
+
+1. **`router.back()` only pops one level.** csv-review.tsx's header back arrow, its
+   error-state "Quay lại" button, and its bottom-bar "Huỷ" button all called plain
+   `router.back()`. When reached the normal way (push chain `index → csv-import →
+   csv-review` still intact — confirmed via the harness this is the actual case for the
+   in-app ephemeral-banner notify path; `router.navigate` correctly reuses the existing
+   mounted screen, no duplicate, no remount), one `back()` only reaches `csv-import` (the
+   file picker), not the chooser.
+2. **`router.back()` exits the entry tab entirely when the stack is shorter.** If
+   csv-review is reached via a cold-start deep link (app suspended/killed while extraction
+   ran in the background, so the OS notification tap relaunches straight into csv-review
+   with no `index`/`csv-import` beneath it in its own stack — plausible after enough
+   background time), `router.back()` doesn't error; it falls through to the tabs
+   navigator's own back-history and **lands on Home**.
+
+Separately confirmed (via the same harness, reading `@react-navigation/bottom-tabs`
+source): pressing the "+" tab while already viewing any entry sub-screen is a **no-op**
+by design — `BottomTabBar.tsx`'s `onPress` only dispatches a navigate action
+`if (!focused && ...)`. This is general, pre-existing behavior across the whole entry
+flow (manual/sms/photo/csv alike), not something introduced by or specific to this CSV
+work — left unfixed here per explicit scope discussion with the user.
+
+This is the exact same defect class `fix/entry-cancel-back-to-chooser` (2026-08-xx,
+documented above) already fixed once for `manual.tsx`'s Hủy button, just never
+propagated to csv-review.tsx (which didn't exist yet at the time) — or, it turns out, to
+`csv-import.tsx`, `photo.tsx`, or `sms.tsx`'s own header back buttons, all of which still
+call plain `router.back()` too (grepped, not fixed — flagged as a latent follow-up, out
+of the scope the user asked for).
+
+## Fix
+
+All three "leave this flow" buttons in csv-review.tsx (header back arrow, error-state
+"Quay lại", bottom-bar "Huỷ") now share one `handleExitFlow = () =>
+router.dismissTo('/(tabs)/entry')` — same primitive `manual.tsx` already uses. `dismissTo`
+pops back to the chooser when it's already below this screen, and replaces this screen
+with it when it isn't, so it self-heals for both stack shapes above with no branching.
+The success/partial-success `router.back()` calls are unchanged, matching the existing
+`manual.tsx` precedent (finishing the flow should show what was just imported, not
+short-circuit to the chooser).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines of `csv-review.tsx`); `npx jest`
+**258/258 pass, 47/47 suites** (255 + 3 new). **Not committed/pushed.** Not exercised on
+device (no device access in this environment) — the notify-when-done round trip itself
+(extraction succeeding/failing while backgrounded) still needs a real on-device pass;
+this fix only addresses the navigation dead-end once the screen is in an error/idle
+state, which is reproducible and now regression-tested independent of a real backend.
+
+## Notes
+
+- Regression tests (`app/(tabs)/entry/__tests__/csv-review.test.tsx`) render the **real**
+  `csv-review.tsx` (hooks mocked: `useWallets`, `useTransactions`,
+  `useCreateTransaction`, `useRules`, `useExtractFromCsv`, `useCategoryCatalog`,
+  `CategoryPickerSheet`, notification/banner stores) via `expo-router/testing-library`'s
+  `renderRouter` with `{ appDir: 'app', overrides }`, using the real `(tabs)/_layout.tsx`
+  and `entry/_layout.tsx` — not a hand-rolled stub of the navigation shape — so the tests
+  exercise the actual bug pattern at its real call site. Confirmed red-then-green: ran the
+  three tests against the pre-fix code (`git stash` on just this file) and watched all
+  three fail with the exact reported symptoms (`/entry/csv-import` and `/home` instead of
+  `/entry`) before restoring the fix.
+- `useExtractFromCsv` is mocked to reject, driving the screen into its real error state —
+  the same state the user's screenshot showed — rather than asserting against a
+  hand-wired "already in error" prop, since csv-review.tsx has no such prop; status is
+  derived entirely from the extraction call's own outcome.
+- Did not investigate *why* the user's real extraction attempt failed in the first place
+  (the "Không thể phân tích file" message) — no loop was available for that without a real
+  device/network trace of a backgrounded request; could be a genuine transient failure
+  (network deprioritized while backgrounded) rather than a bug. Flagged to the user as a
+  separate, unconfirmed question.
+
+---
+
+Feature: CSV import global sticky Parsed ↔ Categorized toggle (same branch, ticket #2 of
+2 — `finviet-mobile`
+[#85](https://github.com/FinViet-Capstone/finviet-mobile/issues/85), blocked by #84
+above and now implemented on top of it).
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on both
+changed/new files 0 errors / 0 new warnings (same 2 pre-existing tolerated
+`set-state-in-effect` warnings on untouched lines); `npx jest` **261/261 pass, 48/48
+suites** (258 + 3 new). **Not committed/pushed.** Not exercised on device — in
+particular, `stickyHeaderIndices` visual pinning itself isn't verifiable via RTL (no real
+layout/scroll engine under Jest); only the state-transition behavior is regression-tested.
+
+## Goals
+
+- The screen's `ScrollView` now passes `stickyHeaderIndices={[1]}`, with its direct
+  children split into: wallet section (0), a new `stickySummary` block (1 — selection
+  count, "Bỏ chọn tất cả", and the new global toggle, given its own opaque
+  `colors.background` so pinned content doesn't show the row list scrolling underneath
+  it), then the row list (2). No new dependency — built entirely on React Native's own
+  `ScrollView` sticky-header support.
+- The global toggle **reuses the exact `ViewToggle` component #84 built for per-row use**
+  (confirmed reusable exactly as designed at the time — see that entry's note on
+  `handleSetRowView`'s idempotent-`onSelect` shape), just wired to a new
+  `handleSetAllRowViews(view)` that overwrites every row's entry in `rowViews` at once.
+  A separate `globalView` state tracks only which segment the global control itself last
+  showed active — not whether every row still agrees, since a row flipped individually
+  afterward is expected to diverge from it (per #85's acceptance criteria).
+- `handleSetAllRowViews` always overwrites, including rows already flipped individually —
+  a plain "set all" master switch, per the ticket's explicit "global always wins" design
+  call (no per-row override protection).
+
+## Notes
+
+- `ViewToggle` gained an optional `testID` prop (defaulting to `undefined`, so it renders
+  no testID when omitted) purely so tests can address the global instance
+  (`global-view-toggle-*`) separately from each row's own
+  (`row-view-toggle-${row.id}-*`) — all instances otherwise share identical
+  accessibility labels ("Đã phân loại"/"Trước phân loại"), which is correct for screen
+  readers but made them ambiguous to `getByLabelText` once more than one exists on
+  screen.
+- New `app/(tabs)/entry/__tests__/csv-review.globalToggle.test.tsx` (3 tests): global
+  toggle sets every row's view at once; global toggle overwrites a row already flipped by
+  hand; a row can still be flipped individually again after the global toggle was used.
+  Same `renderRouter`/real-screen-with-mocked-hooks pattern as #84's fix — this time
+  `useExtractFromCsv` resolves with two real rows (one AI-categorized, one not) instead
+  of rejecting, since these tests need the `ready` state's row list, not the error state
+  `csv-review.test.tsx` exercises.
+- No change to default initial view, selection behavior, or the import flow — confirmed
+  by the existing 258 tests still passing unchanged.
+
+---
+
+Fix: receipt image preview modal (`src/components/common/ImagePreviewModal.tsx`, same
+branch as above per user's explicit instruction to implement on it rather than cutting a
+new `fix/` branch). Reported with a screenshot: the close (X) button rendered overlapping
+the real OS status bar/battery icon and didn't respond to taps; user also asked for
+swipe-to-dismiss.
+
+## Status
+
+Implemented and locally verified: `npm run type-check` clean; `npx eslint` on all three
+changed/new files 0 errors / 0 new warnings (14 total, all the same pre-tolerated
+`react-hooks/immutability`/`set-state-in-effect` class this codebase already tolerates for
+reanimated shared-value writes — 12 pre-existing in `DraggableSheet.tsx`, unchanged count,
+plus 2 of the same class newly introduced in `ImagePreviewModal.tsx`); `npx jest`
+**261/261 pass, 48/48 suites** (no new tests — matches the pre-existing convention of not
+unit-testing this gesture/reanimated class of component; `DraggableSheet.tsx` has none
+either). **Committed** on `feature/csv-review-parsed-categorized-toggle`. Not exercised on
+device — confirming the fix and the swipe feel on a real emulator/device is the user's to
+do.
+
+## Root cause
+
+RN's `Modal` (`presentationStyle="fullScreen"`) opens a *separate native window* on
+Android. `app/_layout.tsx` has exactly one root-level `SafeAreaProvider`, and its measured
+insets don't propagate into that separate window — a documented
+`react-native-safe-area-context` caveat. So the modal's `SafeAreaView` resolved a top inset
+of 0, and the header rendered flush at y=0, physically under/behind the real status bar —
+exactly matching the screenshot where the X overlapped the battery icon.
+
+## Goals
+
+- Nest a second `<SafeAreaProvider>` inside the modal's own content (the standard fix for
+  this library's Modal-on-Android caveat), so insets are measured against the modal's own
+  window instead of wrongly inherited from the app-root one.
+- Swipe-**down**-only dismiss (confirmed with the user across several rounds — not
+  swipe-left, not swipe-up, and deliberately not turning this into a `DraggableSheet`-style
+  bottom sheet: kept full-screen so a receipt photo keeps maximum screen space to zoom
+  into). Extends the existing `pan` gesture rather than adding a competing one: unzoomed, a
+  downward drag translates + fades the whole screen (header/image/hint together) 1:1 with
+  the finger, matching `DraggableSheet`'s existing feel (no minimum distance before it
+  starts tracking). Zoomed pan behavior (`scale.value > MIN_SCALE`) is untouched.
+- New `expand_more` chevron button, centered at the bottom near the hint text, also closes
+  on tap — kept **in addition to** the existing header X (three ways to close: X, chevron,
+  swipe — confirmed with the user this is wanted redundancy, not clutter).
+- `DISMISS_THRESHOLD`/`DISMISS_SPRING_CONFIG` extracted to new
+  `src/constants/gestures.ts`, shared by both `ImagePreviewModal.tsx` and
+  `DraggableSheet.tsx` (previously two verbatim-duplicated copies of the same constants) —
+  a `/code-review` finding fixed before committing, so the app's one swipe-to-dismiss feel
+  can't silently drift between the two components.
+
+## Notes
+
+- **A second `/code-review` finding, also fixed before committing:** the first draft played
+  a 200ms "slide off to 600" exit tween before calling `onClose()`. Both real call sites
+  (`app/(tabs)/entry/photo-confirm.tsx:944`, `app/(tabs)/transactions/[id].tsx:670`)
+  conditionally render the *entire* `<ImagePreviewModal>` off the same prop `onClose()`
+  flips (`{previewUri ? <ImagePreviewModal .../> : null}` and
+  `{showReceiptPreview && receiptImageUri ? <ImagePreviewModal .../> : null}`), so the
+  component unmounts the instant `onClose()` fires — the exit tween could never actually
+  paint a frame; it was dead weight, unlike `DraggableSheet`'s own exit animation, which
+  works because that component keeps itself mounted via local `mounted` state until its
+  animation's `finished` callback fires. Reproducing that same decoupled-mounted-state
+  trick onto a true native `Modal` plus two differently-shaped parent unmount patterns
+  wasn't worth the complexity for this fix, so the tween was simply removed — the live
+  drag-follows-finger feedback during the gesture itself (before release) is what actually
+  delivers the "swipe to dismiss" feel, and release just commits the close immediately,
+  matching how the X button and double-tap-to-reset already behave.
+- `dismissY` (the new shared value driving the swipe) resets to 0 in a `useEffect` keyed on
+  `visible` becoming true — needed because both parents keep the same component instance
+  mounted/toggle `visible` rather than remounting fresh, so without the reset a screen
+  dismissed by swipe would still read as translated/faded the next time it's opened.
+- Scope stayed confined to `ImagePreviewModal.tsx`, `DraggableSheet.tsx` (constant-sharing
+  only — no behavior change there), and the new `src/constants/gestures.ts`.
+
+---
+
+Fix: `DraggableSheet`'s spring-up entrance animation (same branch, same session). User
+reported a "jumping" feel on open. Confirmed scope with the user across three options
+(entrance only / exit only / everything including swipe-release) before touching code —
+**entrance only**.
+
+## Status
+
+Implemented and verified: `npm run type-check` clean; `npx eslint` on the changed file 0
+errors / 9 warnings (down from 12 — one whole effect removed; the remaining 9 are the same
+pre-tolerated `react-hooks/immutability`/`exhaustive-deps`/`set-state-in-effect` classes
+this file already had); `npx jest` 261/261 pass, 48/48 suites (no test file for this
+component, matching its pre-existing convention). Committed on
+`feature/csv-review-parsed-categorized-toggle`.
+
+## Goals
+
+- On open, `translateY`/`backdropOpacity` are now set directly to their final values (0 /
+  1) instead of starting off-screen/transparent and springing in via `withSpring`/
+  `withTiming` — the sheet now appears at its final position immediately, no slide-up.
+  Collapsed the two open-related `useEffect`s into one, since the second one (which only
+  ever *animated* toward the final values) had nothing left to do.
+- **Left untouched, per explicit user confirmation:** the programmatic exit animation
+  (250ms slide-down when closed via a button/backdrop tap) and swipe-to-dismiss (live
+  finger-tracking during the drag, spring-back-or-fly-off on release) — both are the
+  gesture-driven kind of animation, not the automatic transition that was reported as
+  jumping.
+
+## Notes
+
+- All 10 `DraggableSheet` consumers get this for free (single shared component, no API
+  change) — `CategoryPickerSheet`, `CustomCategorySheet`, `WalletPickerSheet`,
+  `EditProfileSheet`, `SetLimitSheet`, and the sheet usages in `transactions/[id].tsx`,
+  `entry/photo-confirm.tsx`, `entry/manual.tsx`, `budgets/goals/index.tsx`,
+  `budgets/goals/[id].tsx`, `wallets/index.tsx`.
+- This reverses part of (not all of) the 2026-08-18 entry above titled "the withdraw-all
+  flow still lagged" / "give `DraggableSheet` a real spring slide-up entrance and timed
+  slide-down exit" — that work's *exit* animation and the underlying deferred-unmount
+  mechanism (the `mounted` state) are both still exactly as that entry left them; only the
+  entrance half is reverted.

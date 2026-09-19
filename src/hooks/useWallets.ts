@@ -133,8 +133,10 @@ export const useLinkSepayAccount = () => {
 export const useLinkSepayWithToken = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ apiToken, accountNumber }: { apiToken: string; accountNumber?: string }) =>
-      linkSepayWithToken(apiToken, accountNumber),
+    mutationFn: (
+      { apiToken, accountNumber, sandbox }:
+      { apiToken: string; accountNumber?: string; sandbox?: boolean },
+    ) => linkSepayWithToken(apiToken, accountNumber, sandbox),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallets.all() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions.all() });
