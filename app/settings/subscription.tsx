@@ -115,19 +115,19 @@ function CustomerSubscription({ customerId }: { customerId: string }) {
       <Text style={styles.headerTitle}>Gói đăng ký</Text>
     </View>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.hero}><MaterialIcon name="workspace_premium" size={42} color={colors.primary} /><Text style={styles.title}>FinViet Premium</Text><Text style={styles.description}>Chọn gói phù hợp với bạn.{"\n"}Thanh toán an toàn bằng VNPay QR.</Text></View>
+      <View style={styles.hero}><MaterialIcon name="workspace_premium" size={42} color={colors.primary} /><Text style={styles.title}>FinViet Premium</Text><Text style={styles.description}>Chọn gói phù hợp với bạn.{"\n"}Thanh toán an toàn qua VNPay.</Text></View>
       {current.data && <View style={styles.card}><Text style={styles.cardTitle}>{current.data.planName}</Text><Text style={styles.body}>{current.data.status === 'active' ? 'Gói đang hoạt động' : 'Đang chờ xử lý gia hạn'} · {money(current.data.lockedPrice)}</Text>{current.data.nextBillingDate && <Text style={styles.body}>Kỳ thanh toán tiếp theo: {new Date(`${current.data.nextBillingDate}T00:00:00`).toLocaleDateString('vi-VN')}</Text>}</View>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       {(plans.isError || current.isError || stored.isError) && <View style={styles.card}><Text style={styles.error}>Không thể tải thông tin gói hoặc giao dịch.</Text><TouchableOpacity style={styles.secondary} onPress={() => { void plans.refetch(); void current.refetch(); void stored.refetch(); }}><Text style={styles.secondaryText}>Thử lại</Text></TouchableOpacity></View>}
       {attempt && !checkout && <View style={styles.card}><Text style={styles.cardTitle}>Giao dịch chưa được xác nhận</Text><Text style={styles.body}>Nếu kết nối bị gián đoạn, hãy tiếp tục cùng giao dịch để tránh tạo thanh toán trùng.</Text><TouchableOpacity style={styles.primary} disabled={busy} onPress={() => purchase(attempt.planId)}><Text style={styles.primaryText}>{busy ? 'Đang xử lý…' : 'Tiếp tục giao dịch'}</Text></TouchableOpacity></View>}
       {checkout && <View style={styles.card} accessibilityLiveRegion="polite">
-        <MaterialIcon name={status === 'succeeded' ? 'check_circle' : 'qr_code_2'} size={38} color={colors.primary} />
-        <Text style={styles.cardTitle}>{status === 'succeeded' ? 'Thanh toán thành công' : status === 'failed' || status === 'canceled' ? 'Thanh toán chưa thành công' : 'Thanh toán VNPay QR'}</Text>
+        <MaterialIcon name={status === 'succeeded' ? 'check_circle' : 'payments'} size={38} color={colors.primary} />
+        <Text style={styles.cardTitle}>{status === 'succeeded' ? 'Thanh toán thành công' : status === 'failed' || status === 'canceled' ? 'Thanh toán chưa thành công' : 'Thanh toán qua VNPay'}</Text>
         <Text style={styles.price}>{money(checkout.amount)}</Text>
         {status === 'succeeded' ? <Text style={styles.body}>Gói đăng ký đã được kích hoạt.</Text> : status === 'failed' || status === 'canceled' ? <><Text style={styles.body}>Giao dịch đã được xác nhận {status === 'canceled' ? 'hủy' : 'không thành công'}. Bạn có thể chọn lại gói.</Text><TouchableOpacity style={styles.secondary} onPress={clearAttempt}><Text style={styles.secondaryText}>Chọn lại gói</Text></TouchableOpacity></> : <>
           <Text style={styles.body}>{expired ? 'Liên kết đã hết hạn. Nếu đã thanh toán, hãy kiểm tra kết quả trước khi tạo giao dịch khác.' : `Còn ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} để thanh toán.`}</Text>
-          {!expired && <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={openPayment}><Text style={styles.primaryText}>Mở mã QR trên VNPay</Text></TouchableOpacity>}
-          <Text style={styles.body}>Trang VNPay sẽ hiển thị mã QR. Dùng ứng dụng ngân hàng trên thiết bị khác để quét, hoặc làm theo hướng dẫn thanh toán trên VNPay. Sau đó quay lại FinViet.</Text>
+          {!expired && <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={openPayment}><Text style={styles.primaryText}>Mở trang thanh toán VNPay</Text></TouchableOpacity>}
+          <Text style={styles.body}>Trang VNPay sẽ cho bạn chọn cách thanh toán, như quét mã QR bằng ứng dụng ngân hàng hoặc dùng thẻ ATM. Thanh toán xong, hãy quay lại FinViet.</Text>
           <TouchableOpacity style={styles.secondary} disabled={payment.isFetching} onPress={() => void payment.refetch()}><Text style={styles.secondaryText}>{payment.isFetching ? 'Đang kiểm tra…' : 'Tôi đã thanh toán · Kiểm tra kết quả'}</Text></TouchableOpacity>
           <Text style={styles.body}>{payment.isError ? 'Chưa thể kiểm tra kết quả. Vui lòng thử lại, không thanh toán lần nữa.' : 'Đang chờ VNPay xác nhận. Đóng trình duyệt không đồng nghĩa với hủy thanh toán.'}</Text>
           {expired && <TouchableOpacity style={styles.secondary} disabled={payment.isFetching} onPress={() => void startAgain()}><Text style={styles.secondaryText}>Chưa thanh toán · Chọn lại gói</Text></TouchableOpacity>}
@@ -139,7 +139,7 @@ function CustomerSubscription({ customerId }: { customerId: string }) {
       {plans.data?.map(plan => <View key={plan.planId} style={styles.card}>
         <Text style={styles.cardTitle}>{plan.name}</Text><Text style={styles.price}>{money(plan.price)}</Text><Text style={styles.body}>/ {plan.billingIntervalMonths} tháng</Text>
         {plan.features.map((feature, index) => <View style={styles.feature} key={index}><MaterialIcon name="check" size={20} color={colors.primary} /><Text style={[styles.body, styles.featureText]}>{feature}</Text></View>)}
-        <TouchableOpacity accessibilityRole="button" disabled={blocked || plan.price <= 0} style={[styles.primary, (blocked || plan.price <= 0) && styles.disabled]} onPress={() => purchase(plan.planId)}><Text style={styles.primaryText}>{current.data?.planId === plan.planId ? 'Gói hiện tại' : plan.price <= 0 ? 'Gói miễn phí' : 'Chọn gói · VNPay QR'}</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" disabled={blocked || plan.price <= 0} style={[styles.primary, (blocked || plan.price <= 0) && styles.disabled]} onPress={() => purchase(plan.planId)}><Text style={styles.primaryText}>{current.data?.planId === plan.planId ? 'Gói hiện tại' : plan.price <= 0 ? 'Gói miễn phí' : 'Chọn gói · VNPay'}</Text></TouchableOpacity>
       </View>)}
       <Text style={styles.caption}>Giá niêm yết bằng Việt Nam đồng. Gói chỉ được kích hoạt sau khi VNPay xác nhận thanh toán.</Text>
     </ScrollView>

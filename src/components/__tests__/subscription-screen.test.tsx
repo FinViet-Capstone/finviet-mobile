@@ -38,12 +38,12 @@ function screen() {
 }
 const checkout = () => ({ paymentId: 'payment-1', redirectUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', amount: 49000, expiresAt: new Date(Date.now() + 900000).toISOString() });
 
-it('opens hosted QR and waits for backend confirmation before showing success', async () => {
+it('opens hosted VNPay checkout and waits for backend confirmation before showing success', async () => {
   jest.mocked(subscribeToPlan).mockResolvedValue(checkout());
   const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   const view = screen();
-  fireEvent.press(await view.findByText('Chọn gói · VNPay QR'));
-  fireEvent.press(await view.findByText('Mở mã QR trên VNPay'));
+  fireEvent.press(await view.findByText('Chọn gói · VNPay'));
+  fireEvent.press(await view.findByText('Mở trang thanh toán VNPay'));
   expect(open).toHaveBeenCalledWith('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
   expect(view.queryByText('Thanh toán thành công')).toBeNull();
   await waitFor(() => expect(view.getByText('Tôi đã thanh toán · Kiểm tra kết quả')).toBeTruthy());
@@ -57,10 +57,10 @@ it('opens hosted QR and waits for backend confirmation before showing success', 
 it('persists the attempt before sending and reuses it after a network failure', async () => {
   jest.mocked(subscribeToPlan).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(checkout());
   const view = screen();
-  fireEvent.press(await view.findByText('Chọn gói · VNPay QR'));
+  fireEvent.press(await view.findByText('Chọn gói · VNPay'));
   await waitFor(() => expect(subscribeToPlan).toHaveBeenCalledTimes(1));
   fireEvent.press(await view.findByText('Tiếp tục giao dịch'));
-  await view.findByText('Mở mã QR trên VNPay');
+  await view.findByText('Mở trang thanh toán VNPay');
   const calls = jest.mocked(subscribeToPlan).mock.calls;
   expect(calls[1][0].key).toBe(calls[0][0].key);
   expect(jest.mocked(SecureStore.setItemAsync).mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(subscribeToPlan).mock.invocationCallOrder[0]);
