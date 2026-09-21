@@ -193,6 +193,10 @@ function CustomerSubscription({ customerId }: { customerId: string }) {
               ? 'Ma QR da het han. Neu da thanh toan, hay kiem tra ket qua truoc khi tao giao dich khac.'
               : `Con ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} de thanh toan.`}
           </Text>
+          {/* payOS's embedded checkout form (@payos/payos-checkout) is DOM-only and can't run in
+              React Native, so we render the raw qrCode string ourselves and poll payment-status
+              instead of mounting their widget. A WebView opening checkoutUrl with returnUrl
+              deep-linking would be the alternative if the backend starts forwarding it - deferred. */}
           {!expired && <View style={styles.qrContainer}>
             <QRCode value={order.qrCode} size={220} backgroundColor="white" />
           </View>}
