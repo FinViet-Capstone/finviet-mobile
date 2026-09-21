@@ -1,41 +1,68 @@
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { api } from '@/lib/api';
-import { getSubscriptionPayment, isVNPayUrl, subscribeToPlan } from '../subscriptions';
+import {
+  createPaymentOrder,
+  getPaymentStatus,
+  getSubscriptionPlans,
+  getCurrentSubscription,
+} from '../subscriptions';
 
 jest.mock('@/lib/mmkv', () => ({
   getAccessToken: jest.fn(() => null), getRefreshToken: jest.fn(() => null),
   clearAuthTokens: jest.fn(), setAuthTokens: jest.fn(),
 }));
 
-const mock = new AxiosMockAdapter(api);
-afterEach(() => mock.reset());
-afterAll(() => mock.restore());
+function success<T>(data: T) {
+  return { success: true, data };
+}
 
-it('retries a timed-out QR checkout with the same key and server-priced payload', async () => {
-  const attempt = { planId: 'plan-1', key: 'retry-key', returnUrl: 'https://example.com/return' };
-  mock.onPost('/subscriptions/subscribe').timeoutOnce();
-  await expect(subscribeToPlan(attempt)).rejects.toThrow();
-  const result = { paymentId: 'payment-1', redirectUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', amount: 49000, expiresAt: '2026-09-18T10:00:00Z' };
-  mock.onPost('/subscriptions/subscribe').reply(200, { success: true, data: result });
-  await expect(subscribeToPlan(attempt)).resolves.toEqual(result);
-  expect(mock.history.post).toHaveLength(2);
-  for (const call of mock.history.post) {
-    expect(call.headers?.['Idempotency-Key']).toBe('retry-key');
-    expect(JSON.parse(call.data)).toEqual({ planId: 'plan-1', returnUrl: attempt.returnUrl, bankCode: 'VNPAYQR' });
-  }
-});
+describe('real subscriptions service - PayOS', () => {
+  const mock = new AxiosMockAdapter(api);
 
-it('keeps a payment pending until the backend confirms success', async () => {
-  mock.onGet('/subscriptions/payments/payment-1').reply(200, { success: true, data: { paymentId: 'payment-1', status: 'pending', amount: 49000, subscriptionId: null } });
-  expect((await getSubscriptionPayment('payment-1')).status).toBe('pending');
-});
+  afterEach(() => mock.reset());
+  afterAll(() => mock.restore());
 
-it.each([
-  ['https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', true],
-  ['https://pay.vnpay.vn/vpcpay.html', true],
-  ['https://sandbox.vnpayment.vn.evil.example/pay', false],
-  ['http://pay.vnpay.vn/pay', false],
-  ['javascript:alert(1)', false],
-])('validates payment destination %s', (url, valid) => {
-  expect(isVNPayUrl(url)).toBe(valid);
+  it('getSubscriptionPlans fetches from /subscriptions/plans', async () => {
+    const plans = [{ planId: 'plan-monthly', name: 'Premium thang', price: 29000, billingIntervalMonths: 1, features: ['AI'], isActive: true }];
+    mock.onGet('/subscriptions/plans').reply(200, success(plans));
+    expect(await getSubscriptionPlans()).toEqual(plans);
+  });
+
+  it('getCurrentSubscription returns null when no subscription exists', async () => {
+    mock.onGet('/subscriptions/current').reply(200, success(null));
+    expect(await getCurrentSubscription()).toBeNull();
+  });
+
+  it('createPaymentOrder posts planId and sends idempotency header', async () => {
+    const order = { orderCode: 123456, qrCode: '00020101...', amount: 29000, description: 'Premium thang', expiresAt: '2026-09-21T12:15:00Z' };
+    mock.onPost('/subscriptions/create-payment').reply((config) => {
+      const body = JSON.parse(config.data);
+      expect(body.planId).toBe('plan-monthly');
+      expect(config.headers?.['Idempotency-Key']).toBe('key-abc');
+      return [200, success(order)];
+    });
+    const result = await createPaymentOrder('plan-monthly', 'key-abc');
+    expect(result.orderCode).toBe(123456);
+    expect(result.qrCode).toBe('00020101...');
+  });
+
+  it('retries with same idempotency key after a timeout', async () => {
+    mock.onPost('/subscriptions/create-payment').timeoutOnce();
+    await expect(createPaymentOrder('plan-1', 'retry-key')).rejects.toThrow();
+    const order = { orderCode: 789, qrCode: 'qr-data', amount: 29000, description: 'test', expiresAt: '2026-09-21T12:15:00Z' };
+    mock.onPost('/subscriptions/create-payment').reply(200, success(order));
+    await expect(createPaymentOrder('plan-1', 'retry-key')).resolves.toEqual(order);
+    expect(mock.history.post).toHaveLength(2);
+    for (const call of mock.history.post) {
+      expect(call.headers?.['Idempotency-Key']).toBe('retry-key');
+    }
+  });
+
+  it('getPaymentStatus fetches from /subscriptions/payment-status/{orderCode}', async () => {
+    const status = { orderCode: 123456, status: 'succeeded', amount: 29000, subscriptionId: 'sub-1' };
+    mock.onGet('/subscriptions/payment-status/123456').reply(200, success(status));
+    const result = await getPaymentStatus(123456);
+    expect(result.status).toBe('succeeded');
+    expect(result.subscriptionId).toBe('sub-1');
+  });
 });
