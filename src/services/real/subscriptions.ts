@@ -48,7 +48,7 @@ export async function getCurrentSubscription(): Promise<CurrentSubscription | nu
 }
 export async function subscribeToPlan(attempt: CheckoutAttempt): Promise<SubscriptionCheckout> {
   return unwrap(await api.post('/subscriptions/subscribe', {
-    planId: attempt.planId, returnUrl: attempt.returnUrl, bankCode: 'VNPAYQR',
+    planId: attempt.planId, returnUrl: attempt.returnUrl, // bankCode omitted: VNPay then offers whichever methods the terminal has enabled.
   }, idempotentConfig(attempt.key)));
 }
 export async function getSubscriptionPayment(id: string): Promise<SubscriptionPayment> {

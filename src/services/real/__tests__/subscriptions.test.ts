@@ -11,7 +11,7 @@ const mock = new AxiosMockAdapter(api);
 afterEach(() => mock.reset());
 afterAll(() => mock.restore());
 
-it('retries a timed-out QR checkout with the same key and server-priced payload', async () => {
+it('retries a timed-out checkout with the same key and server-priced payload', async () => {
   const attempt = { planId: 'plan-1', key: 'retry-key', returnUrl: 'https://example.com/return' };
   mock.onPost('/subscriptions/subscribe').timeoutOnce();
   await expect(subscribeToPlan(attempt)).rejects.toThrow();
@@ -21,7 +21,7 @@ it('retries a timed-out QR checkout with the same key and server-priced payload'
   expect(mock.history.post).toHaveLength(2);
   for (const call of mock.history.post) {
     expect(call.headers?.['Idempotency-Key']).toBe('retry-key');
-    expect(JSON.parse(call.data)).toEqual({ planId: 'plan-1', returnUrl: attempt.returnUrl, bankCode: 'VNPAYQR' });
+    expect(JSON.parse(call.data)).toEqual({ planId: 'plan-1', returnUrl: attempt.returnUrl });
   }
 });
 
