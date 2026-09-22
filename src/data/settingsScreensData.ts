@@ -61,15 +61,6 @@ export const AI_PREFERENCES_STRINGS = {
   back: 'Quay lại',
 };
 
-// Subscription screen strings (Vietnamese)
-export const SUBSCRIPTION_STRINGS = {
-  title: 'Gói dịch vụ',
-  currentPlan: 'Gói hiện tại',
-  inUse: 'Đang sử dụng',
-  upgradeButton: 'Nâng cấp Premium',
-  safePayment: 'Bản demo — chưa thu phí thật. Huỷ bất cứ lúc nào.',
-  perMonth: '/tháng',
-};
 
 // Data export screen strings
 export const DATA_EXPORT_STRINGS = {

@@ -13,14 +13,29 @@ of the old `mock/*` modules when they were deleted).
 
 Every domain hits the real .NET backend: auth, wallets, transactions,
 budgets, saving goals, categories, reports/AI, notifications, rules, SMS/CSV/
-photo extraction, and bank-linking (SePay OAuth2 — the only linking provider;
-Finverse was removed 2026-07). One exception has its entry point hidden
-client-side rather than wired against nothing:
-- **Subscriptions** — the backend has a real `POST /api/subscriptions/subscribe`
-  (VNPay) endpoint, but no customer-facing plan-catalog or
-  current-subscription-status endpoint (only `Admin`-role CRUD exists). The
-  Settings → "Gói dịch vụ" entry is removed until those two land — see
-  `finviet-be/docs/subscriptions-customer-endpoints-todo.md`.
+photo extraction, bank-linking (SePay OAuth2 - the only linking provider;
+Finverse was removed 2026-07), and subscriptions (payOS - see correction
+below).
+
+**Correction (2026-09-22):** Subscriptions was previously documented here as
+having its Settings entry hidden client-side against an incomplete contract
+(no customer-facing plan-catalog/current-subscription-status endpoint,
+VNPay-only).
+That's stale - the backend now exposes `GET /subscriptions/plans` and `GET
+/subscriptions/current`, and the gateway is payOS, not VNPay.
+`app/settings/subscription.tsx` is re-enabled and drives a real
+create-order -> poll -> confirm flow against `src/services/real/subscriptions.ts`
+(`POST /subscriptions/create-payment`, `GET /subscriptions/payment-status/:orderCode`).
+
+payOS's embedded checkout form (`@payos/payos-checkout`) is DOM-only - it
+mounts into a div via `PayOSConfig`/`open()` - and cannot run in React
+Native, so the app deliberately renders the raw `PaymentOrder.qrCode` string
+via `react-native-qrcode-svg` and polls payment-status instead of embedding
+their widget.
+The backend gateway also returns a `checkoutUrl`, but `CreatePaymentResultDto`
+currently forwards only `qrCode`; the only alternative to the QR flow would be
+opening `checkoutUrl` in a WebView with `returnUrl` deep-linking, which would
+need that field forwarded first - deferred, not planned.
 
 **Correction (2026-08-18):** Photo/receipt OCR extraction was previously documented here as
 permanently 503ing (`IReceiptOcrService` as an intentional placeholder). That's stale —
