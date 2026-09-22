@@ -17,9 +17,12 @@ navigation, wallets/transactions/budgets/goals/categories data layer, entry flow
 this codebase anymore (removed 2026-08-18). The AI layer (`src/services/real/reports.ts` →
 `/ai/score`, `/ai/reports`, `/ai/chat`, backed by an LLM/RAG pipeline) computes real
 scores/reports/chat replies from the customer's actual data, matching the "AI-Powered
-Personal Finance Tracker and Spending Advisor" tagline. One domain remains permanently
-unreachable in the UI for lack of a real customer-facing backend contract — Subscriptions —
-see Tech Stack and Monetization below for exactly what's missing on the backend side. Photo/
+Personal Finance Tracker and Spending Advisor" tagline. Subscriptions was previously
+documented here as permanently unreachable in the UI for lack of a real customer-facing
+backend contract; **correction (2026-09-22): that's stale.** The backend now exposes
+customer-facing `GET /subscriptions/plans` and `GET /subscriptions/current` endpoints, the
+gateway is payOS (not the VNPay this doc used to describe), and Settings → "Gói dịch vụ" is
+re-enabled and reachable - see Tech Stack and Monetization below. Photo/
 receipt OCR extraction is no longer in that category: as of backend commit `aff76cc` it's
 wired to a real Gemini-backed OCR provider and returns genuine extracted fields, but (found
 2026-08-18) that extraction path never calls the categorization step SMS/CSV extraction does —
@@ -155,8 +158,9 @@ F. Notifications
 G. Settings & Utilities
 - Real, routed screens under `app/settings/`: profile/preferences home, budget-allocation
   sliders (needs/wants/savings %), category bucket management, data export, and account
-  deletion. Subscription management is not currently reachable — its Settings entry was
-  removed 2026-08-18 (see Monetization below).
+  deletion. Subscription management is reachable again (correction 2026-09-22: the Settings
+  entry removed 2026-08-18 was re-added once the customer-facing plan-catalog/status
+  endpoints landed - see Monetization below).
 
 ## Data
 ---
@@ -241,22 +245,30 @@ modules that implement them.
   a barrel re-exporting every domain straight from `src/services/real/*`. Photo/receipt OCR
   extraction calls its real, now-working Gemini-backed endpoint, but that path skips AI
   categorization entirely (rows return uncategorized regardless of AI health — see Features
-  §A); Subscriptions has its Settings entry point hidden client-side (no customer-facing
-  plan-catalog/status endpoint yet, though the actual VNPay subscribe flow is real) — see
-  Features §A and Monetization.
+  §A); Subscriptions is real end to end (correction 2026-09-22: no longer hidden client-side
+  - the backend added customer-facing plan-catalog/status endpoints and the gateway moved
+  from VNPay to payOS) - see Features §A and Monetization.
 - Backend is a separate repo not present in this codebase — this app only assumes a REST API
   reachable at `EXPO_PUBLIC_API_BASE_URL`; no specific backend technology is asserted here.
 
 ## Monetization
 ---
-The backend has a real, VNPay-integrated `POST /api/subscriptions/subscribe` endpoint and an
-admin-only plan-catalog CRUD (`/api/admin/subscription-plans`), but no customer-facing
-endpoint to list plans or read one's own current subscription status — so a plan catalog
-(free/premium tiers, pricing) can't currently be rendered or acted on from this app. The
-Settings → "Gói dịch vụ" entry point was removed 2026-08-18 rather than half-wire a screen
-against an incomplete contract; see `finviet-be/docs/subscriptions-customer-endpoints-todo.md`
-for the two missing endpoints. No feature-gating logic tying a plan to actual feature access
-exists in this codebase either way.
+This section previously described the backend as VNPay-integrated with only an admin-only
+plan-catalog CRUD and no customer-facing endpoints, and the Settings → "Gói dịch vụ" entry
+point as removed pending those endpoints.
+**Correction (2026-09-22): that's stale.**
+The backend now exposes customer-facing `GET /subscriptions/plans` (plan catalog) and
+`GET /subscriptions/current` (own subscription status) alongside the existing
+`POST /subscriptions/create-payment` and `GET /subscriptions/payment-status/:orderCode`, the
+payment gateway is payOS (QR-code + poll checkout, not VNPay), and Settings → "Gói dịch vụ" is
+re-enabled (`app/settings/subscription.tsx`) driving a real create-order → poll → confirm
+flow.
+payOS's embedded checkout form is DOM-only and can't run in React Native, so the app
+deliberately renders the raw `qrCode` string via `react-native-qrcode-svg` and polls payment
+status rather than embedding that widget - see `context/architecture.md` for the fuller
+writeup of that decision.
+No feature-gating logic tying a plan to actual feature access exists in this codebase either
+way.
 
 ## UI/UX
 ---

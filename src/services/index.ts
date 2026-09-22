@@ -6,13 +6,9 @@
  * types are re-exported here from @/types so this barrel stays the single
  * import surface, matching the pre-existing convention.
  *
- * Two domains have no real backend and their entry points are hidden
- * client-side rather than wired against nothing: Subscriptions (no
- * customer-facing plan-catalog/status endpoints yet — see
- * finviet-be/docs/subscriptions-customer-endpoints-todo.md) and photo/receipt
- * OCR extraction, whose real endpoint exists but always 503s until a backend
- * OCR provider is configured (surfaced honestly, not faked — see
- * real/extraction.ts).
+ * Subscriptions use PayOS for payment (QR bank transfer with webhook
+ * verification). The screen imports directly from real/subscriptions.ts
+ * rather than through this barrel — a pre-existing pattern kept as-is.
  */
 
 import * as auth from './real/auth';
