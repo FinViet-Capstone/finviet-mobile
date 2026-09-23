@@ -23,6 +23,7 @@ import type {
   CsvExtractionResult,
   PhotoExtractionResult,
   PhotoUploadInput,
+  RawFieldPair,
 } from '@/types/extraction';
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ interface ExtractedRowDto {
   categoryId: string | null;
   categoryName: string | null;
   confidence: number | null;
+  /** Original source row, column-by-column — absent until finviet-be ships it (CSV only). */
+  rawFields?: RawFieldPair[] | null;
 }
 
 interface ExtractResponseDto {
@@ -260,6 +263,7 @@ function toCsvRow(row: ExtractedRowDto): CsvExtractionResult['rows'][number] {
     categoryId: row.categoryId ?? null,
     categoryName: row.categoryName ?? null,
     confidence: row.categoryId ? (row.confidence ?? 0) : null,
+    rawFields: row.rawFields?.length ? row.rawFields : undefined,
   };
 }
 

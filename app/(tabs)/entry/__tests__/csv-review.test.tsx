@@ -36,6 +36,7 @@ jest.mock('@/hooks', () => ({
 }));
 jest.mock('@/hooks/useCategoryCatalog', () => ({ useCategoryCatalog: () => ({ get: () => null }) }));
 jest.mock('@/components/categories', () => ({ CategoryPickerSheet: () => null }));
+jest.mock('@/components/entry/CsvRawDataSheet', () => ({ CsvRawDataSheet: () => null }));
 jest.mock('@/lib/notifications', () => ({ scheduleCsvImportReadyNotification: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/stores/ephemeralBannerStore', () => ({
   useEphemeralBannerStore: (selector: (s: { show: () => void }) => unknown) => selector({ show: jest.fn() }),
@@ -51,6 +52,9 @@ function overrides() {
 
 const CSV_PARAMS = 'fileUri=file%3A%2F%2Ftmp%2Fa.csv&fileName=a.csv';
 
+// Longer timeout: this is the first test in the file to call renderRouter, which resolves
+// every route under appDir (including the new csv-raw-preview.tsx) — that first-transform cost
+// can exceed the default 5s timeout on a cold Jest worker under full-suite parallel load.
 it('warm case: header back reaches the chooser, not csv-import, after an in-flight extraction errors', async () => {
   const view = renderRouter({ appDir: 'app', overrides: overrides() }, { initialUrl: '/(tabs)/entry' });
 
@@ -63,7 +67,7 @@ it('warm case: header back reaches the chooser, not csv-import, after an in-flig
 
   expect(view.getPathname()).toBe('/entry');
   expect(view.queryByTestId('csv-review-screen')).toBeNull();
-});
+}, 15000);
 
 it('cold-start case: header back reaches the chooser, not Home, when csv-review has no ancestor in its stack', async () => {
   const view = renderRouter(

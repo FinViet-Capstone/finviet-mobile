@@ -16,6 +16,7 @@ agents/
 prompts/
 .claude/
 .stitch/
+.lavish/
 
 # Environment files
 # Committed: .env.example, .env.development (safe mock-mode defaults).
