@@ -23,6 +23,12 @@ export interface PhotoUploadInput {
   base64?: string | null;
 }
 
+/** One original column value from the source CSV/Excel row, preserved as-is. */
+export interface RawFieldPair {
+  header: string;
+  value: string;
+}
+
 /**
  * One parsed row from a CSV/XLSX bank-statement import. Unlike photo/SMS
  * extraction (single candidate), CSV extraction returns many rows at once.
@@ -42,6 +48,10 @@ export interface CsvExtractionRow {
   categoryName: string | null;
   /** AI classification confidence for categoryId, 0–1. Null when categoryId is null. */
   confidence: number | null;
+  /** Original file row, column-by-column, undefined until the backend ships it. Render by
+   * mapping over however many pairs a row has — never assume a fixed column set or count,
+   * since different banks export different columns. */
+  rawFields?: RawFieldPair[];
 }
 
 export interface CsvExtractionResult {
