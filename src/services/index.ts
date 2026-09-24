@@ -24,6 +24,7 @@ import * as aiPreferences from './real/aiPreferences';
 import * as notifications from './real/notifications';
 import * as extraction from './real/extraction';
 import * as rules from './real/rules';
+import * as sepay from './real/sepay';
 
 /** @/lib/env is dependency-free to avoid an import cycle with the Axios layer. */
 export { API_BASE_URL } from '@/lib/env';
@@ -45,6 +46,16 @@ export type {
   WalletLedgerEntry,
   WalletLedgerPage,
 } from '@/types';
+
+// ─── SePay bank linking ───────────────────────────────────────────────────────
+export const getSepayAuthorizeUrl = sepay.getSepayAuthorizeUrl;
+export const linkSepayAccount = sepay.linkSepayAccount;
+export const linkSepayWithToken = sepay.linkSepayWithToken;
+export const getSepayBankAccounts = sepay.getSepayBankAccounts;
+export const syncSepayWallet = sepay.syncSepayWallet;
+export const getSepayLinks = sepay.getSepayLinks;
+export const unlinkSepayAccount = sepay.unlinkSepayAccount;
+export const SepaySandboxUnavailableError = sepay.SepaySandboxUnavailableError;
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 export const getTransactions = transactions.getTransactions;

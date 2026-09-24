@@ -23,7 +23,7 @@ import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { API_BASE_URL } from '@/lib/env';
 import { getApiErrorMessage } from '@/utils/errors';
-import { SepaySandboxUnavailableError } from '@/services/real/sepay';
+import { SepaySandboxUnavailableError } from '@/services';
 
 const S = {
   title: 'Liên kết SePay',
