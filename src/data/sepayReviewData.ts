@@ -1,0 +1,18 @@
+export const SEPAY_REVIEW_STRINGS = {
+  title: 'Cần xem lại',
+  allWallets: 'Tất cả',
+  accept: 'Chấp nhận',
+  acceptA11yLabel: 'Chấp nhận danh mục AI gợi ý',
+  change: 'Đổi',
+  changeA11yLabel: 'Đổi danh mục',
+  pickCategory: 'Chọn danh mục',
+  emptyTitle: 'Không còn giao dịch cần xem lại',
+  emptySubtitle: 'Các giao dịch từ ví liên kết đã được phân loại.',
+  loadErrorTitle: 'Không tải được danh sách',
+  loadErrorSubtitle: 'Kiểm tra kết nối và thử lại.',
+  offBannerText: 'AI phân loại đang tắt. Bật lại để nhận gợi ý danh mục.',
+  offBannerLink: 'Cài đặt AI',
+  errorToastTitle: 'Không thể lưu danh mục',
+  errorToastBody: 'Giao dịch đã được đưa trở lại danh sách. Vui lòng thử lại.',
+  backA11yLabel: 'Quay lại',
+} as const;

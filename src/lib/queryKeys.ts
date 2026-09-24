@@ -36,6 +36,8 @@ export const queryKeys = {
     detail: (id: string | undefined) =>
       [...queryKeys.transactions.all(), 'byId', id] as const,
     recent: (n: number) => [...queryKeys.transactions.all(), 'recent', n] as const,
+    /** Prefix of every review-queue list, for optimistic updates across wallet filters. */
+    reviewAll: () => [...queryKeys.transactions.all(), 'review'] as const,
     /** SePay AI-categorization review queue. */
     review: (filters: TransactionFilters | null) =>
       [...queryKeys.transactions.all(), 'review', filters] as const,

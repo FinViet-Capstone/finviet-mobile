@@ -24,6 +24,7 @@ export {
   useClassifyTransaction,
   useDeleteTransaction,
 } from './useTransactions';
+export { useSepayReviewQueue, useReviewOverride } from './useSepayReviewQueue';
 export {
   useBudgets,
   useBudgetById,
