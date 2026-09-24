@@ -9,7 +9,7 @@
  * here -- routing decisions stay in the screen so we don't double-navigate.
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
   login,
   register,
@@ -30,7 +30,6 @@ import {
 } from '@/services';
 import { getRefreshToken } from '@/lib/mmkv';
 import { getNotificationInstallationId } from '@/lib/notificationStorage';
-import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
 import type { Customer } from '@/types';
 
@@ -84,7 +83,6 @@ export const useChangePassword = () =>
 
 export const useLogout = () => {
   const clearSession = useAuthStore((s) => s.clearSession);
-  const queryClient = useQueryClient();
   return useMutation<void, Error, void>({
     // Device unregister and refresh-token revoke are both best effort; neither
     // may keep the user signed in locally when the network is unavailable.
@@ -97,10 +95,8 @@ export const useLogout = () => {
       }
       await logout(getRefreshToken() ?? '');
     },
-    onSettled: () => {
-      queryClient.removeQueries({ queryKey: queryKeys.notifications.all() });
-      clearSession();
-    },
+    // clearSession also drops every cached query, notifications included.
+    onSettled: () => clearSession(),
   });
 };
 
