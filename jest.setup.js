@@ -52,3 +52,11 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 jest.mock('@/lib/nativeModuleAvailability', () => ({
   isGoogleSignInAvailable: jest.fn(() => true),
 }));
+
+// The Sentry SDK ships untransformed ESM and would report to the real project
+// (SENTRY_DSN has a default). Any suite reaching the auth store pulls it in via
+// the query client, so it is stubbed globally.
+jest.mock('@/lib/sentry', () => ({
+  initSentry: jest.fn(),
+  captureException: jest.fn(),
+}));
