@@ -36,12 +36,6 @@ export const queryKeys = {
     detail: (id: string | undefined) =>
       [...queryKeys.transactions.all(), 'byId', id] as const,
     recent: (n: number) => [...queryKeys.transactions.all(), 'recent', n] as const,
-    /** SePay AI-categorization review queue. */
-    review: (filters: TransactionFilters | null) =>
-      [...queryKeys.transactions.all(), 'review', filters] as const,
-    /** Review-queue badge count; `walletId` omitted = all linked wallets. */
-    reviewCount: (walletId?: string) =>
-      [...queryKeys.transactions.all(), 'review-count', walletId ?? null] as const,
     summary: (year: number, month: number) =>
       [...queryKeys.transactions.all(), 'summary', year, month] as const,
   },

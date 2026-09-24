@@ -23,7 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { MaterialIcon } from '@/components/common/MaterialIcon';
 import { queryKeys } from '@/lib/queryKeys';
-import { linkSepayAccount, getSepayAuthorizeUrl } from '@/services';
+import { linkSepayAccount, getSepayAuthorizeUrl } from '@/services/real/sepay';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 

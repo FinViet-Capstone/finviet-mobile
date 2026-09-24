@@ -29,7 +29,7 @@ import { DatePickerField } from "@/components/common/DatePickerField";
 import { TextInput } from "@/components/common/TextInput";
 import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
 import type { CatalogCategory } from "@/lib/categoryCatalog";
-import { CategoryPickerSheet, CategorySuggestionField, getCategoryStatus } from "@/components/categories";
+import { CategoryPickerSheet } from "@/components/categories";
 import { useExtractFromSMS, useWallets, useCreateTransaction } from "@/hooks";
 import { PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD } from "@/constants/extraction";
 import { formatVND } from "@/utils/formatters";
@@ -68,6 +68,7 @@ const S = {
   fieldCategory: "Danh mục",
   fieldWallet: "Ví",
   fieldDate: "Ngày",
+  pickCategory: "Chọn danh mục",
   sheetCategory: "Chọn danh mục",
   sheetWallet: "Chọn ví",
   tooShort: "Tin nhắn quá ngắn. Vui lòng dán toàn bộ tin nhắn ngân hàng.",
@@ -102,13 +103,12 @@ export default function SMSEntryScreen() {
   const [merchant, setMerchant] = useState("");
   const [dateIso, setDateIso] = useState(initialISO);
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  // 'ai' while the category is the extraction's suggestion; null once the user picks one.
-  const [categorySource, setCategorySource] = useState<"ai" | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
 
   // Uncertain flags
   const [amountUncertain, setAmountUncertain] = useState(false);
   const [merchantUncertain, setMerchantUncertain] = useState(false);
+  const [categoryUncertain, setCategoryUncertain] = useState(false);
 
   // Modals
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -154,12 +154,14 @@ export default function SMSEntryScreen() {
         if (result.merchant !== null) setMerchant(result.merchant);
         setDateIso(result.transactionDate);
         setCategoryId(result.categoryId);
-        setCategorySource(result.categoryId ? "ai" : null);
         setAmountUncertain(
           result.confidence.amount < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
         );
         setMerchantUncertain(
           result.confidence.merchant < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
+        );
+        setCategoryUncertain(
+          result.confidence.categoryId < PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
         );
         setPhase("review");
       },
@@ -271,7 +273,7 @@ export default function SMSEntryScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* Uncertain notice */}
-            {(amountUncertain || merchantUncertain) && (
+            {(amountUncertain || merchantUncertain || categoryUncertain) && (
               <View style={styles.uncertainBanner}>
                 <MaterialIcon name="warning" size={16} color={colors.warning} />
                 <Text style={styles.uncertainText}>{S.uncertainNotice}</Text>
@@ -355,16 +357,42 @@ export default function SMSEntryScreen() {
             </View>
 
             {/* Category */}
-            <View style={styles.fieldCard}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[
+                styles.fieldCard,
+                categoryUncertain && styles.fieldCardUncertain,
+              ]}
+              onPress={() => setShowCategoryModal(true)}
+            >
               <Text style={styles.fieldLabel}>{S.fieldCategory}</Text>
-              <CategorySuggestionField
-                style={styles.categoryField}
-                category={selectedCategory}
-                source={selectedCategory ? categorySource : null}
-                status={getCategoryStatus(selectedCategory !== null, entryType === "income")}
-                onPress={() => setShowCategoryModal(true)}
-              />
-            </View>
+              <View style={styles.fieldRowValue}>
+                {selectedCategory ? (
+                  <>
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: selectedCategory.color },
+                      ]}
+                    />
+                    <Text style={styles.fieldValueText}>
+                      {selectedCategory.nameVi}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.fieldPlaceholder}>{S.pickCategory}</Text>
+                )}
+                {categoryUncertain ? (
+                  <Text style={styles.uncertainBadge}>?</Text>
+                ) : (
+                  <MaterialIcon
+                    name="chevron_right"
+                    size={20}
+                    color={colors.outlineVariant}
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
 
             {/* Wallet */}
             <TouchableOpacity
@@ -450,7 +478,7 @@ export default function SMSEntryScreen() {
           selectedCategoryId={categoryId}
           onSelect={(id) => {
             setCategoryId(id);
-            setCategorySource(null);
+            setCategoryUncertain(false);
             setShowCategoryModal(false);
           }}
         />
@@ -900,7 +928,13 @@ function createStyles(colors: ThemeColors) {
       gap: SPACING[2],
     },
     fieldError: { fontSize: FONT_SIZE.xs, color: colors.error },
-    categoryField: { justifyContent: "flex-start", gap: SPACING[2] },
+    dot: { width: 10, height: 10, borderRadius: BORDER_RADIUS.full },
+    uncertainBadge: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: FONT_WEIGHT.bold,
+      color: colors.warning,
+      marginLeft: SPACING[1],
+    },
 
     reviewActions: { flexDirection: "row", gap: SPACING[3] },
     rePasteBtn: {

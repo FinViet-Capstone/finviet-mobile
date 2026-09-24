@@ -24,7 +24,7 @@ import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { DraggableSheet } from "@/components/common/DraggableSheet";
 import { useCategoryCatalog } from "@/hooks/useCategoryCatalog";
-import { CategoryPickerSheet, CategorySuggestionField } from "@/components/categories";
+import { CategoryPickerSheet } from "@/components/categories";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { TextInput } from "@/components/common/TextInput";
 import { ImagePreviewModal } from "@/components/common/ImagePreviewModal";
@@ -65,6 +65,7 @@ const S = {
   confirmAll: "Lưu sau khi kiểm tra",
   needCategorize: (n: number) => `Cần phân loại ${n} giao dịch`,
   analyzingRow: "Đang phân tích ảnh này...",
+  aiCategorizeFailed: "AI không phân loại được — chạm để chọn",
   retake: "Chụp lại",
   amountLabel: "Số tiền",
   merchantLabel: "Người nhận",
@@ -106,8 +107,7 @@ interface ExtractedRow {
   categoryId: string | null;
   amountUncertain: boolean;
   merchantUncertain: boolean;
-  /** 'ai' while the category is the extraction's suggestion; null once the user picks one. */
-  categorySource: "ai" | null;
+  categoryUncertain: boolean;
   dateUncertain: boolean;
   selected: boolean;
   isDuplicate: boolean;
@@ -143,6 +143,7 @@ function isUncertain(row: ExtractedRow): boolean {
   return (
     row.amountUncertain ||
     row.merchantUncertain ||
+    row.categoryUncertain ||
     row.dateUncertain
   );
 }
@@ -348,17 +349,54 @@ function ReviewRow({
               </View>
             </View>
 
-            {/* Category */}
-            <View style={styles.reviewField}>
-              <Text style={styles.reviewFieldLabel}>{S.categoryLabel}</Text>
-              <CategorySuggestionField
-                style={styles.reviewCategoryRow}
-                category={cat}
-                source={cat ? row.categorySource : null}
-                status={cat ? "ok" : "failed"}
-                onPress={onEditCategory}
-              />
-            </View>
+            {/* Category — tappable */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.reviewField}
+              onPress={onEditCategory}
+            >
+              <Text
+                style={[
+                  styles.reviewFieldLabel,
+                  row.categoryUncertain && styles.uncertainLabel,
+                ]}
+              >
+                {S.categoryLabel}
+              </Text>
+              <View style={styles.reviewCategoryRow}>
+                {cat ? (
+                  <>
+                    <View
+                      style={[styles.catDot, { backgroundColor: cat.color }]}
+                    />
+                    <Text
+                      style={[
+                        styles.reviewFieldValue,
+                        row.categoryUncertain && styles.uncertainValue,
+                      ]}
+                    >
+                      {cat.nameVi}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcon
+                      name="error_outline"
+                      size={12}
+                      color={colors.error}
+                    />
+                    <Text style={[styles.uncategorizedText, styles.needCategoryText]}>
+                      {S.aiCategorizeFailed}
+                    </Text>
+                  </>
+                )}
+                <MaterialIcon
+                  name="chevron_right"
+                  size={16}
+                  color={blocking ? colors.error : colors.onSurfaceVariant}
+                />
+              </View>
+            </TouchableOpacity>
 
             {/* Date */}
             <DatePickerField
@@ -441,7 +479,7 @@ export default function PhotoConfirmScreen() {
       categoryId: null,
       amountUncertain: false,
       merchantUncertain: false,
-      categorySource: null,
+      categoryUncertain: false,
       dateUncertain: false,
       selected: true,
       isDuplicate: false,
@@ -490,7 +528,9 @@ export default function PhotoConfirmScreen() {
                     merchantUncertain:
                       result.confidence.merchant <
                       PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
-                    categorySource: result.categoryId ? ("ai" as const) : null,
+                    categoryUncertain:
+                      result.confidence.categoryId <
+                      PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
                     dateUncertain:
                       result.confidence.transactionDate <
                       PHOTO_EXTRACTION_CONFIDENCE_THRESHOLD,
@@ -566,7 +606,7 @@ export default function PhotoConfirmScreen() {
     (categoryId: string) => {
       setRows((prev) =>
         prev.map((r, i) =>
-          i === editingIdx ? { ...r, categoryId, categorySource: null } : r,
+          i === editingIdx ? { ...r, categoryId, categoryUncertain: false } : r,
         ),
       );
       setEditingIdx(null);
@@ -1193,6 +1233,17 @@ function createStyles(colors: ThemeColors) {
     gap: 4,
     flex: 2,
     justifyContent: "flex-end",
+  },
+  catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
+  uncategorizedText: {
+    fontSize: FONT_SIZE.xs,
+    color: colors.secondary,
+    fontStyle: "italic",
+  },
+  needCategoryText: {
+    color: colors.error,
+    fontStyle: "normal",
+    fontWeight: FONT_WEIGHT.semibold,
   },
   failedText: { fontSize: FONT_SIZE.xs, color: colors.error, lineHeight: 18 },
   reviewProcessingRow: {

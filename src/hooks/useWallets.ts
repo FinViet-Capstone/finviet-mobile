@@ -8,17 +8,19 @@ import {
   createTransfer,
   withdrawFromWallet,
   getWalletTransactions,
-  linkSepayAccount,
-  linkSepayWithToken,
-  syncSepayWallet,
-  getSepayLinks,
-  unlinkSepayAccount,
   type CreateWalletInput,
   type UpdateWalletInput,
   type CreateTransferInput,
   type WithdrawInput,
   type WalletLedgerQuery,
 } from '@/services';
+import {
+  linkSepayAccount,
+  linkSepayWithToken,
+  syncSepayWallet,
+  getSepayLinks,
+  unlinkSepayAccount,
+} from '@/services/real/sepay';
 import { queryKeys, STALE_TIME } from '@/lib/queryKeys';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────

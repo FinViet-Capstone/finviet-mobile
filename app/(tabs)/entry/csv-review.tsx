@@ -14,7 +14,7 @@ import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, withAlpha } from '@/theme';
 import { useThemeColors, type ThemeColors } from '@/providers/ThemeProvider';
 import { MaterialIcon } from '@/components/common/MaterialIcon';
-import { CategoryPickerSheet, CategorySuggestionField, getCategoryStatus } from '@/components/categories';
+import { CategoryPickerSheet } from '@/components/categories';
 import { CsvRawDataSheet } from '@/components/entry/CsvRawDataSheet';
 import { useWallets } from '@/hooks/useWallets';
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
@@ -26,7 +26,6 @@ import { getApiErrorMessage } from '@/utils/errors';
 import { scheduleCsvImportReadyNotification } from '@/lib/notifications';
 import { useEphemeralBannerStore } from '@/stores/ephemeralBannerStore';
 import { useCsvRawPreviewStore, type CsvRawPreviewRow } from '@/stores/csvRawPreviewStore';
-import { AI_FAILED_PICK_LABEL, CATEGORIZATION_STRINGS } from '@/data/categorizationData';
 
 // ─── Strings ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +43,8 @@ const S = {
   selectAll: 'Chọn tất cả',
   deselectAll: 'Bỏ chọn tất cả',
   duplicate: 'Có thể trùng',
+  uncategorized: 'Chưa phân loại',
+  aiCategorizeFailed: 'AI không phân loại được — chạm để chọn',
   pickCategory: 'Chọn danh mục',
   amountLabel: 'Số tiền',
   categoryLabel: 'Danh mục',
@@ -61,6 +62,8 @@ const S = {
   notifyReadyTitle: 'Phân loại xong',
   notifyReadyBody: (n: number) => `AI đã phân loại xong ${n} giao dịch. Chạm để xem kết quả.`,
   contentLabel: 'Nội dung',
+  sourceAi: 'AI',
+  sourceRule: 'Quy tắc',
   viewRawData: 'Xem dữ liệu gốc',
 };
 
@@ -110,8 +113,8 @@ function getCategoryDisplay(
 ): { label: string; tone: 'resolved' | 'failed' | 'uncategorized' } {
   if (cat) return { label: cat.nameVi, tone: 'resolved' };
   const aiFailedToCategorize = !row.suggestedCategoryId && row.type !== 'income';
-  if (aiFailedToCategorize) return { label: AI_FAILED_PICK_LABEL, tone: 'failed' };
-  return { label: CATEGORIZATION_STRINGS.uncategorized, tone: 'uncategorized' };
+  if (aiFailedToCategorize) return { label: S.aiCategorizeFailed, tone: 'failed' };
+  return { label: S.uncategorized, tone: 'uncategorized' };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -143,8 +146,10 @@ function PreviewRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const cat = useCategoryCatalog().get(row.suggestedCategoryId) ?? null;
   const isIncome = row.type === 'income';
+  const needsCategoryEdit = !row.suggestedCategoryId;
   // Income rows are never sent for AI categorization by design (only expenses are), so a
   // missing category there is expected, not a failure — only flag it for expense rows.
+  const aiFailedToCategorize = needsCategoryEdit && !isIncome;
 
   return (
     <TouchableOpacity activeOpacity={0.7} style={[styles.previewRow, !row.selected && styles.previewRowDeselected, row.isDuplicate && styles.previewRowDuplicate]} onPress={onToggle}>
@@ -174,7 +179,7 @@ function PreviewRow({
         </View>
       )}
 
-      {/* Danh mục - tap-to-edit; badge/failed/unsure states live in CategorySuggestionField. */}
+      {/* Danh mục — tap-to-edit, plus a source badge when AI/a rule actually decided it. */}
       <View style={styles.rowField}>
         <Text style={styles.rowFieldLabel}>{S.categoryLabel}</Text>
         <View style={styles.rowCategoryRight}>
@@ -189,12 +194,27 @@ function PreviewRow({
               <MaterialIcon name="description" size={12} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           )}
-          <CategorySuggestionField
-            category={cat}
-            source={row.categorySource === 'ai' ? 'ai' : row.categorySource === 'client_rule' ? 'rule' : null}
-            status={getCategoryStatus(cat !== null, isIncome)}
-            onPress={onEditCategory}
-          />
+          <TouchableOpacity activeOpacity={0.7} style={styles.categoryValueRow} onPress={onEditCategory}>
+            {cat ? (
+              <>
+                {row.categorySource && (
+                  <View style={styles.sourceBadge}>
+                    <Text style={styles.sourceBadgeText}>{row.categorySource === 'ai' ? S.sourceAi : S.sourceRule}</Text>
+                  </View>
+                )}
+                <View style={[styles.catDot, { backgroundColor: cat.color }]} />
+                <Text style={styles.rowFieldValue}>{cat.nameVi}</Text>
+              </>
+            ) : aiFailedToCategorize ? (
+              <>
+                <MaterialIcon name="error_outline" size={12} color={colors.error} />
+                <Text style={styles.aiFailedText}>{S.aiCategorizeFailed}</Text>
+              </>
+            ) : (
+              <Text style={styles.uncategorizedText}>{S.uncategorized}</Text>
+            )}
+            <MaterialIcon name="chevron_right" size={16} color={aiFailedToCategorize ? colors.error : needsCategoryEdit ? colors.secondary : colors.onSurfaceVariant} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -681,10 +701,18 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center', justifyContent: 'center',
     },
 
+    // AI/rule source attribution badge, shown next to a resolved category in Categorized view
+    sourceBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: BORDER_RADIUS.full, backgroundColor: withAlpha(colors.primary, 0.12) },
+    sourceBadgeText: { fontSize: 9, fontWeight: FONT_WEIGHT.bold, color: colors.primary },
+
     rowField: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 20 },
     rowFieldLabel: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, flex: 1 },
     rowFieldValue: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.semibold, color: colors.onSurface, flex: 2, textAlign: 'right' },
     rowCategoryRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 2, justifyContent: 'flex-end' },
+    categoryValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, justifyContent: 'flex-end' },
+    catDot: { width: 8, height: 8, borderRadius: BORDER_RADIUS.full },
+    uncategorizedText: { fontSize: FONT_SIZE.xs, color: colors.secondary, fontStyle: 'italic' },
+    aiFailedText: { fontSize: FONT_SIZE.xs, color: colors.error, fontWeight: FONT_WEIGHT.semibold },
 
     // Bottom bar
     bottomBar: {
