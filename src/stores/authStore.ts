@@ -20,6 +20,11 @@ interface AuthState {
   customer:        Customer | null;
   /** False until session bootstrap (token rehydrate) finishes on app launch. */
   hydrated:        boolean;
+  /**
+   * Bumped by every setSession, so async work started under one session (a
+   * slow logout) can tell whether someone has signed in since.
+   */
+  sessionGeneration: number;
 
   setSession:         (customer: Customer) => void;
   clearSession:       () => void;
@@ -33,10 +38,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   onboardingDone:  false,
   customer:        null,
   hydrated:        false,
+  sessionGeneration: 0,
 
   setSession(customer) {
     if (get().customer?.id !== customer.id) dropCachedServerData();
-    set({ isAuthenticated: true, onboardingDone: customer.onboardingDone, customer });
+    set((state) => ({
+      isAuthenticated: true,
+      onboardingDone: customer.onboardingDone,
+      customer,
+      sessionGeneration: state.sessionGeneration + 1,
+    }));
   },
 
   clearSession() {

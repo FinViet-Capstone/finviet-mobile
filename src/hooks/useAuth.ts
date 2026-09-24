@@ -83,20 +83,30 @@ export const useChangePassword = () =>
 
 export const useLogout = () => {
   const clearSession = useAuthStore((s) => s.clearSession);
-  return useMutation<void, Error, void>({
+  return useMutation<void, Error, void, { sessionGeneration: number }>({
+    onMutate: () => ({ sessionGeneration: useAuthStore.getState().sessionGeneration }),
     // Device unregister and refresh-token revoke are both best effort; neither
     // may keep the user signed in locally when the network is unavailable.
     mutationFn: async () => {
+      // Read before any await: a sign-in during the unregister call replaces the
+      // stored token, and that new session's token must not be revoked.
+      const refreshToken = getRefreshToken() ?? '';
       try {
         const installationId = await getNotificationInstallationId();
         await unregisterNotificationDevice(installationId);
       } catch {
         // The backend registration is reconciled on the next authenticated use.
       }
-      await logout(getRefreshToken() ?? '');
+      await logout(refreshToken);
     },
-    // clearSession also drops every cached query, notifications included.
-    onSettled: () => clearSession(),
+    // The screen leaves for the auth stack before this settles, which can take
+    // the full request timeout offline. If anyone signed in meanwhile, the
+    // session is theirs now and must survive. clearSession also drops every
+    // cached query, notifications included.
+    onSettled: (_data, _error, _input, context) => {
+      if (context && useAuthStore.getState().sessionGeneration !== context.sessionGeneration) return;
+      clearSession();
+    },
   });
 };
 
