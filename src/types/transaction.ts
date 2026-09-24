@@ -15,18 +15,6 @@
 export type TransactionType = 'expense' | 'income' | 'transfer_out' | 'transfer_in';
 export type EntryMethod = 'manual' | 'photo' | 'csv_import' | 'linked' | 'sms_paste';
 
-/** Where a transaction sits in the SePay AI categorization pipeline. 'none' = not applicable. */
-export type CategorizationStatus =
-  | 'none'
-  | 'pending'
-  | 'suggested'
-  | 'unsure'
-  | 'failed'
-  | 'applied'
-  | 'reviewed';
-
-export type AiSource = 'manual' | 'merchant_rule' | 'ai_auto' | 'ai_suggestion' | 'fallback';
-
 export interface Transaction {
   id: string;
   customerId: string;
@@ -51,12 +39,6 @@ export interface Transaction {
   transferPairId: string | null;
   /** External transaction ID from linked wallet provider (SePay, etc.) */
   externalId: string | null;
-  /** 'none' when the backend does not report a status (older backend or non-SePay row). */
-  categorizationStatus: CategorizationStatus;
-  aiSuggestedCategoryId: string | null;
-  aiSuggestedCategoryName: string | null;
-  aiConfidence: number | null;
-  aiSource: AiSource | null;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */
@@ -139,9 +121,6 @@ export interface TransactionFilters {
    * contributions appear in the full transaction history.
    */
   hideGoalContributions?: boolean;
-  /** Match any of these categorization statuses (sent comma-separated). */
-  categorizationStatus?: CategorizationStatus[];
-  entryMethod?: EntryMethod;
 }
 
 export interface TransactionSummaryCategory {

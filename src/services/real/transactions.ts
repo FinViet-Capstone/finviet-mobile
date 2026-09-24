@@ -20,8 +20,6 @@
 import { api, unwrap } from '@/lib/api';
 import { idempotentConfig } from '@/lib/idempotency';
 import type {
-  AiSource,
-  CategorizationStatus,
   Transaction,
   TransactionType,
   EntryMethod,
@@ -54,11 +52,6 @@ interface TransactionDto {
   merchant?: string | null;
   transferPairId?: string | null;
   externalId?: string | null;
-  categorizationStatus?: string | null;
-  aiSuggestedCategoryId?: string | null;
-  aiSuggestedCategoryName?: string | null;
-  aiConfidence?: number | null;
-  aiSource?: string | null;
   createdAt?: string;
   updatedAt?: string | null;
 }
@@ -92,33 +85,9 @@ function toTransactionType(raw: string): TransactionType {
 
 const ENTRY_METHODS: EntryMethod[] = ['manual', 'photo', 'csv_import', 'linked', 'sms_paste'];
 
-// The backend names the SePay entry method `sepay_sync`; the FE calls it `linked`.
-const BACKEND_LINKED_ENTRY_METHOD = 'sepay_sync';
-
 function toEntryMethod(raw?: string): EntryMethod {
   const v = (raw ?? '').toLowerCase();
-  if (v === BACKEND_LINKED_ENTRY_METHOD) return 'linked';
   return (ENTRY_METHODS as string[]).includes(v) ? (v as EntryMethod) : 'manual';
-}
-
-function toServerEntryMethod(method: EntryMethod): string {
-  return method === 'linked' ? BACKEND_LINKED_ENTRY_METHOD : method;
-}
-
-const CATEGORIZATION_STATUSES: CategorizationStatus[] = [
-  'none', 'pending', 'suggested', 'unsure', 'failed', 'applied', 'reviewed',
-];
-
-function toCategorizationStatus(raw?: string | null): CategorizationStatus {
-  const v = (raw ?? '').toLowerCase();
-  return (CATEGORIZATION_STATUSES as string[]).includes(v) ? (v as CategorizationStatus) : 'none';
-}
-
-const AI_SOURCES: AiSource[] = ['manual', 'merchant_rule', 'ai_auto', 'ai_suggestion', 'fallback'];
-
-function toAiSource(raw?: string | null): AiSource | null {
-  const v = (raw ?? '').toLowerCase();
-  return (AI_SOURCES as string[]).includes(v) ? (v as AiSource) : null;
 }
 
 function toTransaction(dto: TransactionDto): Transaction {
@@ -135,11 +104,6 @@ function toTransaction(dto: TransactionDto): Transaction {
     entryMethod: toEntryMethod(dto.entryMethod),
     transferPairId: dto.transferPairId ?? null,
     externalId: dto.externalId ?? null,
-    categorizationStatus: toCategorizationStatus(dto.categorizationStatus),
-    aiSuggestedCategoryId: dto.aiSuggestedCategoryId ?? null,
-    aiSuggestedCategoryName: dto.aiSuggestedCategoryName ?? null,
-    aiConfidence: dto.aiConfidence ?? null,
-    aiSource: toAiSource(dto.aiSource),
     createdAt: dto.createdAt ?? '',
     updatedAt: dto.updatedAt ?? dto.createdAt ?? '',
   };
@@ -166,12 +130,6 @@ export async function getTransactions(
   else if (filters?.categoryId !== undefined) baseParams.categoryId = filters.categoryId;
   const serverType = toServerType(filters?.type);
   if (serverType) baseParams.type = serverType;
-  if (filters?.categorizationStatus?.length) {
-    baseParams.categorizationStatus = filters.categorizationStatus.join(',');
-  }
-  if (filters?.entryMethod !== undefined) {
-    baseParams.entryMethod = toServerEntryMethod(filters.entryMethod);
-  }
 
   const firstResponse = await api.get('/transactions', {
     params: { ...baseParams, page: 1 },
@@ -366,11 +324,6 @@ export async function createTransfer(
     entryMethod: 'manual',
     transferPairId: null,
     externalId: null,
-    categorizationStatus: 'none',
-    aiSuggestedCategoryId: null,
-    aiSuggestedCategoryName: null,
-    aiConfidence: null,
-    aiSource: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
