@@ -9,10 +9,10 @@ export const SEPAY_REVIEW_STRINGS = {
   emptyTitle: 'Không còn giao dịch cần xem lại',
   emptySubtitle: 'Các giao dịch từ ví liên kết đã được phân loại.',
   loadErrorTitle: 'Không tải được danh sách',
-  loadErrorSubtitle: 'Kiểm tra kết nối và thử lại.',
   offBannerText: 'AI phân loại đang tắt. Bật lại để nhận gợi ý danh mục.',
   offBannerLink: 'Cài đặt AI',
   errorToastTitle: 'Không thể lưu danh mục',
   errorToastBody: 'Giao dịch đã được đưa trở lại danh sách. Vui lòng thử lại.',
-  backA11yLabel: 'Quay lại',
+  ruleErrorTitle: 'Không tạo được quy tắc',
+  ruleErrorBody: 'Danh mục đã được lưu nhưng quy tắc chưa được tạo. Vui lòng thử lại sau.',
 } as const;

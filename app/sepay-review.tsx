@@ -25,14 +25,13 @@ export default function SepayReviewScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ walletId?: string }>();
-  const [walletId, setWalletId] = useState<string | undefined>(params.walletId || undefined);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(params.walletId || undefined);
   const [pickerTx, setPickerTx] = useState<Transaction | null>(null);
 
-  const { data: rows, isLoading, isError, refetch } = useSepayReviewQueue(walletId);
-  const { data: walletData } = useWallets();
-  const { data: aiPreferences } = useAiPreferences();
+  const { data: walletData, isLoading: isWalletsLoading } = useWallets();
+  const { data: aiPreferences, isLoading: isPreferencesLoading } = useAiPreferences();
   const catalog = useCategoryCatalog();
-  const createRuleMutation = useCreateRule();
+  const { mutate: createRule } = useCreateRule();
   const showBanner = useEphemeralBannerStore((state) => state.show);
 
   const linkedWallets = useMemo(
@@ -44,6 +43,15 @@ export default function SepayReviewScreen() {
     [linkedWallets],
   );
   const isAiOff = aiPreferences?.categorizationMode === 'off';
+  // A preselected wallet only applies when it is a linked wallet and there are chips to change
+  // it; otherwise a stale or single-wallet param would filter the inbox with no way to clear it.
+  const walletId =
+    linkedWallets.length >= 2 && linkedWallets.some((wallet) => wallet.id === selectedWalletId)
+      ? selectedWalletId
+      : undefined;
+  const { data: rows, isLoading: isRowsLoading, isError, refetch } = useSepayReviewQueue(walletId);
+  // Wait for the AI mode so suggestions are never offered for a moment and then withdrawn.
+  const isLoading = isRowsLoading || isPreferencesLoading || isWalletsLoading;
 
   const offerRule = useCallback(
     (merchant: string, categoryId: string) => {
@@ -53,17 +61,18 @@ export default function SepayReviewScreen() {
         {
           text: TX.ruleConfirm,
           onPress: () =>
-            createRuleMutation.mutate(
+            createRule(
               { merchantKeyword: merchant, categoryId },
               {
                 onSuccess: (res) =>
                   Alert.alert(TX.ruleAppliedTitle, TX.ruleAppliedMessage(res.appliedCount), [{ text: TX.ok }]),
+                onError: () => showBanner({ title: S.ruleErrorTitle, body: S.ruleErrorBody, onPress: () => undefined }),
               },
             ),
         },
       ]);
     },
-    [catalog, createRuleMutation],
+    [catalog, createRule, showBanner],
   );
 
   const overrideMutation = useReviewOverride({
@@ -116,7 +125,7 @@ export default function SepayReviewScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={ListSeparator}
         ListEmptyComponent={<EmptyState icon="task_alt" title={S.emptyTitle} subtitle={S.emptySubtitle} />}
         showsVerticalScrollIndicator={false}
       />
@@ -142,13 +151,13 @@ export default function SepayReviewScreen() {
 
       {linkedWallets.length >= 2 && (
         <View style={styles.chips}>
-          <WalletChip label={S.allWallets} selected={!walletId} onPress={() => setWalletId(undefined)} />
+          <WalletChip label={S.allWallets} selected={!walletId} onPress={() => setSelectedWalletId(undefined)} />
           {linkedWallets.map((wallet) => (
             <WalletChip
               key={wallet.id}
               label={wallet.name}
               selected={walletId === wallet.id}
-              onPress={() => setWalletId(wallet.id)}
+              onPress={() => setSelectedWalletId(wallet.id)}
             />
           ))}
         </View>
@@ -170,6 +179,12 @@ export default function SepayReviewScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function ListSeparator() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return <View style={styles.separator} />;
 }
 
 function WalletChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
