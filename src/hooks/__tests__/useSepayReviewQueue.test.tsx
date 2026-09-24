@@ -20,7 +20,7 @@ const mockGetTransactions = getTransactions as jest.Mock;
 const mockOverride = overrideCategorization as jest.Mock;
 
 function row(id: string, categorizationStatus: CategorizationStatus): Transaction {
-  return { id, categorizationStatus } as Transaction;
+  return { id, categorizationStatus, transactionDate: '2026-09-23', createdAt: '2026-09-23T10:00:00Z' } as Transaction;
 }
 
 describe('getReviewRefetchInterval', () => {
@@ -37,6 +37,7 @@ describe('buildReviewFilters', () => {
     expect(buildReviewFilters()).toEqual({
       categorizationStatus: ['pending', 'suggested', 'unsure', 'failed'],
       entryMethod: 'linked',
+      type: 'expense',
     });
     expect(buildReviewFilters('w1').walletId).toBe('w1');
   });
@@ -111,6 +112,31 @@ describe('review queue hooks', () => {
 
       await act(async () => { resolve(); });
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    });
+
+    it('restores only the failed row when overrides run concurrently', async () => {
+      const rows = [row('a', 'suggested'), row('b', 'unsure'), row('c', 'unsure')];
+      queryClient.setQueryData(key, rows);
+      mockGetTransactions.mockReturnValue(new Promise(() => undefined));
+      let rejectA!: (e: Error) => void;
+      let resolveB!: () => void;
+      mockOverride
+        .mockReturnValueOnce(new Promise((_, rej) => { rejectA = rej; }))
+        .mockReturnValueOnce(new Promise<void>((res) => { resolveB = res; }));
+      const onError = jest.fn();
+
+      const { result } = renderHook(() => useReviewOverride({ onError }), { wrapper });
+      act(() => result.current.mutate({ transactionId: 'a', categoryId: 'cat_food' }));
+      await waitFor(() => expect(queryClient.getQueryData<Transaction[]>(key)?.length).toBe(2));
+      act(() => result.current.mutate({ transactionId: 'b', categoryId: 'cat_food' }));
+      await waitFor(() => expect(queryClient.getQueryData<Transaction[]>(key)?.length).toBe(1));
+
+      await act(async () => { rejectA(new Error('boom')); });
+      await act(async () => { resolveB(); });
+
+      await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onError.mock.calls[0][1].transactionId).toBe('a');
+      expect(queryClient.getQueryData<Transaction[]>(key)?.map((r) => r.id)).toEqual(['a', 'c']);
     });
 
     it('restores the row when the request fails', async () => {

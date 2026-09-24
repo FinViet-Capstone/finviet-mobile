@@ -32,7 +32,6 @@ export default function SepayReviewScreen() {
   const { data: walletData } = useWallets();
   const { data: aiPreferences } = useAiPreferences();
   const catalog = useCategoryCatalog();
-  const overrideMutation = useReviewOverride();
   const createRuleMutation = useCreateRule();
   const showBanner = useEphemeralBannerStore((state) => state.show);
 
@@ -67,20 +66,24 @@ export default function SepayReviewScreen() {
     [catalog, createRuleMutation],
   );
 
-  const applyCategory = useCallback(
-    (tx: Transaction, categoryId: string, shouldOfferRule: boolean) => {
-      overrideMutation.mutate(
-        { transactionId: tx.id, categoryId },
-        {
-          onSuccess: () => {
-            const merchant = tx.merchant?.trim();
-            if (shouldOfferRule && merchant) offerRule(merchant, categoryId);
-          },
-          onError: () => showBanner({ title: S.errorToastTitle, body: S.errorToastBody, onPress: () => undefined }),
-        },
-      );
+  const overrideMutation = useReviewOverride({
+    onSuccess: ({ merchant, offerRule: shouldOfferRule, categoryId }) => {
+      const name = merchant?.trim();
+      if (shouldOfferRule && name) offerRule(name, categoryId);
     },
-    [overrideMutation, offerRule, showBanner],
+    onError: () => showBanner({ title: S.errorToastTitle, body: S.errorToastBody, onPress: () => undefined }),
+  });
+
+  const { mutate: overrideCategory } = overrideMutation;
+  const applyCategory = useCallback(
+    (tx: Transaction, categoryId: string, shouldOfferRule: boolean) =>
+      overrideCategory({
+        transactionId: tx.id,
+        categoryId,
+        merchant: tx.merchant,
+        offerRule: shouldOfferRule,
+      }),
+    [overrideCategory],
   );
 
   const handleAccept = useCallback(

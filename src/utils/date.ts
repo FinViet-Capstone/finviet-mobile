@@ -31,3 +31,9 @@ export function sectionLabel(iso: string): string {
   const [, , d] = iso.split('-');
   return `${parseInt(d, 10)}, ${WEEKDAYS_VI[date.getDay()]}`;
 }
+
+/** 'YYYY-MM-DD' -> 'DD/MM/YYYY'; anything else is returned unchanged. */
+export function formatDisplayDate(iso: string): string {
+  const parts = iso.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : iso;
+}

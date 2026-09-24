@@ -9,6 +9,7 @@ import {
 } from '@/components/categories/CategorySuggestionField';
 import { useCategoryCatalog } from '@/hooks/useCategoryCatalog';
 import { formatVND } from '@/utils/formatters';
+import { formatDisplayDate } from '@/utils/date';
 import { SEPAY_REVIEW_STRINGS as S } from '@/data/sepayReviewData';
 import type { Transaction } from '@/types/transaction';
 
@@ -63,7 +64,7 @@ export const SepayReviewCard = React.memo(function SepayReviewCard({
         <View style={styles.headerText}>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <Text style={styles.meta} numberOfLines={1}>
-            {[walletName, tx.transactionDate].filter(Boolean).join(' · ')}
+            {[walletName, formatDisplayDate(tx.transactionDate)].filter(Boolean).join(' · ')}
           </Text>
         </View>
         <Text style={styles.amount}>{formatVND(tx.amount)}</Text>
