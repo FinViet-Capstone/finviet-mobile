@@ -7,6 +7,7 @@ import {
   AuthError,
   authErrorMessage,
   isAuthError,
+  isRegistrationResumable,
   type AuthErrorCode,
 } from '@/types/auth';
 
@@ -74,11 +75,36 @@ describe('AUTH_ERROR_MESSAGES_VI', () => {
       'oauth_failed',
       'weak_password',
       'wrong_current_password',
+      'verification_email_failed',
       'unknown',
     ];
     codes.forEach((code) => {
       expect(AUTH_ERROR_MESSAGES_VI[code]).toBeTruthy();
       expect(AUTH_ERROR_MESSAGES_VI[code].length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe('isRegistrationResumable', () => {
+  // Register creates the account before the slow verification-email step, so a
+  // retry that hits 409 means the customer must be sent to verify-email
+  // (resend code) instead of being stranded on the register form.
+  it('is true when the email already has an account (retry after a failed register)', () => {
+    expect(isRegistrationResumable(new AuthError('email_in_use'))).toBe(true);
+  });
+
+  it('is true when the account was saved but the verification email could not be sent', () => {
+    expect(isRegistrationResumable(new AuthError('verification_email_failed'))).toBe(true);
+  });
+
+  it.each<AuthErrorCode>(['network_error', 'weak_password', 'rate_limited', 'unknown'])(
+    'is false for %s',
+    (code) => {
+      expect(isRegistrationResumable(new AuthError(code))).toBe(false);
+    },
+  );
+
+  it('is false for non-AuthError values', () => {
+    expect(isRegistrationResumable(new Error('boom'))).toBe(false);
   });
 });

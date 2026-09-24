@@ -2,7 +2,7 @@ import AxiosMockAdapter from 'axios-mock-adapter';
 import { api } from '@/lib/api';
 import { getFirebaseIdTokenFromGoogle } from '@/lib/googleAuth';
 import { setAuthTokens } from '@/lib/mmkv';
-import { googleOAuth, getProfile, updateProfileSettings } from '@/services/real/auth';
+import { googleOAuth, getProfile, register, updateProfileSettings } from '@/services/real/auth';
 import { AuthError } from '@/types/auth';
 
 // Token storage is SecureStore-backed; stubbed so the session write is
@@ -142,5 +142,33 @@ describe('real auth service — googleOAuth', () => {
     mock.onPost('/auth/google-login').reply(status, { success: false, message: 'nope' });
 
     await expect(googleOAuth('login')).rejects.toMatchObject({ code });
+  });
+});
+
+// Register commits the account server-side before the slow verification-email
+// step, so a dropped connection or a retry must map to codes the screen can
+// recover from (see isRegistrationResumable).
+describe('real auth service - register failure contract', () => {
+  const input = { displayName: 'a', email: 'a@example.com', password: 'Passw0rd1' };
+
+  it('maps a dropped connection (no HTTP response) to network_error', async () => {
+    mock.onPost('/auth/register').networkError();
+
+    await expect(register(input)).rejects.toMatchObject({ code: 'network_error' });
+  });
+
+  it('maps a retry against the already-created account (409) to email_in_use', async () => {
+    mock.onPost('/auth/register').reply(409, { success: false, message: 'Email already registered' });
+
+    await expect(register(input)).rejects.toMatchObject({ code: 'email_in_use' });
+  });
+
+  it('maps a 200 "could not be sent" (account saved, email timed out) to verification_email_failed', async () => {
+    mock.onPost('/auth/register').reply(200, {
+      success: true,
+      data: 'Account created but verification email could not be sent.',
+    });
+
+    await expect(register(input)).rejects.toMatchObject({ code: 'verification_email_failed' });
   });
 });

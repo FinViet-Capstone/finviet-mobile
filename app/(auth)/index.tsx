@@ -19,7 +19,7 @@ import { Button } from '@/components/common/Button';
 import { TextInput } from '@/components/common/TextInput';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { useLogin, useRegister, useGoogleOAuth } from '@/hooks';
-import { isAuthError } from '@/types/auth';
+import { isAuthError, isRegistrationResumable } from '@/types/auth';
 import {
   loginSchema,
   registerSchema,
@@ -130,6 +130,16 @@ export default function AuthScreen() {
             pathname: '/(auth)/verify-email',
             params: { email: user.email, password: data.password },
           }),
+        // A failed first attempt may still have created the account (unverified),
+        // so the retry gets "email in use" - resume at verify-email to resend the code.
+        onError: (err) => {
+          if (isRegistrationResumable(err)) {
+            router.push({
+              pathname: '/(auth)/verify-email',
+              params: { email: data.email, password: data.password },
+            });
+          }
+        },
       },
     );
   };

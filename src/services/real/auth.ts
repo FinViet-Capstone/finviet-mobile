@@ -10,7 +10,7 @@
  * Admin. It needs a dev/production build — the native module is absent in Expo Go.
  */
 
-import axios, { isAxiosError } from 'axios';
+import { isAxiosError } from 'axios';
 import { api, unwrap, type AuthResponsePayload } from '@/lib/api';
 import { getFirebaseIdTokenFromGoogle, signOutFromGoogle } from '@/lib/googleAuth';
 import { setAuthTokens } from '@/lib/mmkv';
@@ -97,7 +97,7 @@ function toAuthError(
   err: unknown,
   match?: (status: number, message: string) => AuthErrorCode | undefined,
 ): AuthError {
-  if (!axios.isAxiosError(err)) {
+  if (!isAxiosError(err)) {
     return new AuthError('unknown');
   }
   const e = err as AxiosErrorLike;
@@ -330,15 +330,12 @@ export async function register(input: RegisterPayload): Promise<Customer> {
       email: input.email,
       password: input.password,
     });
-    // The backend returns 200 even when the verification email failed to send
-    // (e.g. SendGrid sender not verified). Don't swallow that — surface it so the
-    // user isn't stranded on the verify screen waiting for a code that never comes.
+    // The backend returns 200 even when the verification email failed or timed out
+    // (account already saved). Surface it as a typed error so the screen can resume
+    // at verify-email, where resend is available.
     const message = (res.data?.data ?? res.data?.message ?? '') as string;
     if (/could not be sent|failed to send|not be sent/i.test(message)) {
-      throw new AuthError(
-        'unknown',
-        'Đăng ký thành công nhưng không gửi được email xác minh. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
-      );
+      throw new AuthError('verification_email_failed');
     }
     return await toCustomer({
       customerId: '',

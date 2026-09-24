@@ -22,6 +22,7 @@ export type AuthErrorCode =
   | 'weak_password'
   | 'wrong_current_password'
   | 'verification_failed'
+  | 'verification_email_failed'
   | 'unknown';
 
 export class AuthError extends Error {
@@ -37,6 +38,20 @@ export class AuthError extends Error {
 /** Type guard for catch blocks. */
 export function isAuthError(e: unknown): e is AuthError {
   return e instanceof AuthError;
+}
+
+/**
+ * Register creates the account server-side before the verification-email step,
+ * so an email-send timeout (200 "could not be sent") or a retry that hits
+ * "email in use" both mean an account that may still be unverified. Those
+ * customers must be sent to verify-email (resend code) rather than left on the
+ * register form.
+ */
+export function isRegistrationResumable(e: unknown): boolean {
+  return (
+    isAuthError(e) &&
+    (e.code === 'email_in_use' || e.code === 'verification_email_failed')
+  );
 }
 
 /**
@@ -60,6 +75,8 @@ export const AUTH_ERROR_MESSAGES_VI: Record<AuthErrorCode, string> = {
   wrong_current_password: 'Mật khẩu hiện tại không chính xác',
   verification_failed:
     'Mã xác minh không đúng hoặc đã hết hạn. Hãy kiểm tra lại hoặc gửi lại mã.',
+  verification_email_failed:
+    'Tài khoản đã được tạo nhưng chưa gửi được email xác minh. Hãy gửi lại mã.',
   unknown: 'Đã có lỗi xảy ra. Hãy thử lại sau.',
 };
 
