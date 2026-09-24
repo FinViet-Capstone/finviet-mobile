@@ -48,7 +48,7 @@ import { formatVND } from '@/utils/formatters';
 import { getApiErrorMessage } from '@/utils/errors';
 import { deleteReceiptImage, getReceiptImageUri } from '@/lib/receiptImageStorage';
 import { TX_DETAIL_STRINGS as S } from '@/data/transactionDetailData';
-import type { CategorizationOutcome } from '@/types';
+import { AiSuggestionCard, getStoredAiSuggestion, type AiSuggestion } from '@/components/transaction/AiSuggestionCard';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Route: /transactions/[id]?mode=full|category&returnTo=history
@@ -109,7 +109,8 @@ function DetailBody({
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [amountError, setAmountError] = useState<string | undefined>();
   const [amountFocused, setAmountFocused] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<CategorizationOutcome | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [storedDismissed, setStoredDismissed] = useState(false);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
 
   useEffect(() => {
@@ -262,6 +263,16 @@ function DetailBody({
     ]);
   };
 
+  const storedSuggestion = storedDismissed
+    ? null
+    : getStoredAiSuggestion(tx, categoryCatalog.get(tx.aiSuggestedCategoryId)?.nameVi);
+  const activeSuggestion = aiSuggestion ?? storedSuggestion;
+
+  const handleDismissSuggestion = () => {
+    setAiSuggestion(null);
+    setStoredDismissed(true);
+  };
+
   const handleAiSuggest = () => {
     setAiSuggestion(null);
     categorizeMutation.mutate(txId, {
@@ -273,7 +284,11 @@ function DetailBody({
           return;
         }
         if (outcome.source === 'AI_SUGGESTION' && outcome.suggestedCategoryId) {
-          setAiSuggestion(outcome);
+          setAiSuggestion({
+            categoryId: outcome.suggestedCategoryId,
+            categoryName: outcome.suggestedCategoryName ?? '',
+            confidence: outcome.confidence ?? null,
+          });
           return;
         }
         if (outcome.source === 'OFF') {
@@ -291,14 +306,15 @@ function DetailBody({
   };
 
   const handleApplySuggestion = () => {
-    if (!aiSuggestion?.suggestedCategoryId) return;
-    const suggestedId = aiSuggestion.suggestedCategoryId;
+    if (!activeSuggestion) return;
+    const suggestedId = activeSuggestion.categoryId;
     overrideMutation.mutate(
       { transactionId: txId, categoryId: suggestedId },
       {
         onSuccess: () => {
           setCategoryId(suggestedId);
           setAiSuggestion(null);
+          setStoredDismissed(true);
         },
         onError: (error) =>
           Alert.alert(S.aiSuggestErrorTitle, getApiErrorMessage(error, S.aiSuggestApplyErrorMsg)),
@@ -397,40 +413,13 @@ function DetailBody({
           {/* AI category suggestion — offered only while uncategorized (e.g. a SePay-synced
               transaction the backend's default suggest_only mode never auto-applied). */}
           {!isTransfer && !selectedCategory ? (
-            aiSuggestion?.suggestedCategoryId ? (
-              <View style={[styles.fieldRow, styles.aiSuggestCard]}>
-                <View style={[styles.fieldIconWrap, { backgroundColor: withAlpha(colors.tertiary, 0.13) }]}>
-                  <MaterialIcon name="auto_awesome" size={20} color={colors.tertiary} />
-                </View>
-                <View style={styles.fieldTextWrap}>
-                  <Text style={styles.fieldLabel}>{S.aiSuggestCardTitle}</Text>
-                  <Text style={styles.fieldValue}>{aiSuggestion.suggestedCategoryName}</Text>
-                  {aiSuggestion.confidence != null ? (
-                    <Text style={styles.aiSuggestConfidence}>
-                      {S.aiSuggestConfidence(Math.round(aiSuggestion.confidence * 100))}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={styles.aiSuggestActions}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => setAiSuggestion(null)}
-                    disabled={overrideMutation.isPending}
-                  >
-                    <Text style={styles.aiSuggestDismiss}>{S.aiSuggestDismiss}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    style={styles.aiSuggestApplyBtn}
-                    onPress={handleApplySuggestion}
-                    disabled={overrideMutation.isPending}
-                  >
-                    {overrideMutation.isPending
-                      ? <ActivityIndicator size="small" color={colors.onTertiary} />
-                      : <Text style={styles.aiSuggestApplyText}>{S.aiSuggestApply}</Text>}
-                  </TouchableOpacity>
-                </View>
-              </View>
+            activeSuggestion ? (
+              <AiSuggestionCard
+                suggestion={activeSuggestion}
+                onApply={handleApplySuggestion}
+                onDismiss={handleDismissSuggestion}
+                isApplying={overrideMutation.isPending}
+              />
             ) : (
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -740,15 +729,6 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: SPACING[3],
   },
   aiSuggestButtonText: { fontSize: FONT_SIZE.sm, fontWeight: FONT_WEIGHT.semibold, color: colors.tertiary },
-  aiSuggestCard: { backgroundColor: withAlpha(colors.tertiary, 0.08), alignItems: 'flex-start' },
-  aiSuggestConfidence: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant, marginTop: 2 },
-  aiSuggestActions: { alignItems: 'flex-end', gap: SPACING[2] },
-  aiSuggestDismiss: { fontSize: FONT_SIZE.xs, color: colors.onSurfaceVariant },
-  aiSuggestApplyBtn: {
-    backgroundColor: colors.tertiary, borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING[3], paddingVertical: SPACING[1] + 2, minWidth: 72, alignItems: 'center',
-  },
-  aiSuggestApplyText: { fontSize: FONT_SIZE.xs, fontWeight: FONT_WEIGHT.bold, color: colors.onTertiary },
 
   // Actions
   actions: { flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[4] },
