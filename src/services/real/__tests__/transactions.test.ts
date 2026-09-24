@@ -76,4 +76,77 @@ describe('real transactions service', () => {
     ]);
     expect(mock.history.get).toHaveLength(2);
   });
+
+  it('maps sepay_sync to the linked entry method and carries the AI fields', async () => {
+    mock.onGet('/transactions').reply(200, successPage(1, 1, [
+      {
+        ...transactionDto('sepay', '2026-08-14T01:00:00Z'),
+        entryMethod: 'sepay_sync',
+        categoryId: null,
+        categorizationStatus: 'suggested',
+        aiSuggestedCategoryId: 'cat_food',
+        aiSuggestedCategoryName: 'Ăn uống',
+        aiConfidence: 0.82,
+        aiSource: 'ai_suggestion',
+      },
+    ]));
+
+    const [row] = await getTransactions();
+
+    expect(row).toMatchObject({
+      entryMethod: 'linked',
+      categorizationStatus: 'suggested',
+      aiSuggestedCategoryId: 'cat_food',
+      aiSuggestedCategoryName: 'Ăn uống',
+      aiConfidence: 0.82,
+      aiSource: 'ai_suggestion',
+    });
+  });
+
+  it('treats a missing categorizationStatus as none (older backend)', async () => {
+    mock.onGet('/transactions').reply(200, successPage(1, 1, [
+      transactionDto('legacy', '2026-08-14T01:00:00Z'),
+    ]));
+
+    const [row] = await getTransactions();
+
+    expect(row.categorizationStatus).toBe('none');
+    expect(row.aiSuggestedCategoryId).toBeNull();
+    expect(row.aiSuggestedCategoryName).toBeNull();
+    expect(row.aiConfidence).toBeNull();
+    expect(row.aiSource).toBeNull();
+  });
+
+  it('falls back to none for an unknown categorizationStatus', async () => {
+    mock.onGet('/transactions').reply(200, successPage(1, 1, [
+      { ...transactionDto('odd', '2026-08-14T01:00:00Z'), categorizationStatus: 'bogus' },
+    ]));
+
+    const [row] = await getTransactions();
+
+    expect(row.categorizationStatus).toBe('none');
+  });
+
+  it('sends categorizationStatus (comma-separated) and entryMethod filters', async () => {
+    mock.onGet('/transactions').reply(200, successPage(1, 1, []));
+
+    await getTransactions({
+      categorizationStatus: ['pending', 'suggested'],
+      entryMethod: 'linked',
+    });
+
+    expect(mock.history.get[0].params).toMatchObject({
+      categorizationStatus: 'pending,suggested',
+      entryMethod: 'sepay_sync',
+    });
+  });
+
+  it('omits the new filters when not provided', async () => {
+    mock.onGet('/transactions').reply(200, successPage(1, 1, []));
+
+    await getTransactions({ walletId: 'w1' });
+
+    expect(mock.history.get[0].params).not.toHaveProperty('categorizationStatus');
+    expect(mock.history.get[0].params).not.toHaveProperty('entryMethod');
+  });
 });

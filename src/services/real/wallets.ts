@@ -23,12 +23,15 @@ import type {
 
 // ─── Backend DTO shapes (camelCase over the wire) ─────────────────────────────
 
-interface WalletDto {
+export interface WalletDto {
   walletId: string;
   customerId: string;
   walletName: string;
   walletType: string;
   balance: number;
+  institutionName?: string | null;
+  accountMask?: string | null;
+  lastSyncedAt?: string | null;
 }
 
 interface WalletListDto {
@@ -44,18 +47,32 @@ function toWalletType(raw: string): WalletType {
   return v.includes('link') || v.includes('sepay') ? 'linked' : 'basic';
 }
 
-function toWallet(dto: WalletDto): Wallet {
+export function toWallet(dto: WalletDto): Wallet {
+  const type = toWalletType(dto.walletType);
   return {
     id: dto.walletId,
     customerId: dto.customerId,
     name: dto.walletName,
-    type: toWalletType(dto.walletType),
+    type,
     balance: dto.balance,
     isDeleted: false,
     // The backend response carries no timestamps; the UI never renders them for
     // wallets, so empty strings keep the type honest without inventing data.
     createdAt: '',
     updatedAt: '',
+    // The wallet endpoints report no per-wallet sync state, so a linked wallet
+    // is shown as 'active'.
+    linkedMetadata:
+      type === 'linked'
+        ? {
+            institutionId: '',
+            institutionName: dto.institutionName ?? '',
+            accountId: '',
+            accountNumber: dto.accountMask ?? undefined,
+            lastSyncAt: dto.lastSyncedAt ?? undefined,
+            syncStatus: 'active',
+          }
+        : undefined,
   };
 }
 

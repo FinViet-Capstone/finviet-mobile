@@ -23,20 +23,10 @@
 
 import { isAxiosError } from 'axios';
 import { api, unwrap } from '@/lib/api';
-import type { Wallet, WalletType } from '@/types';
+import type { Wallet } from '@/types';
+import { toWallet, type WalletDto } from './wallets';
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
-
-interface WalletDto {
-  walletId: string;
-  customerId: string;
-  walletName: string;
-  walletType: string;
-  balance: number;
-  institutionName?: string | null;
-  accountMask?: string | null;
-  lastSyncedAt?: string | null;
-}
 
 interface SepayLinkResultDto {
   wallets: WalletDto[];
@@ -142,33 +132,6 @@ export interface SepayUnlinkResult {
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
-
-function toWalletType(raw: string): WalletType {
-  return /link|sepay/i.test(raw ?? '') ? 'linked' : 'basic';
-}
-
-function toWallet(dto: WalletDto): Wallet {
-  return {
-    id: dto.walletId,
-    customerId: dto.customerId,
-    name: dto.walletName,
-    type: toWalletType(dto.walletType),
-    balance: dto.balance,
-    isDeleted: false,
-    createdAt: '',
-    updatedAt: '',
-    linkedMetadata: dto.institutionName
-      ? {
-          institutionId: '',
-          institutionName: dto.institutionName ?? '',
-          accountId: '',
-          accountNumber: dto.accountMask ?? undefined,
-          lastSyncAt: dto.lastSyncedAt ?? undefined,
-          syncStatus: 'active',
-        }
-      : undefined,
-  };
-}
 
 function toBankAccount(dto: SepayBankAccountDto): SepayBankAccount {
   return {
