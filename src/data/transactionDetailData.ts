@@ -84,7 +84,6 @@ export const TX_DETAIL_STRINGS = {
   aiSuggestOffSettingsBtn: "Mở cài đặt",
   aiSuggestAppliedTitle: "Đã tự động phân loại",
   aiSuggestAppliedMsg: (category: string) => `AI đã gán danh mục "${category}".`,
-  aiSuggestBadge: "AI",
   aiSuggestCardTitle: "AI đề xuất danh mục",
   aiSuggestConfidence: (pct: number) => `Độ tin cậy ${pct}%`,
   aiSuggestApply: "Áp dụng",
