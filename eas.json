@@ -10,16 +10,10 @@
     },
     "preview": {
       "distribution": "internal",
-      "node": "24.18.0",
-      "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://finviet-be-7t8w.onrender.com/api"
-      }
+      "node": "24.18.0"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://finviet-be-7t8w.onrender.com/api"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
