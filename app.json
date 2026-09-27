@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/finviet-icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/finviet-vertical.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#15121b"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.finviet.mobile",
@@ -41,6 +35,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/finviet-vertical.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#15121b"
+        }
+      ],
       [
         "expo-notifications",
         {
