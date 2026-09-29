@@ -67,7 +67,7 @@ flowchart TD
 
 ## Tech stack
 
-Expo 57 and React Native 0.86 with the New Architecture enabled, TypeScript in strict mode. Expo Router for file-based navigation. TanStack Query for server state and Zustand for client state. React Hook Form with Zod for form validation. Axios for the API client. Expo Secure Store for tokens. React Native Gifted Charts for visualizations. Sentry for crash reporting. Jest with React Native Testing Library for unit tests and Maestro for end-to-end flows. EAS Build for native builds.
+Expo 57 and React Native 0.86 with the New Architecture enabled, TypeScript in strict mode. Expo Router for file-based navigation. TanStack Query for server state and Zustand for client state. React Hook Form with Zod for form validation. Axios for the API client. Expo Secure Store for tokens. React Native Gifted Charts for visualizations. Jest with React Native Testing Library for unit tests and Maestro for end-to-end flows. EAS Build for native builds.
 
 ## Getting started
 
@@ -84,7 +84,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Set `EXPO_PUBLIC_API_BASE_URL` in `.env.local` to your backend, including the `/api` suffix. Use `http://10.0.2.2:5122/api` for an Android emulator, or your machine's LAN address for a physical device. The remaining keys in `.env.example` are optional and gate individual integrations: leave `EXPO_PUBLIC_SENTRY_DSN` empty to disable crash reporting locally, and SePay bank linking stays unavailable without a client ID.
+Set `EXPO_PUBLIC_API_BASE_URL` in `.env.local` to your backend, including the `/api` suffix. Use `http://10.0.2.2:5122/api` for an Android emulator, or your machine's LAN address for a physical device. The remaining keys in `.env.example` are optional and gate individual integrations: SePay bank linking, for example, stays unavailable without a client ID.
 
 ```bash
 npm run android   # or: npm run ios

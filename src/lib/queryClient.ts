@@ -1,5 +1,4 @@
-import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import { captureException } from '@/lib/sentry';
+import { QueryClient } from '@tanstack/react-query';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -9,10 +8,4 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-  queryCache: new QueryCache({
-    onError: captureException,
-  }),
-  mutationCache: new MutationCache({
-    onError: captureException,
-  }),
 });

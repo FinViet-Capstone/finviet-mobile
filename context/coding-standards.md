@@ -58,7 +58,6 @@ You are an expert in TypeScript, React Native, Expo, and Mobile UI development.
 
   Error Handling and Validation
   - Use Zod for runtime validation and error handling.
-  - Implement proper error logging using Sentry or a similar service.
   - Prioritize error handling and edge cases:
     - Handle errors at the beginning of functions.
     - Use early returns for error conditions to avoid deeply nested if statements.
