@@ -15,7 +15,6 @@ import { isAuthError } from '@/types/auth';
 
 jest.mock('@/lib/env', () => ({
   API_BASE_URL: 'http://test.local/api',
-  SENTRY_DSN: '',
   GOOGLE_WEB_CLIENT_ID: 'web-client-id.apps.googleusercontent.com',
   FIREBASE_API_KEY: 'firebase-api-key',
 }));

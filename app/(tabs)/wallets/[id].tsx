@@ -80,11 +80,7 @@ export default function WalletDetailScreen() {
   const { data: sepayLinks } = useSepayLinks();
   const unlinkMutation = useUnlinkSepayAccount();
 
-  const now = new Date();
-  const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-
-  const { data: txData, isLoading: txLoading, isError: txIsError, refetch: refetchTx } = useTransactions({ walletId: id ?? undefined, startDate, endDate });
+  const { data: txData, isLoading: txLoading, isError: txIsError, refetch: refetchTx } = useTransactions({ walletId: id ?? undefined });
   const transactions = (txData ?? []) as Transaction[];
 
   const handleTxPress = useCallback((tx: Transaction) => {
