@@ -62,21 +62,12 @@
       ],
       "expo-router",
       "expo-secure-store",
-      "@sentry/react-native",
       [
         "expo-build-properties",
         {
           "android": {
             "usesCleartextTraffic": true
           }
-        }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "alone-wbc"
         }
       ],
       "@react-native-community/datetimepicker",

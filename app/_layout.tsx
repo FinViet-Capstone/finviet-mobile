@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,13 +13,8 @@ import { ThemeProvider, useThemeScheme } from '@/providers/ThemeProvider';
 import { NotificationProvider } from '@/providers/NotificationProvider';
 import { EphemeralBanner } from '@/components/common/EphemeralBanner';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT, BORDER_RADIUS } from '@/theme';
-import { initSentry, captureException } from '@/lib/sentry';
-import * as Sentry from '@sentry/react-native';
 
-// Runs once at module load, before the first render.
-initSentry();
-
-export default Sentry.wrap(function RootLayout() {
+export default function RootLayout() {
   // Registered under the exact family name MaterialIcon expects, so the
   // ligature-based <MaterialIcon name="wallet" /> renders glyphs, not text.
   const [fontsLoaded, fontError] = useFonts({
@@ -58,7 +52,7 @@ export default Sentry.wrap(function RootLayout() {
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
-});
+}
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -83,10 +77,6 @@ function ThemedStatusBar() {
  * successfully if the error occurred above it in the tree.
  */
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
-  useEffect(() => {
-    captureException(error);
-  }, [error]);
-
   return (
     <View style={boundaryStyles.container}>
       <Text style={boundaryStyles.title}>Đã có lỗi xảy ra</Text>

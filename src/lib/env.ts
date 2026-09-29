@@ -16,15 +16,6 @@ if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
   );
 }
 
-// Default DSN for this project's Sentry instance; EXPO_PUBLIC_SENTRY_DSN
-// overrides it per-environment. Set the env var to '' explicitly (not just
-// omit it) if crash reporting must be disabled, e.g. local dev.
-const DEFAULT_SENTRY_DSN =
-  'https://b26adbc3b815c2b9fd62db860e8ebc62@o4511073418215424.ingest.de.sentry.io/4511904839893072';
-
-/** Sentry DSN. Empty disables crash reporting. */
-export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? DEFAULT_SENTRY_DSN;
-
 // ─── Google Sign-In (see src/lib/googleAuth.ts) ───────────────────────────────
 // Neither value is a secret — both ship inside any app binary that uses them,
 // and Firebase treats the browser key as public. They live in env rather than

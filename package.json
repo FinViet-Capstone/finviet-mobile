@@ -37,7 +37,7 @@
       "<rootDir>/jest.setup.js"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|standard-navigation|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@tanstack/.*|axios))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|standard-navigation|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|native-base|react-native-svg|@tanstack/.*|axios))"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
@@ -55,7 +55,6 @@
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/native": "^7.1.8",
-    "@sentry/react-native": "~7.11.0",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.18.0",
     "expo": "~57.0.25",
