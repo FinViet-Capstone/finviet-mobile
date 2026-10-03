@@ -26,6 +26,7 @@ import {
   clearAuthTokens,
 } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
+import { forceLogoutAccountDeactivated, isAccountDeactivatedError } from '@/lib/forceLogout';
 
 /** Success envelope returned by every .NET endpoint. */
 export interface ApiEnvelope<T> {
@@ -138,10 +139,19 @@ api.interceptors.response.use(
     const original = error.config as RetryConfig | undefined;
     const status = error.response?.status;
     const url: string = original?.url ?? '';
+    const isAuthCall = url.includes('/auth/');
+
+    // Admin locked the account: the backend rejects every authenticated request
+    // with 403 account_deactivated. End the session right away instead of letting
+    // the user keep operating on stale screens. /auth/* calls (login, google-login)
+    // surface their own error on the form, so they are left alone here.
+    if (!isAuthCall && isAccountDeactivatedError(error)) {
+      forceLogoutAccountDeactivated();
+      return Promise.reject(error);
+    }
 
     // Only attempt refresh on a genuine 401 for a non-auth request we haven't
     // already retried, and only if a refresh token exists.
-    const isAuthCall = url.includes('/auth/');
     if (
       status === 401 &&
       original &&
@@ -158,8 +168,12 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshErr) {
         refreshPromise = null;
-        clearAuthTokens();
-        useAuthStore.getState().clearSession();
+        if (isAccountDeactivatedError(refreshErr)) {
+          forceLogoutAccountDeactivated();
+        } else {
+          clearAuthTokens();
+          useAuthStore.getState().clearSession();
+        }
         return Promise.reject(refreshErr);
       }
     }
