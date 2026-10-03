@@ -33,6 +33,9 @@ export const BUSINESS_RULE_MESSAGES_VI: Record<string, string> = {
   payment_expired: 'Giao dich da het han. Vui long tao giao dich moi.',
   already_subscribed: 'Bạn đã có gói đăng ký đang hoạt động.',
   plan_discontinued: 'Gói này đã ngừng cung cấp. Vui lòng chọn gói khác.',
+  // ─── Account status (ForbiddenException code) ─────────────────────────────
+  account_deactivated:
+    'Tài khoản của bạn đã bị quản trị viên tạm khóa. Vui lòng liên hệ bộ phận hỗ trợ.',
   // ─── Profile ────────────────────────────────────────────────────────────────
   allocation_locked_use_schedule_endpoint:
     'Không thể chỉnh sửa thu nhập và phân bổ ngân sách ở đây sau khi đã hoàn tất thiết lập ban đầu — hãy dùng chức năng lên lịch thay đổi thu nhập.',

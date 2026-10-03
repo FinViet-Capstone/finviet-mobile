@@ -85,6 +85,7 @@ export {
   useDeleteAccount,
 } from './useAuth';
 export { useBootstrapSession } from './useBootstrapSession';
+export { useSessionGuard } from './useSessionGuard';
 export { useRules, useCreateRule } from './useRules';
 export {
   useCustomerCategories,

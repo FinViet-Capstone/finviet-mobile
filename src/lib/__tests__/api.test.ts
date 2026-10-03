@@ -14,6 +14,7 @@ import MockAdapter from 'axios-mock-adapter';
 import { api, unwrap } from '@/lib/api';
 import { getAccessToken, getRefreshToken, setAuthTokens, clearAuthTokens } from '@/lib/mmkv';
 import { useAuthStore } from '@/stores/authStore';
+import { forceLogoutAccountDeactivated } from '@/lib/forceLogout';
 
 jest.mock('@/lib/mmkv', () => ({
   getAccessToken: jest.fn(),
@@ -24,6 +25,12 @@ jest.mock('@/lib/mmkv', () => ({
 
 jest.mock('@/stores/authStore', () => ({
   useAuthStore: { getState: jest.fn(() => ({ clearSession: jest.fn() })) },
+}));
+
+// Keep the real error classifier; only stub the side-effecting logout.
+jest.mock('@/lib/forceLogout', () => ({
+  ...jest.requireActual('@/lib/forceLogout'),
+  forceLogoutAccountDeactivated: jest.fn(),
 }));
 
 const mockedGetAccessToken = getAccessToken as jest.Mock;
@@ -205,5 +212,49 @@ describe('response interceptor — 401 refresh rotation', () => {
     expect(unwrap(walletsRes)).toBe('wallets-ok');
     expect(unwrap(budgetsRes)).toBe('budgets-ok');
     expect(refreshCalls).toBe(1);
+  });
+});
+
+describe('response interceptor — account locked by admin', () => {
+  const locked = { success: false, message: 'Account is deactivated.', code: 'account_deactivated' };
+  const mockedForceLogout = forceLogoutAccountDeactivated as jest.Mock;
+
+  it('force-logs-out on 403 account_deactivated without attempting refresh', async () => {
+    setTokens('valid-token', 'refresh-token-1');
+    apiMock.onPost('/transactions').reply(403, locked);
+
+    await expect(api.post('/transactions', {})).rejects.toMatchObject({ response: { status: 403 } });
+
+    expect(mockedForceLogout).toHaveBeenCalledTimes(1);
+    expect(bareAxiosMock.history.post.length).toBe(0);
+  });
+
+  it('does not force-logout on an ordinary 403 (no account_deactivated code)', async () => {
+    setTokens('valid-token', 'refresh-token-1');
+    apiMock.onGet('/admin/users').reply(403, { success: false, message: 'Access denied.' });
+
+    await expect(api.get('/admin/users')).rejects.toMatchObject({ response: { status: 403 } });
+
+    expect(mockedForceLogout).not.toHaveBeenCalled();
+    expect(mockedClearSession).not.toHaveBeenCalled();
+  });
+
+  it('leaves /auth/ calls to the screen (e.g. Google login on a locked account)', async () => {
+    apiMock.onPost('/auth/google-login').reply(403, locked);
+
+    await expect(api.post('/auth/google-login', {})).rejects.toMatchObject({ response: { status: 403 } });
+
+    expect(mockedForceLogout).not.toHaveBeenCalled();
+  });
+
+  it('force-logs-out when the refresh call reports the account is locked', async () => {
+    setTokens('expired-token', 'refresh-token-1');
+    apiMock.onGet('/wallets').reply(401, { success: false, message: 'Unauthorized' });
+    bareAxiosMock.onPost(/\/auth\/refresh-token$/).reply(403, locked);
+
+    await expect(api.get('/wallets')).rejects.toBeDefined();
+
+    expect(mockedForceLogout).toHaveBeenCalledTimes(1);
+    expect(mockedClearSession).not.toHaveBeenCalled();
   });
 });

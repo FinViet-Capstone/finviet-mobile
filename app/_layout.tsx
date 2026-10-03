@@ -8,7 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { MaterialSymbolsOutlined_400Regular } from '@expo-google-fonts/material-symbols-outlined';
 import { queryClient } from '@/lib/queryClient';
-import { useBootstrapSession } from '@/hooks';
+import { useBootstrapSession, useSessionGuard } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
 import { ThemeProvider, useThemeScheme } from '@/providers/ThemeProvider';
 import { NotificationProvider } from '@/providers/NotificationProvider';
@@ -52,6 +52,7 @@ export default Sentry.wrap(function RootLayout() {
                 <Stack.Screen name="(tabs)" />
               </Stack>
               <EphemeralBanner />
+              <SessionGuard />
             </NotificationProvider>
           </SafeAreaProvider>
         </ThemeProvider>
@@ -63,6 +64,16 @@ export default Sentry.wrap(function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 });
+
+/**
+ * Sends the user back to login when the session ends behind the current screen
+ * (e.g. an admin locked the account) and re-checks the account on app resume.
+ * Rendered only after hydration, inside the navigation tree.
+ */
+function SessionGuard() {
+  useSessionGuard();
+  return null;
+}
 
 /**
  * `expo-status-bar`'s `style="auto"` derives its content color from the OS
