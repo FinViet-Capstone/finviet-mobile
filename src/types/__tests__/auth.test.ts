@@ -10,6 +10,7 @@ import {
   isRegistrationResumable,
   type AuthErrorCode,
 } from '@/types/auth';
+import { BUSINESS_RULE_MESSAGES_VI } from '@/utils/errors';
 
 describe('AuthError', () => {
   it('carries the code', () => {
@@ -106,5 +107,12 @@ describe('isRegistrationResumable', () => {
 
   it('is false for non-AuthError values', () => {
     expect(isRegistrationResumable(new Error('boom'))).toBe(false);
+  });
+});
+
+describe('account_locked copy', () => {
+  // A locked login (403) and a forced logout of a locked session describe the same admin lock.
+  it('matches the account_deactivated message shown elsewhere in the app', () => {
+    expect(AUTH_ERROR_MESSAGES_VI.account_locked).toBe(BUSINESS_RULE_MESSAGES_VI.account_deactivated);
   });
 });

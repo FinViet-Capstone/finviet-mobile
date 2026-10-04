@@ -60,8 +60,10 @@ export function isRegistrationResumable(e: unknown): boolean {
  */
 export const AUTH_ERROR_MESSAGES_VI: Record<AuthErrorCode, string> = {
   invalid_credentials: 'Email hoặc mật khẩu không chính xác',
+  // The backend has no failed-attempt lockout: a 403 at login always means an admin locked
+  // the account (finviet-be `account_deactivated`), so say so instead of "try again later".
   account_locked:
-    'Tài khoản đã bị khoá tạm thời do nhiều lần đăng nhập sai. Hãy thử lại sau.',
+    'Tài khoản của bạn đã bị quản trị viên tạm khóa. Vui lòng liên hệ bộ phận hỗ trợ.',
   email_not_verified:
     'Email chưa được xác minh. Hãy kiểm tra hộp thư để hoàn tất xác minh.',
   email_in_use: 'Email này đã được sử dụng. Hãy đăng nhập hoặc dùng email khác.',
